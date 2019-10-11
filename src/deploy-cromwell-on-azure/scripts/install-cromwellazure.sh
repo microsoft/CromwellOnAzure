@@ -17,7 +17,7 @@ sudo mkdir /inputs-1
 sudo mkdir /cromwellazure
 
 #Download Cromwell app config
-sudo curl -o /cromwell-app-config/cromwell-application.conf https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/cromwell-application.conf?token=AFSS5T47CZWURCQTJLOEO6S5T54EU
+sudo curl -o /cromwell-app-config/cromwell-application.conf https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/cromwell-application.conf?token=AFSS5T36GJPIUMW46DO3NTK5VGP2E
 
 #Install Docker Compose
 sudo apt update
@@ -32,8 +32,8 @@ sudo chmod +x /usr/local/bin/docker-compose
 sudo docker-compose --version
 
 #Download Docker Compose files
-sudo curl -o /cromwellazure/docker-compose.yml https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/docker-compose.yml?token=AFSS5T6VNYRB46VKKUEAHCS5UYBPQ
-sudo curl -o /cromwellazure/docker-compose.lab1.yml https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/docker-compose.lab1.yml?token=AFSS5T5QQUZKLG2NDOR3IOC5T54F6
+sudo curl -o /cromwellazure/docker-compose.yml https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/docker-compose.yml?token=AFSS5T2WD7SQRL6DYCFS5P25VGP3G
+sudo curl -o /cromwellazure/docker-compose.lab1.yml https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/docker-compose.lab1.yml?token=AFSS5T242HTPHXBVG5YLXFC5VGP6A
 
 #Replace variables in Docker Compose files
 sudo sed -i "s/LABNAME/$LAB_NAME/g" /cromwellazure/docker-compose.yml
@@ -52,7 +52,7 @@ sudo apt-get update
 sudo apt-get -y install blobfuse fuse
 
 #Download blobfuse mount script
-sudo curl -o /usr/sbin/mount.blobfuse https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/mount.blobfuse?token=AFSS5T52ATB2YCIY3TODGIC5T54HY
+sudo curl -o /usr/sbin/mount.blobfuse https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/mount.blobfuse?token=AFSS5T3JTTFTXZ7SSJSYNLK5VGP7O
 sudo chmod +x /usr/sbin/mount.blobfuse
 
 #Update fstab so blobfuse runs on startup
@@ -83,9 +83,9 @@ sudo mount -a
 sudo curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
 #configure service to run at startup
-sudo curl -o /cromwellazure/startup.sh https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/startup.sh?token=AFSS5T75HDT2VKY3IRPW7PK5UYBRI
+sudo curl -o /cromwellazure/startup.sh https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/startup.sh?token=AFSS5TY2YKE3AW2ZW5L5TT25VGQAY
 sudo sed -i "s/STORAGEACCOUNTNAME/$STORAGE_ACCOUNT_NAME/g" /cromwellazure/startup.sh
 sudo sed -i "s/LABNAME/$LAB_NAME/g" /cromwellazure/startup.sh
 sudo chmod +x /cromwellazure/startup.sh
-sudo curl -o /lib/systemd/system/cromwellazure.service https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/cromwellazure.service?token=AFSS5T4GE3LEANVIFNN6X225T54FM
+sudo curl -o /lib/systemd/system/cromwellazure.service https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/cromwellazure.service?token=AFSS5T47GFKD4TOU3X6YR3C5VGQBS
 sudo systemctl enable cromwellazure
