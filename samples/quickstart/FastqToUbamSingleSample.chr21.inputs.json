@@ -1,0 +1,11 @@
+{
+  "FastqToUbamSingleSample.sample_name": "chr21",
+  "FastqToUbamSingleSample.library_name": "Pond001",
+  "FastqToUbamSingleSample.group_name": "GrA",
+  "FastqToUbamSingleSample.platform": "illumina",
+  "FastqToUbamSingleSample.platform_unit": "GrA.chr21",
+  "FastqToUbamSingleSample.fastq_pair": [
+    "/msgenpublicdata/inputs/chr21/chr21.read1.fq.gz",
+    "/msgenpublicdata/inputs/chr21/chr21.read2.fq.gz"
+  ]
+}

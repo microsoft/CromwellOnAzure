@@ -1,0 +1,8 @@
+[Unit]
+Description=CromwellOnAzure - Start blobfuse and Docker Compose
+
+[Service]
+ExecStart=/bin/bash /cromwellazure/startup.sh
+
+[Install]
+WantedBy=multi-user.target

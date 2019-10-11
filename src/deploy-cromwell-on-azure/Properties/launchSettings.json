@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Setup": {
+      "commandName": "Project",
+      "commandLineArgs": "--subscriptionid f483a450-5f19-4b20-9326-b5852bb89d83 --regionname westus2 --mainidentifierprefix coadevtest --resourcegroupname coadevtest2"
+    }
+  }
+}

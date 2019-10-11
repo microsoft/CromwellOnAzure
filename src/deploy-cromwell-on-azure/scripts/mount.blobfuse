@@ -1,0 +1,39 @@
+#!/bin/bash
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
+account_name=$(echo $3 | grep -Po '(?i)account_name=\K([^,]*)')
+container_name=$(echo $3 | grep -Po '(?i)container_name=\K([^,]*)')
+
+token=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+
+subscription_ids=$(curl -s -X GET "https://management.azure.com/subscriptions/?api-version=2019-08-01" -H "Authorization: Bearer $token" | grep -Po '"id":"/subscriptions/\K([^"]*)' )
+
+for subscription_id in $subscription_ids; do
+  echo $subscription_id
+
+  resource_filter="resourceType%20eq%20'Microsoft.Storage/storageAccounts'%20and%20name%20eq%20'$account_name'"
+
+  account_id=$(curl -s -X GET "https://management.azure.com/subscriptions/$subscription_id/resources?%24filter=$resource_filter&api-version=2019-05-10" -H "Authorization: Bearer $token" \
+    | grep -Po "/subscriptions/[^\"]*/providers/Microsoft.Storage/storageAccounts/$account_name")
+
+  if [ "$account_id" ]; then
+    account_key=$(curl -s -X POST "https://management.azure.com/$account_id/listKeys?api-version=2016-12-01" -H "Authorization: Bearer $token" -d '' | grep -Po '"key1","value":"\K([^"]*)' )
+
+    export AZURE_STORAGE_ACCOUNT=$account_name
+    export AZURE_STORAGE_ACCESS_KEY=$account_key
+
+    echo $AZURE_STORAGE_ACCOUNT
+
+    tmp_dir="/mnt/blobfusetmp/$account_name/$container_name"
+    mkdir -p $tmp_dir
+
+    /usr/bin/blobfuse $1 --tmp-path=$tmp_dir -o nonempty -o attr_timeout=240 -o entry_timeout=240 -o negative_timeout=120 -o allow_other --container-name=$container_name
+
+    break
+  fi
+done
+
+if [ ! "$account_id" ]; then
+  echo "Could not find account $account_name"
+fi

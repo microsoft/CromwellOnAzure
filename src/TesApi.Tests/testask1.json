@@ -1,0 +1,85 @@
+﻿{
+  "id": "ffb23efdd27144fb9013b11a9e32398d",
+  "state": "QUEUED",
+  "name": "workflow1.Task1",
+  "description": "workflowId1:BackendJobDescriptorKey_CommandCallNode_workflow1.Task1:-1:1",
+  "inputs": [
+    {
+      "name": "file1.txt",
+      "description": "File1",
+      "url": "/storageAccount1/container1/file1.txt",
+      "path": "/cromwell-executions/workflow1/workflowId1/call-Task1/inputs/storageAccount1/container1/file1.txt",
+      "type": "FILE"
+    },
+    {
+      "name": "commandScript",
+      "description": "workflow1.Task1.commandScript",
+      "url": null,
+      "path": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/script",
+      "type": "FILE",
+      "content": "#!/bin/bash\n\ncd /cromwell-executions/workflow1/workflowId1/call-Task1/execution\ntmpDir=$(mkdir -p \"/cromwell-executions/workflow1/workflowId1/call-Task1/tmp.806bfb03\" && echo \"/cromwell-executions/workflow1/workflowId1/call-Task1/tmp.806bfb03\")\nchmod 777 \"$tmpDir\"\nexport _JAVA_OPTIONS=-Djava.io.tmpdir=\"$tmpDir\"\nexport TMPDIR=\"$tmpDir\"\nexport HOME=\"$HOME\"\n(\ncd /cromwell-executions/workflow1/workflowId1/call-Task1/execution\n\n)\noute2bf9eaa=\"${tmpDir}/out.$$\" erre2bf9eaa=\"${tmpDir}/err.$$\"\nmkfifo \"$oute2bf9eaa\" \"$erre2bf9eaa\"\ntrap 'rm \"$oute2bf9eaa\" \"$erre2bf9eaa\"' EXIT\ntee '/cromwell-executions/workflow1/workflowId1/call-Task1/execution/stdout' < \"$oute2bf9eaa\" &\ntee '/cromwell-executions/workflow1/workflowId1/call-Task1/execution/stderr' < \"$erre2bf9eaa\" >&2 &\n(\ncd /cromwell-executions/workflow1/workflowId1/call-Task1/execution\n\n\necho \"Hello World from Task1.\" > OutputFromTask1.vcf\n)  > \"$oute2bf9eaa\" 2> \"$erre2bf9eaa\"\necho $? > /cromwell-executions/workflow1/workflowId1/call-Task1/execution/rc.tmp\n(\n# add a .file in every empty directory to facilitate directory delocalization on the cloud\ncd /cromwell-executions/workflow1/workflowId1/call-Task1/execution\nfind . -type d -empty -print0 | xargs -0 -I % touch %/.file\n)\n(\ncd /cromwell-executions/workflow1/workflowId1/call-Task1/execution\nsync\n\n\n)\nmv /cromwell-executions/workflow1/workflowId1/call-Task1/execution/rc.tmp /cromwell-executions/workflow1/workflowId1/call-Task1/execution/rc\n"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "rc",
+      "description": "workflow1.Task1.rc",
+      "url": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/rc",
+      "path": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/rc",
+      "type": "FILE"
+    },
+    {
+      "name": "stdout",
+      "description": "workflow1.Task1.stdout",
+      "url": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/stdout",
+      "path": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/stdout",
+      "type": "FILE"
+    },
+    {
+      "name": "stderr",
+      "description": "workflow1.Task1.stderr",
+      "url": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/stderr",
+      "path": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/stderr",
+      "type": "FILE"
+    },
+    {
+      "name": "commandScript",
+      "description": "workflow1.Task1.commandScript",
+      "url": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/script",
+      "path": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/script",
+      "type": "FILE"
+    },
+    {
+      "name": "workflow1.Task1.output.0",
+      "description": "workflow1.Task1.output.0",
+      "url": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/OutputFromTask1.vcf",
+      "path": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/OutputFromTask1.vcf",
+      "type": "FILE"
+    }
+  ],
+  "resources": {
+    "cpu_cores": null,
+    "preemptible": false,
+    "ram_gb": null,
+    "disk_gb": null,
+    "zones": null
+  },
+  "executors": [
+    {
+      "image": "registryServer1/imageName1:tag1",
+      "command": [
+        "/bin/bash",
+        "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/script"
+      ],
+      "workdir": null,
+      "stdin": null,
+      "stdout": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/stdout",
+      "stderr": "/cromwell-executions/workflow1/workflowId1/call-Task1/execution/stderr",
+      "env": null
+    }
+  ],
+  "volumes": null,
+  "tags": null,
+  "logs": null,
+  "creation_time": null
+}
