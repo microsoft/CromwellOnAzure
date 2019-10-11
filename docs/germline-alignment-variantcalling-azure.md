@@ -13,7 +13,7 @@ You can find the sample WDL, JSON inputs and the `WholeGenomeGermlineSingleSampl
 
 Currently, you must copy any data to your input storage account. In the upcoming 1.0.0 production release, you will be able to use the "msgenpublicdata" storage account directly as a relative path, like in the JSON inputs file.
 
-Trigger JSON file:
+This is an example trigger JSON file:
 ```
 {
  "WorkflowUrl": "https://raw.githubusercontent.com/microsoft/five-dollar-genome-analysis-pipeline-azure/az1.1.0/WholeGenomeGermlineSingleSample.wdl",
@@ -22,6 +22,7 @@ Trigger JSON file:
  "WorkflowDependenciesUrl": null
 }
 ```
+Substitute the "WorkflowInputsUrl" with the http link to your inputs JSON file hosted on your Storage account. See more instructions on how to run a workflow on Cromwell on Azure [here](quickstart-cromwell-on-azure.md).
 
 ### Start the workflow
 To start the workflow on Cromwell on Azure, place the trigger JSON file in the "new" folder of the "workflows" container within your Cromwell on Azure storage account that is associated with your host VM. This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred over to the "inprogress" directory in the ""workflows" container.<br/>
