@@ -4,6 +4,12 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.0</TargetFramework>
   </PropertyGroup>
+  
+  <PropertyGroup>
+    <AssemblyName Condition="'$(Configuration)' == 'win'">deploy-cromwell-on-azure-win</AssemblyName>
+    <AssemblyName Condition="'$(Configuration)' == 'linux'">deploy-cromwell-on-azure-linux</AssemblyName>
+    <AssemblyName Condition="'$(Configuration)' == 'osx'">deploy-cromwell-on-azure-osx</AssemblyName>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.25.0" />
