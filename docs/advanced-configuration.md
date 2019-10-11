@@ -1,5 +1,5 @@
 # Advanced configuration and debugging for Cromwell on Azure
-This article describes advanced features that allow customization and debugging of Cromwell on Azure. 
+This article describes advanced features that allow customization and debugging of Cromwell on Azure.
 
 ## Expand data disk for MySQL database storage for Cromwell
 To ensure that no data is corrupted for MySQL backed storage for Cromwell, Cromwell on Azure mounts MySQL files on to an Azure Managed Data Disk of size 32G. In case there is a need to increase the size of this data disk, follow instructions [here](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/expand-disks#expand-an-azure-managed-disk).
@@ -7,11 +7,11 @@ To ensure that no data is corrupted for MySQL backed storage for Cromwell, Cromw
 ## Connect to the host VM
 To get logs from all the docker containers or to use the Cromwell REST API endpoints, you may want to connect to the Linux host VM. At installation, a user is created to allow managing the host VM with username "vmadmin". The password is randomly generated and shown during installation. If you need to reset your VM password, you can do this using the Azure Portal or by following these [instructions](https://docs.microsoft.com/en-us/azure/virtual-machines/troubleshooting/reset-password). 
 
-![Reset password](screenshots/resetpassword.png)
+![Reset password](/docs/screenshots/resetpassword.PNG)
 
 To connect to your host VM, navigate to the Connect button on the Overview blade of your Azure VM instance. Then copy the ssh connection string and paste in a command line, PowerShell or terminal application to log in.
 
-![Connect with SSH](screenshots/connectssh.png)
+![Connect with SSH](/docs/screenshots/connectssh.PNG)
 
 ### How to get container logs to debug issues
 The host VM is running multiple docker containers that enable Cromwell on Azure - mysql, broadinstitute/cromwell, cromwellonazure/tes, cromwellonazure/triggerservice. On rare occasions, you may want to debug and diagnose issues with the docker containers. After logging in to the VM, run: 
@@ -44,48 +44,60 @@ Cromwell on Azure uses [managed identities](https://docs.microsoft.com/en-us/azu
 
 To allow the host VM to connect to **custom** Azure resources like Storage Account, Batch Account etc. you can use the [Azure Portal](https://docs.microsoft.com/en-us/azure/role-based-access-control/role-assignments-portal) or [Azure CLI](https://docs.microsoft.com/en-us/azure/role-based-access-control/role-assignments-cli) to find the managed identity of the host VM and add it as a Contributor to the required Azure resource.<br/>
 
-All the configuration files are hosted on your Cromwell on Azure Storage account, in the "configuration" container - `containers-to-mount`, `docker-compose.yml`,`cromwell-application.conf`. You can modify and save these file using Azure Portal UI "Edit Blob" option or simply upload a new file to replace the existing one.
-
 For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI.
 
-![Restart VM](screenshots/restartVM.png)
+![Restart VM](/docs/screenshots/restartVM.png)
 
 ### Use private docker containers 
 Cromwell on Azure supports private docker images for your WDL tasks hosted on [Azure Container Registry or ACR](https://docs.microsoft.com/en-us/azure/container-registry/).
 To allow the host VM to use an ACR, add the VM identity as a Contributor to the Container Registry via Azure Portal or Azure CLI.<br/>
 
 ### Mount another storage account
-Navigate to the "configuration" container in the Cromwell on Azure Storage account. Replace YOURSTORAGEACCOUNTNAME with your storage account name and YOURCONTAINERNAME with your container name in the `containers-to-mount` file below:
-```
-/YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/
-```
-Add this to the end of file and save your changes.<br/>
+Log on to the host VM using the ssh connection string as described above. Replace YOURSTORAGEACCOUNTNAME with your storage account name and YOURCONTAINERNAME with your container name:
 
+```
+sudo bash
+echo "/usr/sbin/mount.blobfuse /YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/ fuse _netdev,account_name=YOURSTORAGEACCOUNTNAME,container_name=YOURCONTAINERNAME" >> /etc/fstab
+
+cd /cromwellazure
+sudo nano docker-compose.yml
+```
+In the "cromwell" service section, under "volumes" add
+```
+      - type: bind
+        source: /YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/
+        target: /YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/
+
+```
 To allow the host VM to write to a storage account, add the VM Identity as a Contributor to the Storage Account via Azure Portal or Azure CLI.<br/>
 
-Alternatively, you can choose to add a [SAS url for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file
-```
-https://<yourstorageaccountname>.blob.core.windows.net:443/<yourcontainername>?<sastoken>
-```
-
-When using the newly mounted storage account in your inputs JSON file, use the path `"/container-mountpath/filepath.extension"`, where `container-mountpath` is `/YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/`.
-
-For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI.
+For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`.
 
 ### Change batch account
-Navigate to the "configuration" container in the Cromwell on Azure Storage account. Replace `BatchAccountName` environment variable for the "tes" service in the `docker-compose.yml` file with the name of the desired Batch account and save your changes.<br/>
+Log on to the host VM using the ssh connection string as described above. Replace `BatchAccountName` environment variable for the "tes" service in the `docker-compose.yml` file with the name of the desired Batch account and save your changes.<br/>
 
+```
+cd /cromwellazure/
+sudo nano docker-compose.yml
+# Modify the BatchAccountName and save the file
+```
 To allow the host VM to use a batch account, add the VM identity as a Contributor to the Azure Batch account via Azure Portal or Azure CLI.<br/>
 To allow the host VM to read prices and information about types of machines available for the batch account, add the VM identity as a Billing Reader to the subscription with the configured Batch Account.
 
-For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI.
+For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`.
 
 ### Use dedicated VMs for all your tasks
 By default, we are using an environment variable `UsePreemptibleVmsOnly` set to true, to always use low priority Azure Batch nodes.<br/>
 
-If you prefer to use dedicated Azure Batch nodes, navigate to the "configuration" container in the Cromwell on Azure Storage account. Replace `UsePreemptibleVmsOnly` environment variable for the "tes" service to "false" in the `docker-compose.yml` file and save your changes.<br/>
+If you prefer to use dedicated Azure Batch nodes, log on to the host VM using the ssh connection string as described above. Replace `UsePreemptibleVmsOnly` environment variable for the "tes" service to "false" in the `docker-compose.yml` file and save your changes.<br/>
 
-For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI.
+```
+cd /cromwellazure/
+sudo nano docker-compose.yml
+# Modify UsePreemptibleVmsOnly to false and save the file
+```
+
+For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`.
 
 ### Connect Cromwell on Azure to a managed instance of Azure MySQL
 **Create Azure MySQL server**<br/>
@@ -108,8 +120,14 @@ flush privileges
 ```
 
 **Connect Cromwell to the database by modifying the Cromwell configuration file**<br/>
-Navigate to the "configuration" container in the Cromwell on Azure Storage account. Replace "yourMySQLServerName" with your MySQL server name in the `cromwell-application.conf` file under the database connection settings. <br/>
+Log on to the host VM using the ssh connection string as described above. Replace "yourMySQLServerName" with your MySQL server name in the `cromwell-application.conf` file under the database connection settings. <br/>
 
+```
+cd /cromwell-app-config
+sudo nano cromwell-application.conf
+```
+
+Find the database section and make the changes:
 ```
 database {
   db.url = "jdbc:mysql://<yourMySQLServerName>.mysql.database.azure.com:3306/cromwell_db?useSSL=false&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true&serverTimezone=UTC"
@@ -121,6 +139,6 @@ database {
 }
 
 ```
-For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI.
+For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`.
 
 Learn more about Cromwell configuration options [here](https://cromwell.readthedocs.io/en/stable/Configuring/)<br/>
