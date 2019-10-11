@@ -69,7 +69,7 @@ To abort a workflow, upload an empty JSON file to the "workflows" container name
 
 ## Pricing for Cromwell on Azure
 To learn more about your Resource Group's cost, navigate to the "Cost Analysis" menu item in the "Cost Management" section of your Azure Resource Group on Azure Portal. More information [here](https://docs.microsoft.com/en-us/azure/cost-management/quick-acm-cost-analysis).<br/>
-![RG cost analysis](screenshots/rgcost.png)
+![RG cost analysis](/docs/screenshots/rgcost.png)
 
 You can also use the [Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/) to estimate your monthly cost.
 
@@ -78,14 +78,14 @@ You can also use the [Pricing Calculator](https://azure.microsoft.com/en-us/pric
 ### How to check all tasks running for a workflow using Batch account
 Each task in a workflow starts an Azure Batch node. To see currently active tasks, navigate to your Azure Batch instance on Azure Poetal. Click on "Jobs" and then search for the Cromwell `workflowId` to see all tasks associated with a workflow.<br/>
 
-![Batch account](screenshots/batch-account.png)
+![Batch account](/docs/screenshots/batch-account.png)
 
 ### How to use Application Insights
 When working with Cromwell on Azure, you may run into issues with Azure Batch or Storage accounts. For instance, if a file path cannot be found or if the WDL workflow failed with an unknown reason. For these scenarios, consider debugging or collecting more information using [Application Insights](https://docs.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview).<br/>
 
 Navigate to your Application Insights instance on Azure Portal. Click on the "Logs (Analytics)" menu item under the "Monitoring" section to get all logs from Cromwell on Azure's TES backend.<br/>
 
-![App insights](screenshots/appinsights.png)
+![App insights](/docs/screenshots/appinsights.png)
 
 You can explore exceptions or logs to find the reason for failure, and use time ranges or [Kusto Query Language](https://docs.microsoft.com/en-us/azure/kusto/query/) to narrow your search.<br/>
 
@@ -94,7 +94,7 @@ You can explore exceptions or logs to find the reason for failure, and use time 
 
 Navigate to your Cosmos DB instance on Azure Portal. Click on the "Data Explorer" menu item, Click on the "TES" container and select "Items". <br/>
 
-![Cosmos DB SQL query](screenshots/cosmosdb.png)
+![Cosmos DB SQL query](/docs/screenshots/cosmosdb.png)
 
 You can write a [SQL query](https://docs.microsoft.com/en-us/azure/cosmos-db/tutorial-query-sql-api) to get all tasks in a workflow using the following query, replacing `workflowId` with the id returned from Cromwell for your workflow:
 ```
