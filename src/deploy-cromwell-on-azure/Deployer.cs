@@ -25,7 +25,7 @@ namespace CromwellOnAzureDeployer
     public class Deployer
     {
         private const string LabName = "lab1";
-        private const string InstallScriptUrl = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/install-cromwellazure.sh?token=AFSS5T672KYSO3GTVDNZGBC5UYBTU";
+        private const string InstallScriptUrl = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/install-cromwellazure.sh?token=AFSS5TZ4HZMK2PSXMCWGNHS5VGQFG";
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger<Deployer> logger;
         private IAzureStorage azureStorage { get; set; }
