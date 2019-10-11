@@ -7,9 +7,11 @@ Learn more [here](https://github.com/microsoft/five-dollar-genome-analysis-pipel
 
 ### Input data 
 
-All the required input files for the tutorial are on a publicly hosted Azure Storage account
+All the required input files for the tutorial are on a publicly hosted Azure Storage account.
 
 You can find the sample WDL, JSON inputs and the `WholeGenomeGermlineSingleSample.hg38.json` trigger file for the pipeline on the [GitHub repo](https://github.com/microsoft/five-dollar-genome-analysis-pipeline-azure/tree/az1.1.0). 
+
+Currently, you must copy any data to your input storage account. In the upcoming 1.0.0 production release, you will be able to use the "msgenpublicdata" storage account directly as a relative path, like in the JSON inputs file.
 
 Trigger JSON file:
 ```
