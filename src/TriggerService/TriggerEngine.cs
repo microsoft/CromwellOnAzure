@@ -5,18 +5,18 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace TriggerService.Core
+namespace TriggerService
 {
     public class TriggerEngine
     {
         private static readonly TimeSpan availabilityWaitTime = TimeSpan.FromSeconds(30);
         private readonly ILogger logger;
-        private readonly Lab lab;
+        private readonly CromwellOnAzureEnvironment environment;
 
-        public TriggerEngine(ILoggerFactory loggerFactory, Lab lab)
+        public TriggerEngine(ILoggerFactory loggerFactory, CromwellOnAzureEnvironment environment)
         {
             logger = loggerFactory.CreateLogger<TriggerEngine>();
-            this.lab = lab;
+            this.environment = environment;
         }
 
         public async Task RunAsync()
@@ -38,7 +38,7 @@ namespace TriggerService.Core
                         WaitForCromwellToBecomeAvailableAsync(),
                         WaitForAzureStorageToBecomeAvailableAsync());
 
-                    await lab.UpdateExistingWorkflowsAsync();
+                    await environment.UpdateExistingWorkflowsAsync();
 
                     await Task.Delay(TimeSpan.FromSeconds(20));
                 }
@@ -60,7 +60,7 @@ namespace TriggerService.Core
                         WaitForCromwellToBecomeAvailableAsync(),
                         WaitForAzureStorageToBecomeAvailableAsync());
 
-                    await lab.ProcessAndAbortWorkflowsAsync();
+                    await environment.ProcessAndAbortWorkflowsAsync();
 
                     await Task.Delay(TimeSpan.FromSeconds(20));
                 }
@@ -74,7 +74,7 @@ namespace TriggerService.Core
 
         private async Task WaitForCromwellToBecomeAvailableAsync()
         {
-            var isCromwellAvailable = await lab.IsCromwellAvailableAsync();
+            var isCromwellAvailable = await environment.IsCromwellAvailableAsync();
 
             if (isCromwellAvailable)
             {
@@ -92,7 +92,7 @@ namespace TriggerService.Core
                 }
 
                 await Task.Delay(availabilityWaitTime);
-                isCromwellAvailable = await lab.IsCromwellAvailableAsync();
+                isCromwellAvailable = await environment.IsCromwellAvailableAsync();
             }
 
             logger.LogInformation($"Cromwell is available.");
@@ -100,7 +100,7 @@ namespace TriggerService.Core
 
         private async Task WaitForAzureStorageToBecomeAvailableAsync()
         {
-            var isAzureStorageAvailable = await lab.IsAzureStorageAvailableAsync();
+            var isAzureStorageAvailable = await environment.IsAzureStorageAvailableAsync();
 
             if (isAzureStorageAvailable)
             {
@@ -118,7 +118,7 @@ namespace TriggerService.Core
                 }
 
                 await Task.Delay(availabilityWaitTime);
-                isAzureStorageAvailable = await lab.IsAzureStorageAvailableAsync();
+                isAzureStorageAvailable = await environment.IsAzureStorageAvailableAsync();
             }
 
             logger.LogInformation($"Azure Storage is available.");

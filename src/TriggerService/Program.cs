@@ -6,7 +6,6 @@ using System.Configuration;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using TriggerService.Core;
 
 namespace TriggerService
 {
@@ -20,8 +19,7 @@ namespace TriggerService
         private static async Task InitAndRunAsync()
         {
             var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(Environment.GetEnvironmentVariable("ApplicationInsightsAccountName"));
-            var labName = Environment.GetEnvironmentVariable("LAB_NAME");
-            var azStorageName = Environment.GetEnvironmentVariable("DefaultStorageAccountName");
+            var defaultStorageAccountName = Environment.GetEnvironmentVariable("DefaultStorageAccountName");
             var cromwellUrl = ConfigurationManager.AppSettings.Get("CromwellUrl");
 
             var serviceCollection = new ServiceCollection()
@@ -41,13 +39,12 @@ namespace TriggerService
 
             var serviceProvider = serviceCollection.BuildServiceProvider();
 
-            var lab = new Lab(
+            var environment = new CromwellOnAzureEnvironment(
                             serviceProvider.GetRequiredService<ILoggerFactory>(),
-                            labName,
-                            new AzureStorage(serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<AzureStorage>(), azStorageName, true),
+                            new AzureStorage(serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<AzureStorage>(), defaultStorageAccountName),
                             new CromwellApiClient.CromwellApiClient(cromwellUrl));
 
-            serviceCollection.AddTransient(s => new TriggerEngine(s.GetRequiredService<ILoggerFactory>(), lab));
+            serviceCollection.AddSingleton(s => new TriggerEngine(s.GetRequiredService<ILoggerFactory>(), environment));
             serviceProvider = serviceCollection.BuildServiceProvider();
             var engine = serviceProvider.GetService<TriggerEngine>();
             await engine.RunAsync();

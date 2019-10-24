@@ -1,7 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace TriggerService.Core
+namespace Common
 {
     public class Workflow
     {

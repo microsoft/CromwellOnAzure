@@ -6,16 +6,16 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Blob;
 
-namespace TriggerService.Core
+namespace TriggerService
 {
     public interface IAzureStorage
     {
-        string GetAzureStorageAccountAuthority();
+        string AccountName { get; }
+        string AccountAuthority { get; }
         string GetBlobSasUrl(string blobUrl, TimeSpan sasTokenDuration);
         Task<byte[]> DownloadFileAsync(string blobUrl);
         Task<string> UploadFileFromPathAsync(string path, string container, string blobName);
         Task<string> UploadFileTextAsync(string content, string container, string blobName);
-        Task CreateDefaultContainersAsync();
         Task MutateStateAsync(string container, string blobName, AzureStorage.WorkflowState newState);
         Task<List<string>> GetByStateAsync(string container, AzureStorage.WorkflowState state);
         Task SetStateToInProgressAsync(string container, string blobName, string id);

@@ -2,17 +2,12 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace CromwellOnAzureDeployer
 {
     internal class Program
     {
-        private static readonly bool StartedFromGui = Console.CursorTop == 0 && Console.CursorLeft == 0;
-
         public static async Task Main(string[] args)
         {
             await InitializeAndDeployAsync(args);
@@ -20,19 +15,29 @@ namespace CromwellOnAzureDeployer
 
         private static async Task InitializeAndDeployAsync(string[] args)
         {
-            PrintWelcomeScreen();
-
             var configuration = Configuration.BuildConfiguration(args);
 
-            var services = new ServiceCollection()
-                .AddLogging(loggingBuilder => { loggingBuilder.AddConsole(); })
-                .BuildServiceProvider();
+            PrintWelcomeScreen(configuration.Silent);
 
-            await new Deployer(services.GetRequiredService<ILoggerFactory>(), configuration).DeployAsync();
+            var isSuccessful = await new Deployer(configuration).DeployAsync();
+
+            if (isSuccessful)
+            {
+                Environment.Exit(0);
+            }
+            else
+            {
+                Environment.Exit(1);
+            }
         }
 
-        private static void PrintWelcomeScreen()
+        private static void PrintWelcomeScreen(bool isSilent)
         {
+            if(isSilent)
+            {
+                return;
+            }
+
             Console.WriteLine("Copyright (c) Microsoft Corporation.");
             Console.WriteLine("Licensed under the MIT License.");
             Console.WriteLine("Privacy & Cookies: https://go.microsoft.com/fwlink/?LinkId=521839");
@@ -42,14 +47,6 @@ namespace CromwellOnAzureDeployer
             Console.ResetColor();
             Console.WriteLine("https://github.com/microsoft/CromwellOnAzure");
             Console.WriteLine();
-
-            if (StartedFromGui && !Debugger.IsAttached)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("This program requires parameters and must be started from the command line. Press any key to exit...");
-                Console.ReadKey();
-                Environment.Exit(1);
-            }
         }
     }
 }

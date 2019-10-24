@@ -1,0 +1,32 @@
+﻿# This file lists blob containers that will be mounted to the Cromwell host, so they are available for WDL commands that access the files from the Cromwell host.
+
+# Accepted formats are:
+# 1. Blob container URL with SAS, for cases where VM's identity does not have access to the storage account (public containers from other Azure tenants).
+#    https://<storage account name>.blob.core.windows.net/<container name>?<SAS token>
+# 2. /<storage account name>/<container name>, where the VM has Contributor role on the storage account.
+
+# In both cases, the containers are mounted as /<storage account name>/<container name> on the Cromwell host.
+# Similarly, when specifying file paths in inputs.json files, use the same approach to refer to Azure blobs: /<storage account name>/<container name>/<blob path>
+# You may also use http URIs for input files, but WDL commands that access the files from the Cromwell host will not be able to access them.
+
+# Wildcards are supported. For example:
+# - to include all containers in an account, enter /mystorageaccount/*
+# - to include all containers in all accounts, enter *
+# Only those accounts that the VM's identity has Contributor role on will actually be considered.
+
+# Exclusions are supported and processed after inclusions:
+# - to exclude specific account or container, prefix the line with "-", for example -/mystorageaccount/private
+
+# Comments are allowed only at the beginning of the line.
+# Changes in this file take effect after VM restart.
+
+# Required containers, don't delete these lines:
+
+/STORAGEACCOUNTNAME/configuration
+/STORAGEACCOUNTNAME/cromwell-executions
+/STORAGEACCOUNTNAME/cromwell-workflow-logs
+
+# Optional containers, should list all containers where your input files are located:
+
+https://msgenpublicdata.blob.core.windows.net/inputs?sv=2015-04-05&sr=c&si=coa&sig=pENt%2FMMOj24uoNBZIPLa%2BNVVkvopcFK51rwADyYLEPE%3D
+/STORAGEACCOUNTNAME/inputs

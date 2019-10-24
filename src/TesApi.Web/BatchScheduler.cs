@@ -21,7 +21,6 @@ namespace TesApi.Web
     /// <summary>
     /// Orchestrates <see cref="TesTask"/>s on Azure Batch
     /// </summary>
-
     public class BatchScheduler : IBatchScheduler
     {
         private const int DefaultCoreCount = 1;
@@ -694,7 +693,7 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Class that captures how <see cref="Testask"/> transitions from current state to the new state, given the current Batch task state and optional condition. 
+        /// Class that captures how <see cref="TesTask"/> transitions from current state to the new state, given the current Batch task state and optional condition. 
         /// Transitions typically include an action that needs to run in order for the task to move to the new state.
         /// </summary>
         private class TesTaskStateTransition

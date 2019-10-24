@@ -5,7 +5,7 @@ FROM mcr.microsoft.com/dotnet/core/sdk:3.0 AS build-env
 WORKDIR /app
 COPY ./src/TriggerService/*.* ./TriggerService/
 COPY ./src/CromwellApiClient/*.* ./CromwellApiClient/
-COPY ./src/TriggerService.Core/*.* ./TriggerService.Core/
+COPY ./src/Common/*.* ./Common/
 WORKDIR /app/TriggerService
 RUN dotnet publish -c Release -o out
 FROM mcr.microsoft.com/dotnet/core/runtime:3.0

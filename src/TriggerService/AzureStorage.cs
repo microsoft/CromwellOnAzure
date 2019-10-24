@@ -17,7 +17,7 @@ using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 
-namespace TriggerService.Core
+namespace TriggerService
 {
     public class AzureStorage : IAzureStorage
     {
@@ -26,23 +26,20 @@ namespace TriggerService.Core
         private readonly CloudStorageAccount account;
         private readonly CloudBlobClient blobClient;
 
-        public AzureStorage(ILogger<AzureStorage> logger, string connectionStringOrAccountName, bool useMsi = false)
+        public AzureStorage(ILogger<AzureStorage> logger, string accountName)
         {
             this.logger = logger;
+            this.AccountName = accountName;
+
             ServicePointManager.DefaultConnectionLimit = Environment.ProcessorCount * 8;
             ServicePointManager.Expect100Continue = false;
 
-            if (useMsi)
-            {
-                account = GetCloudStorageAccountUsingMsiAsync(connectionStringOrAccountName).Result;
-            }
-            else
-            {
-                account = CloudStorageAccount.Parse(connectionStringOrAccountName);
-            }
-
+            account = GetCloudStorageAccountUsingMsiAsync(accountName).Result;
             blobClient = account.CreateCloudBlobClient();
         }
+
+        public string AccountName { get; }
+        public string AccountAuthority => account.BlobStorageUri.PrimaryUri.Authority;
 
         public static async Task<string> GetAppInsightsInstrumentationKeyAsync(string appInsightsApplicationId)
         {
@@ -82,21 +79,6 @@ namespace TriggerService.Core
             catch
             {
                 return false;
-            }
-        }
-        public string GetAzureStorageAccountAuthority()
-        {
-            return account.BlobStorageUri.PrimaryUri.Authority;
-        }
-
-        public async Task CreateDefaultContainersAsync()
-        {
-            var defaultContainers = new List<string> { "workflows", "inputs", "cromwell-executions", "cromwell-workflow-logs", "outputs" };
-
-            foreach (var container in defaultContainers)
-            {
-                var containerReference = blobClient.GetContainerReference(container);
-                await containerReference.CreateIfNotExistsAsync();
             }
         }
 
@@ -145,12 +127,14 @@ namespace TriggerService.Core
             await blob.UploadFromFileAsync(path);
             return blob.Uri.AbsoluteUri;
         }
+
         public string GetBlobSasUrl(string blobUrl, TimeSpan sasTokenDuration)
         {
             var policy = new SharedAccessBlobPolicy() { Permissions = SharedAccessBlobPermissions.Read, SharedAccessExpiryTime = DateTime.Now.Add(sasTokenDuration) };
             var blob = new CloudBlob(new Uri(blobUrl), blobClient);
             return blobUrl + blob.GetSharedAccessSignature(policy, null, null, SharedAccessProtocol.HttpsOnly, null);
         }
+
         public async Task<string> UploadFileTextAsync(string content, string container, string blobName)
         {
             var containerReference = blobClient.GetContainerReference(container);
@@ -186,6 +170,12 @@ namespace TriggerService.Core
 
         public async Task<byte[]> DownloadFileAsync(string blobUrl)
         {
+            // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs
+            if (!blobUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) && blobUrl.TrimStart('/').StartsWith(this.AccountName + "/", StringComparison.OrdinalIgnoreCase))
+            {
+                blobUrl = blobUrl.TrimStart('/').Replace(this.AccountName, $"http://{this.AccountAuthority}", StringComparison.OrdinalIgnoreCase);
+            }
+
             var blob = new CloudBlockBlob(new Uri(blobUrl), account.Credentials);
 
             var options = new BlobRequestOptions()
@@ -231,10 +221,9 @@ namespace TriggerService.Core
             {
                 var partialResult = await blobContainer.ListBlobsSegmentedAsync(
                     prefix: prefix,
-                    useFlatBlobListing: true, // List all blobs ignoring directories
+                    useFlatBlobListing: true,
                     currentToken: continuationToken,
-                    blobListingDetails: BlobListingDetails.None, // Don't retrieve metadata
-                                                                 //cancellationToken: cancellationToken,
+                    blobListingDetails: BlobListingDetails.None,
                     maxResults: null,
                     options: null,
                     operationContext: null).ConfigureAwait(false);

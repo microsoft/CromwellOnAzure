@@ -12,7 +12,6 @@ namespace CromwellOnAzureDeployer
     {
         public string SubscriptionId { get; set; }
         public string RegionName { get; set; } = "westus";
-        public string ContainerRegistryServer { get; set; } = $"msgentesdev.azurecr.io";
         public string MainIdentifierPrefix { get; set; } = "coa";
         public KnownLinuxVirtualMachineImage VmImage { get; set; } = KnownLinuxVirtualMachineImage.UbuntuServer16_04_Lts;
         public VirtualMachineSizeTypes VmSize { get; set; } = VirtualMachineSizeTypes.StandardD2V2;
@@ -25,6 +24,14 @@ namespace CromwellOnAzureDeployer
         public string CosmosDbAccountName { get; set; }
         public string ApplicationInsightsAccountName { get; set; }
         public string VmName { get; set; }
+        public bool Silent { get; set; }
+        public bool DeleteResourceGroupOnFailure { get; set; }
+        public string CromwellImageName { get; set; } = "broadinstitute/cromwell:prod";
+        public string TesImageName { get; set; } = "mcr.microsoft.com/cromwellonazure/tes:1";
+        public string TriggerServiceImageName { get; set; } = "mcr.microsoft.com/cromwellonazure/triggerservice:1";
+        public string CustomCromwellImagePath { get; set; }
+        public string CustomTesImagePath { get; set; }
+        public string CustomTriggerServiceImagePath { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {
