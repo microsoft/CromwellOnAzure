@@ -354,7 +354,7 @@ namespace TesApi.Web
         {
             var filter = new ODATADetailLevel
             {
-                FilterClause = $"state eq 'completed' and executionInfo/endTime lt DateTime'{DateTime.Today.Subtract(oldestJobAge):o}'",
+                FilterClause = $"state eq 'completed' and executionInfo/endTime lt DateTime'{DateTime.Today.Subtract(oldestJobAge):yyyy-MM-ddTHH:mm:ssZ}'",
                 SelectClause = "id"
             };
 

@@ -97,17 +97,23 @@ namespace TesApi.Web
 
             foreach (var jobId in jobsToDelete)
             {
+                logger.LogInformation($"Job Id to delete: {jobId}");
+
                 var tesTaskId = jobId.Split(new[] { '-' })[0];
+                logger.LogInformation($"TES task Id to delete: {tesTaskId}");
 
                 var repositoryItem = await repository.GetItemAsync(tesTaskId);
 
-                if (repositoryItem.Value.State == TesState.COMPLETEEnum ||
-                    repositoryItem.Value.State == TesState.EXECUTORERROREnum ||
-                    repositoryItem.Value.State == TesState.SYSTEMERROREnum ||
-                    repositoryItem.Value.State == TesState.CANCELEDEnum ||
-                    repositoryItem.Value.State == TesState.UNKNOWNEnum)
+                if (repositoryItem != null)
                 {
-                    await azureProxy.DeleteBatchJobAsync(jobId);
+                    if (repositoryItem.Value.State == TesState.COMPLETEEnum ||
+                        repositoryItem.Value.State == TesState.EXECUTORERROREnum ||
+                        repositoryItem.Value.State == TesState.SYSTEMERROREnum ||
+                        repositoryItem.Value.State == TesState.CANCELEDEnum ||
+                        repositoryItem.Value.State == TesState.UNKNOWNEnum)
+                    {
+                        await azureProxy.DeleteBatchJobAsync(tesTaskId);
+                    }
                 }
             }
         }
