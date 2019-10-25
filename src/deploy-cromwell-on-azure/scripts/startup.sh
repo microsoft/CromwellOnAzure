@@ -14,7 +14,8 @@ echo "CromwellOnAzure startup log"
 echo
 echo "mount_containers.sh:"
 cd /cromwellazure
-./mount_containers.sh -a STORAGEACCOUNTNAME
+# Exit code 32 = already mounted:
+./mount_containers.sh -a STORAGEACCOUNTNAME || [[ $? == 32 || $? == 0 ]]
 echo
 echo "Mounted blobfuse containers:"
 findmnt -t fuse

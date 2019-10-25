@@ -417,7 +417,7 @@ namespace TesApi.Web
                     containerRunOptions: $"--rm -v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash} --entrypoint /bin/sh"),
 
                 ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}") },
-                CommandLine = $" -c \"/bin/sh {downloadFilesScriptPath}; chmod -R o+rx {cromwellPathPrefixWithoutEndSlash} \"",
+                CommandLine = $" -c \"/bin/sh {downloadFilesScriptPath}; chmod -R o+rwx {cromwellPathPrefixWithoutEndSlash} \"",
                 WaitForSuccess = true
             };
 
@@ -426,7 +426,6 @@ namespace TesApi.Web
             // The first command is sh or bash
             var command = executor.Command[0] + " -c \"" + string.Join(" && ",
                 executor.Command.Skip(1)
-                .Append($"chmod -R o+rx {cromwellPathPrefixWithoutEndSlash}")
                 .Append($"cd {cromwellPathPrefixWithoutEndSlash}")
                 .Append("for f in $(find -type l -xtype f);do cp --remove-destination $(readlink $f) $f;done;")) + "\"";
 
@@ -439,7 +438,7 @@ namespace TesApi.Web
 
                 ContainerSettings = new TaskContainerSettings(
                     imageName: executor.Image,
-                    containerRunOptions: $"--rm -v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash} --entrypoint= --workdir /",
+                    containerRunOptions: $"--rm -v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash} --entrypoint= ",
                     registry: (await GetContainerRegistry(executor.Image))),
 
                 OutputFiles = task.Outputs
