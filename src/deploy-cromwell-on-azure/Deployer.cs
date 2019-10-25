@@ -94,10 +94,10 @@ namespace CromwellOnAzureDeployer
                     Task.Run(async () => 
                         { 
                             linuxVm = await CreateVirtualMachineAsync(); 
-                            sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword)); 
+                            sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+                            await WaitForSshConnectivityAsync(sshConnectionInfo);
+                            await ConfigureVmAsync(sshConnectionInfo);
                         }, cts.Token)
-                        .ContinueWith(_ => ConfigureVmAsync(sshConnectionInfo), cts.Token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default)
-                        .Unwrap()
                 });
 
                 var vmManagedIdentity = linuxVm.SystemAssignedManagedServiceIdentityPrincipalId;
