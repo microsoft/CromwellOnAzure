@@ -110,6 +110,7 @@ namespace CromwellOnAzureDeployer
                 await AssignVmAsDataReaderToStorageAccountAsync(vmManagedIdentity, storageAccount);
 
                 await RestartVmAsync(linuxVm);
+                await WaitForSshConnectivityAsync(sshConnectionInfo);
                 await WaitForDockerComposeAsync(sshConnectionInfo);
                 await WaitForCromwellAsync(sshConnectionInfo);
 
@@ -139,6 +140,44 @@ namespace CromwellOnAzureDeployer
             RefreshableConsole.WriteLine($"Completed in {mainTimer.Elapsed.TotalMinutes:n1} minutes.");
 
             return isDeploymentSuccessful;
+        }
+
+        private Task WaitForSshConnectivityAsync(ConnectionInfo sshConnectionInfo)
+        {
+            var timeout = TimeSpan.FromMinutes(10);
+
+            return Execute(
+                "Waiting for VM to accept SSH connections...",
+                async () =>
+                {
+                    var startTime = DateTime.UtcNow;
+
+                    while (!cts.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            using var sshClient = new SshClient(sshConnectionInfo);
+                            sshClient.Connect();
+                            sshClient.Disconnect();
+                        }
+                        catch
+                        {
+                            if (DateTime.UtcNow.Subtract(startTime) > timeout)
+                            {
+                                throw new Exception("Timeout occurred while waiting for VM to accept SSH connections");
+                            }
+                            else
+                            {
+                                await Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
+                                continue;
+                            }
+                        }
+
+                        break;
+                    }
+
+                    return Task.FromResult(false);
+                });
         }
 
         private Task WaitForDockerComposeAsync(ConnectionInfo sshConnectionInfo)
