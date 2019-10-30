@@ -31,7 +31,7 @@ Run the following at command line or terminal after navigating to where your exe
 .\deploy-cromwell-on-azure.exe --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> 
 ```
 
-Installation can take up to 25 minutes to complete.
+Installation can take up to 20 minutes to complete.
 
 ## Cromwell on Azure installed resources
 Once installed, Cromwell on Azure configures the following Azure resources:
@@ -56,14 +56,14 @@ You can find publicly available paired end reads for chromosome 21 hosted here:
 [https://msgenpublicdata.blob.core.windows.net/inputs/chr21/chr21.read1.fq.gz](https://msgenpublicdata.blob.core.windows.net/inputs/chr21/chr21.read1.fq.gz)
 [https://msgenpublicdata.blob.core.windows.net/inputs/chr21/chr21.read2.fq.gz](https://msgenpublicdata.blob.core.windows.net/inputs/chr21/chr21.read2.fq.gz)
 
-You can use these URLs directly to download these input files as they are publicly available.<br/>
+You can use these input files directly as they are publicly available.<br/>
 
-You can then upload the data into the "inputs" container in your Cromwell on Azure storage account associated with your host VM.
+Alternatively, you can choose to upload the data into the "inputs" container in your Cromwell on Azure storage account associated with your host VM.
 You can do this directly from the Azure Portal, or use various tools including [Microsoft Azure Storage Explorer](https://azure.microsoft.com/features/storage-explorer/), [blobporter](https://github.com/Azure/blobporter), or [AzCopy](https://docs.microsoft.com/azure/storage/common/storage-use-azcopy?toc=%2fazure%2fstorage%2fblobs%2ftoc.json). <br/>
 
 ## Get inputs JSON and WDL files
 You can find an inputs JSON file and a sample WDL for converting FASTQ to uBAM format in this [GitHub repo](https://github.com/microsoft/CromwellOnAzure/blob/master/samples/quickstart). The chr21 FASTQ files are hosted on the public Azure Storage account container.<br/>
-Currently, you must copy any data to your input storage account. In the upcoming 1.0.0 production release, you will be able to use the "msgenpublicdata" storage account directly as a relative path, like the below example.<br/>
+You can use the "msgenpublicdata" storage account directly as a relative path, like the below example.<br/>
 
 The inputs JSON file should contain the following:
 ```
@@ -83,11 +83,11 @@ The inputs JSON file should contain the following:
 The input path consists of 3 parts - the storage account name, the blob container name, file path with extension. Example file path for an "inputs" container in a storage account "msgenpublicdata" will look like
 `"/msgenpublicdata/inputs/chr21/chr21.read1.fq.gz"`
 
-Once your inputs are in your Storage account, replace the name "msgenpublicdata/inputs" to your `<storageaccountname>/<containername>`. <br/>
+If you chose to host these files on your own Storage account, replace the name "msgenpublicdata/inputs" to your `<storageaccountname>/<containername>`. <br/>
  
 Alternatively, you can use http or https paths for your input files [using shared access signatures (SAS)](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for files in a private Azure Storage account container or refer to any public file location. 
 
-Please note, [Cromwell engine currently does not support http(s) paths](https://github.com/broadinstitute/cromwell/issues/4184#issuecomment-425981166). So ensure that your workflow WDL does not perform any WDL operations/input expressions that require Cromwell to download the http(s) inputs on the host machine.
+Please note, [Cromwell engine currently does not support http(s) paths](https://github.com/broadinstitute/cromwell/issues/4184#issuecomment-425981166)in the JSON inputs file that accompany a WDL. So ensure that your workflow WDL does not perform any WDL operations/input expressions that require Cromwell to download the http(s) inputs on the host machine.
 
 ## Configure your Cromwell on Azure trigger file
 Cromwell on Azure uses a trigger file to note the paths to all input information and to initiate the workflow. A sample trigger file can be downloaded from this [GitHub repo](https://github.com/microsoft/CromwellOnAzure/blob/master/samples/quickstart/FastqToUbamSingleSample.chr21.json) and includes the following information:
@@ -111,8 +111,13 @@ When using WDL and inputs JSON file hosted on your private Azure Storage account
 
 Alternatively, you can use any http or https path to a TES compliant WDL and inputs.json [using shared access signatures (SAS)](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for files in a private Azure Storage account container or refer to any public file location. 
 
+You can also host your WDL and JSON inputs files on your Storage account container and use the `/<storageaccountname>/<containername>/blobName` format.
+
 ## Start a WDL workflow
-To start a WDL workflow on Cromwell on Azure, place the trigger file in the "new" folder of the "workflows" container within your Cromwell on Azure storage account that is associated with your host VM. This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred over to the "inprogress" directory in the Workflows container.<br/>
+To start a WDL workflow, go to your Cromwell on Azure Storage account associated with your host VM. In the "workflows" container, create the directory "new" and place the trigger file in that folder. This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred over to the "inprogress" directory in the Workflows container.<br/>
+
+![directory](/docs/screenshots/newportal.PNG)
+![directory2](/docs/screenshots/newexplorer.PNG)
 
 For example, a trigger JSON file with name `task1.json` in the "new" directory, will be move to "inprogress" directory with a modified name `task1.guid.json`. This guid is a workflow id assigned by Cromwell.<br/>
 
