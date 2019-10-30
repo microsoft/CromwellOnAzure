@@ -72,7 +72,7 @@ Alternatively, you can choose to add a [SAS url for your desired container](http
 https://<yourstorageaccountname>.blob.core.windows.net:443/<yourcontainername>?<sastoken>
 ```
 
-When using the newly mounted storage account in your inputs JSON file, use the path `"/container-mountpath/filepath.extension"`, where `container-mountpath` is `/YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/`.
+When using the newly mounted storage account in your inputs JSON file, use the path `"/container-mountpath/blobName"`, where `container-mountpath` is `/YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/`.
 
 For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI.
 

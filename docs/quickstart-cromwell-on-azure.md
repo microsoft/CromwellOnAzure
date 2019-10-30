@@ -111,10 +111,13 @@ When using WDL and inputs JSON file hosted on your private Azure Storage account
 
 Alternatively, you can use any http or https path to a TES compliant WDL and inputs.json [using shared access signatures (SAS)](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for files in a private Azure Storage account container or refer to any public file location. 
 
-You can also host your WDL and JSON inputs files on your Storage account container and use the `/<storageaccountname>/<containername>/blobPath` format.
+You can also host your WDL and JSON inputs files on your Storage account container and use the `/<storageaccountname>/<containername>/blobName` format.
 
 ## Start a WDL workflow
-To start a WDL workflow on Cromwell on Azure, place the trigger file in the "new" folder of the "workflows" container within your Cromwell on Azure storage account that is associated with your host VM. This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred over to the "inprogress" directory in the Workflows container.<br/>
+To start a WDL workflow, go to your Cromwell on Azure Storage account associated with your host VM. In the "workflows" container, create the directory "new" and place the trigger file in that folder. This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred over to the "inprogress" directory in the Workflows container.<br/>
+
+![new directory ](/docs/screenshots/newportal.png)
+![new directory 2](/docs/screenshots/newexplorer.png)
 
 For example, a trigger JSON file with name `task1.json` in the "new" directory, will be move to "inprogress" directory with a modified name `task1.guid.json`. This guid is a workflow id assigned by Cromwell.<br/>
 
