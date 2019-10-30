@@ -438,7 +438,7 @@ namespace TesApi.Web
 
                 ContainerSettings = new TaskContainerSettings(
                     imageName: executor.Image,
-                    containerRunOptions: $"--rm -v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash} --entrypoint= ",
+                    containerRunOptions: $"--rm -v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash} --entrypoint= --workdir /",
                     registry: (await GetContainerRegistry(executor.Image))),
 
                 OutputFiles = task.Outputs
