@@ -22,7 +22,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TesApi.Tests", "src\TesApi.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TriggerService", "src\TriggerService\TriggerService.csproj", "{BB61BF85-0DE4-469B-85D4-3744E1B03F89}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TriggerService.Core", "src\TriggerService.Core\TriggerService.Core.csproj", "{2EF85FF5-B418-4979-8A9F-D1C5C698C453}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "src\Common\Common.csproj", "{63C91E1C-640C-4281-8388-971908009CAE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -54,10 +54,10 @@ Global
 		{BB61BF85-0DE4-469B-85D4-3744E1B03F89}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BB61BF85-0DE4-469B-85D4-3744E1B03F89}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BB61BF85-0DE4-469B-85D4-3744E1B03F89}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2EF85FF5-B418-4979-8A9F-D1C5C698C453}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2EF85FF5-B418-4979-8A9F-D1C5C698C453}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2EF85FF5-B418-4979-8A9F-D1C5C698C453}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2EF85FF5-B418-4979-8A9F-D1C5C698C453}.Release|Any CPU.Build.0 = Release|Any CPU
+		{63C91E1C-640C-4281-8388-971908009CAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{63C91E1C-640C-4281-8388-971908009CAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{63C91E1C-640C-4281-8388-971908009CAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{63C91E1C-640C-4281-8388-971908009CAE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

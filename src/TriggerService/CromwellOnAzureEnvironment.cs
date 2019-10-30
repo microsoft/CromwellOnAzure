@@ -6,25 +6,26 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Common;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace TriggerService.Core
+namespace TriggerService
 {
-    public class Lab
+    public class CromwellOnAzureEnvironment
     {
+        private static readonly Regex blobNameRegex = new Regex("^(?:https?://|/)?[^/]+/[^/]+/(.+)");  // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs in the trigger file.
         private readonly HttpClient httpClient = new HttpClient();
-        private string Name { get; set; }
         private IAzureStorage storage { get; set; }
         private ICromwellApiClient cromwellApiClient { get; set; }
         private readonly ILogger<AzureStorage> logger;
 
-        public Lab(ILoggerFactory loggerFactory, string name, IAzureStorage storage, ICromwellApiClient cromwellApiClient)
+        public CromwellOnAzureEnvironment(ILoggerFactory loggerFactory, IAzureStorage storage, ICromwellApiClient cromwellApiClient)
         {
             logger = loggerFactory.CreateLogger<AzureStorage>();
-            Name = name;
             this.storage = storage;
             this.cromwellApiClient = cromwellApiClient;
             logger.LogInformation($"Cromwell URL: {cromwellApiClient.GetUrl()}");
@@ -57,7 +58,7 @@ namespace TriggerService.Core
             }
             catch (Exception exc)
             {
-                logger.LogError(exc, $"Exception while processing {ToString()}");
+                logger.LogError(exc, $"UpdateExistingWorkflowsAsync()");
                 await Task.Delay(TimeSpan.FromSeconds(2));
             }
         }
@@ -71,7 +72,7 @@ namespace TriggerService.Core
             }
             catch (Exception exc)
             {
-                logger.LogError(exc, $"Exception while processing {ToString()}");
+                logger.LogError(exc, $"ProcessAndAbortWorkflowsAsync()");
                 await Task.Delay(TimeSpan.FromSeconds(2));
             }
         }
@@ -190,24 +191,9 @@ namespace TriggerService.Core
             }
         }
 
-        public override string ToString()
-        {
-            return $"Lab name: {Name}";
-        }
-
         private static string GetBlobName(string url)
         {
-            var tempUrl = url;
-            var queryStringIndex = tempUrl.IndexOf('?');
-
-            if (queryStringIndex > 0)
-            {
-                // Remove query string
-                tempUrl = tempUrl.Substring(0, queryStringIndex);
-            }
-
-            var uri = new Uri(tempUrl);
-            return string.Concat(uri.Segments.Skip(2)).Replace("/", "_");
+            return blobNameRegex.Match(url)?.Groups[1].Value.Replace("/", "_");
         }
 
         private static Guid ExtractWorkflowId(Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob blobTrigger, AzureStorage.WorkflowState currentState)
@@ -275,11 +261,11 @@ namespace TriggerService.Core
             }
 
             var blobName = GetBlobName(url);
-            var uri = new Uri(url);
 
             byte[] data;
 
-            if (uri.Authority == storage.GetAzureStorageAccountAuthority())
+            if ((Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase)) 
+                || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase))
             {
                 // use known credentials
                 data = await storage.DownloadFileAsync(url);

@@ -21,7 +21,6 @@ namespace TesApi.Web
     /// <summary>
     /// Orchestrates <see cref="TesTask"/>s on Azure Batch
     /// </summary>
-
     public class BatchScheduler : IBatchScheduler
     {
         private const int DefaultCoreCount = 1;
@@ -418,7 +417,7 @@ namespace TesApi.Web
                     containerRunOptions: $"--rm -v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash} --entrypoint /bin/sh"),
 
                 ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}") },
-                CommandLine = $" -c \"/bin/sh {downloadFilesScriptPath}; chmod -R o+rx {cromwellPathPrefixWithoutEndSlash} \"",
+                CommandLine = $" -c \"/bin/sh {downloadFilesScriptPath}; chmod -R o+rwx {cromwellPathPrefixWithoutEndSlash} \"",
                 WaitForSuccess = true
             };
 
@@ -427,7 +426,6 @@ namespace TesApi.Web
             // The first command is sh or bash
             var command = executor.Command[0] + " -c \"" + string.Join(" && ",
                 executor.Command.Skip(1)
-                .Append($"chmod -R o+rx {cromwellPathPrefixWithoutEndSlash}")
                 .Append($"cd {cromwellPathPrefixWithoutEndSlash}")
                 .Append("for f in $(find -type l -xtype f);do cp --remove-destination $(readlink $f) $f;done;")) + "\"";
 
@@ -694,7 +692,7 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Class that captures how <see cref="Testask"/> transitions from current state to the new state, given the current Batch task state and optional condition. 
+        /// Class that captures how <see cref="TesTask"/> transitions from current state to the new state, given the current Batch task state and optional condition. 
         /// Transitions typically include an action that needs to run in order for the task to move to the new state.
         /// </summary>
         private class TesTaskStateTransition

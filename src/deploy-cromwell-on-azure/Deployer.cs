@@ -4,314 +4,550 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using Common;
+using Microsoft.Azure.Management.Batch;
+using Microsoft.Azure.Management.Batch.Models;
+using Microsoft.Azure.Management.Compute.Fluent;
+using Microsoft.Azure.Management.Compute.Fluent.Models;
+using Microsoft.Azure.Management.CosmosDB.Fluent;
 using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
+using Microsoft.Azure.Management.Graph.RBAC.Fluent.Models;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
+using Microsoft.Azure.Management.Storage.Fluent;
 using Microsoft.Azure.Services.AppAuthentication;
-using Microsoft.Extensions.Logging;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Auth;
+using Microsoft.Azure.Storage.Blob;
 using Microsoft.Rest;
-using Microsoft.Rest.Azure;
+using Microsoft.Rest.Azure.OData;
 using Newtonsoft.Json;
-using TriggerService.Core;
+using Renci.SshNet;
 
 namespace CromwellOnAzureDeployer
 {
     public class Deployer
     {
-        private const string LabName = "lab1";
-        private const string InstallScriptUrl = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/src/deploy-cromwell-on-azure/scripts/install-cromwellazure.sh?token=AFSS5TZ4HZMK2PSXMCWGNHS5VGQFG";
-        private readonly ILoggerFactory loggerFactory;
-        private readonly ILogger<Deployer> logger;
-        private IAzureStorage azureStorage { get; set; }
-        private Configuration configuration { get; set; }
-        private IAzure azureFluentApi { get; set; }
-        private AzureCredentials azureCredentials { get; set; }
-        private Stopwatch stepTimer { get; set; } = new Stopwatch();
+        private const string WorkflowsContainerName = "workflows";
+        private const string ConfigurationContainerName = "configuration";
+        private const string InputsContainerName = "inputs";
 
-        public Deployer(ILoggerFactory loggerFactory, Configuration configuration)
+        private readonly CancellationTokenSource cts = new CancellationTokenSource();
+        private Configuration configuration { get; set; }
+        private TokenCredentials tokenCredentials;
+        private IAzure azureClient { get; set; }
+        private AzureCredentials azureCredentials { get; set; }
+
+        public Deployer(Configuration configuration)
         {
-            this.loggerFactory = loggerFactory;
-            logger = loggerFactory.CreateLogger<Deployer>();
             this.configuration = configuration;
         }
 
-        public async Task DeployAsync()
+        public async Task<bool> DeployAsync()
         {
-            Console.WriteLine("Running...");
+            var isDeploymentSuccessful = false;
+            var mainTimer = Stopwatch.StartNew();
+
+            RefreshableConsole.WriteLine("Running...");
+
+            await ValidateTokenProviderAsync();
+
+            tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
+            azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
+            azureClient = GetAzureClient(azureCredentials);
 
             await ValidateConfigurationAsync();
 
-            var region = Region.Create(configuration.RegionName);
-
-            var mainTimer = new Stopwatch();
-            mainTimer.Start();
-
             try
             {
-                await RefreshAzureTokenAsync();
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine($"VM host: {configuration.VmName}.{configuration.RegionName}.cloudapp.azure.com");
+                RefreshableConsole.WriteLine($"VM username: {configuration.VmUsername}");
+                RefreshableConsole.WriteLine($"VM password: {configuration.VmPassword}");
+                RefreshableConsole.WriteLine();
 
-                Console.WriteLine();
-                Console.WriteLine($"VM host: {configuration.VmName}.{region.Name}.cloudapp.azure.com");
-                Console.WriteLine($"VM username: {configuration.VmUsername}");
-                Console.WriteLine($"VM password: {configuration.VmPassword}");
-                Console.WriteLine();
+                await CreateResourceGroupAsync();
 
-                stepTimer.Start();
+                BatchAccount batchAccount = null;
+                IGenericResource appInsights = null;
+                ICosmosDBAccount cosmosDb = null;
+                IStorageAccount storageAccount = null;
+                IVirtualMachine linuxVm = null;
+                ConnectionInfo sshConnectionInfo = null;
 
-                await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
+                await Task.WhenAll(new Task[]
                 {
-                    Console.WriteLine($"Creating Resource Group: {configuration.ResourceGroupName}");
+                    Task.Run(async () => batchAccount = await CreateBatchAccountAsync(), cts.Token),
+                    Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(), cts.Token),
+                    Task.Run(async () => cosmosDb = await CreateCosmosDbAsync(), cts.Token),
+                    Task.Run(async () => storageAccount = await CreateStorageAccountAsync(), cts.Token),
 
-                    var resourceGroup = await azure.ResourceGroups.Define(configuration.ResourceGroupName)
-                        .WithRegion(region)
-                        .CreateAsync();
-
-                    WriteExecutionTime();
-                    return resourceGroup;
-                });
-
-                var batchAccount = await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine($"Creating Batch Account: {configuration.BatchAccountName}");
-
-                    var batchAccountResource = await azure.BatchAccounts.Define(configuration.BatchAccountName)
-                        .WithRegion(region)
-                        .WithExistingResourceGroup(configuration.ResourceGroupName)
-                        .CreateAsync();
-
-                    WriteExecutionTime();
-                    return batchAccountResource;
-                });
-
-                var appInsights = await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine($"Creating Application Insights: {configuration.ApplicationInsightsAccountName}");
-
-                    var appInsightsResource = await ResourceManager
-                        .Configure()
-                        .Authenticate(azureCredentials)
-                        .WithSubscription(configuration.SubscriptionId)
-                        .GenericResources.Define(configuration.ApplicationInsightsAccountName)
-                        .WithRegion(region)
-                        .WithExistingResourceGroup(configuration.ResourceGroupName)
-                        .WithResourceType("components")
-                        .WithProviderNamespace("microsoft.insights")
-                        .WithoutPlan()
-                        .WithApiVersion("2015-05-01")
-                        .WithParentResource(string.Empty)
-                        .WithProperties(new Dictionary<string, string>() { { "Application_Type", "other" } })
-                        .CreateAsync();
-
-                    WriteExecutionTime();
-
-                    return appInsightsResource;
-                });
-
-                var linuxVm = await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    const int dataDiskSizeGiB = 32;
-                    const int dataDiskLun = 0;
-
-                    Console.WriteLine($"Creating Linux VM: {configuration.VmName}");
-
-                    var vm = await azure.VirtualMachines.Define(configuration.VmName)
-                       .WithRegion(region)
-                       .WithExistingResourceGroup(configuration.ResourceGroupName)
-                       .WithNewPrimaryNetwork(configuration.VnetAddressSpace)
-                       .WithPrimaryPrivateIPAddressDynamic()
-                       .WithNewPrimaryPublicIPAddress(configuration.VmName)
-                       .WithPopularLinuxImage(configuration.VmImage)
-                       .WithRootUsername(configuration.VmUsername)
-                       .WithRootPassword(configuration.VmPassword)
-                       .WithNewDataDisk(dataDiskSizeGiB, dataDiskLun, Microsoft.Azure.Management.Compute.Fluent.Models.CachingTypes.None)
-                       .WithSize(configuration.VmSize)
-                       .WithSystemAssignedManagedServiceIdentity()
-                       .CreateAsync();
-
-                    WriteExecutionTime();
-                    return vm;
+                    Task.Run(async () => 
+                        { 
+                            linuxVm = await CreateVirtualMachineAsync(); 
+                            sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+                            await WaitForSshConnectivityAsync(sshConnectionInfo);
+                            await ConfigureVmAsync(sshConnectionInfo);
+                        }, cts.Token)
                 });
 
                 var vmManagedIdentity = linuxVm.SystemAssignedManagedServiceIdentityPrincipalId;
 
-                await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine($"Assigning {BuiltInRole.Contributor} role for VM to App Insights resource scope.");
+                await AssignVmAsBillingReaderToSubscriptionAsync(vmManagedIdentity);
+                await AssignVmAsContributorToAppInsightsAsync(vmManagedIdentity, appInsights);
+                await AssignVmAsContributorToCosmosDb(vmManagedIdentity, cosmosDb);
+                await AssignVmAsContributorToBatchAccountAsync(vmManagedIdentity, batchAccount);
+                await AssignVmAsContributorToStorageAccountAsync(vmManagedIdentity, storageAccount);
+                await AssignVmAsDataReaderToStorageAccountAsync(vmManagedIdentity, storageAccount);
 
-                    var roleAssignment = await azure.AccessManagement.RoleAssignments.Define(Guid.NewGuid().ToString())
-                     .ForObjectId(vmManagedIdentity)
-                     .WithBuiltInRole(BuiltInRole.Contributor)
-                     .WithResourceScope(appInsights)
-                     .CreateAsync();
+                await RestartVmAsync(linuxVm);
+                await WaitForSshConnectivityAsync(sshConnectionInfo);
+                await WaitForDockerComposeAsync(sshConnectionInfo);
+                await WaitForCromwellAsync(sshConnectionInfo);
 
-                    WriteExecutionTime();
-                    return roleAssignment;
-                });
+                isDeploymentSuccessful = await VerifyInstallationAsync(storageAccount);
 
-                await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine($"Assigning {BuiltInRole.BillingReader} role for VM to Subscription scope.");
-
-                    var roleAssignment = await azure.AccessManagement.RoleAssignments.Define(Guid.NewGuid().ToString())
-                        .ForObjectId(vmManagedIdentity)
-                        .WithBuiltInRole(BuiltInRole.BillingReader)
-                        .WithSubscriptionScope(configuration.SubscriptionId)
-                        .CreateAsync();
-
-                    WriteExecutionTime();
-                    return roleAssignment;
-                });
-
-                var cosmosDb = await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine($"Creating Cosmos DB: {configuration.CosmosDbAccountName}");
-
-                    var cosmosDbResource = await azure.CosmosDBAccounts.Define(configuration.CosmosDbAccountName)
-                       .WithRegion(region)
-                       .WithExistingResourceGroup(configuration.ResourceGroupName)
-                       .WithDataModelSql()
-                       .WithSessionConsistency()
-                       .WithWriteReplication(region)
-                       .CreateAsync();
-
-                    WriteExecutionTime();
-                    return cosmosDbResource;
-                });
-
-                await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine($"Assigning {BuiltInRole.Contributor} role for VM to Cosmos DB resource scope.");
-
-                    var roleAssignment = await azure.AccessManagement.RoleAssignments.Define(Guid.NewGuid().ToString())
-                     .ForObjectId(vmManagedIdentity)
-                     .WithBuiltInRole(BuiltInRole.Contributor)
-                     .WithResourceScope(cosmosDb)
-                     .CreateAsync();
-
-                    WriteExecutionTime();
-                    return roleAssignment;
-                });
-
-                await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine($"Assigning {BuiltInRole.Contributor} role for VM to Batch Account resource scope.");
-
-                    var roleAssignment = await azure.AccessManagement.RoleAssignments.Define(Guid.NewGuid().ToString())
-                     .ForObjectId(vmManagedIdentity)
-                     .WithBuiltInRole(BuiltInRole.Contributor)
-                     .WithResourceScope(batchAccount)
-                     .CreateAsync();
-
-                    WriteExecutionTime();
-                    return roleAssignment;
-                });
-
-                var storageAccount = await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine($"Creating Storage Account: {configuration.StorageAccountName}");
-
-                    var storageAccountResource = await azure.StorageAccounts.Define(configuration.StorageAccountName)
-                        .WithRegion(region)
-                        .WithExistingResourceGroup(configuration.ResourceGroupName)
-                        .CreateAsync();
-
-                    azureStorage = new AzureStorage(loggerFactory.CreateLogger<AzureStorage>(), configuration.StorageAccountName, true);
-                    await azureStorage.CreateDefaultContainersAsync();
-
-                    WriteExecutionTime();
-                    return storageAccountResource;
-                });
-
-                await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine($"Assigning {BuiltInRole.Contributor} role for VM to Storage Account resource scope.");
-
-                    var roleAssignment = await azure.AccessManagement.RoleAssignments.Define(Guid.NewGuid().ToString())
-                     .ForObjectId(vmManagedIdentity)
-                     .WithBuiltInRole(BuiltInRole.Contributor)
-                     .WithResourceScope(storageAccount)
-                     .CreateAsync();
-
-                    WriteExecutionTime();
-                    return roleAssignment;
-                });
-
-                var linuxCustomScriptExtensionName = "initial-setup";
-
-                await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    const string linuxCustomScriptExtensionPublisherName = "Microsoft.Azure.Extensions";
-                    const string linuxCustomScriptExtensionTypeName = "CustomScript";
-                    const string linuxCustomScriptExtensionVersionName = "2.0";
-                    var acrAccount = configuration.ContainerRegistryServer.Substring(0, configuration.ContainerRegistryServer.IndexOf("."));
-                    var bashCommand = $"bash install-cromwellazure.sh {LabName} {configuration.StorageAccountName} {configuration.CosmosDbAccountName} {configuration.BatchAccountName} {configuration.ApplicationInsightsAccountName}";
-                    Console.WriteLine("Running Linux VM bash script.");
-
-                    var vmResource = await linuxVm.Update()
-                        .DefineNewExtension(linuxCustomScriptExtensionName)
-                            .WithPublisher(linuxCustomScriptExtensionPublisherName)
-                            .WithType(linuxCustomScriptExtensionTypeName)
-                            .WithVersion(linuxCustomScriptExtensionVersionName)
-                            .WithMinorVersionAutoUpgrade()
-                            .WithPublicSetting("fileUris", new List<string> { InstallScriptUrl })
-                            .WithPublicSetting("commandToExecute", bashCommand)
-                        .Attach()
-                        .ApplyAsync();
-
-                    WriteExecutionTime();
-                    return vmResource;
-                });
-
-                await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine("Removing existing extension...");
-
-                    var vmResource = await linuxVm.Update()
-                        .WithoutExtension(linuxCustomScriptExtensionName)
-                        .ApplyAsync();
-
-                    WriteExecutionTime();
-                    return vmResource;
-                });
-
-                await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine("Restarting VM...");
-                    await linuxVm.RestartAsync();
-                    WriteExecutionTime();
-                    return Task.FromResult(false);
-                });
-
-                var isTestWorkflowSuccessful = await VerifyInstallationAsync();
-
-                if (!isTestWorkflowSuccessful)
+                if (!isDeploymentSuccessful)
                 {
                     await DeleteResourceGroupIfUserConsentsAsync();
                 }
             }
-            catch (CloudException cloudException)
+            catch (Microsoft.Rest.Azure.CloudException cloudException)
             {
                 var json = cloudException.Response.Content;
-                Console.WriteLine(json);
+                RefreshableConsole.WriteLine(json);
                 Debugger.Break();
                 WriteGeneralRetryMessageToConsole();
                 await DeleteResourceGroupIfUserConsentsAsync();
             }
             catch (Exception exc)
             {
-                Console.WriteLine(exc);
+                RefreshableConsole.WriteLine(exc.ToString());
                 Debugger.Break();
                 WriteGeneralRetryMessageToConsole();
                 await DeleteResourceGroupIfUserConsentsAsync();
             }
 
-            Console.WriteLine($"Completed in {mainTimer.Elapsed.TotalMinutes:n1} minutes.");
+            RefreshableConsole.WriteLine($"Completed in {mainTimer.Elapsed.TotalMinutes:n1} minutes.");
+
+            return isDeploymentSuccessful;
+        }
+
+        private Task WaitForSshConnectivityAsync(ConnectionInfo sshConnectionInfo)
+        {
+            var timeout = TimeSpan.FromMinutes(10);
+
+            return Execute(
+                "Waiting for VM to accept SSH connections...",
+                async () =>
+                {
+                    var startTime = DateTime.UtcNow;
+
+                    while (!cts.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            using var sshClient = new SshClient(sshConnectionInfo);
+                            sshClient.Connect();
+                            sshClient.Disconnect();
+                        }
+                        catch
+                        {
+                            if (DateTime.UtcNow.Subtract(startTime) > timeout)
+                            {
+                                throw new Exception("Timeout occurred while waiting for VM to accept SSH connections");
+                            }
+                            else
+                            {
+                                await Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
+                                continue;
+                            }
+                        }
+
+                        break;
+                    }
+
+                    return Task.FromResult(false);
+                });
+        }
+
+        private Task WaitForDockerComposeAsync(ConnectionInfo sshConnectionInfo)
+        {
+            return Execute(
+                "Waiting for docker containers to download and start...",
+                async () =>
+                {
+                    while (!cts.IsCancellationRequested)
+                    {
+                        var (numberOfRunningContainers, _, _) = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, "sudo docker ps -a | grep -c 'Up '", false);
+
+                        if (numberOfRunningContainers == "4")
+                        {
+                            break;
+                        }
+
+                        await Task.Delay(5000, cts.Token);
+                    }
+
+                    return Task.FromResult(false);
+                });
+        }
+
+        private Task WaitForCromwellAsync(ConnectionInfo sshConnectionInfo)
+        {
+            return Execute(
+                "Waiting for Cromwell to perform one-time database preparation...",
+                async () =>
+                {
+                    while (!cts.IsCancellationRequested)
+                    {
+                        var (isCromwellAvailable, _, _) = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, "[ $(sudo docker logs cromwellazure_triggerservice_1 | grep -c 'Cromwell is available.') -gt 0 ] && echo 1 || echo 0");
+
+                        if (isCromwellAvailable == "1")
+                        {
+                            break;
+                        }
+
+                        await Task.Delay(5000, cts.Token);
+                    }
+
+                    return Task.FromResult(false);
+                });
+        }
+
+        private IAzure GetAzureClient(AzureCredentials azureCredentials)
+        {
+            return Azure
+                .Configure()
+                .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                .Authenticate(azureCredentials)
+                .WithSubscription(configuration.SubscriptionId);
+        }
+
+        private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo)
+        {
+            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, "sudo mkdir /cromwellazure && sudo chown vmadmin /cromwellazure && sudo chmod ug=rwx,o= /cromwellazure");
+            await CopyInstallationFilesAsync(sshConnectionInfo);
+            await Task.WhenAll(new[] { RunInstallationScriptAsync(sshConnectionInfo), CopyAnyCustomDockerImagesToTheVmAsync(sshConnectionInfo) });
+            await LoadAnyCustomDockerImagesAndCopyDockerComposeFileAsync(sshConnectionInfo);
+        }
+
+        private async Task CopyInstallationFilesAsync(ConnectionInfo sshConnectionInfo)
+        {
+            var startTime = DateTime.UtcNow;
+            var line = RefreshableConsole.WriteLine("Copying installation files to the VM...");
+
+            var startupText = ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "startup.sh")).Replace("STORAGEACCOUNTNAME", configuration.StorageAccountName);
+            await UploadFileToVirtualMachineAsync(sshConnectionInfo, startupText, "/cromwellazure/startup.sh", true);
+
+            await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "wait-for-it.sh")), "/cromwellazure/wait-for-it/wait-for-it.sh", true);
+            await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "install-cromwellazure.sh")), "/cromwellazure/install-cromwellazure.sh", true);
+            await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "mount_containers.sh")), "/cromwellazure/mount_containers.sh", true);
+            await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "cromwellazure.service")), "/lib/systemd/system/cromwellazure.service", false);
+            await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "mount.blobfuse")), "/usr/sbin/mount.blobfuse", true);
+
+            WriteExecutionTime(line, startTime);
+        }
+
+        private async Task RunInstallationScriptAsync(ConnectionInfo sshConnectionInfo)
+        {
+            var startTime = DateTime.UtcNow;
+            var line = RefreshableConsole.WriteLine("Running installation script on the VM...");
+            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"/cromwellazure/install-cromwellazure.sh");
+            WriteExecutionTime(line, startTime);
+        }
+
+        private async Task CopyAnyCustomDockerImagesToTheVmAsync(ConnectionInfo sshConnectionInfo)
+        {
+            async Task CopyCustomDockerImageAsync(string customImagePath)
+            {
+                var startTime = DateTime.UtcNow;
+                var line = RefreshableConsole.WriteLine($"Copying custom image from {customImagePath} to the VM...");
+                var remotePath = $"/cromwellazure/{Path.GetFileName(customImagePath)}";
+                await UploadFileToVirtualMachineAsync(sshConnectionInfo, File.OpenRead(customImagePath), remotePath, false);
+                WriteExecutionTime(line, startTime);
+            }
+
+            if (!string.IsNullOrEmpty(configuration.CustomTesImagePath))
+            {
+                await CopyCustomDockerImageAsync(configuration.CustomTesImagePath);
+            }
+
+            if (!string.IsNullOrEmpty(configuration.CustomCromwellImagePath))
+            {
+                await CopyCustomDockerImageAsync(configuration.CustomCromwellImagePath);
+            }
+
+            if (!string.IsNullOrEmpty(configuration.CustomTriggerServiceImagePath))
+            {
+                await CopyCustomDockerImageAsync(configuration.CustomTriggerServiceImagePath);
+            }
+        }
+
+        private async Task LoadAnyCustomDockerImagesAndCopyDockerComposeFileAsync(ConnectionInfo sshConnectionInfo)
+        {
+            async Task<string> LoadCustomDockerImageAsync(string customImagePath)
+            {
+                var startTime = DateTime.UtcNow;
+                var line = RefreshableConsole.WriteLine($"Loading custom image on the VM...");
+                var remotePath = $"/cromwellazure/{Path.GetFileName(customImagePath)}";
+                var (loadedImageName, _, _) = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"imageName=$(sudo docker load -i {remotePath}) && rm {remotePath} && imageName=$(expr \"$imageName\" : 'Loaded.*: \\(.*\\)') && echo $imageName");
+                WriteExecutionTime(line, startTime);
+
+                return loadedImageName;
+            }
+
+            var tesImageName = configuration.TesImageName;
+            var cromwellImageName = configuration.CromwellImageName;
+            var triggerServiceImageName = configuration.TriggerServiceImageName;
+
+            if (!string.IsNullOrEmpty(configuration.CustomTesImagePath))
+            {
+                tesImageName = await LoadCustomDockerImageAsync(configuration.CustomTesImagePath);
+            }
+
+            if (!string.IsNullOrEmpty(configuration.CustomCromwellImagePath))
+            {
+                cromwellImageName = await LoadCustomDockerImageAsync(configuration.CustomCromwellImagePath);
+            }
+
+            if (!string.IsNullOrEmpty(configuration.CustomTriggerServiceImagePath))
+            {
+                triggerServiceImageName = await LoadCustomDockerImageAsync(configuration.CustomTriggerServiceImagePath);
+            }
+
+            var dockerComposeConfigText = ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "docker-compose.yml"))
+                .Replace("STORAGEACCOUNTNAME", configuration.StorageAccountName)
+                .Replace("COSMOSDBNAME", configuration.CosmosDbAccountName)
+                .Replace("VARBATCHACCOUNTNAME", configuration.BatchAccountName)
+                .Replace("VARAPPLICATIONINSIGHTSACCOUNTNAME", configuration.ApplicationInsightsAccountName)
+                .Replace("TESIMAGENAME", tesImageName)
+                .Replace("CROMWELLIMAGENAME", cromwellImageName)
+                .Replace("TRIGGERSERVICEIMAGENAME", triggerServiceImageName);
+
+            await UploadFileToVirtualMachineAsync(sshConnectionInfo, dockerComposeConfigText, "/cromwellazure/docker-compose.yml", false);
+        }
+
+        private Task RestartVmAsync(IVirtualMachine linuxVm)
+        {
+            return Execute(
+                "Restarting VM...",
+                async () =>
+                {
+                    await linuxVm.RestartAsync(cts.Token);
+                    return Task.FromResult(false);
+                });
+        }
+
+        private Task AssignVmAsDataReaderToStorageAccountAsync(string vmManagedIdentity, IStorageAccount storageAccount)
+        {
+            // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-reader
+            var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1";
+
+            return Execute(
+                $"Assigning Storage Blob Data Reader role for VM to Storage Account resource scope...",
+                () => azureClient.AccessManagement.RoleAssignments
+                    .Define(Guid.NewGuid().ToString())
+                    .ForObjectId(vmManagedIdentity)
+                    .WithRoleDefinition(roleDefinitionId)
+                    .WithResourceScope(storageAccount)
+                    .CreateAsync(cts.Token));
+        }
+
+        private Task AssignVmAsContributorToStorageAccountAsync(string vmManagedIdentity, IResource storageAccount)
+        {
+            return Execute(
+                $"Assigning {BuiltInRole.Contributor} role for VM to Storage Account resource scope...",
+                () => azureClient.AccessManagement.RoleAssignments
+                    .Define(Guid.NewGuid().ToString())
+                    .ForObjectId(vmManagedIdentity)
+                    .WithBuiltInRole(BuiltInRole.Contributor)
+                    .WithResourceScope(storageAccount)
+                    .CreateAsync(cts.Token));
+        }
+
+        private Task<IStorageAccount> CreateStorageAccountAsync()
+        {
+            return Execute(
+                $"Creating Storage Account: {configuration.StorageAccountName}...",
+                async () =>
+                {
+                    var storageAccount = await azureClient.StorageAccounts
+                        .Define(configuration.StorageAccountName)
+                        .WithRegion(configuration.RegionName)
+                        .WithExistingResourceGroup(configuration.ResourceGroupName)
+                        .CreateAsync(cts.Token);
+
+                    cts.Token.ThrowIfCancellationRequested();
+
+                    var blobClient = await GetBlobClientAsync(storageAccount);
+                    var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
+
+                    await Task.WhenAll(defaultContainers.Select(c => blobClient.GetContainerReference(c).CreateIfNotExistsAsync(cts.Token)));
+
+                    cts.Token.ThrowIfCancellationRequested();
+
+                    // Upload config files
+                    var configContainer = blobClient.GetContainerReference(ConfigurationContainerName);
+
+                    var cromwellAppConfigPath = GetPathFromAppRelativePath("scripts", "cromwell-application.conf");
+                    var cromwellAppConfigText = ReadAllTextWithUnixLineEndings(cromwellAppConfigPath);
+                    await configContainer.GetBlockBlobReference(Path.GetFileName(cromwellAppConfigPath)).UploadTextAsync(cromwellAppConfigText, cts.Token);
+
+                    var containersToMountConfigPath = GetPathFromAppRelativePath("scripts", "containers-to-mount");
+                    var containersToMountConfigText = ReadAllTextWithUnixLineEndings(containersToMountConfigPath);
+                    containersToMountConfigText = containersToMountConfigText.Replace("STORAGEACCOUNTNAME", configuration.StorageAccountName);
+                    await configContainer.GetBlockBlobReference(Path.GetFileName(containersToMountConfigPath)).UploadTextAsync(containersToMountConfigText, cts.Token);
+
+                    return storageAccount;
+                });
+        }
+
+        private Task AssignVmAsContributorToBatchAccountAsync(string vmManagedIdentity, BatchAccount batchAccount)
+        {
+            return Execute(
+                $"Assigning {BuiltInRole.Contributor} role for VM to Batch Account resource scope...",
+                () => azureClient.AccessManagement.RoleAssignments
+                    .Define(Guid.NewGuid().ToString())
+                    .ForObjectId(vmManagedIdentity)
+                    .WithBuiltInRole(BuiltInRole.Contributor)
+                    .WithScope(batchAccount.Id)
+                    .CreateAsync(cts.Token));
+        }
+
+        private Task AssignVmAsContributorToCosmosDb(string vmManagedIdentity, IResource cosmosDb)
+        {
+            return Execute(
+                $"Assigning {BuiltInRole.Contributor} role for VM to Cosmos DB resource scope...",
+                () => azureClient.AccessManagement.RoleAssignments
+                    .Define(Guid.NewGuid().ToString())
+                    .ForObjectId(vmManagedIdentity)
+                    .WithBuiltInRole(BuiltInRole.Contributor)
+                    .WithResourceScope(cosmosDb)
+                    .CreateAsync(cts.Token));
+        }
+
+        private Task<ICosmosDBAccount> CreateCosmosDbAsync()
+        {
+            return Execute(
+                $"Creating Cosmos DB: {configuration.CosmosDbAccountName}...",
+                () => azureClient.CosmosDBAccounts
+                    .Define(configuration.CosmosDbAccountName)
+                    .WithRegion(configuration.RegionName)
+                    .WithExistingResourceGroup(configuration.ResourceGroupName)
+                    .WithDataModelSql()
+                    .WithSessionConsistency()
+                    .WithWriteReplication(Region.Create(configuration.RegionName))
+                    .CreateAsync(cts.Token));
+        }
+
+        private Task AssignVmAsBillingReaderToSubscriptionAsync(string vmManagedIdentity)
+        {
+            return Execute(
+                $"Assigning {BuiltInRole.BillingReader} role for VM to Subscription scope...",
+                () => azureClient.AccessManagement.RoleAssignments.Define(Guid.NewGuid().ToString())
+                    .ForObjectId(vmManagedIdentity)
+                    .WithBuiltInRole(BuiltInRole.BillingReader)
+                    .WithSubscriptionScope(configuration.SubscriptionId)
+                    .CreateAsync(cts.Token));
+        }
+
+        private Task AssignVmAsContributorToAppInsightsAsync(string vmManagedIdentity, IResource appInsights)
+        {
+            return Execute(
+                $"Assigning {BuiltInRole.Contributor} role for VM to App Insights resource scope...",
+                () => azureClient.AccessManagement.RoleAssignments
+                    .Define(Guid.NewGuid().ToString())
+                    .ForObjectId(vmManagedIdentity)
+                    .WithBuiltInRole(BuiltInRole.Contributor)
+                    .WithResourceScope(appInsights)
+                    .CreateAsync(cts.Token));
+        }
+
+        private Task<IVirtualMachine> CreateVirtualMachineAsync()
+        {
+            const int dataDiskSizeGiB = 32;
+            const int dataDiskLun = 0;
+
+            return Execute(
+                $"Creating Linux VM: {configuration.VmName}...",
+                () => azureClient.VirtualMachines.Define(configuration.VmName)
+                    .WithRegion(configuration.RegionName)
+                    .WithExistingResourceGroup(configuration.ResourceGroupName)
+                    .WithNewPrimaryNetwork(configuration.VnetAddressSpace)
+                    .WithPrimaryPrivateIPAddressDynamic()
+                    .WithNewPrimaryPublicIPAddress(configuration.VmName)
+                    .WithPopularLinuxImage(configuration.VmImage)
+                    .WithRootUsername(configuration.VmUsername)
+                    .WithRootPassword(configuration.VmPassword)
+                    .WithNewDataDisk(dataDiskSizeGiB, dataDiskLun, CachingTypes.None)
+                    .WithSize(configuration.VmSize)
+                    .WithSystemAssignedManagedServiceIdentity()
+                    .CreateAsync(cts.Token));
+        }
+
+        private Task<IGenericResource> CreateAppInsightsResourceAsync()
+        {
+            return Execute(
+                $"Creating Application Insights: {configuration.ApplicationInsightsAccountName}...",
+                () => ResourceManager
+                    .Configure()
+                    .Authenticate(azureCredentials)
+                    .WithSubscription(configuration.SubscriptionId)
+                    .GenericResources.Define(configuration.ApplicationInsightsAccountName)
+                    .WithRegion(configuration.RegionName)
+                    .WithExistingResourceGroup(configuration.ResourceGroupName)
+                    .WithResourceType("components")
+                    .WithProviderNamespace("microsoft.insights")
+                    .WithoutPlan()
+                    .WithApiVersion("2015-05-01")
+                    .WithParentResource(string.Empty)
+                    .WithProperties(new Dictionary<string, string>() { { "Application_Type", "other" } })
+                    .CreateAsync(cts.Token));
+        }
+
+        private Task<BatchAccount> CreateBatchAccountAsync()
+        {
+            return Execute(
+                $"Creating Batch Account: {configuration.BatchAccountName}...",
+                () =>
+                {
+                    return new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
+                        .BatchAccount
+                        .CreateAsync(configuration.ResourceGroupName, configuration.BatchAccountName, new BatchAccountCreateParameters { Location = configuration.RegionName }, cts.Token);
+                });
+        }
+
+        private Task CreateResourceGroupAsync()
+        {
+            return Execute(
+                $"Creating Resource Group: {configuration.ResourceGroupName}...",
+                () => azureClient.ResourceGroups
+                    .Define(configuration.ResourceGroupName)
+                    .WithRegion(configuration.RegionName)
+                    .CreateAsync(cts.Token));
+        }
+
+        private async Task DeleteResourceGroupAsync()
+        {
+            var startTime = DateTime.UtcNow;
+            var line = RefreshableConsole.WriteLine("Deleting resource group...");
+            await azureClient.ResourceGroups.DeleteByNameAsync(configuration.ResourceGroupName, CancellationToken.None);
+            WriteExecutionTime(line, startTime);
+        }
+
+        private static string GetPathFromAppRelativePath(params string[] paths)
+        {
+            return Path.Combine(paths.Prepend(AppContext.BaseDirectory).ToArray());
         }
 
         private static void ValidateMainIdentifierPrefix(string prefix)
@@ -329,6 +565,11 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private static string ReadAllTextWithUnixLineEndings(string path)
+        {
+            return File.ReadAllText(path).Replace("\r\n", "\n");
+        }
+
         private static void ValidateRegionName(string regionName)
         {
             if (string.IsNullOrWhiteSpace(regionName))
@@ -336,7 +577,7 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException("RegionName is required.");
             }
 
-            var invalidRegionsRegex = new Regex("^(germany|china|us)");
+            var invalidRegionsRegex = new Regex("^(germany|china|usgov|usdod)");
             var validRegionNames = Region.Values.Select(r => r.Name).Where(rn => !invalidRegionsRegex.IsMatch(rn));
 
             if (!validRegionNames.Contains(regionName, StringComparer.OrdinalIgnoreCase))
@@ -345,8 +586,12 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private static async Task ValidateSubscriptionAsync(string subscriptionId)
+        private async Task ValidateSubscriptionAsync(string subscriptionId)
         {
+            const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
+            const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
+            const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
+
             if (string.IsNullOrWhiteSpace(subscriptionId))
             {
                 throw new ValidationException($"SubcriptionId is required.");
@@ -355,32 +600,59 @@ namespace CromwellOnAzureDeployer
             var azure = Azure
                 .Configure()
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
-                .Authenticate(await GetAzureCredentialsAsync());
+                .Authenticate(azureCredentials);
 
-            var subscriptionExists = (await azure.Subscriptions.ListAsync()).Any(sub => sub.Inner.SubscriptionId.Equals(subscriptionId, StringComparison.OrdinalIgnoreCase));
+            var subscriptionExists = (await azure.Subscriptions.ListAsync()).Any(sub => sub.SubscriptionId.Equals(subscriptionId, StringComparison.OrdinalIgnoreCase));
 
             if (!subscriptionExists)
             {
-                throw new ValidationException($"Invalid or inaccessible subcription id '{subscriptionId}'. Make sure that subscription exists and that you have Contributor access to it.", displayExample: false);
+                throw new ValidationException($"Invalid or inaccessible subcription id '{subscriptionId}'. Make sure that subscription exists and that you are either an Owner or have Contributor and User Access Administrator roles on the subscription.", displayExample: false);
+            }
+
+            var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
+            var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
+
+            var currentPrincipalRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{subscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
+                .Body
+                .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
+
+            if (!currentPrincipalRoleIds.Contains(ownerRoleId) && !(currentPrincipalRoleIds.Contains(contributorRoleId) && currentPrincipalRoleIds.Contains(userAccessAdministratorRoleId)))
+            {
+                throw new ValidationException($"Insufficient subscription access level. You must be either an Owner or have Contributor and User Access Administrator roles on the subscription.", displayExample: false);
             }
         }
 
-        private static async Task<AzureCredentials> GetAzureCredentialsAsync()
+        private async Task ValidateBatchQuotaAsync()
+        {
+            var accountQuota = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.Location.GetQuotasAsync(configuration.RegionName)).AccountQuota;
+            var existingBatchAccountCount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).AsEnumerable().Count(b => b.Location.Equals(configuration.RegionName));
+
+            if (existingBatchAccountCount >= accountQuota)
+            {
+                throw new ValidationException($"The regional Batch account quota ({accountQuota} account(s) per region) for the specified subscription has been reached. Submit a support request to increase the quota or choose another region.", displayExample: false);
+            }
+        }
+
+        private static async Task<CloudBlobClient> GetBlobClientAsync(IStorageAccount storageAccount)
+        {
+            var accessKey = (await storageAccount.GetKeysAsync()).First().Value;
+            var storageCredentials = new StorageCredentials(storageAccount.Name, accessKey);
+
+            return new CloudStorageAccount(storageCredentials, true).CreateCloudBlobClient();
+        }
+
+        private static async Task ValidateTokenProviderAsync()
         {
             try
             {
-                var tokenProvider = new AzureServiceTokenProvider();
-                var accessToken = await tokenProvider.GetAccessTokenAsync("https://management.azure.com/");
-                return new AzureCredentials(new TokenCredentials(accessToken), null, null, AzureEnvironment.AzureGlobalCloud);
+                await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
             }
-            catch (AzureServiceTokenProviderException)
+            catch (AzureServiceTokenProviderException ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("No access token found.  Please install the Azure CLI and login with 'az login'");
-                Console.ResetColor();
-                Console.WriteLine("Link: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli");
+                RefreshableConsole.WriteLine("No access token found.  Please install the Azure CLI and login with 'az login'", ConsoleColor.Red);
+                RefreshableConsole.WriteLine("Link: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli");
+                RefreshableConsole.WriteLine($"Error details: {ex.Message}");
                 Environment.Exit(1);
-                throw;
             }
         }
 
@@ -391,21 +663,16 @@ namespace CromwellOnAzureDeployer
                 ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                 ValidateRegionName(configuration.RegionName);
                 await ValidateSubscriptionAsync(configuration.SubscriptionId);
+                await ValidateBatchQuotaAsync();
             }
             catch (ValidationException validationException)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(validationException.Reason);
-                Console.ResetColor();
+                RefreshableConsole.WriteLine(validationException.Reason, ConsoleColor.Red);
 
                 if (validationException.DisplayExample)
                 {
-                    Console.WriteLine();
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.Write($"Example: ");
-                    Console.ResetColor();
-                    Console.WriteLine($"deploy-cromwell-on-azure --subscriptionid {Guid.NewGuid()} --regionname westus2 --mainidentifierprefix coa");
-                    Console.ResetColor();
+                    RefreshableConsole.WriteLine();
+                    RefreshableConsole.WriteLine($"Example: ", ConsoleColor.Green).Write($"deploy-cromwell-on-azure --subscriptionid {Guid.NewGuid()} --regionname westus2 --mainidentifierprefix coa");
                 }
 
                 Environment.Exit(1);
@@ -414,47 +681,43 @@ namespace CromwellOnAzureDeployer
 
         private async Task DeleteResourceGroupIfUserConsentsAsync()
         {
-            Console.WriteLine();
-            Console.Write("Delete the resource group?  Type 'yes' and press enter, or, press any key to exit: ");
-            var userResponse = Console.ReadLine();
+            var userResponse = string.Empty;
 
-            if (userResponse.Equals("yes", StringComparison.OrdinalIgnoreCase))
+            if (!configuration.Silent)
             {
-                await ExecuteWithCredentialsAsync(async (azureCredentials, azure) =>
-                {
-                    Console.WriteLine("Deleting resource group...");
-                    await azure.ResourceGroups.DeleteByNameAsync(configuration.ResourceGroupName);
-                    WriteExecutionTime();
-                    return Task.FromResult(false);
-                });
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.Write("Delete the resource group?  Type 'yes' and press enter, or, press any key to exit: ");
+                userResponse = RefreshableConsole.ReadLine();
+            }
+
+            if (userResponse.Equals("yes", StringComparison.OrdinalIgnoreCase) || configuration.DeleteResourceGroupOnFailure)
+            {
+                await DeleteResourceGroupAsync();
             }
         }
 
-        private async Task<bool> VerifyInstallationAsync()
+        private async Task<bool> VerifyInstallationAsync(IStorageAccount storageAccount)
         {
-            Console.WriteLine("Running a test workflow...");
-            var isTestWorkflowSuccessful = await TestWorkflowAsync();
-            WriteExecutionTime();
+            var startTime = DateTime.UtcNow;
+            var line = RefreshableConsole.WriteLine("Running a test workflow...");
+            var isTestWorkflowSuccessful = await TestWorkflowAsync(storageAccount);
+            WriteExecutionTime(line, startTime);
 
             if (isTestWorkflowSuccessful)
             {
-                Console.WriteLine();
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"Test workflow succeeded.");
-                Console.ResetColor();
-                Console.WriteLine();
-                Console.WriteLine("Learn more about how to use Cromwell on Azure: https://github.com/microsoft/CromwellOnAzure");
-                Console.WriteLine();
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine($"Test workflow succeeded.", ConsoleColor.Green);
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine("Learn more about how to use Cromwell on Azure: https://github.com/microsoft/CromwellOnAzure");
+                RefreshableConsole.WriteLine();
             }
             else
             {
-                Console.WriteLine();
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Test workflow failed.");
-                Console.ResetColor();
-                Console.WriteLine();
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine($"Test workflow failed.", ConsoleColor.Red);
+                RefreshableConsole.WriteLine();
                 WriteGeneralRetryMessageToConsole();
-                Console.WriteLine();
+                RefreshableConsole.WriteLine();
             }
 
             return isTestWorkflowSuccessful;
@@ -462,95 +725,162 @@ namespace CromwellOnAzureDeployer
 
         private void WriteGeneralRetryMessageToConsole()
         {
-            Console.WriteLine("Please try deployment again, and create an issue if this continues to fail: https://github.com/microsoft/CromwellOnAzure/issues");
+            RefreshableConsole.WriteLine("Please try deployment again, and create an issue if this continues to fail: https://github.com/microsoft/CromwellOnAzure/issues");
         }
 
-        private async Task<bool> TestWorkflowAsync()
+        private async Task<bool> TestWorkflowAsync(IStorageAccount storageAccount)
         {
             var id = Guid.NewGuid();
-            const string container = "workflows";
-            var wdlUrl = await azureStorage.UploadFileTextAsync(File.ReadAllText(Path.Combine(System.AppContext.BaseDirectory, "test.wdl")), "inputs", "test/test.wdl");
-            var jsonUrl = await azureStorage.UploadFileTextAsync(File.ReadAllText(Path.Combine(System.AppContext.BaseDirectory, "test.json")), "inputs", "test/test.json");
+            var blobClient = await GetBlobClientAsync(storageAccount);
+            await UploadFileTextAsync(blobClient, File.ReadAllText(GetPathFromAppRelativePath("test.wdl")), InputsContainerName, "test/test.wdl");
+            await UploadFileTextAsync(blobClient, File.ReadAllText(GetPathFromAppRelativePath("test.json")), InputsContainerName, "test/test.json");
 
             var workflow = new Workflow
             {
-                WorkflowUrl = wdlUrl,
-                WorkflowInputsUrl = jsonUrl
+                WorkflowUrl = $"/{configuration.StorageAccountName}/{InputsContainerName}/test/test.wdl",
+                WorkflowInputsUrl = $"/{configuration.StorageAccountName}/{InputsContainerName}/test/test.json"
             };
 
-            var json = JsonConvert.SerializeObject(workflow);
+            var json = JsonConvert.SerializeObject(workflow, Formatting.Indented);
+            await UploadFileTextAsync(blobClient, json, WorkflowsContainerName, $"new/{id}.json");
 
-            await azureStorage.UploadFileTextAsync(json, container, $"new/{id}.json");
-            return await IsSuccessfulAfterLongPollingAsync(id, container);
+            return await IsSuccessfulAfterLongPollingAsync(blobClient.GetContainerReference(WorkflowsContainerName), id);
         }
 
-        private async Task<bool> IsSuccessfulAfterLongPollingAsync(Guid id, string container)
+        private async Task<bool> IsSuccessfulAfterLongPollingAsync(CloudBlobContainer container, Guid id)
         {
             while (true)
             {
                 try
                 {
-                    var isSucceeded = await azureStorage.IsSingleBlobExistsFromPrefixAsync(container, $"succeeded/{id}");
-                    var isFailed = await azureStorage.IsSingleBlobExistsFromPrefixAsync(container, $"failed/{id}");
+                    var succeeded = container.ListBlobs($"succeeded/{id}", useFlatBlobListing: true).Count() == 1;
+                    var failed = container.ListBlobs($"failed/{id}", useFlatBlobListing: true).Count() == 1;
 
-                    if (isSucceeded || isFailed)
+                    if (succeeded || failed)
                     {
-                        return isSucceeded && !isFailed;
+                        return succeeded && !failed;
                     }
                 }
                 catch (Exception exc)
                 {
                     // "Server is busy" occasionally can be ignored
-                    Console.WriteLine(exc.Message);
+                    RefreshableConsole.WriteLine(exc.Message);
                 }
 
-                await Task.Delay(5000);
+                await Task.Delay(TimeSpan.FromSeconds(10));
             }
         }
 
-        private async Task<T> ExecuteWithCredentialsAsync<T>(Func<AzureCredentials, IAzure, Task<T>> func)
+        private async Task<T> Execute<T>(string message, Func<Task<T>> func)
         {
             const int retryCount = 3;
+
+            var startTime = DateTime.UtcNow;
+            var line = RefreshableConsole.WriteLine(message);
 
             for (var i = 0; i < retryCount; i++)
             {
                 try
                 {
-                    return await func.Invoke(azureCredentials, azureFluentApi);
+                    cts.Token.ThrowIfCancellationRequested();
+                    var result = await func();
+                    WriteExecutionTime(line, startTime);
+                    return result;
                 }
-                catch (CloudException cloudException)
+                catch (Microsoft.Rest.Azure.CloudException cloudException) when (cloudException.ToCloudErrorType() == CloudErrorType.ExpiredAuthenticationToken)
                 {
-                    if (cloudException.ToCloudErrorType() == CloudErrorType.ExpiredAuthenticationToken)
-                    {
-                        await RefreshAzureTokenAsync();
-                        continue;
-                    }
-
+                }
+                catch (OperationCanceledException ex) when (ex.CancellationToken == cts.Token)
+                {
+                    line.Write(" Cancelled", ConsoleColor.Red);
+                    return await Task.FromResult(default(T));
+                }
+                catch
+                {
+                    line.Write($" Failed", ConsoleColor.Red);
+                    cts.Cancel();
                     throw;
                 }
             }
 
+            line.Write($" Failed", ConsoleColor.Red);
+            cts.Cancel();
             throw new Exception($"Failed after {retryCount} attempts");
         }
 
-        private async Task RefreshAzureTokenAsync()
+        private void WriteExecutionTime(RefreshableConsole.Line line, DateTime startTime)
         {
-            Console.WriteLine("Getting Azure credentials...");
-            azureCredentials = await GetAzureCredentialsAsync();
-
-            azureFluentApi = Azure
-                .Configure()
-                .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
-                .Authenticate(azureCredentials)
-                .WithSubscription(configuration.SubscriptionId);
+            line.Write($" Completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds:n0}s", ConsoleColor.Green);
         }
 
-        private void WriteExecutionTime()
+        private async Task<(string Output, string Error, int ExitStatus)> ExecuteCommandOnVirtualMachineAsync(ConnectionInfo sshConnectionInfo, string command, bool throwOnNonZeroExitCode = true)
         {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"Completed in {stepTimer.Elapsed.TotalSeconds:n0}s");
-            Console.ResetColor();
-            stepTimer.Restart();
+            using var sshClient = new SshClient(sshConnectionInfo);
+            sshClient.Connect();
+            var (output, error, exitStatus) = await sshClient.ExecuteCommandAsync(command, throwOnNonZeroExitCode, cts.Token);
+            sshClient.Disconnect();
+
+            return (output, error, exitStatus);
+        }
+
+        private async Task UploadFileToVirtualMachineAsync(ConnectionInfo sshConnectionInfo, string fileContent, string remoteFilePath, bool makeExecutable)
+        {
+            using var input = new MemoryStream(Encoding.UTF8.GetBytes(fileContent));
+            await UploadFileToVirtualMachineAsync(sshConnectionInfo, input, remoteFilePath, makeExecutable);
+        }
+
+        private async Task UploadFileToVirtualMachineAsync(ConnectionInfo sshConnectionInfo, Stream input, string remoteFilePath, bool makeExecutable)
+        {
+            var dir = GetLinuxParentPath(remoteFilePath);
+
+            using var sshClient = new SshClient(sshConnectionInfo);
+            using var sftpClient = new SftpClient(sshConnectionInfo);
+
+            sshClient.Connect();
+
+            // Create destination directory if needed and make it writable for the current user
+            var (output, _, _) = await sshClient.ExecuteCommandAsync($"sudo mkdir -p {dir} && owner=$(stat -c '%U' {dir}) && mask=$(stat -c '%a' {dir}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {dir} && echo 1 ))", true, cts.Token);
+            var dirWasMadeWritableToOthers = output == "1";
+
+            sftpClient.Connect();
+            await sftpClient.UploadFileAsync(input, remoteFilePath, true, cts.Token);
+            sftpClient.Disconnect();
+
+            if (makeExecutable)
+            {
+                await sshClient.ExecuteCommandAsync($"sudo chmod +x {remoteFilePath}", true, cts.Token);
+            }
+
+            if (dirWasMadeWritableToOthers)
+            {
+                await sshClient.ExecuteCommandAsync($"sudo chmod o-w {dir}", true, cts.Token);
+            }
+
+            sshClient.Disconnect();
+        }
+
+        public async Task<string> UploadFileTextAsync(CloudBlobClient blobClient, string content, string container, string blobName)
+        {
+            var containerReference = blobClient.GetContainerReference(container);
+            await containerReference.CreateIfNotExistsAsync();
+            var blob = containerReference.GetBlockBlobReference(blobName);
+            await blob.UploadTextAsync(content, cts.Token);
+
+            return blob.Uri.AbsoluteUri;
+        }
+
+        private static string GetLinuxParentPath(string path)
+        {
+            const char dirSeparator = '/';
+
+            if (string.IsNullOrEmpty(path))
+            {
+                return null;
+            }
+
+            var pathComponents = path.TrimEnd(dirSeparator).Split(dirSeparator);
+
+            return string.Join(dirSeparator, pathComponents.Take(pathComponents.Length - 1));
         }
 
         private class ValidationException : Exception

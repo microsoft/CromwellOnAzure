@@ -12,5 +12,7 @@
   "StorageAccountName": "",
   "CosmosDbAccountName": "",
   "ApplicationInsightsAccountName": "",
-  "VmName": ""
+  "VmName": "",
+  "Silent": false,
+  "DeleteResourceGroupOnFailure":  false
 }

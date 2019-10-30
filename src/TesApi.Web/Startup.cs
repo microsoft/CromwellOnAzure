@@ -24,6 +24,8 @@ namespace TesApi.Web
     {
         private const string CosmosDbDatabaseId = "TES";
         private const string CosmosDbCollectionId = "Tasks";
+        private const string CosmosDbPartitionId = "01";
+
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly IHostingEnvironment hostingEnvironment;
@@ -55,7 +57,7 @@ namespace TesApi.Web
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Latest);
 
             (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKey(Configuration["CosmosDbAccountName"]).Result;
-            services.AddSingleton<IRepository<TesTask>>(new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, CosmosDbDatabaseId, CosmosDbCollectionId, Configuration["LAB_NAME"]));
+            services.AddSingleton<IRepository<TesTask>>(new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, CosmosDbDatabaseId, CosmosDbCollectionId, CosmosDbPartitionId));
             services.AddSingleton<IBatchScheduler>(new BatchScheduler(loggerFactory.CreateLogger<BatchScheduler>(), Configuration, azureProxy));
 
             services

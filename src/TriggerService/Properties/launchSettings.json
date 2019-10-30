@@ -1,11 +1,7 @@
 {
   "profiles": {
     "TriggerService": {
-      "commandName": "Project",
-      "environmentVariables": {
-        "Key": "Value",
-        "LAB_NAME": "lab1"
-      }
+      "commandName": "Project"
     }
   }
 }

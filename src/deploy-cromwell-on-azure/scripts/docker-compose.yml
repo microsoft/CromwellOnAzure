@@ -4,11 +4,8 @@
 version: "3.6"
 services:
   tes:
-    container_name: lab1_tes
-    image: "mcr.microsoft.com/cromwellonazure/tes:1"
+    image: "TESIMAGENAME"
     environment:
-      - IS_DOCKERCOMPOSE=true
-      - LAB_NAME=LABNAME
       - DefaultStorageAccountName=STORAGEACCOUNTNAME
       - CosmosDbAccountName=COSMOSDBNAME
       - BatchAccountName=VARBATCHACCOUNTNAME
@@ -17,14 +14,13 @@ services:
     expose:
       - "80"
   mysqldb:
-    container_name: lab1_mysqldb
     image: "mysql:latest"
     environment:
       - MYSQL_ROOT_PASSWORD=cromwell
       - MYSQL_DATABASE=cromwell_db
     volumes:
       - type: bind
-        source: /mysql-1
+        source: /mysql
         target: /var/lib/mysql
     entrypoint:
       - /bin/sh
@@ -32,37 +28,26 @@ services:
     command: ["echo \"CREATE USER 'cromwell'@'localhost' IDENTIFIED BY 'cromwell'; GRANT ALL PRIVILEGES ON cromwell_db.* TO 'cromwell'@'localhost' WITH GRANT OPTION; CREATE USER 'cromwell'@'%' IDENTIFIED BY 'cromwell'; GRANT ALL PRIVILEGES ON cromwell_db.* TO 'cromwell'@'%' WITH GRANT OPTION;\" > /docker-entrypoint-initdb.d/init_user.sql && docker-entrypoint.sh mysqld && echo \"Deleting change log lock table...\" && mysql -u cromwell -p cromwell -e \"DELETE FROM DATABASECHANGELOGLOCK;\""]
     expose:
       - "3306"
-    depends_on:
-      - "tes"
   cromwell:
-    container_name: lab1_cromwell
-    image: "broadinstitute/cromwell:prod"
+    image: "CROMWELLIMAGENAME"
     volumes:
       - type: bind
-        source: /cromwell-workflow-logs
-        target: /cromwell-workflow-logs
-      - type: bind
-        source: /cromwell-app-config
-        target: /cromwell-app-config
-      - type: bind
-        source: /cromwell-executions
-        target: /cromwell-executions
-      - type: bind
-        source: /inputs
-        target: /STORAGEACCOUNTNAME/inputs
+        source: /cromwellazure/wait-for-it
+        target: /wait-for-it
     entrypoint:
       - /bin/sh
       - -c
-    command: ["[ -d wait-for-it ] || git clone https://github.com/vishnubob/wait-for-it.git && /wait-for-it/wait-for-it.sh mysqldb:3306 -t 255 -- java -Dconfig.file=/cromwell-app-config/cromwell-application.conf -jar /app/cromwell.jar server"]
+    command: ["/wait-for-it/wait-for-it.sh mysqldb:3306 -t 255 -- java -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server"]
     ports:
       - "8000:8000"
     depends_on:
       - "mysqldb"
+      - "tes"
   triggerservice:
-    container_name: lab1_triggerservice
-    image: "mcr.microsoft.com/cromwellonazure/triggerservice:1"
+    image: "TRIGGERSERVICEIMAGENAME"
     environment:
-      - LAB_NAME=LABNAME
+      - DefaultStorageAccountName=STORAGEACCOUNTNAME
+      - LAB_NAME=lab1
       - ApplicationInsightsAccountName=VARAPPLICATIONINSIGHTSACCOUNTNAME
     depends_on:
       - "cromwell"
