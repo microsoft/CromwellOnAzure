@@ -9,7 +9,11 @@ To get logs from all the docker containers or to use the Cromwell REST API endpo
 
 ![Reset password](/docs/screenshots/resetpassword.PNG)
 
-To connect to your host VM, navigate to the Connect button on the Overview blade of your Azure VM instance. Then copy the ssh connection string and paste in a command line, PowerShell or terminal application to log in.
+To connect to your host VM, you can either
+1. Construct your ssh connection string if you have the VM name `ssh vmadmin@<hostname>` OR
+2. Navigate to the Connect button on the Overview blade of your Azure VM instance, then copy the ssh connection string. 
+
+Paste the ssh connectiong string in a command line, PowerShell or terminal application to log in.
 
 ![Connect with SSH](/docs/screenshots/connectssh.PNG)
 
@@ -44,7 +48,9 @@ Cromwell on Azure uses [managed identities](https://docs.microsoft.com/en-us/azu
 
 To allow the host VM to connect to **custom** Azure resources like Storage Account, Batch Account etc. you can use the [Azure Portal](https://docs.microsoft.com/en-us/azure/role-based-access-control/role-assignments-portal) or [Azure CLI](https://docs.microsoft.com/en-us/azure/role-based-access-control/role-assignments-cli) to find the managed identity of the host VM and add it as a Contributor to the required Azure resource.<br/>
 
-For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI.
+For convenience, some configuration files are hosted on your Cromwell on Azure Storage account, in the "configuration" container - `containers-to-mount`, and `cromwell-application.conf`. You can modify and save these file using Azure Portal UI "Edit Blob" option or simply upload a new file to replace the existing one.
+
+For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`.
 
 ![Restart VM](/docs/screenshots/restartVM.png)
 
@@ -53,25 +59,22 @@ Cromwell on Azure supports private docker images for your WDL tasks hosted on [A
 To allow the host VM to use an ACR, add the VM identity as a Contributor to the Container Registry via Azure Portal or Azure CLI.<br/>
 
 ### Mount another storage account
-Log on to the host VM using the ssh connection string as described above. Replace YOURSTORAGEACCOUNTNAME with your storage account name and YOURCONTAINERNAME with your container name:
-
+Navigate to the "configuration" container in the Cromwell on Azure Storage account. Replace YOURSTORAGEACCOUNTNAME with your storage account name and YOURCONTAINERNAME with your container name in the `containers-to-mount` file below:
 ```
-sudo bash
-echo "/usr/sbin/mount.blobfuse /YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/ fuse _netdev,account_name=YOURSTORAGEACCOUNTNAME,container_name=YOURCONTAINERNAME" >> /etc/fstab
-
-cd /cromwellazure
-sudo nano docker-compose.yml
+/YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/
 ```
-In the "cromwell" service section, under "volumes" add
-```
-      - type: bind
-        source: /YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/
-        target: /YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/
+Add this to the end of file and save your changes.<br/>
 
-```
-To allow the host VM to write to a storage account, add the VM Identity as a Contributor to the Storage Account via Azure Portal or Azure CLI.<br/>
+To allow the host VM to write to a Storage account, add the VM Identity as a Contributor to the Storage Account via Azure Portal or Azure CLI.<br/>
 
-For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`.
+Alternatively, you can choose to add a [SAS url for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file. This is also applicable if your VM cannot be granted Contributor access to the Storage account because the two resources are in different Azure tenants
+```
+https://<yourstorageaccountname>.blob.core.windows.net:443/<yourcontainername>?<sastoken>
+```
+
+When using the newly mounted storage account in your inputs JSON file, use the path `"/container-mountpath/filepath.extension"`, where `container-mountpath` is `/YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/`.
+
+For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI.
 
 ### Change batch account
 Log on to the host VM using the ssh connection string as described above. Replace `BatchAccountName` environment variable for the "tes" service in the `docker-compose.yml` file with the name of the desired Batch account and save your changes.<br/>
@@ -84,7 +87,7 @@ sudo nano docker-compose.yml
 To allow the host VM to use a batch account, add the VM identity as a Contributor to the Azure Batch account via Azure Portal or Azure CLI.<br/>
 To allow the host VM to read prices and information about types of machines available for the batch account, add the VM identity as a Billing Reader to the subscription with the configured Batch Account.
 
-For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`.
+For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`. or run `sudo reboot`.
 
 ### Use dedicated VMs for all your tasks
 By default, we are using an environment variable `UsePreemptibleVmsOnly` set to true, to always use low priority Azure Batch nodes.<br/>
@@ -120,7 +123,7 @@ flush privileges
 ```
 
 **Connect Cromwell to the database by modifying the Cromwell configuration file**<br/>
-Log on to the host VM using the ssh connection string as described above. Replace "yourMySQLServerName" with your MySQL server name in the `cromwell-application.conf` file under the database connection settings. <br/>
+Navigate to the "configuration" container in the Cromwell on Azure Storage account. Replace "yourMySQLServerName" with your MySQL server name in the `cromwell-application.conf` file under the database connection settings. <br/>
 
 ```
 cd /cromwell-app-config

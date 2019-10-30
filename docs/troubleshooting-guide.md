@@ -5,8 +5,8 @@ This article lists common questions and troubleshooting tips for using Cromwell 
 For any pipeline, you can create a [WDL](https://software.broadinstitute.org/wdl/) file that calls your tools in docker containers. Please note that Cromwell on Azure only supports tasks with docker containers defined for security reasons.<br/>
 For specifying inputs to any workflow, you may want to use a JSON file that allows you to customize inputs to any workflow WDL file.<br/>
 
-For files hosted on an Azure Storage account, the input path consists of 3 parts - the storage account name, the blob container name, file path with extension. Example file path for an "inputs" container in a storage account "cromwellonazuretest" will look like
-`"/cromwellonazuretest/inputs/chr21.read1.fq.gz"`
+For files hosted on an Azure Storage account, the input path consists of 3 parts - the storage account name, the blob container name, file path with extension. Example file path for an "inputs" container in a storage account "msgenpublicdata" will look like
+`"/msgenpublicdata/inputs/chr21.read1.fq.gz"`
 
 Example WDL file:
 ```
