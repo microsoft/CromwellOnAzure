@@ -116,8 +116,8 @@ You can also host your WDL and JSON inputs files on your Storage account contain
 ## Start a WDL workflow
 To start a WDL workflow, go to your Cromwell on Azure Storage account associated with your host VM. In the "workflows" container, create the directory "new" and place the trigger file in that folder. This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred over to the "inprogress" directory in the Workflows container.<br/>
 
-![new directory ](/docs/screenshots/newportal.png)
-![new directory 2](/docs/screenshots/newexplorer.png)
+![directory](/docs/screenshots/newportal.PNG)
+![directory2](/docs/screenshots/newexplorer.PNG)
 
 For example, a trigger JSON file with name `task1.json` in the "new" directory, will be move to "inprogress" directory with a modified name `task1.guid.json`. This guid is a workflow id assigned by Cromwell.<br/>
 
