@@ -21,6 +21,10 @@ There are two ways to obtain the installation executable:
 2. Clone the [Cromwell on Azure repository](https://github.com/microsoft/CromwellOnAzure) and build the solution in Visual Studio 2019. Note that [VS 2019](https://visualstudio.microsoft.com/vs/) and [.NET Core SDK 3.0 and 2.2.x](https://dotnet.microsoft.com/download/dotnet-core) are required prerequisites. Build and [publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish?tabs=netcore21#synopsis) the solution (remember to use the correct runtime identifier) to produce the executable
 
 ## Configure and run the installation executable
+To run the executable on Linux or OS X, assign execute permissions to the file by running the following command on the terminal: 
+`chmod +x <fileName>`<br/>
+Replace `fileName` with the correct name: `deploy-cromwell-on-azure-linux` or `deploy-cromwell-on-azure-osx.app`.<br/>
+
 The installation executable needs to be configured and run from the command line. You will need the following parameters:
 - *Required*: Your Azure `SubscriptionId`. For more details see [Subscriptions](https://account.azure.com/Subscriptions).
 - *Required*: The `RegionName` specifies the region you would like to use for your Cromwell on Azure instance. To find a list of all available regions, run `az account list-locations` on command line or PowerShell and use the desired region's "name" property for `RegionName`.
