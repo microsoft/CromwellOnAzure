@@ -22,9 +22,14 @@ This is an example trigger JSON file:
  "WorkflowDependenciesUrl": null
 }
 ```
-Substitute the "WorkflowInputsUrl" with the http link to your inputs JSON file hosted on your Storage account. See more instructions on how to run a workflow on Cromwell on Azure [here](quickstart-cromwell-on-azure.md).
+See more instructions on how to run a workflow on Cromwell on Azure [here](quickstart-cromwell-on-azure.md).
 
-### Start the workflow
-To start the workflow on Cromwell on Azure, place the trigger JSON file in the "new" folder of the "workflows" container within your Cromwell on Azure storage account that is associated with your host VM. This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred over to the "inprogress" directory in the ""workflows" container.<br/>
+## Start a WDL workflow
+To start a WDL workflow, go to your Cromwell on Azure Storage account associated with your host VM. In the "workflows" container, create the directory "new" and place the trigger file in that folder. This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred over to the "inprogress" directory in the Workflows container.<br/>
 
-Once your workflow completes, you can view the output files in the "cromwell-executions" container within your Azure Storage account. Additional output files from the cromwell endpoint, including metadata and the timing file, are found in the "outputs" container. <br/>
+![directory](/docs/screenshots/newportal.PNG)
+![directory2](/docs/screenshots/newexplorer.PNG)
+
+For example, a trigger JSON file with name `task1.json` in the "new" directory, will be move to "inprogress" directory with a modified name `task1.guid.json`. This guid is a workflow id assigned by Cromwell.<br/>
+
+Once your workflow completes, you can view the output files of your workflow in the "cromwell-executions" container within your Azure Storage Account. Additional output files from the cromwell endpoint, including metadata and the timing file, are found in the "outputs" container. To learn more about Cromwell's metadata and timing information, visit the [Cromwell documentation](https://cromwell.readthedocs.io/en/stable/).<br/>
