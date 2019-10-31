@@ -28,6 +28,9 @@ workflow FastqToUbamSingleSample {
         docker_image = gotc_docker,
         gotc_path = gotc_path
     }
+    output {
+	File unmapped_bam = FastqToUbam.unmapped_bam
+    }
 }
 
 
