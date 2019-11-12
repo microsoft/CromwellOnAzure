@@ -3,7 +3,7 @@
 <!-- This file is consumed by PowerShell scripts in the 'health-localization' repo under the LocBuild\GeoPolitical folder(s) -->
 <!DOCTYPE varsdefined [
 <!ENTITY GitReposFolder "C:\GITs\Repos">
-<!ENTITY GitRepoName "Emmons">
+<!ENTITY GitRepoName "CromwellOnAzure">
 ]>
 
 <GeoPol_Folders>
