@@ -128,4 +128,4 @@ For example, a trigger JSON file with name `task1.json` in the "new" directory, 
 Once your workflow completes, you can view the output files of your workflow in the "cromwell-executions" container within your Azure Storage Account. Additional output files from the cromwell endpoint, including metadata and the timing file, are found in the "outputs" container. To learn more about Cromwell's metadata and timing information, visit the [Cromwell documentation](https://cromwell.readthedocs.io/en/stable/).<br/>
 
 ## Abort an in-progress workflow
-To abort a workflow that is in-progress, go to your Cromwell on Azure Storage account associated with your host VM. In the "workflows" container, place a new trigger file in the "abort" virtual directory named `'cromwellID.json'`, where "cromwellID" is the Cromwell workflow ID you wish to abort.
+To abort a workflow that is in-progress, go to your Cromwell on Azure Storage account associated with your host VM. In the "workflows" container, place an empty file in the "abort" virtual directory named `cromwellID.json`, where "cromwellID" is the Cromwell workflow ID you wish to abort.
