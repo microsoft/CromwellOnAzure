@@ -2,18 +2,18 @@
 This quickstart walks through how to install Cromwell on Azure and run a sample workflow. 
 
 Get started in just a few steps: 
-1. Installation: Download prerequisites and use the installation executable to configure the Azure resources needed to run Cromwell on Azure. 
+1. Installation: download prerequisites and use the installation executable to configure the Azure resources needed to run Cromwell on Azure. 
 2. Create a JSON file with required URLs. 
 3. Run the sample workflow.
 
 
 # Installation: 
 ## Installation Prerequisites
-Before installing Cromwell on Azure, be sure that you have [Azure Command Line Interface (az cli)](https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest), a command line experience for managing Azure resources. Install it from [here](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest). Once you have "az cli" installed, run `az login` on PowerShell, command line or terminal and use your Azure credentials to get started!<br/>
+Before installing Cromwell on Azure, be sure that you have installed the [Azure Command Line Interface (az cli)](https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest), a command line experience for managing Azure resources, available [here](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest). Once you have "az cli" installed, run `az login` and use your Azure credentials to get started!<br/>
 
 You will also need to set up your [Azure Subscription](https://portal.azure.com/) before installing Cromwell on Azure.<br/>
 
-To ensure an error free installation, check your Azure Batch account quotas. Learn more [here](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas).<br/>
+If you already have an Azure Batch account in your Azure subscription, you may need to increase your Azure Batch quota. Learn more [here](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas).<br/>
 
 ## Download the installation executable
 There are two ways to obtain the installation executable: 
@@ -41,18 +41,18 @@ Installation can take up to 20 minutes to complete.
 Once installed, Cromwell on Azure configures the following Azure resources:
 
 * [Host VM](https://azure.microsoft.com/en-us/services/virtual-machines/) - The host VM runs the Cromwell server.  It includes the virtual machine, disk, network interface, public IP address, and virtual network. 
-* [Batch account](https://docs.microsoft.com/en-us/azure/batch/) - The Batch account is connected to the host VM by default and will spin up the virtual machines that run each task in a workflow. 
+* [Batch account](https://docs.microsoft.com/en-us/azure/batch/) - The Batch account is connected to the host VM by default and will spin up the virtual machines that run each task in a workflow.  After installation, create an Azure support request to increase your core quotas if you plan on running large workflows.  Learn more [here](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas).
 * [Storage account](https://docs.microsoft.com/en-us/azure/storage/) - This Storage account is mounted to the host VM. By default, it includes the following Blob containers - "cromwell-executions", "cromwell-workflow-logs", "inputs", "outputs", and "workflows".
 * [Application Insights](https://docs.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview) - This contains all logs from the workflow to enable debugging at the task level. 
 * [Cosmos DB](https://docs.microsoft.com/en-us/azure/cosmos-db/introduction) - This database includes information and metadata about each task in each workflow run by the host VM.
 
- All of these resources will be grouped under a single resource group in your account, which you can view on the [Azure Portal](https://portal.azure.com). Note that your specific Resource Group name, host VM name and host VM password for username "vmadmin" are printed to the screen during installation. We recommend safely storing these for your future use! <br/>
+ All of these resources will be grouped under a single resource group in your account, which you can view on the [Azure Portal](https://portal.azure.com). Note that your specific resource group name, host VM name and host VM password for username "vmadmin" are printed to the screen during installation. We recommend safely storing these for your future use.<br/>
 
 Note that as part of the Cromwell on Azure installation, a "Hello World" workflow is automatically run. The input files for this workflow are found in the "inputs" container, and the output files can be found in the "cromwell-executions" container.<br/>
 
 
 # Run a sample workflow
-To run a workflow using Cromwell on Azure, you will need to upload your input files and your WDL file to Azure storage. You will also need to generate a Cromwell on Azure-specific trigger file which includes the path to your WDL and inputs file, and any workflow options and dependencies. Submitting this trigger file initiates the Cromwell workflow. In this example, we will run a sample workflow written in WDL that converts FASTQ files to uBAM for chromosome 21.
+To run a workflow using Cromwell on Azure, you will need to upload your input files and your WDL file to Azure Storage. You will also need to generate a Cromwell on Azure-specific trigger file which includes the path to your WDL and inputs file, and any workflow options and dependencies. Submitting this trigger file initiates the Cromwell workflow. In this example, we will run a sample workflow written in WDL that converts FASTQ files to uBAM for chromosome 21.
 
 ## Access input data 
 You can find publicly available paired end reads for chromosome 21 hosted here:
@@ -96,7 +96,7 @@ Please note, [Cromwell engine currently does not support http(s) paths](https://
 ## Configure your Cromwell on Azure trigger file
 Cromwell on Azure uses a trigger file to note the paths to all input information and to initiate the workflow. A sample trigger file can be downloaded from this [GitHub repo](https://github.com/microsoft/CromwellOnAzure/blob/master/samples/quickstart/FastqToUbamSingleSample.chr21.json) and includes the following information:
 - The "WorkflowUrl" is the url for your WDL file. You can get this from the Azure Portal.
-- The "WorkflowInputsUrl" is the url for your input json file.
+- The "WorkflowInputsUrl" is the url for your input JSON file.
 - The "WorkflowOptionsUrl" is only used with some WDL files. If you are not using it set this to `null`.
 - The "WorkflowDependenciesUrl" is only used with some WDL files. If you are not using it set this to `null`.
 
@@ -110,15 +110,15 @@ Your trigger file should be configured as follows:
 }
 ```
 
-When using WDL and inputs JSON file hosted on your private Azure Storage account's blob containers, the specific url can be found by clicking on the file to view the blob's properties from the Azure portal. The URL path to "WorkflowUrl" for a test WDL file will look like:
+When using WDL and inputs JSON file hosted on your private Azure Storage account's blob containers, the specific URL can be found by clicking on the file to view the blob's properties from the Azure portal. The URL path to "WorkflowUrl" for a test WDL file will look like:
 `https://<storageaccountname>.blob.core.windows.net/inputs/test/test.wdl`
 
 Alternatively, you can use any http or https path to a TES compliant WDL and inputs.json [using shared access signatures (SAS)](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for files in a private Azure Storage account container or refer to any public file location. 
 
-You can also host your WDL and JSON inputs files on your Storage account container and use the `/<storageaccountname>/<containername>/blobName` format.
+You can also host your WDL and JSON inputs files on your storage account container and use the `/<storageaccountname>/<containername>/blobName` format.
 
 ## Start a WDL workflow
-To start a WDL workflow, go to your Cromwell on Azure Storage account associated with your host VM. In the "workflows" container, place the trigger file in the "new" virtual directory (note: virtual directories do not exist on their own, they are just part of a blob's name). This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred to the "inprogress" directory in the Workflows container.<br/>
+To start a WDL workflow, go to your Cromwell on Azure Storage account associated with your host VM. In the `workflows` container, place the trigger file in the "new" virtual directory (note: virtual directories do not exist on their own, they are just part of a blob's name). This initiates a Cromwell workflow, and returns a workflow ID that is appended to the trigger JSON file name and transferred to the "inprogress" directory in the `workflows` container.<br/>
 
 ![directory](/docs/screenshots/newportal.PNG)
 ![directory2](/docs/screenshots/newexplorer.PNG)
