@@ -408,6 +408,10 @@ namespace CromwellOnAzureDeployer
                     containersToMountConfigText = containersToMountConfigText.Replace("STORAGEACCOUNTNAME", configuration.StorageAccountName);
                     await configContainer.GetBlockBlobReference(Path.GetFileName(containersToMountConfigPath)).UploadTextAsync(containersToMountConfigText, cts.Token);
 
+                    var workflowsContainer = blobClient.GetContainerReference(WorkflowsContainerName);
+                    await workflowsContainer.GetBlockBlobReference("new/readme.txt").UploadTextAsync("Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure", cts.Token);
+                    await workflowsContainer.GetBlockBlobReference("abort/readme.txt").UploadTextAsync("Upload a trigger file to this virtual directory to abort an existing workflow. The trigger file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure", cts.Token);
+
                     return storageAccount;
                 });
         }

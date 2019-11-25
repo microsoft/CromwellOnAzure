@@ -106,17 +106,19 @@ namespace TriggerService
             await blob.DeleteIfExistsAsync();
         }
 
-        public async Task<List<string>> GetByStateAsync(string container, WorkflowState state)
-        {
-            var containerReference = blobClient.GetContainerReference(container);
-            var blobs = await GetBlobsWithPrefixAsync(containerReference, state.ToString().ToLowerInvariant());
-            return blobs.Select(b => b.Name).ToList();
-        }
 
+        /// <summary>
+        /// Return all blobs for a given state, except readme files
+        /// </summary>
+        /// <param name="state">Workflow state to query for</param>
+        /// <returns></returns>
         public async Task<IEnumerable<CloudBlockBlob>> GetWorkflowsByStateAsync(WorkflowState state)
         {
             var containerReference = blobClient.GetContainerReference(WorkflowsContainerName);
-            return await GetBlobsWithPrefixAsync(containerReference, state.ToString().ToLowerInvariant());
+            var lowercaseState = state.ToString().ToLowerInvariant();
+            var blobs = await GetBlobsWithPrefixAsync(containerReference, lowercaseState);
+            var readmeBlobName = $"{lowercaseState}/readme.txt";
+            return blobs.Where(blob => !blob.Name.Equals(readmeBlobName, StringComparison.OrdinalIgnoreCase));
         }
 
         public async Task<string> UploadFileFromPathAsync(string path, string container, string blobName)

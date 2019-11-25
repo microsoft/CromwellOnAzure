@@ -118,7 +118,7 @@ Alternatively, you can use any http or https path to a TES compliant WDL and inp
 You can also host your WDL and JSON inputs files on your Storage account container and use the `/<storageaccountname>/<containername>/blobName` format.
 
 ## Start a WDL workflow
-To start a WDL workflow, go to your Cromwell on Azure Storage account associated with your host VM. In the "workflows" container, create the directory "new" and place the trigger file in that folder. This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred over to the "inprogress" directory in the Workflows container.<br/>
+To start a WDL workflow, go to your Cromwell on Azure Storage account associated with your host VM. In the "workflows" container, place the trigger file in the "new" virtual directory (note: virtual directories do not exist on their own, they are just part of a blob's name). This initiates a Cromwell workflow, and returns a workflow id that is appended to the trigger JSON file name and transferred to the "inprogress" directory in the Workflows container.<br/>
 
 ![directory](/docs/screenshots/newportal.PNG)
 ![directory2](/docs/screenshots/newexplorer.PNG)
@@ -126,3 +126,6 @@ To start a WDL workflow, go to your Cromwell on Azure Storage account associated
 For example, a trigger JSON file with name `task1.json` in the "new" directory, will be move to "inprogress" directory with a modified name `task1.guid.json`. This guid is a workflow id assigned by Cromwell.<br/>
 
 Once your workflow completes, you can view the output files of your workflow in the "cromwell-executions" container within your Azure Storage Account. Additional output files from the cromwell endpoint, including metadata and the timing file, are found in the "outputs" container. To learn more about Cromwell's metadata and timing information, visit the [Cromwell documentation](https://cromwell.readthedocs.io/en/stable/).<br/>
+
+## Abort an in-progress workflow
+To abort a workflow that is in-progress, go to your Cromwell on Azure Storage account associated with your host VM. In the "workflows" container, place a new trigger file in the "abort" virtual directory named `'cromwellID.json'`, where "cromwellID" is the Cromwell workflow ID you wish to abort.
