@@ -21,6 +21,7 @@ namespace CromwellOnAzureDeployer
         public string ResourceGroupName { get; set; }
         public string BatchAccountName { get; set; }
         public string StorageAccountName { get; set; }
+        public string NetworkSecurityGroupName { get; set; }
         public string CosmosDbAccountName { get; set; }
         public string ApplicationInsightsAccountName { get; set; }
         public string VmName { get; set; }
@@ -70,6 +71,11 @@ namespace CromwellOnAzureDeployer
             if (string.IsNullOrWhiteSpace(StorageAccountName))
             {
                 StorageAccountName = SdkContext.RandomResourceName($"{MainIdentifierPrefix}", 24);
+            }
+
+            if (string.IsNullOrWhiteSpace(NetworkSecurityGroupName))
+            {
+                NetworkSecurityGroupName = SdkContext.RandomResourceName($"{MainIdentifierPrefix}", 15);
             }
 
             if (string.IsNullOrWhiteSpace(CosmosDbAccountName))
