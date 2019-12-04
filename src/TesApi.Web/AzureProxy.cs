@@ -490,22 +490,37 @@ namespace TesApi.Web
             }
         }
 
+        private async Task<string> GetPricingContentJsonAsync()
+        {
+            var pricingUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2016-08-31-preview&$filter=OfferDurableId eq 'MS-AZR-0003p' and Currency eq 'USD' and Locale eq 'en-US' and RegionInfo eq 'US'";
+
+            try
+            {
+                var accessToken = await GetAzureAccessTokenAsync();
+                var pricingRequest = new HttpRequestMessage(HttpMethod.Get, pricingUrl);
+                pricingRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                var pricingResponse = await httpClient.SendAsync(pricingRequest);
+                var pricingContent = await pricingResponse.Content.ReadAsStringAsync();
+
+                return pricingContent;
+            }
+            catch (Exception ex)
+            {
+                logger.LogInformation($"GetVmSizesAndPricesAsync URL: {pricingUrl}");
+                logger.LogError(ex, "GetPricingContentJsonAsync");
+                throw;
+            }
+        }
+
         /// <summary>
         /// Get the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>.
         /// </summary>
         /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
         private async Task<IEnumerable<VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
         {
-            var accessToken = await GetAzureAccessTokenAsync();
             var azureClient = await GetAzureManagementClientAsync();
-
+            var pricingContent = await GetPricingContentJsonAsync();
             var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).VirtualMachines.Sizes.ListByRegionAsync(location)).ToList();
-
-            var pricingUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2016-08-31-preview&$filter=OfferDurableId eq 'MS-AZR-0003p' and Currency eq 'USD' and Locale eq 'en-US' and RegionInfo eq 'US'";
-            var pricingRequest = new HttpRequestMessage(HttpMethod.Get, pricingUrl);
-            pricingRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-            var pricingResponse = await httpClient.SendAsync(pricingRequest);
-            var pricingContent = await pricingResponse.Content.ReadAsStringAsync();
 
             try
             {
@@ -552,7 +567,6 @@ namespace TesApi.Web
             }
             catch (Exception ex)
             {
-                logger.LogInformation($"GetVmSizesAndPricesAsync URL: {pricingUrl}");
                 logger.LogError(ex, "GetVmSizesAndPricesAsync");
                 throw new Exception($"Could not retrieve VM pricing info. Make sure that TES service principal has Billing Reader role on the subscription", ex);
             }
