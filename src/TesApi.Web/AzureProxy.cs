@@ -43,7 +43,7 @@ namespace TesApi.Web
         private readonly BatchClient batchClient;
         private readonly string subscriptionId;
         private readonly string location;
-        private readonly string altRegionName;
+        private readonly string billingRegionName;
 
         private MemoryCache cache { get; set; } = new MemoryCache(new MemoryCacheOptions());
 
@@ -60,7 +60,7 @@ namespace TesApi.Web
             batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{batchAccount.AccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
             subscriptionId = batchAccount.Manager.SubscriptionId;
             location = batchAccount.RegionName;
-            altRegionName = AzureRegionUtils.GetBillingRegionName(location);
+            billingRegionName = AzureRegionUtils.GetBillingRegionName(location);
         }
 
         // TODO: Static method because the instrumentation key is needed in both Program.cs and Startup.cs and we wanted to avoid intializing the batch client twice.
@@ -525,7 +525,7 @@ namespace TesApi.Web
             try
             {
                 var vmPrices = JObject.Parse(pricingContent)["Meters"]
-                    .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Replace(" ", "").Equals(altRegionName, StringComparison.OrdinalIgnoreCase))
+                    .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Replace(" ", "").Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
                     .Select(m => new { MeterNames = m["MeterName"].ToString(), MeterSubCategories = m["MeterSubCategory"].ToString().Replace(" Series", ""), PricePerHour = decimal.Parse(m["MeterRates"]["0"].ToString()) })
                     .Where(m => !m.MeterSubCategories.Contains("Windows"))
                     .Select(m => new { MeterNames = m.MeterNames.Replace(" Low Priority", ""), m.MeterSubCategories, m.PricePerHour, LowPriority = m.MeterNames.Contains(" Low Priority") })
