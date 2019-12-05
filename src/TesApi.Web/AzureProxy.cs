@@ -60,7 +60,7 @@ namespace TesApi.Web
             batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{batchAccount.AccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
             subscriptionId = batchAccount.Manager.SubscriptionId;
             location = batchAccount.RegionName;
-            altRegionName = AzureRegionUtils.GetAltName(location);
+            altRegionName = AzureRegionUtils.GetBillingRegionName(location);
         }
 
         // TODO: Static method because the instrumentation key is needed in both Program.cs and Startup.cs and we wanted to avoid intializing the batch client twice.

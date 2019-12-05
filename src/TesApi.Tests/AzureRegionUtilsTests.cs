@@ -7,10 +7,10 @@ namespace TesApi.Tests
     public class AzureRegionUtilsTests
     {
         [TestMethod]
-        public void Alternate_Region_Name_For_westus_Is_Valid()
+        public void Billing_Region_Name_For_westus_Is_Valid()
         {
-            Assert.IsTrue(AzureRegionUtils.GetAltName("WESTUS") == "USWest");
-            Assert.IsTrue(AzureRegionUtils.GetAltName("westus") == "USWest");
+            Assert.IsTrue(AzureRegionUtils.GetBillingRegionName("WESTUS") == "US West");
+            Assert.IsTrue(AzureRegionUtils.GetBillingRegionName("westus") == "US West");
         }
     }
 }
