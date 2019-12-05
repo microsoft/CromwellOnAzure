@@ -506,7 +506,7 @@ namespace TesApi.Web
             }
             catch (Exception ex)
             {
-                logger.LogInformation($"GetVmSizesAndPricesAsync URL: {pricingUrl}");
+                logger.LogInformation($"GetPricingContentJsonAsync URL: {pricingUrl}");
                 logger.LogError(ex, "GetPricingContentJsonAsync");
                 throw;
             }
