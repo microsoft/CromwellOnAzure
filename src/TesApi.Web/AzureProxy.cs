@@ -60,7 +60,13 @@ namespace TesApi.Web
             batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{batchAccount.AccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
             subscriptionId = batchAccount.Manager.SubscriptionId;
             location = batchAccount.RegionName;
-            billingRegionName = AzureRegionUtils.GetBillingRegionName(location);
+
+            if (!AzureRegionUtils.TryGetBillingRegionName(location, out string azureBillingRegionName))
+            {
+                logger.LogWarning($"Azure ARM location '{location}' does not have a corresponding Azure Billing Region.  Prices from the fallback billing region '{azureBillingRegionName}' will be used instead.");
+            }
+
+            billingRegionName = azureBillingRegionName;
         }
 
         // TODO: Static method because the instrumentation key is needed in both Program.cs and Startup.cs and we wanted to avoid intializing the batch client twice.
