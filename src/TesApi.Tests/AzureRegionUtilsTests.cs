@@ -12,21 +12,21 @@ namespace TesApi.Tests
     public class AzureRegionUtilsTests
     {
         [TestMethod]
-        public void Billing_Region_Name_For_westus_Is_Valid()
+        public void BillingRegionNameIsValid()
         {
             Assert.IsTrue(AzureRegionUtils.TryGetBillingRegionName("westus", out string billingRegionName));
             Assert.AreEqual(billingRegionName, "US West");
         }
 
         [TestMethod]
-        public void ArmLocation_Is_Case_Insensitive()
+        public void BillingRegionLookupIsCaseInsensitive()
         {
             Assert.IsTrue(AzureRegionUtils.TryGetBillingRegionName("WeStUs", out string billingRegionName));
             Assert.AreEqual(billingRegionName, "US West");
         }
 
         [TestMethod]
-        public void Unknown_ArmLocation_results_in_null()
+        public void BillingRegionLookupFailsIfRegionDoesNotExist()
         {
             Assert.IsFalse(AzureRegionUtils.TryGetBillingRegionName("unknown", out string billingRegionName));
             Assert.IsNull(billingRegionName);
