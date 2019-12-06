@@ -25,6 +25,7 @@ namespace TesApi.Web
         private const string CosmosDbDatabaseId = "TES";
         private const string CosmosDbCollectionId = "Tasks";
         private const string CosmosDbPartitionId = "01";
+        private const string defaultAzureOfferDurableId = "MS-AZR-0003p";
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -52,7 +53,14 @@ namespace TesApi.Web
         /// <param name="services"></param>
         public void ConfigureServices(IServiceCollection services)
         {
-            IAzureProxy azureProxy = new AzureProxy(Configuration["BatchAccountName"], loggerFactory.CreateLogger<AzureProxy>());
+            string azureOfferDurableId = defaultAzureOfferDurableId;
+            
+            if (!string.IsNullOrWhiteSpace(Configuration["AzureOfferDurableId"]))
+            {
+                azureOfferDurableId = Configuration["AzureOfferDurableId"];
+            }
+
+            IAzureProxy azureProxy = new AzureProxy(Configuration["BatchAccountName"], azureOfferDurableId, loggerFactory.CreateLogger<AzureProxy>());
             services.AddSingleton<IAzureProxy>(azureProxy);
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Latest);
 

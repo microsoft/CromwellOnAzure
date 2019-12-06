@@ -44,6 +44,7 @@ namespace TesApi.Web
         private readonly string subscriptionId;
         private readonly string location;
         private readonly string billingRegionName;
+        private readonly string azureOfferDurableId;
 
         private MemoryCache cache { get; set; } = new MemoryCache(new MemoryCacheOptions());
 
@@ -52,7 +53,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="batchAccountName">Batch account name</param>
         /// <param name="logger">The logger</param>
-        public AzureProxy(string batchAccountName, ILogger logger)
+        public AzureProxy(string batchAccountName, string azureOfferDurableId, ILogger logger)
         {
             this.logger = logger;
             this.batchAccountName = batchAccountName;
@@ -67,6 +68,7 @@ namespace TesApi.Web
             }
 
             billingRegionName = azureBillingRegionName;
+            this.azureOfferDurableId = azureOfferDurableId;
         }
 
         // TODO: Static method because the instrumentation key is needed in both Program.cs and Startup.cs and we wanted to avoid intializing the batch client twice.
@@ -498,7 +500,7 @@ namespace TesApi.Web
 
         private async Task<string> GetPricingContentJsonAsync()
         {
-            var pricingUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2016-08-31-preview&$filter=OfferDurableId eq 'MS-AZR-0003p' and Currency eq 'USD' and Locale eq 'en-US' and RegionInfo eq 'US'";
+            var pricingUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2016-08-31-preview&$filter=OfferDurableId eq '{azureOfferDurableId}' and Currency eq 'USD' and Locale eq 'en-US' and RegionInfo eq 'US'";
 
             try
             {
