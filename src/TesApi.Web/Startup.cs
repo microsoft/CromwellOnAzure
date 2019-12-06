@@ -30,6 +30,7 @@ namespace TesApi.Web
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly IHostingEnvironment hostingEnvironment;
+        private readonly string azureOfferDurableId;
 
         /// <summary>
         /// Startup class for ASP.NET core
@@ -40,6 +41,7 @@ namespace TesApi.Web
             this.hostingEnvironment = hostingEnvironment;
             logger = loggerFactory.CreateLogger<Startup>();
             this.loggerFactory = loggerFactory;
+            azureOfferDurableId = Configuration["AzureOfferDurableId"] ?? defaultAzureOfferDurableId;
         }
 
         /// <summary>
@@ -52,14 +54,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="services"></param>
         public void ConfigureServices(IServiceCollection services)
-        {
-            string azureOfferDurableId = defaultAzureOfferDurableId;
-            
-            if (!string.IsNullOrWhiteSpace(Configuration["AzureOfferDurableId"]))
-            {
-                azureOfferDurableId = Configuration["AzureOfferDurableId"];
-            }
-
+        {           
             IAzureProxy azureProxy = new AzureProxy(Configuration["BatchAccountName"], azureOfferDurableId, loggerFactory.CreateLogger<AzureProxy>());
             services.AddSingleton<IAzureProxy>(azureProxy);
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Latest);
