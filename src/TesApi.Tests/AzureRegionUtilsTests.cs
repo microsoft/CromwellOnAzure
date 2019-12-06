@@ -26,11 +26,10 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
-        public void Unknown_ArmLocation_Falls_Back_To_westus2()
+        public void Unknown_ArmLocation_results_in_null()
         {
             Assert.IsFalse(AzureRegionUtils.TryGetBillingRegionName("unknown", out string billingRegionName));
-            AzureRegionUtils.TryGetBillingRegionName("westus2", out string westus2billingRegionName);
-            Assert.AreEqual(billingRegionName, westus2billingRegionName);
+            Assert.IsNull(billingRegionName);
         }
 
         /// <summary>

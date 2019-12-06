@@ -63,11 +63,9 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="armLocation">Azure ARM location, e.g. 'westus'</param>
         /// <param name="billingRegionName">The Azure billing region name, e.g. 'US West'</param>
-        /// <returns>true if a matching billing region is found, false otherwise.  If false, the default billing region for Azure is returned (westus2)</returns>
+        /// <returns>true if a matching billing region is found, false otherwise</returns>
         public static bool TryGetBillingRegionName(string armLocation, out string billingRegionName)
         {
-            const string fallbackAzureRegion = "westus2";
-
             if (billingRegionLookup.TryGetValue(armLocation.ToLowerInvariant(), out var altName))
             {
                 billingRegionName = altName;
@@ -75,7 +73,7 @@ namespace TesApi.Web
             }
             else
             {
-                billingRegionName = billingRegionLookup[fallbackAzureRegion];
+                billingRegionName = null;
                 return false;
             }
         }
