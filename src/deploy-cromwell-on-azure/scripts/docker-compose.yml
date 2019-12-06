@@ -11,6 +11,7 @@ services:
       - BatchAccountName=VARBATCHACCOUNTNAME
       - ApplicationInsightsAccountName=VARAPPLICATIONINSIGHTSACCOUNTNAME
       - UsePreemptibleVmsOnly=true
+      - AzureOfferDurableId=MS-AZR-0003p
     expose:
       - "80"
   mysqldb:

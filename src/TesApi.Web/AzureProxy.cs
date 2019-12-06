@@ -35,6 +35,7 @@ namespace TesApi.Web
     {
         private const double MbToGbRatio = 0.001;
         private const char BatchJobAttemptSeparator = '-';
+        private const string defaultAzureBillingRegionName = "US West";
 
         private static readonly HttpClient httpClient = new HttpClient();
 
@@ -43,6 +44,8 @@ namespace TesApi.Web
         private readonly BatchClient batchClient;
         private readonly string subscriptionId;
         private readonly string location;
+        private readonly string billingRegionName;
+        private readonly string azureOfferDurableId;
 
         private MemoryCache cache { get; set; } = new MemoryCache(new MemoryCacheOptions());
 
@@ -51,7 +54,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="batchAccountName">Batch account name</param>
         /// <param name="logger">The logger</param>
-        public AzureProxy(string batchAccountName, ILogger logger)
+        public AzureProxy(string batchAccountName, string azureOfferDurableId, ILogger logger)
         {
             this.logger = logger;
             this.batchAccountName = batchAccountName;
@@ -59,6 +62,17 @@ namespace TesApi.Web
             batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{batchAccount.AccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
             subscriptionId = batchAccount.Manager.SubscriptionId;
             location = batchAccount.RegionName;
+            this.azureOfferDurableId = azureOfferDurableId;
+
+            if (AzureRegionUtils.TryGetBillingRegionName(location, out string azureBillingRegionName))
+            {
+                billingRegionName = azureBillingRegionName;
+            }
+            else
+            {
+                logger.LogWarning($"Azure ARM location '{location}' does not have a corresponding Azure Billing Region.  Prices from the fallback billing region '{defaultAzureBillingRegionName}' will be used instead.");
+                billingRegionName = defaultAzureBillingRegionName;
+            }
         }
 
         // TODO: Static method because the instrumentation key is needed in both Program.cs and Startup.cs and we wanted to avoid intializing the batch client twice.
@@ -488,28 +502,42 @@ namespace TesApi.Web
             }
         }
 
+        private async Task<string> GetPricingContentJsonAsync()
+        {
+            var pricingUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2016-08-31-preview&$filter=OfferDurableId eq '{azureOfferDurableId}' and Currency eq 'USD' and Locale eq 'en-US' and RegionInfo eq 'US'";
+
+            try
+            {
+                var accessToken = await GetAzureAccessTokenAsync();
+                var pricingRequest = new HttpRequestMessage(HttpMethod.Get, pricingUrl);
+                pricingRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                var pricingResponse = await httpClient.SendAsync(pricingRequest);
+                var pricingContent = await pricingResponse.Content.ReadAsStringAsync();
+
+                return pricingContent;
+            }
+            catch (Exception ex)
+            {
+                logger.LogInformation($"GetPricingContentJsonAsync URL: {pricingUrl}");
+                logger.LogError(ex, "GetPricingContentJsonAsync");
+                throw;
+            }
+        }
+
         /// <summary>
         /// Get the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>.
         /// </summary>
         /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
         private async Task<IEnumerable<VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
         {
-            var accessToken = await GetAzureAccessTokenAsync();
             var azureClient = await GetAzureManagementClientAsync();
-
+            var pricingContent = await GetPricingContentJsonAsync();
             var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).VirtualMachines.Sizes.ListByRegionAsync(location)).ToList();
-
-            var pricingUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2016-08-31-preview&$filter=OfferDurableId eq 'MS-AZR-0003p' and Currency eq 'USD' and Locale eq 'en-US' and RegionInfo eq 'US'";
-            var pricingRequest = new HttpRequestMessage(HttpMethod.Get, pricingUrl);
-            pricingRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-            var pricingResponse = await httpClient.SendAsync(pricingRequest);
-            var pricingContent = await pricingResponse.Content.ReadAsStringAsync();
 
             try
             {
-                // TODO: Use actual location for MeterRegion. Note that location contains eg. "westus" while MeterRegion below contains "US West"
                 var vmPrices = JObject.Parse(pricingContent)["Meters"]
-                    .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString() == "US West")
+                    .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
                     .Select(m => new { MeterNames = m["MeterName"].ToString(), MeterSubCategories = m["MeterSubCategory"].ToString().Replace(" Series", ""), PricePerHour = decimal.Parse(m["MeterRates"]["0"].ToString()) })
                     .Where(m => !m.MeterSubCategories.Contains("Windows"))
                     .Select(m => new { MeterNames = m.MeterNames.Replace(" Low Priority", ""), m.MeterSubCategories, m.PricePerHour, LowPriority = m.MeterNames.Contains(" Low Priority") })
@@ -551,7 +579,6 @@ namespace TesApi.Web
             }
             catch (Exception ex)
             {
-                logger.LogInformation($"GetVmSizesAndPricesAsync URL: {pricingUrl}");
                 logger.LogError(ex, "GetVmSizesAndPricesAsync");
                 throw new Exception($"Could not retrieve VM pricing info. Make sure that TES service principal has Billing Reader role on the subscription", ex);
             }
