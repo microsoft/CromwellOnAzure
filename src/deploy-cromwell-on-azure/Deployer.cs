@@ -20,6 +20,8 @@ using Microsoft.Azure.Management.CosmosDB.Fluent;
 using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent.Models;
+using Microsoft.Azure.Management.Network.Fluent;
+using Microsoft.Azure.Management.Network.Fluent.Models;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
@@ -93,7 +95,12 @@ namespace CromwellOnAzureDeployer
 
                     Task.Run(async () => 
                         { 
-                            linuxVm = await CreateVirtualMachineAsync(); 
+                            linuxVm = await CreateVirtualMachineAsync();
+
+                            var nic = linuxVm.GetPrimaryNetworkInterface();
+                            var nsg = await CreateNetworkSecurityGroupAsync();
+                            await AssociateNicWithNetworkSecurityGroupAsync(nic, nsg);
+
                             sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
                             await WaitForSshConnectivityAsync(sshConnectionInfo);
                             await ConfigureVmAsync(sshConnectionInfo);
@@ -497,6 +504,38 @@ namespace CromwellOnAzureDeployer
                     .WithSize(configuration.VmSize)
                     .WithSystemAssignedManagedServiceIdentity()
                     .CreateAsync(cts.Token));
+        }
+
+        private Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync()
+        {
+            const string ruleName = "SSH";
+            const int allowedPort = 22;
+            const int defaultPriority = 300;
+
+            return Execute(
+                $"Creating Network Security Group: {configuration.NetworkSecurityGroupName}...",
+                () => azureClient.NetworkSecurityGroups.Define(configuration.NetworkSecurityGroupName)
+                    .WithRegion(configuration.RegionName)
+                    .WithExistingResourceGroup(configuration.ResourceGroupName)
+                    .DefineRule(ruleName)                        
+                    .AllowInbound()
+                    .FromAnyAddress()
+                    .FromAnyPort()
+                    .ToAnyAddress()
+                    .ToPort(allowedPort)
+                    .WithProtocol(SecurityRuleProtocol.Tcp)
+                    .WithPriority(defaultPriority)
+                    .Attach()
+                    .CreateAsync(cts.Token)
+            );
+        }
+
+        private Task<INetworkInterface> AssociateNicWithNetworkSecurityGroupAsync(INetworkInterface nic, INetworkSecurityGroup nsg)
+        {
+            return Execute(
+                $"Associating NIC with Network Security Group: {configuration.NetworkSecurityGroupName}...",
+                () => nic.Update().WithExistingNetworkSecurityGroup(nsg).ApplyAsync()
+            );
         }
 
         private Task<IGenericResource> CreateAppInsightsResourceAsync()
