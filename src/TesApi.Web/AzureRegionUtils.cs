@@ -21,19 +21,15 @@ namespace TesApi.Web
                 new KeyValuePair<string, string>("canadaeast", "CA East"),
                 new KeyValuePair<string, string>("centralindia", "IN Central"),
                 new KeyValuePair<string, string>("centralus", "US Central"),
-                new KeyValuePair<string, string>("centraluseuap", "US Central"),
                 new KeyValuePair<string, string>("eastasia", "AP East"),
                 new KeyValuePair<string, string>("eastus", "US East"),
                 new KeyValuePair<string, string>("eastus2", "US East 2"),
-                new KeyValuePair<string, string>("eastus2euap", "US East 2"),
                 new KeyValuePair<string, string>("francecentral", "FR Central"),
                 new KeyValuePair<string, string>("francesouth", "FR South"),
                 new KeyValuePair<string, string>("germanynorth", "DE North"),
                 new KeyValuePair<string, string>("germanywestcentral", "DE West Central"),
                 new KeyValuePair<string, string>("japaneast", "JA East"),
                 new KeyValuePair<string, string>("japanwest", "JA West"),
-                new KeyValuePair<string, string>("jioindiacentral", "IN Central Jio"),
-                new KeyValuePair<string, string>("jioindiawest", "IN West Jio"),
                 new KeyValuePair<string, string>("koreacentral", "KR Central"),
                 new KeyValuePair<string, string>("koreasouth", "KR South"),
                 new KeyValuePair<string, string>("northcentralus", "US North Central"),
@@ -60,7 +56,6 @@ namespace TesApi.Web
                 new KeyValuePair<string, string>("westus2", "US West 2"),
             });
 
-
         /// <summary>
         /// Gets the Azure billing region name from an Azure ARM location
         /// </summary>
@@ -69,16 +64,15 @@ namespace TesApi.Web
         /// <returns>true if a matching billing region is found, false otherwise</returns>
         public static bool TryGetBillingRegionName(string armLocation, out string billingRegionName)
         {
+            billingRegionName = null;
+
             if (billingRegionLookup.TryGetValue(armLocation.ToLowerInvariant(), out var altName))
             {
                 billingRegionName = altName;
                 return true;
             }
-            else
-            {
-                billingRegionName = null;
-                return false;
-            }
+
+            return false;
         }
     }
 }
