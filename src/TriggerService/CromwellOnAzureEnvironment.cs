@@ -190,6 +190,32 @@ namespace TriggerService
             }
         }
 
+        public async Task<(string, byte[])> GetBlobFileNameAndData(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return (null, null);
+            }
+
+            var blobName = GetBlobName(url);
+
+            byte[] data;
+
+            if (((Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase))
+                || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase))
+                && uri.ParseQueryString().Get("sig") == null)
+            {
+                // use known credentials, unless the URL specifies a shared-access signature
+                data = await storage.DownloadBlockBlobAsync(url);
+            }
+            else
+            {
+                data = await storage.DownloadFileUsingHttpClientAsync(url);
+            }
+
+            return (blobName, data);
+        }
+
         private static Guid ExtractWorkflowId(Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob blobTrigger, AzureStorage.WorkflowState currentState)
         {
             var blobName = blobTrigger.Name.Substring(currentState.ToString().Length + 1);
@@ -208,32 +234,6 @@ namespace TriggerService
         private static string GetBlobName(string url)
         {
             return blobNameRegex.Match(url)?.Groups[1].Value.Replace("/", "_");
-        }
-
-        public async Task<(string, byte[])> GetBlobFileNameAndData(string url)
-        {
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                return (null, null);
-            }
-
-            var blobName = GetBlobName(url);
-
-            byte[] data;
-
-            if (((Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase))
-                || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase))
-                && uri.ParseQueryString().Get("sig") == null)
-            {
-                // use known credentials, unless the URL specifies a shared-access signature
-                data = await storage.DownloadBlobAsync(url);
-            }
-            else
-            {
-                data = await storage.GetByteArrayAsync(url);
-            }
-
-            return (blobName, data);
         }
 
         private async Task UploadOutputsAsync(Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob blobTrigger, Guid id, string sampleName)

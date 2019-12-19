@@ -54,7 +54,7 @@ namespace TesApi.Web
             defaultStorageAccountName = configuration["DefaultStorageAccountName"];    // This account contains the cromwell-executions container
             usePreemptibleVmsOnly = bool.TryParse(configuration["UsePreemptibleVmsOnly"], out var temp) ? temp : false;
 
-            externalStorageContainers = configuration["ExternalStorageContainers"]?.Split(new[] { ',', ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            externalStorageContainers = configuration["ExternalStorageContainers"]?.Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                 .SelectMany(e => externalStorageContainerRegex.Matches(e).Cast<Match>()
                     .Select(m => new ExternalStorageContainerInfo { BlobEndpoint = m.Groups[1].Value, AccountName = m.Groups[2].Value, ContainerName = m.Groups[3].Value, SasToken = m.Groups[4].Value }))
                 .ToList();

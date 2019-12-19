@@ -39,7 +39,7 @@ namespace TriggerService
 
             blobClient = account.CreateCloudBlobClient();
             var host = account.BlobStorageUri.PrimaryUri.Host;
-            AccountName = host.Substring(host.IndexOf("."));
+            AccountName = host.Substring(0, host.IndexOf("."));
         }
 
         public string AccountName { get; }
@@ -172,7 +172,7 @@ namespace TriggerService
             await containerReference.DeleteIfExistsAsync();
         }
 
-        public async Task<byte[]> DownloadBlobAsync(string blobUrl)
+        public async Task<byte[]> DownloadBlockBlobAsync(string blobUrl)
         {
             // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs
             if (!blobUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) && blobUrl.TrimStart('/').StartsWith(this.AccountName + "/", StringComparison.OrdinalIgnoreCase))
@@ -196,7 +196,7 @@ namespace TriggerService
             }
         }
 
-        public async Task<byte[]> GetByteArrayAsync(string url)
+        public async Task<byte[]> DownloadFileUsingHttpClientAsync(string url)
         {
             return await httpClient.GetByteArrayAsync(url);
         }

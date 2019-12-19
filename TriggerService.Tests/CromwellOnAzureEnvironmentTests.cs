@@ -11,8 +11,8 @@ namespace TriggerService.Tests
     [TestClass]
     public class CromwellOnAzureEnvironmentTests
     {
-        private string azureCredentialCodePathMethodName { get; set; }
-        private string httpClientCodePathMethodName { get; set; }
+        private byte[] blobData = new byte[1] { 0 };
+        private byte[] httpClientData = new byte[1] { 1 };
 
         [TestMethod]
         public async Task GetBlobFileNameAndDataWithDefaultStorageAccount()
@@ -27,7 +27,7 @@ namespace TriggerService.Tests
             Assert.IsTrue(data.Length > 0);
 
             // Test if Azure credentials code path is used
-            Assert.AreEqual(azureCredentialCodePathMethodName, Encoding.UTF8.GetString(data, 0, data.Length));
+            Assert.AreEqual(data, blobData);
         }
 
         [TestMethod]
@@ -43,7 +43,7 @@ namespace TriggerService.Tests
             Assert.IsTrue(data.Length > 0);
 
             // Test if HttpClient code path is used
-            Assert.AreEqual(httpClientCodePathMethodName, Encoding.UTF8.GetString(data, 0, data.Length));
+            Assert.AreEqual(data, httpClientData);
         }
 
         private async Task<(string, byte[])> GetBlobFileNameAndDataUsingMocksAsync(string url, string accountAuthority)
@@ -54,16 +54,14 @@ namespace TriggerService.Tests
             var serviceProvider = serviceCollection.BuildServiceProvider();
 
             var azStorageMock = new Mock<IAzureStorage>();
-            azureCredentialCodePathMethodName = nameof(azStorageMock.Object.DownloadBlobAsync);
-            httpClientCodePathMethodName = nameof(azStorageMock.Object.GetByteArrayAsync);
 
             azStorageMock.Setup(az => az
-                .DownloadBlobAsync(It.IsAny<string>()))
-                .Returns(Task.FromResult(Encoding.UTF8.GetBytes(azureCredentialCodePathMethodName)));
+                .DownloadBlockBlobAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult(blobData));
 
             azStorageMock.Setup(az => az
-                .GetByteArrayAsync(It.IsAny<string>()))
-                .Returns(Task.FromResult(Encoding.UTF8.GetBytes(httpClientCodePathMethodName)));
+                .DownloadFileUsingHttpClientAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult(httpClientData));
 
             azStorageMock.SetupGet(az => az.AccountAuthority).Returns(accountAuthority);
 
