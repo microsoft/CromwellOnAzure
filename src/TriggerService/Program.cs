@@ -39,9 +39,11 @@ namespace TriggerService
 
             var serviceProvider = serviceCollection.BuildServiceProvider();
 
+            var cloudStorageAccount = await AzureStorage.GetCloudStorageAccountUsingMsiAsync(defaultStorageAccountName);
+
             var environment = new CromwellOnAzureEnvironment(
                             serviceProvider.GetRequiredService<ILoggerFactory>(),
-                            new AzureStorage(serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<AzureStorage>(), defaultStorageAccountName),
+                            new AzureStorage(serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<AzureStorage>(), cloudStorageAccount, new System.Net.Http.HttpClient()),
                             new CromwellApiClient.CromwellApiClient(cromwellUrl));
 
             serviceCollection.AddSingleton(s => new TriggerEngine(s.GetRequiredService<ILoggerFactory>(), environment));

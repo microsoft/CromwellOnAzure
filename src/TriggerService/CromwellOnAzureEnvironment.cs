@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -17,17 +16,17 @@ namespace TriggerService
 {
     public class CromwellOnAzureEnvironment
     {
-        private static readonly Regex blobNameRegex = new Regex("^(?:https?://|/)?[^/]+/[^/]+/(.+)");  // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs in the trigger file.
-        private readonly HttpClient httpClient = new HttpClient();
+        private static readonly Regex blobNameRegex = new Regex("^(?:https?://|/)?[^/]+/[^/]+/([^?.]+)");  // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs in the trigger file.
         private IAzureStorage storage { get; set; }
         private ICromwellApiClient cromwellApiClient { get; set; }
         private readonly ILogger<AzureStorage> logger;
 
         public CromwellOnAzureEnvironment(ILoggerFactory loggerFactory, IAzureStorage storage, ICromwellApiClient cromwellApiClient)
         {
-            logger = loggerFactory.CreateLogger<AzureStorage>();
             this.storage = storage;
             this.cromwellApiClient = cromwellApiClient;
+            this.logger = loggerFactory.CreateLogger<AzureStorage>();
+
             logger.LogInformation($"Cromwell URL: {cromwellApiClient.GetUrl()}");
         }
 
@@ -191,11 +190,6 @@ namespace TriggerService
             }
         }
 
-        private static string GetBlobName(string url)
-        {
-            return blobNameRegex.Match(url)?.Groups[1].Value.Replace("/", "_");
-        }
-
         private static Guid ExtractWorkflowId(Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob blobTrigger, AzureStorage.WorkflowState currentState)
         {
             var blobName = blobTrigger.Name.Substring(currentState.ToString().Length + 1);
@@ -209,6 +203,37 @@ namespace TriggerService
             var blobName = blobTrigger.Name.Substring(AzureStorage.WorkflowState.InProgress.ToString().Length + 1);
             var withoutExtension = Path.GetFileNameWithoutExtension(blobName);
             return withoutExtension.Substring(0, withoutExtension.LastIndexOf('.'));
+        }
+
+        private static string GetBlobName(string url)
+        {
+            return blobNameRegex.Match(url)?.Groups[1].Value.Replace("/", "_");
+        }
+
+        public async Task<(string, byte[])> GetBlobFileNameAndData(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return (null, null);
+            }
+
+            var blobName = GetBlobName(url);
+
+            byte[] data;
+
+            if (((Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase))
+                || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase))
+                && uri.ParseQueryString().Get("sig") == null)
+            {
+                // use known credentials, unless the URL specifies a shared-access signature
+                data = await storage.DownloadBlobAsync(url);
+            }
+            else
+            {
+                data = await storage.GetByteArrayAsync(url);
+            }
+
+            return (blobName, data);
         }
 
         private async Task UploadOutputsAsync(Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob blobTrigger, Guid id, string sampleName)
@@ -251,31 +276,6 @@ namespace TriggerService
             {
                 logger.LogWarning(exc, $"Getting timing threw an exception for Id: {id}");
             }
-        }
-
-        private async Task<(string, byte[])> GetBlobFileNameAndData(string url)
-        {
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                return (null, null);
-            }
-
-            var blobName = GetBlobName(url);
-
-            byte[] data;
-
-            if ((Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase)) 
-                || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase))
-            {
-                // use known credentials
-                data = await storage.DownloadFileAsync(url);
-            }
-            else
-            {
-                data = await httpClient.GetByteArrayAsync(url);
-            }
-
-            return (blobName, data);
         }
     }
 }

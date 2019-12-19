@@ -13,7 +13,7 @@ namespace TriggerService
         string AccountName { get; }
         string AccountAuthority { get; }
         string GetBlobSasUrl(string blobUrl, TimeSpan sasTokenDuration);
-        Task<byte[]> DownloadFileAsync(string blobUrl);
+        Task<byte[]> DownloadBlobAsync(string blobUrl);
         Task<string> UploadFileFromPathAsync(string path, string container, string blobName);
         Task<string> UploadFileTextAsync(string content, string container, string blobName);
         Task MutateStateAsync(string container, string blobName, AzureStorage.WorkflowState newState);
@@ -24,5 +24,6 @@ namespace TriggerService
         Task<IEnumerable<CloudBlockBlob>> GetWorkflowsByStateAsync(AzureStorage.WorkflowState state);
         Task<bool> IsSingleBlobExistsFromPrefixAsync(string container, string blobPrefix);
         Task<bool> IsAvailableAsync();
+        Task<byte[]> GetByteArrayAsync(string url);
     }
 }
