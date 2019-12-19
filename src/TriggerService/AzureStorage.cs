@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.Fluent;
@@ -25,17 +26,20 @@ namespace TriggerService
         private readonly ILogger<AzureStorage> logger;
         private readonly CloudStorageAccount account;
         private readonly CloudBlobClient blobClient;
+        private readonly HttpClient httpClient;
 
-        public AzureStorage(ILogger<AzureStorage> logger, string accountName)
+        public AzureStorage(ILogger<AzureStorage> logger, CloudStorageAccount account, HttpClient httpClient)
         {
-            this.logger = logger;
-            this.AccountName = accountName;
-
             ServicePointManager.DefaultConnectionLimit = Environment.ProcessorCount * 8;
             ServicePointManager.Expect100Continue = false;
 
-            account = GetCloudStorageAccountUsingMsiAsync(accountName).Result;
+            this.logger = logger;
+            this.account = account;
+            this.httpClient = httpClient;
+
             blobClient = account.CreateCloudBlobClient();
+            var host = account.BlobStorageUri.PrimaryUri.Host;
+            AccountName = host.Substring(0, host.IndexOf("."));
         }
 
         public string AccountName { get; }
@@ -168,12 +172,12 @@ namespace TriggerService
             await containerReference.DeleteIfExistsAsync();
         }
 
-        public async Task<byte[]> DownloadFileAsync(string blobUrl)
+        public async Task<byte[]> DownloadBlockBlobAsync(string blobUrl)
         {
             // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs
             if (!blobUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) && blobUrl.TrimStart('/').StartsWith(this.AccountName + "/", StringComparison.OrdinalIgnoreCase))
             {
-                blobUrl = blobUrl.TrimStart('/').Replace(this.AccountName, $"http://{this.AccountAuthority}", StringComparison.OrdinalIgnoreCase);
+                blobUrl = blobUrl.TrimStart('/').Replace(this.AccountName, $"https://{this.AccountAuthority}", StringComparison.OrdinalIgnoreCase);
             }
 
             var blob = new CloudBlockBlob(new Uri(blobUrl), account.Credentials);
@@ -190,6 +194,11 @@ namespace TriggerService
                 await blob.DownloadToStreamAsync(memoryStream, null, options, context);
                 return memoryStream.ToArray();
             }
+        }
+
+        public async Task<byte[]> DownloadFileUsingHttpClientAsync(string url)
+        {
+            return await httpClient.GetByteArrayAsync(url);
         }
 
         public enum WorkflowState { New, InProgress, Succeeded, Failed, Abort };
@@ -237,7 +246,7 @@ namespace TriggerService
             return blobList;
         }
 
-        private static async Task<CloudStorageAccount> GetCloudStorageAccountUsingMsiAsync(string accountName)
+        public static async Task<CloudStorageAccount> GetCloudStorageAccountUsingMsiAsync(string accountName)
         {
             var accounts = await GetAccessibleStorageAccountsAsync();
             var account = accounts.FirstOrDefault(s => s.Name == accountName);

@@ -24,6 +24,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TriggerService", "src\Trigg
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "src\Common\Common.csproj", "{63C91E1C-640C-4281-8388-971908009CAE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TriggerService.Tests", "TriggerService.Tests\TriggerService.Tests.csproj", "{76E9ECA1-AA42-4A59-9C8B-665A69A8FADF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -58,6 +60,10 @@ Global
 		{63C91E1C-640C-4281-8388-971908009CAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{63C91E1C-640C-4281-8388-971908009CAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{63C91E1C-640C-4281-8388-971908009CAE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{76E9ECA1-AA42-4A59-9C8B-665A69A8FADF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{76E9ECA1-AA42-4A59-9C8B-665A69A8FADF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{76E9ECA1-AA42-4A59-9C8B-665A69A8FADF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{76E9ECA1-AA42-4A59-9C8B-665A69A8FADF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
