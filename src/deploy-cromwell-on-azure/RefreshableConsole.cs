@@ -46,15 +46,8 @@ namespace CromwellOnAzureDeployer
         {
             lock (lockObj)
             {
-                var cursorTop = initialCursorTop - cursorTopAdjustment;
-                
-                if (cursorTop < 0)
-                {
-                    cursorTop = 0;
-                }
-
                 Console.CursorVisible = false;
-                Console.CursorTop = cursorTop;
+                Console.CursorTop = Math.Max(0, initialCursorTop - cursorTopAdjustment);
                 Console.CursorLeft = 0;
                 lines.ForEach(line => line.Render());
                 Console.CursorVisible = true;
