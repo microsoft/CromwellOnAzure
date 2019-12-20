@@ -1,0 +1,2476 @@
+[
+  {
+    "VmSizes": [
+      "Standard_G2",
+      "Standard_GS2"
+    ],
+    "VmSeries": [
+      "G",
+      "GS"
+    ],
+    "PricePerHour": 1.22,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NV24s_v3"
+    ],
+    "VmSeries": [
+      "NVSv3"
+    ],
+    "PricePerHour": 0.456,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_L16s"
+    ],
+    "VmSeries": [
+      "LS"
+    ],
+    "PricePerHour": 1.376,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_E4_v3",
+      "Standard_E4s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.059,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D2_v2",
+      "Standard_DS2_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.14,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A8m_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.594,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A9"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 1.95,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D3_v2_Promo",
+      "Standard_DS3_v2_-_Expired_Promo"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.279,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Basic_A4"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.376,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NC24"
+    ],
+    "VmSeries": [
+      "NC"
+    ],
+    "PricePerHour": 0.864,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E64i_v3",
+      "Standard_E64is_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 4.032,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A1_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.009,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_NC24r_Promo"
+    ],
+    "VmSeries": [
+      "NC"
+    ],
+    "PricePerHour": 2.091,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NV24"
+    ],
+    "VmSeries": [
+      "NV"
+    ],
+    "PricePerHour": 0.992,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E64_v3",
+      "Standard_E64s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.806,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_F2s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.106,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D2_v2",
+      "Standard_DS2_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.0279,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D13_v2",
+      "Standard_DS13_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.148,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_Type_1"
+    ],
+    "VmSeries": [
+      "ESv3 Dedicated Host"
+    ],
+    "PricePerHour": 4.312,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_E64i_v3",
+      "Standard_E64is_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.806,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_NV24_Promo"
+    ],
+    "VmSeries": [
+      "NV"
+    ],
+    "PricePerHour": 2.976,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H16mr_Promo"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 1.717,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D12_v2",
+      "Standard_DS12_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.074,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A5"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.25,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D4_v2",
+      "Standard_DS4_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.112,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_NV48s_v3"
+    ],
+    "VmSeries": [
+      "NVSv3"
+    ],
+    "PricePerHour": 4.56,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Basic_A3"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.0376,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_F64s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 3.392,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F4s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.212,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D12_v2_Promo",
+      "Standard_DS12_v2_-_Expired_Promo"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.37,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F1",
+      "Standard_F1s"
+    ],
+    "VmSeries": [
+      "F",
+      "FS"
+    ],
+    "PricePerHour": 0.062,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_L8s"
+    ],
+    "VmSeries": [
+      "LS"
+    ],
+    "PricePerHour": 0.138,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D5_v2",
+      "Standard_DS5_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 1.117,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F8s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.424,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D11_v2_Promo",
+      "Standard_DS11_v2_-_Expired_Promo"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.185,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H16_Promo"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 1.165,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NV12"
+    ],
+    "VmSeries": [
+      "NV"
+    ],
+    "PricePerHour": 0.496,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_B12ms"
+    ],
+    "VmSeries": [
+      "BS"
+    ],
+    "PricePerHour": 0.595,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D32_v3",
+      "Standard_D32s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 1.872,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A8_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.08,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_B1s"
+    ],
+    "VmSeries": [
+      "BS"
+    ],
+    "PricePerHour": 0.0124,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D14",
+      "Standard_DS14"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.308,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_F72s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.612,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_L8s"
+    ],
+    "VmSeries": [
+      "LS"
+    ],
+    "PricePerHour": 0.688,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D8_v3",
+      "Standard_D8s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.468,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A4m_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.059,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_NV24s_v2"
+    ],
+    "VmSeries": [
+      "NVSv2"
+    ],
+    "PricePerHour": 0.614,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_NV12_Promo"
+    ],
+    "VmSeries": [
+      "NV"
+    ],
+    "PricePerHour": 1.488,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_E32_v3",
+      "Standard_E32s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.474,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D4",
+      "Standard_DS4"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.616,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NC12_Promo"
+    ],
+    "VmSeries": [
+      "NC"
+    ],
+    "PricePerHour": 0.95,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A8m_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.119,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A1"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.06,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Basic_A0"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.018,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D15_v2",
+      "Standard_DS15_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.37,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A8"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.975,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NV12s_v2"
+    ],
+    "VmSeries": [
+      "NVSv2"
+    ],
+    "PricePerHour": 0.307,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D13",
+      "Standard_DS13"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.771,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D4_v2_Promo",
+      "Standard_DS4_v2_-_Expired_Promo"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.559,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A10"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.156,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A4_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.038,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E64_v3",
+      "Standard_E64s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 4.032,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F16s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.848,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D13_v2_Promo",
+      "Standard_DS13_v2_-_Expired_Promo"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.741,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D3_v2",
+      "Standard_DS3_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.279,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_G2",
+      "Standard_GS2"
+    ],
+    "VmSeries": [
+      "G",
+      "GS"
+    ],
+    "PricePerHour": 0.244,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Basic_A4"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.0752,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E32_v3",
+      "Standard_E32s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 2.24,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NC12"
+    ],
+    "VmSeries": [
+      "NC"
+    ],
+    "PricePerHour": 0.432,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E20_v3",
+      "Standard_E20s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.28,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_NV6s_v2"
+    ],
+    "VmSeries": [
+      "NVSv2"
+    ],
+    "PricePerHour": 0.153,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_F32s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.272,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_B4ms"
+    ],
+    "VmSeries": [
+      "BS"
+    ],
+    "PricePerHour": 0.198,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A3"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.24,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D4_v3",
+      "Standard_D4s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.0468,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A8_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.4,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F4s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.034,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_F48s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.509,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D16_v3",
+      "Standard_D16s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.187,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_F2s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.017,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A9"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.39,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_B20ms"
+    ],
+    "VmSeries": [
+      "BS"
+    ],
+    "PricePerHour": 0.992,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A4m_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.297,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D12",
+      "Standard_DS12"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.0771,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A4"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.096,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D1_v2",
+      "Standard_DS1_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.07,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D14_v2",
+      "Standard_DS14_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.296,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_H16m"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 0.52,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A4_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.191,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_Type_1"
+    ],
+    "VmSeries": [
+      "DSv3 Dedicated Host"
+    ],
+    "PricePerHour": 3.943,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D2",
+      "Standard_DS2"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.154,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_B8ms"
+    ],
+    "VmSeries": [
+      "BS"
+    ],
+    "PricePerHour": 0.397,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D14_v2",
+      "Standard_DS14_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 1.482,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D1",
+      "Standard_DS1"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.015,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_G3",
+      "Standard_GS3"
+    ],
+    "VmSeries": [
+      "G",
+      "GS"
+    ],
+    "PricePerHour": 2.44,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F64s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.544,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_H16"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 1.941,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D11_v2",
+      "Standard_DS11_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.185,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F8",
+      "Standard_F8s"
+    ],
+    "VmSeries": [
+      "F",
+      "FS"
+    ],
+    "PricePerHour": 0.498,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A2"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.024,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E2_v3",
+      "Standard_E2s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.028,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E8_v3",
+      "Standard_E8s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.112,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E48_v3",
+      "Standard_E48s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.672,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D48_v3",
+      "Standard_D48s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 2.808,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_B16ms"
+    ],
+    "VmSeries": [
+      "BS"
+    ],
+    "PricePerHour": 0.794,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H16mr"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 0.572,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Basic_A0"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.004,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_B2ms"
+    ],
+    "VmSeries": [
+      "BS"
+    ],
+    "PricePerHour": 0.0992,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_G4",
+      "Standard_GS4"
+    ],
+    "VmSeries": [
+      "G",
+      "GS"
+    ],
+    "PricePerHour": 0.976,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_NV12s_v3"
+    ],
+    "VmSeries": [
+      "NVSv3"
+    ],
+    "PricePerHour": 0.228,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E4_v3",
+      "Standard_E4s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.296,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NV12s_v2"
+    ],
+    "VmSeries": [
+      "NVSv2"
+    ],
+    "PricePerHour": 1.534,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D5_v2",
+      "Standard_DS5_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.223,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_H8m_Promo"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 0.78,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H8m"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 0.26,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A0"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.02,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F48s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 2.544,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F1",
+      "Standard_F1s"
+    ],
+    "VmSeries": [
+      "F",
+      "FS"
+    ],
+    "PricePerHour": 0.012,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_H16r"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 2.136,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_E20_v3",
+      "Standard_E20s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 1.48,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F2",
+      "Standard_F2s"
+    ],
+    "VmSeries": [
+      "F",
+      "FS"
+    ],
+    "PricePerHour": 0.0249,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Basic_A1"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.0062,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E48_v3",
+      "Standard_E48s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 3.36,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D13",
+      "Standard_DS13"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.154,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E16_v3",
+      "Standard_E16s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 1.12,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D12_v2",
+      "Standard_DS12_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.37,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A7"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 1.0,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D14",
+      "Standard_DS14"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 1.542,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H16m_Promo"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 1.561,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_E16_v3",
+      "Standard_E16s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.237,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D2_v3",
+      "Standard_D2s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.023,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_NV6_Promo"
+    ],
+    "VmSeries": [
+      "NV"
+    ],
+    "PricePerHour": 0.744,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NV24s_v2"
+    ],
+    "VmSeries": [
+      "NVSv2"
+    ],
+    "PricePerHour": 3.069,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H8"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 0.971,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D11",
+      "Standard_DS11"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.0386,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_L16s"
+    ],
+    "VmSeries": [
+      "LS"
+    ],
+    "PricePerHour": 0.275,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A0"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.004,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D16_v3",
+      "Standard_D16s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.936,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A2_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.018,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_E2_v3",
+      "Standard_E2s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.148,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NC6_Promo"
+    ],
+    "VmSeries": [
+      "NC"
+    ],
+    "PricePerHour": 0.475,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NV6"
+    ],
+    "VmSeries": [
+      "NV"
+    ],
+    "PricePerHour": 0.248,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D15i_v2",
+      "Standard_DS15i_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 1.852,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D15_v2",
+      "Standard_DS15_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 1.852,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D14_v2_Promo",
+      "Standard_DS14_v2_-_Expired_Promo"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 1.482,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D3",
+      "Standard_DS3"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.0616,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D13_v2",
+      "Standard_DS13_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.741,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D8_v3",
+      "Standard_D8s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.0936,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D64_v3",
+      "Standard_D64s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.749,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D5_v2_Promo",
+      "Standard_DS5_v2_-_Expired_Promo"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 1.117,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_B2s"
+    ],
+    "VmSeries": [
+      "BS"
+    ],
+    "PricePerHour": 0.0496,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_L4s"
+    ],
+    "VmSeries": [
+      "LS"
+    ],
+    "PricePerHour": 0.0688,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D1_v2",
+      "Standard_DS1_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.014,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D4_v3",
+      "Standard_D4s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.234,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_G1",
+      "Standard_GS1"
+    ],
+    "VmSeries": [
+      "G",
+      "GS"
+    ],
+    "PricePerHour": 0.61,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F32s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 1.696,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F72s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 3.816,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A2m_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.149,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A11"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 1.56,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Basic_A3"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.188,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H8"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 0.194,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_NC24_Promo"
+    ],
+    "VmSeries": [
+      "NC"
+    ],
+    "PricePerHour": 1.901,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F16",
+      "Standard_F16s"
+    ],
+    "VmSeries": [
+      "F",
+      "FS"
+    ],
+    "PricePerHour": 0.996,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A2_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.091,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D48_v3",
+      "Standard_D48s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.562,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_Type_2"
+    ],
+    "VmSeries": [
+      "FSv2 Dedicated Host"
+    ],
+    "PricePerHour": 4.198,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_G4",
+      "Standard_GS4"
+    ],
+    "VmSeries": [
+      "G",
+      "GS"
+    ],
+    "PricePerHour": 4.88,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_B1ms"
+    ],
+    "VmSeries": [
+      "BS"
+    ],
+    "PricePerHour": 0.0248,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NV24s_v3"
+    ],
+    "VmSeries": [
+      "NVSv3"
+    ],
+    "PricePerHour": 2.28,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Basic_A1"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.031,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H16r_Promo"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 1.281,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_E8_v3",
+      "Standard_E8s_v3"
+    ],
+    "VmSeries": [
+      "Ev3",
+      "ESv3"
+    ],
+    "PricePerHour": 0.56,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NV6s_v2"
+    ],
+    "VmSeries": [
+      "NVSv2"
+    ],
+    "PricePerHour": 0.767,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NC6"
+    ],
+    "VmSeries": [
+      "NC"
+    ],
+    "PricePerHour": 0.216,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A3"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.048,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D2_v3",
+      "Standard_D2s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.117,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A7"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.2,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_HC44rs"
+    ],
+    "VmSeries": [
+      "HCS"
+    ],
+    "PricePerHour": 2.059,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A1_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.043,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F2",
+      "Standard_F2s"
+    ],
+    "VmSeries": [
+      "F",
+      "FS"
+    ],
+    "PricePerHour": 0.124,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H16m"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 2.601,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H16"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 0.388,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A2m_v2"
+    ],
+    "VmSeries": [
+      "Av2"
+    ],
+    "PricePerHour": 0.03,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_NV48s_v3"
+    ],
+    "VmSeries": [
+      "NVSv3"
+    ],
+    "PricePerHour": 0.912,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D11",
+      "Standard_DS11"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.193,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F4",
+      "Standard_F4s"
+    ],
+    "VmSeries": [
+      "F",
+      "FS"
+    ],
+    "PricePerHour": 0.0498,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A11"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.312,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D64_v3",
+      "Standard_D64s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 3.744,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Basic_A2"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.0162,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_F16",
+      "Standard_F16s"
+    ],
+    "VmSeries": [
+      "F",
+      "FS"
+    ],
+    "PricePerHour": 0.199,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D3",
+      "Standard_DS3"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.308,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F16s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.136,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A6"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.1,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A5"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.05,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A8"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.195,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_F8",
+      "Standard_F8s"
+    ],
+    "VmSeries": [
+      "F",
+      "FS"
+    ],
+    "PricePerHour": 0.0996,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D4_v2",
+      "Standard_DS4_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.559,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H16r"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 0.427,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A4"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.48,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D32_v3",
+      "Standard_D32s_v3"
+    ],
+    "VmSeries": [
+      "Dv3",
+      "DSv3"
+    ],
+    "PricePerHour": 0.374,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_G3",
+      "Standard_GS3"
+    ],
+    "VmSeries": [
+      "G",
+      "GS"
+    ],
+    "PricePerHour": 0.488,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D1",
+      "Standard_DS1"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.077,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Basic_A2"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.081,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A6"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.5,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_L32s"
+    ],
+    "VmSeries": [
+      "LS"
+    ],
+    "PricePerHour": 0.55,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A1"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.012,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_B1ls"
+    ],
+    "VmSeries": [
+      "BS"
+    ],
+    "PricePerHour": 0.0062,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D11_v2",
+      "Standard_DS11_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.037,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D2_v2_Promo",
+      "Standard_DS2_v2_-_Expired_Promo"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.14,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_G5",
+      "Standard_GS5"
+    ],
+    "VmSeries": [
+      "G",
+      "GS"
+    ],
+    "PricePerHour": 1.738,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_G5",
+      "Standard_GS5"
+    ],
+    "VmSeries": [
+      "G",
+      "GS"
+    ],
+    "PricePerHour": 8.69,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D4",
+      "Standard_DS4"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.123,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_A10"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.78,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_A2"
+    ],
+    "VmSeries": [
+      "A"
+    ],
+    "PricePerHour": 0.12,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H8m"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 1.301,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NC24r"
+    ],
+    "VmSeries": [
+      "NC"
+    ],
+    "PricePerHour": 0.95,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_F4",
+      "Standard_F4s"
+    ],
+    "VmSeries": [
+      "F",
+      "FS"
+    ],
+    "PricePerHour": 0.249,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_HC44rs"
+    ],
+    "VmSeries": [
+      "HCS"
+    ],
+    "PricePerHour": 0.412,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D12",
+      "Standard_DS12"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.386,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_NV12s_v3"
+    ],
+    "VmSeries": [
+      "NVSv3"
+    ],
+    "PricePerHour": 1.14,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H16mr"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 2.861,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_H8_Promo"
+    ],
+    "VmSeries": [
+      "H"
+    ],
+    "PricePerHour": 0.582,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_D3_v2",
+      "Standard_DS3_v2"
+    ],
+    "VmSeries": [
+      "Dv2",
+      "DSv2"
+    ],
+    "PricePerHour": 0.0559,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_L4s"
+    ],
+    "VmSeries": [
+      "LS"
+    ],
+    "PricePerHour": 0.344,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_F8s_v2"
+    ],
+    "VmSeries": [
+      "FSv2"
+    ],
+    "PricePerHour": 0.068,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_D2",
+      "Standard_DS2"
+    ],
+    "VmSeries": [
+      "D",
+      "DS"
+    ],
+    "PricePerHour": 0.0308,
+    "LowPriority": true
+  },
+  {
+    "VmSizes": [
+      "Standard_L32s"
+    ],
+    "VmSeries": [
+      "LS"
+    ],
+    "PricePerHour": 2.752,
+    "LowPriority": false
+  },
+  {
+    "VmSizes": [
+      "Standard_G1",
+      "Standard_GS1"
+    ],
+    "VmSeries": [
+      "G",
+      "GS"
+    ],
+    "PricePerHour": 0.122,
+    "LowPriority": true
+  }
+]
