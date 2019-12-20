@@ -512,7 +512,8 @@ namespace TesApi.Web
                 var pricingRequest = new HttpRequestMessage(HttpMethod.Get, pricingUrl);
                 pricingRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
                 var pricingResponse = await httpClient.SendAsync(pricingRequest);
-                var pricingContent = await pricingResponse.Content.ReadAsStringAsync();
+                var pricingContent = System.Text.Encoding.UTF8.GetString(
+                    await pricingResponse.Content.ReadAsByteArrayAsync());
 
                 return pricingContent;
             }
