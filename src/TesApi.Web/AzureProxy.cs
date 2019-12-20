@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Auth;
@@ -512,10 +513,8 @@ namespace TesApi.Web
                 var pricingRequest = new HttpRequestMessage(HttpMethod.Get, pricingUrl);
                 pricingRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
                 var pricingResponse = await httpClient.SendAsync(pricingRequest);
-                var pricingContent = System.Text.Encoding.UTF8.GetString(
-                    await pricingResponse.Content.ReadAsByteArrayAsync());
-
-                return pricingContent;
+                var content = await pricingResponse.Content.ReadAsByteArrayAsync();
+                return Encoding.UTF8.GetString(content).TrimStart('\ufeff');
             }
             catch (Exception ex)
             {
