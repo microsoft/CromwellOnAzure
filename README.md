@@ -1,4 +1,5 @@
 # Welcome to Cromwell on Azure
+Get started in a few quick steps! See our [Quickstart](docs/quickstart-cromwell-on-azure.md) guide<br/>
 ## What is Cromwell on Azure? 
 [Cromwell](https://cromwell.readthedocs.io/en/stable/) is a workflow management system for scientific workflows, orchestrating the computing tasks needed for genomics analysis. Originally developed by the [Broad Institute](https://github.com/broadinstitute/cromwell), Cromwell is used in the GATK Best Practices genome analysis pipeline. Cromwell supports running scripts at various scales, including your local machine, a local computing cluster, and on the cloud. <br/>
 
