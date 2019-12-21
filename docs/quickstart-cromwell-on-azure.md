@@ -2,18 +2,17 @@
 This quickstart walks through how to install Cromwell on Azure and run a sample workflow. 
 
 Get started in just a few steps: 
-1. Installation: download prerequisites and use the installation executable to configure the Azure resources needed to run Cromwell on Azure. 
-2. Create a JSON file with required URLs. 
-3. Run the sample workflow.
+1. Installation: download prerequisites and use the installation executable to configure the Azure resources needed to run Cromwell on Azure 
+2. Create a JSON file with required URLs
+3. Run the sample workflow
 
+# Installation
+## Prerequisites
+Before installing Cromwell on Azure, be sure that you have installed the [Azure Command Line Interface (az cli)](https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest), a command line experience for managing Azure resources, available [here](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest). Once you have "az cli" installed, run `az login` and use your Azure credentials to get started.<br/>
 
-# Installation: 
-## Installation Prerequisites
-Before installing Cromwell on Azure, be sure that you have installed the [Azure Command Line Interface (az cli)](https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest), a command line experience for managing Azure resources, available [here](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest). Once you have "az cli" installed, run `az login` and use your Azure credentials to get started!<br/>
+You will need an [Azure Subscription](https://portal.azure.com/) before installing Cromwell on Azure, if you don't already have one.<br/>
 
-You will also need to set up your [Azure Subscription](https://portal.azure.com/) before installing Cromwell on Azure.<br/>
-
-If you already have an Azure Batch account in your Azure subscription, you may need to increase your Azure Batch quota. Learn more [here](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas).<br/>
+If you already have an Azure Batch account in your Azure subscription, or you expect to run at scale, you may need to increase your Azure Batch quota. Learn more [here](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas).<br/>
 
 ## Download the installation executable
 There are two ways to obtain the installation executable: 
@@ -30,7 +29,7 @@ The installation executable needs to be configured and run from the command line
 - *Required*: The `RegionName` specifies the region you would like to use for your Cromwell on Azure instance. To find a list of all available regions, run `az account list-locations` on command line or PowerShell and use the desired region's "name" property for `RegionName`.
 - *Optional*: `MainIdentifierPrefix`. This string, followed by a GUID will be used to name your Cromwell on Azure resource group and associated resources. If not specified, default value of "coa" followed by a GUID is used as a prefix for the Azure Resource Group and all Azure resources created for your Cromwell on Azure instance. After installation, you can search for your resources using the `MainIdentifierPrefix` value.<br/>
 
-Run the following at command line or terminal after navigating to where your executable is saved:
+Run the following at the command line or terminal after navigating to where your executable is saved:
 ```
 .\deploy-cromwell-on-azure.exe --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> 
 ```
