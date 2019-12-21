@@ -3,9 +3,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Auth;
@@ -491,9 +493,9 @@ namespace TesApi.Web
         {
             const string key = "vmSizesAndPrices";
 
-            if (cache.TryGetValue(key, out List<VirtualMachineInfo> vmInfo))
+            if (cache.TryGetValue(key, out List<VirtualMachineInfo> cachedVmSizesAndPrices))
             {
-                return vmInfo;
+                return cachedVmSizesAndPrices;
             }
             else
             {
@@ -512,16 +514,31 @@ namespace TesApi.Web
                 var pricingRequest = new HttpRequestMessage(HttpMethod.Get, pricingUrl);
                 pricingRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
                 var pricingResponse = await httpClient.SendAsync(pricingRequest);
-                var pricingContent = await pricingResponse.Content.ReadAsStringAsync();
-
-                return pricingContent;
+                var content = await pricingResponse.Content.ReadAsByteArrayAsync();
+                return Encoding.UTF8.GetString(content).TrimStart('\ufeff');
             }
             catch (Exception ex)
             {
                 logger.LogInformation($"GetPricingContentJsonAsync URL: {pricingUrl}");
-                logger.LogError(ex, "GetPricingContentJsonAsync");
+                logger.LogError(ex, $"Could not retrieve VM pricing info. Make sure that TES service principal has Billing Reader role on the subscription");
                 throw;
             }
+        }
+
+        private IEnumerable<VmPrice> ExtractVmPricesFromRateCardResponse(string pricingContent)
+        {
+            return JObject.Parse(pricingContent)["Meters"]
+                .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
+                .Select(m => new { MeterNames = m["MeterName"].ToString(), MeterSubCategories = m["MeterSubCategory"].ToString().Replace(" Series", ""), PricePerHour = decimal.Parse(m["MeterRates"]["0"].ToString()) })
+                .Where(m => !m.MeterSubCategories.Contains("Windows"))
+                .Select(m => new { MeterNames = m.MeterNames.Replace(" Low Priority", ""), m.MeterSubCategories, m.PricePerHour, LowPriority = m.MeterNames.Contains(" Low Priority") })
+                .Select(m => new VmPrice
+                {
+                    VmSizes = m.MeterNames.Split(new char[] { '/' }).Select(x => ((m.MeterSubCategories.Contains("Basic") ? "Basic_" : "Standard_") + x).Replace(" ", "_") + (m.MeterSubCategories.Contains("Promo") ? "_Promo" : "")).ToArray(),
+                    VmSeries = m.MeterSubCategories.Replace(" Promo", "").Replace(" Basic", "").Split(new char[] { '/' }),
+                    PricePerHour = m.PricePerHour,
+                    LowPriority = m.LowPriority
+                });
         }
 
         /// <summary>
@@ -531,57 +548,48 @@ namespace TesApi.Web
         private async Task<IEnumerable<VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
         {
             var azureClient = await GetAzureManagementClientAsync();
-            var pricingContent = await GetPricingContentJsonAsync();
             var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).VirtualMachines.Sizes.ListByRegionAsync(location)).ToList();
+
+            IEnumerable<VmPrice> vmPrices;
 
             try
             {
-                var vmPrices = JObject.Parse(pricingContent)["Meters"]
-                    .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
-                    .Select(m => new { MeterNames = m["MeterName"].ToString(), MeterSubCategories = m["MeterSubCategory"].ToString().Replace(" Series", ""), PricePerHour = decimal.Parse(m["MeterRates"]["0"].ToString()) })
-                    .Where(m => !m.MeterSubCategories.Contains("Windows"))
-                    .Select(m => new { MeterNames = m.MeterNames.Replace(" Low Priority", ""), m.MeterSubCategories, m.PricePerHour, LowPriority = m.MeterNames.Contains(" Low Priority") })
-                    .Select(m => new
-                    {
-                        VmSizes = m.MeterNames.Split(new char[] { '/' }).Select(x => ((m.MeterSubCategories.Contains("Basic") ? "Basic_" : "Standard_") + x).Replace(" ", "_") + (m.MeterSubCategories.Contains("Promo") ? "_Promo" : "")).ToArray(),
-                        VmSeries = m.MeterSubCategories.Replace(" Promo", "").Replace(" Basic", "").Split(new char[] { '/' }),
-                        m.PricePerHour,
-                        m.LowPriority
-                    });
+                var pricingContent = await GetPricingContentJsonAsync();
+                vmPrices = ExtractVmPricesFromRateCardResponse(pricingContent);
+            }
+            catch
+            {
+                logger.LogWarning("Using default VM prices.");
+                vmPrices = JsonConvert.DeserializeObject<IEnumerable<VmPrice>>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "DefaultVmPrices.json")));
+            }
 
-                var vmInfos = new List<VirtualMachineInfo>();
+            var vmInfos = new List<VirtualMachineInfo>();
 
-                foreach (var vmPrice in vmPrices)
+            foreach (var vmPrice in vmPrices)
+            {
+                for (var i = 0; i < vmPrice.VmSizes.Length; i++)
                 {
-                    for (var i = 0; i < vmPrice.VmSizes.Length; i++)
-                    {
-                        var vmSize = vmSizesAvailableAtLocation.SingleOrDefault(x => x.Name == vmPrice.VmSizes[i]);
+                    var vmSize = vmSizesAvailableAtLocation.SingleOrDefault(x => x.Name == vmPrice.VmSizes[i]);
 
-                        if (vmSize != null)
+                    if (vmSize != null)
+                    {
+                        vmInfos.Add(new VirtualMachineInfo
                         {
-                            vmInfos.Add(new VirtualMachineInfo
-                            {
-                                VmSize = vmPrice.VmSizes[i],
-                                MemoryInGB = vmSize.MemoryInMB * MbToGbRatio,
-                                NumberOfCores = vmSize.NumberOfCores,
-                                ResourceDiskSizeInGB = vmSize.ResourceDiskSizeInMB * MbToGbRatio,
-                                MaxDataDiskCount = vmSize.MaxDataDiskCount,
-                                VmSeries = vmPrice.VmSeries[i],
-                                LowPriority = vmPrice.LowPriority,
-                                PricePerHour = vmPrice.PricePerHour
-                            });
-                        }
+                            VmSize = vmPrice.VmSizes[i],
+                            MemoryInGB = vmSize.MemoryInMB * MbToGbRatio,
+                            NumberOfCores = vmSize.NumberOfCores,
+                            ResourceDiskSizeInGB = vmSize.ResourceDiskSizeInMB * MbToGbRatio,
+                            MaxDataDiskCount = vmSize.MaxDataDiskCount,
+                            VmSeries = vmPrice.VmSeries[i],
+                            LowPriority = vmPrice.LowPriority,
+                            PricePerHour = vmPrice.PricePerHour
+                        });
                     }
                 }
+            }
 
-                // TODO: Check if pricing API did not return the list and vmInfos is null
-                return vmInfos.Where(vm => GetVmSizesSupportedByBatch().Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "GetVmSizesAndPricesAsync");
-                throw new Exception($"Could not retrieve VM pricing info. Make sure that TES service principal has Billing Reader role on the subscription", ex);
-            }
+            // TODO: Check if pricing API did not return the list and vmInfos is null
+            return vmInfos.Where(vm => GetVmSizesSupportedByBatch().Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase));
         }
 
         private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
@@ -767,6 +775,14 @@ namespace TesApi.Web
             public int DedicatedCoreQuota { get; set; }
             public int LowPriorityCoreQuota { get; set; }
             public int PoolQuota { get; set; }
+        }
+
+        private class VmPrice
+        {
+            public string[] VmSizes { get; set; }
+            public string[] VmSeries { get; set; }
+            public decimal PricePerHour { get; set; }
+            public bool LowPriority { get; set; }
         }
     }
 }
