@@ -47,6 +47,7 @@ namespace CromwellOnAzureDeployer
         private Configuration configuration { get; set; }
         private TokenCredentials tokenCredentials;
         private IAzure azureClient { get; set; }
+        private IResourceManager resourceManagerClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
 
         public Deployer(Configuration configuration)
@@ -66,7 +67,9 @@ namespace CromwellOnAzureDeployer
             tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
             azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
             azureClient = GetAzureClient(azureCredentials);
+            resourceManagerClient = GetResourceManagerClient(azureCredentials);
 
+            await RegisterResourceProvidersAsync();
             await ValidateConfigurationAsync();
 
             try
@@ -238,6 +241,38 @@ namespace CromwellOnAzureDeployer
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                 .Authenticate(azureCredentials)
                 .WithSubscription(configuration.SubscriptionId);
+        }
+
+        private IResourceManager GetResourceManagerClient(AzureCredentials azureCredentials)
+        {
+            return ResourceManager
+                .Configure()
+                .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                .Authenticate(azureCredentials)
+                .WithSubscription(configuration.SubscriptionId);
+        }
+
+        private Task RegisterResourceProvidersAsync()
+        {
+            var resourceProviders = new List<string>
+            {
+                "Microsoft.Compute",
+                "Microsoft.Network",
+                "Microsoft.Batch",
+                "Microsoft.DocumentDB",
+                "Microsoft.insights",
+                "Microsoft.Storage"
+            };
+
+            return Execute(
+                $"Registering resource providers...",
+                () =>
+                {
+                    return Task.WhenAll(
+                        resourceProviders.Select(rp =>
+                            resourceManagerClient.Providers.RegisterAsync(rp))
+                    );
+                });
         }
 
         private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo)
