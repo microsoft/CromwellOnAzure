@@ -634,7 +634,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task ValidateSubscriptionAndResourceGroupAsync(string subscriptionId)
+        private async Task ValidateSubscriptionAndResourceGroupAsync(string subscriptionId, string resourceGroupName)
         {
             const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
@@ -660,12 +660,28 @@ namespace CromwellOnAzureDeployer
             var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
             var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
 
-            var currentPrincipalRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{subscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
+            var currentPrincipalSubscriptionRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{subscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
                 .Body
                 .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
-            if (!currentPrincipalRoleIds.Contains(ownerRoleId) && !(currentPrincipalRoleIds.Contains(contributorRoleId) && currentPrincipalRoleIds.Contains(userAccessAdministratorRoleId)))
+            if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId)))
             {
+                var rgExists = await azureClient.ResourceGroups.ContainAsync(resourceGroupName);
+
+                if (!rgExists)
+                {
+                    throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
+                }
+
+                var currentPrincipalRgRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
+                    .Body
+                    .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
+
+                if (!currentPrincipalRgRoleIds.Contains(ownerRoleId))
+                {
+                    throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
+                }
+
                 SkipBillingReaderRoleAssignment = true;
 
                 RefreshableConsole.WriteLine("Warning: insufficient subscription access level to assign the Billing Reader", ConsoleColor.Yellow);
@@ -718,7 +734,7 @@ namespace CromwellOnAzureDeployer
             {
                 ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                 ValidateRegionName(configuration.RegionName);
-                await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId);
+                await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName);
                 await ValidateBatchQuotaAsync();
             }
             catch (ValidationException validationException)
