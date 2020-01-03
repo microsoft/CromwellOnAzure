@@ -267,9 +267,10 @@ namespace CromwellOnAzureDeployer
         {
             var cloudResourceProviders = await resourceManagerClient.Providers.ListAsync();
 
-            var unregisteredResourceProviders = requiredResourceProviders.Intersect(cloudResourceProviders
-                .Where(rp => !rp.RegistrationState.Equals("Registered", StringComparison.OrdinalIgnoreCase))
-                .Select(rp => rp.Namespace))
+            var unregisteredResourceProviders = requiredResourceProviders
+                .Intersect(cloudResourceProviders
+                    .Where(rp => !rp.RegistrationState.Equals("Registered", StringComparison.OrdinalIgnoreCase))
+                    .Select(rp => rp.Namespace), StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             try
