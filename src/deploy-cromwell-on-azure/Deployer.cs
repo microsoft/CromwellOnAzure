@@ -44,6 +44,17 @@ namespace CromwellOnAzureDeployer
         private const string InputsContainerName = "inputs";
 
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
+
+        private readonly List<string> requiredResourceProviders = new List<string>
+            {
+                "Microsoft.Compute",
+                "Microsoft.Network",
+                "Microsoft.Batch",
+                "Microsoft.DocumentDB",
+                "Microsoft.insights",
+                "Microsoft.Storage"
+            };
+
         private Configuration configuration { get; set; }
         private TokenCredentials tokenCredentials;
         private IAzure azureClient { get; set; }
@@ -252,27 +263,45 @@ namespace CromwellOnAzureDeployer
                 .WithSubscription(configuration.SubscriptionId);
         }
 
-        private Task RegisterResourceProvidersAsync()
+        private async Task RegisterResourceProvidersAsync()
         {
-            var resourceProviders = new List<string>
-            {
-                "Microsoft.Compute",
-                "Microsoft.Network",
-                "Microsoft.Batch",
-                "Microsoft.DocumentDB",
-                "Microsoft.insights",
-                "Microsoft.Storage"
-            };
+            var cloudResourceProviders = await resourceManagerClient.Providers.ListAsync();
 
-            return Execute(
-                $"Registering resource providers...",
-                () =>
-                {
-                    return Task.WhenAll(
-                        resourceProviders.Select(rp =>
-                            resourceManagerClient.Providers.RegisterAsync(rp))
-                    );
-                });
+            var unregisteredResourceProviders = requiredResourceProviders.Intersect(cloudResourceProviders
+                .Where(rp => !rp.RegistrationState.Equals("Registered", StringComparison.OrdinalIgnoreCase))
+                .Select(rp => rp.Namespace))
+                .ToList();
+
+            try
+            {
+                await Execute(
+                    $"Registering resource providers...",
+                    () =>
+                    {
+                        return Task.WhenAll(
+                            unregisteredResourceProviders.Select(rp =>
+                                resourceManagerClient.Providers.RegisterAsync(rp))
+                        );
+                    });
+            }
+            catch (Microsoft.Rest.Azure.CloudException ex) when (ex.ToCloudErrorType() == CloudErrorType.AuthorizationFailed)
+            {
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine("Unable to programatically register the required resource providers.", ConsoleColor.Red);
+                RefreshableConsole.WriteLine("This can happen if you are not the Azure subscription owner, and it's an older Azure subscription.", ConsoleColor.Red);
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine("Please contact your Azure subscription owner and have them:", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine("1. Navigate to https://portal.azure.com", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine("2. Select Subscription -> Resource Providers", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine("3. Select each of the following and click Register:", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine();
+                unregisteredResourceProviders.ForEach(rp => RefreshableConsole.WriteLine(rp, ConsoleColor.Yellow));
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine("After completion, please re-attempt deployment.");
+
+                Environment.Exit(1);
+            }
         }
 
         private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo)
