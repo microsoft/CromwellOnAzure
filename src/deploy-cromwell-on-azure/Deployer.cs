@@ -47,6 +47,7 @@ namespace CromwellOnAzureDeployer
 
         private readonly List<string> requiredResourceProviders = new List<string>
             {
+                "Microsoft.Authorization",
                 "Microsoft.Compute",
                 "Microsoft.Network",
                 "Microsoft.Batch",
