@@ -48,6 +48,7 @@ namespace CromwellOnAzureDeployer
         private TokenCredentials tokenCredentials;
         private IAzure azureClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
+        private bool SkipBillingReaderRoleAssignment { get; set; }
 
         public Deployer(Configuration configuration)
         {
@@ -109,7 +110,11 @@ namespace CromwellOnAzureDeployer
 
                 var vmManagedIdentity = linuxVm.SystemAssignedManagedServiceIdentityPrincipalId;
 
-                await AssignVmAsBillingReaderToSubscriptionAsync(vmManagedIdentity);
+                if (!SkipBillingReaderRoleAssignment)
+                {
+                    await AssignVmAsBillingReaderToSubscriptionAsync(vmManagedIdentity);
+                }
+
                 await AssignVmAsContributorToAppInsightsAsync(vmManagedIdentity, appInsights);
                 await AssignVmAsContributorToCosmosDb(vmManagedIdentity, cosmosDb);
                 await AssignVmAsContributorToBatchAccountAsync(vmManagedIdentity, batchAccount);
@@ -661,7 +666,14 @@ namespace CromwellOnAzureDeployer
 
             if (!currentPrincipalRoleIds.Contains(ownerRoleId) && !(currentPrincipalRoleIds.Contains(contributorRoleId) && currentPrincipalRoleIds.Contains(userAccessAdministratorRoleId)))
             {
-                throw new ValidationException($"Insufficient subscription access level. You must be either an Owner or have Contributor and User Access Administrator roles on the subscription.", displayExample: false);
+                SkipBillingReaderRoleAssignment = true;
+
+                RefreshableConsole.WriteLine("Warning: insufficient subscription access level to assign the Billing Reader", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine("role for the VM to your Azure Subscription.", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine("Deployment will continue, but only default VM prices will be used for your workflows,", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine("since the Billing Reader role is required to access RateCard API pricing data.", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine("To resolve this in the future, have your Azure subscription Owner or Contributor", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine("assign the Billing Reader role for the VM's managed identity to your Azure Subscription scope.", ConsoleColor.Yellow);
             }
         }
 

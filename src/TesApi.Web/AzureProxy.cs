@@ -559,7 +559,7 @@ namespace TesApi.Web
             }
             catch
             {
-                logger.LogWarning("Using default VM prices.");
+                logger.LogWarning("Using default VM prices. Please see the section 'Dynamic cost optimization and RateCard API access': https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md");
                 vmPrices = JsonConvert.DeserializeObject<IEnumerable<VmPrice>>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "DefaultVmPrices.json")));
             }
 

@@ -73,6 +73,8 @@ To learn more about your Resource Group's cost, navigate to the "Cost Analysis" 
 
 You can also use the [Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/) to estimate your monthly cost.
 
+## Dynamic cost optimization and RateCard API access
+VM price data is used to select the most cost-effective VM for a task's runtime requirements, and is also stored in the TES database to allow calculation of total workflow cost.  VM price data is obtained from the [Azure RateCard API](https://docs.microsoft.com/en-us/previous-versions/azure/reference/mt219005(v=azure.100)).  Accessing the Azure RateCard API requires the VM's Billing Reader role to be assigned to your Azure subscription scope.  If you don't have Owner or Contributor role access to your subscription, the deployer will not be able to complete this on your behalf - you will need to contact your Azure subscription's owner or contributor to complete this for you.  You will see a warning in the TES logs indicating that default VM prices are being used until this is resolved.
 
 ## Debugging tools
 ### How to check all tasks running for a workflow using Batch account
