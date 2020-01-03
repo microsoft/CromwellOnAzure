@@ -265,44 +265,72 @@ namespace CromwellOnAzureDeployer
 
         private async Task RegisterResourceProvidersAsync()
         {
-            var cloudResourceProviders = await resourceManagerClient.Providers.ListAsync();
+            var unregisteredResourceProviders = await GetRequiredResourceProvidersNotRegisteredAsync();
 
-            var unregisteredResourceProviders = requiredResourceProviders
-                .Intersect(cloudResourceProviders
-                    .Where(rp => !rp.RegistrationState.Equals("Registered", StringComparison.OrdinalIgnoreCase))
-                    .Select(rp => rp.Namespace), StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            if (unregisteredResourceProviders.Count == 0)
+            {
+                return;
+            }
 
             try
             {
                 await Execute(
                     $"Registering resource providers...",
-                    () =>
+                    async () =>
                     {
-                        return Task.WhenAll(
+                        await Task.WhenAll(
                             unregisteredResourceProviders.Select(rp =>
                                 resourceManagerClient.Providers.RegisterAsync(rp))
                         );
+
+                        // RP registration takes a few minutes; poll until done registering
+
+                        while (!cts.IsCancellationRequested)
+                        {
+                            unregisteredResourceProviders = await GetRequiredResourceProvidersNotRegisteredAsync();
+
+                            if (unregisteredResourceProviders.Count == 0)
+                            {
+                                break;
+                            }
+                            
+                            await Task.Delay(TimeSpan.FromSeconds(15));
+                        }
+
+                        return Task.FromResult(false);
                     });
             }
             catch (Microsoft.Rest.Azure.CloudException ex) when (ex.ToCloudErrorType() == CloudErrorType.AuthorizationFailed)
             {
                 RefreshableConsole.WriteLine();
                 RefreshableConsole.WriteLine("Unable to programatically register the required resource providers.", ConsoleColor.Red);
-                RefreshableConsole.WriteLine("This can happen if you are not the Azure subscription owner, and it's an older Azure subscription.", ConsoleColor.Red);
+                RefreshableConsole.WriteLine("This can happen if you don't have the Owner or Contributor role assignment for the subscription.", ConsoleColor.Red);
                 RefreshableConsole.WriteLine();
-                RefreshableConsole.WriteLine("Please contact your Azure subscription owner and have them:", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine("Please contact the Owner or Contributor of your Azure subscription, and have them:", ConsoleColor.Yellow);
                 RefreshableConsole.WriteLine();
                 RefreshableConsole.WriteLine("1. Navigate to https://portal.azure.com", ConsoleColor.Yellow);
                 RefreshableConsole.WriteLine("2. Select Subscription -> Resource Providers", ConsoleColor.Yellow);
                 RefreshableConsole.WriteLine("3. Select each of the following and click Register:", ConsoleColor.Yellow);
                 RefreshableConsole.WriteLine();
-                unregisteredResourceProviders.ForEach(rp => RefreshableConsole.WriteLine(rp, ConsoleColor.Yellow));
+                unregisteredResourceProviders.ForEach(rp => RefreshableConsole.WriteLine($"- {rp}", ConsoleColor.Yellow));
                 RefreshableConsole.WriteLine();
                 RefreshableConsole.WriteLine("After completion, please re-attempt deployment.");
 
                 Environment.Exit(1);
             }
+        }
+        
+        private async Task<List<string>> GetRequiredResourceProvidersNotRegisteredAsync()
+        {
+            var cloudResourceProviders = await resourceManagerClient.Providers.ListAsync();
+
+            var notRegisteredResourceProviders = requiredResourceProviders
+                .Intersect(cloudResourceProviders
+                    .Where(rp => !rp.RegistrationState.Equals("Registered", StringComparison.OrdinalIgnoreCase))
+                    .Select(rp => rp.Namespace), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return notRegisteredResourceProviders;
         }
 
         private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo)
