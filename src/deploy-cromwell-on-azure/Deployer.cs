@@ -634,7 +634,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task ValidateSubscriptionAsync(string subscriptionId)
+        private async Task ValidateSubscriptionAndResourceGroupAsync(string subscriptionId)
         {
             const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
@@ -674,6 +674,7 @@ namespace CromwellOnAzureDeployer
                 RefreshableConsole.WriteLine("since the Billing Reader role is required to access RateCard API pricing data.", ConsoleColor.Yellow);
                 RefreshableConsole.WriteLine("To resolve this in the future, have your Azure subscription Owner or Contributor", ConsoleColor.Yellow);
                 RefreshableConsole.WriteLine("assign the Billing Reader role for the VM's managed identity to your Azure Subscription scope.", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine("More info: https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access", ConsoleColor.Yellow);
             }
         }
 
@@ -717,7 +718,7 @@ namespace CromwellOnAzureDeployer
             {
                 ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                 ValidateRegionName(configuration.RegionName);
-                await ValidateSubscriptionAsync(configuration.SubscriptionId);
+                await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId);
                 await ValidateBatchQuotaAsync();
             }
             catch (ValidationException validationException)
