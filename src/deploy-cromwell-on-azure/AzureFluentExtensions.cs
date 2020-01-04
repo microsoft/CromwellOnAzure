@@ -11,12 +11,13 @@ namespace CromwellOnAzureDeployer
     {
         public static CloudError ToCloudError(this CloudException cloudException)
         {
-            return (JsonConvert.DeserializeObject<CloudErrorWrapper>(cloudException.Response.Content)).Error;
+            return JsonConvert.DeserializeObject<CloudErrorWrapper>(cloudException.Response.Content).Error;
         }
 
         public static CloudErrorType ToCloudErrorType(this CloudException cloudException)
         {
-            Enum.TryParse(cloudException.ToCloudError().Code, out CloudErrorType cloudErrorType);
+            var code = cloudException.ToCloudError().Code;
+            Enum.TryParse(code, out CloudErrorType cloudErrorType);
             return cloudErrorType;
         }
     }
@@ -26,6 +27,6 @@ namespace CromwellOnAzureDeployer
     }
     public enum CloudErrorType
     {
-        NotSet, ExpiredAuthenticationToken
+        NotSet, ExpiredAuthenticationToken, AuthorizationFailed
     }
 }
