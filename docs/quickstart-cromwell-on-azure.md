@@ -13,7 +13,7 @@ The main steps are:
    1. `Owner` of the subscription<br/>
    1. `Contributor` and `User Access Administrator` of the subscription
    1. `Owner` of the resource group.
-      1. *Note: this level of access will result in a warning during deployment, and will not use the latest VM pricing data.</i>  [Learn more](https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access)*
+      1. *Note: this level of access will result in a warning during deployment, and will not use the latest VM pricing data.</i>  [Learn more](https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access).  Also, you must specify the resource group name during deployment with this level of access (see below).*
 1. Install the [Azure Command Line Interface (az cli)](https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest), a command line experience for managing Azure resources.
 1. Run `az login` to authenticate with Azure
 
@@ -34,7 +34,9 @@ The main steps are:
       1. Specifies the region you would like to use for your Cromwell on Azure instance. To find a list of all available regions, run `az account list-locations` on the command line or in PowerShell and use the desired region's "name" property for `RegionName`.
    1. `MainIdentifierPrefix` (*optional*)
       1. This string will be used to prefix the name of your Cromwell on Azure resource group and associated resources. If not specified, the default value of "coa" followed by random characters is used as a prefix for the resource group and all Azure resources created for your Cromwell on Azure instance. After installation, you can search for your resources using the `MainIdentifierPrefix` value.<br/>
-
+   1. `ResourceGroupName` (*optional*, **required** when you only have owner-level access of the *resource group*)
+      1. Species the name of a pre-existing resource group that you wish to deploy into.
+      
 Run the following at the command line or terminal after navigating to where your executable is saved:
 ```
 .\deploy-cromwell-on-azure.exe --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> 
