@@ -78,13 +78,13 @@ namespace CromwellOnAzureDeployer
             RefreshableConsole.WriteLine("Running...");
 
             await ValidateTokenProviderAsync();
-            await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName);
             
             tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
             azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
             azureClient = GetAzureClient(azureCredentials);
             resourceManagerClient = GetResourceManagerClient(azureCredentials);
 
+            await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName);
             await RegisterResourceProvidersAsync();
             await ValidateBatchQuotaAsync();
 
