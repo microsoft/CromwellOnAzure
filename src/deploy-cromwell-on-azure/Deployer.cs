@@ -70,7 +70,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task<bool> DeployAsync()
         {
-            ValidateCommandLineArguments();
+            await ValidateConfigurationAsync();
 
             var isDeploymentSuccessful = false;
             var mainTimer = Stopwatch.StartNew();
@@ -85,7 +85,7 @@ namespace CromwellOnAzureDeployer
             resourceManagerClient = GetResourceManagerClient(azureCredentials);
 
             await RegisterResourceProvidersAsync();
-            await ValidateConfigurationAsync();
+            await ValidateBatchQuotaAsync();
 
             try
             {
@@ -736,6 +736,11 @@ namespace CromwellOnAzureDeployer
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
             const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
 
+            if (string.IsNullOrWhiteSpace(configuration.SubscriptionId))
+            {
+                throw new ValidationException($"SubcriptionId is required.");
+            }
+
             var azure = Azure
                 .Configure()
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
@@ -787,12 +792,19 @@ namespace CromwellOnAzureDeployer
 
         private async Task ValidateBatchQuotaAsync()
         {
-            var accountQuota = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.Location.GetQuotasAsync(configuration.RegionName)).AccountQuota;
-            var existingBatchAccountCount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).AsEnumerable().Count(b => b.Location.Equals(configuration.RegionName));
-
-            if (existingBatchAccountCount >= accountQuota)
+            try
             {
-                throw new ValidationException($"The regional Batch account quota ({accountQuota} account(s) per region) for the specified subscription has been reached. Submit a support request to increase the quota or choose another region.", displayExample: false);
+                var accountQuota = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.Location.GetQuotasAsync(configuration.RegionName)).AccountQuota;
+                var existingBatchAccountCount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).AsEnumerable().Count(b => b.Location.Equals(configuration.RegionName));
+
+                if (existingBatchAccountCount >= accountQuota)
+                {
+                    throw new ValidationException($"The regional Batch account quota ({accountQuota} account(s) per region) for the specified subscription has been reached. Submit a support request to increase the quota or choose another region.", displayExample: false);
+                }
+            }
+            catch (ValidationException validationException)
+            {
+                DisplayValidationExceptionAndExit(validationException);
             }
         }
 
@@ -819,30 +831,14 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private void ValidateCommandLineArguments()
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(configuration.SubscriptionId))
-                {
-                    throw new ValidationException($"SubcriptionId is required.");
-                }
-
-                ValidateRegionName(configuration.RegionName);
-                ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
-            }
-            catch (ValidationException validationException)
-            {
-                DisplayValidationExceptionAndExit(validationException);
-            }
-        }
-
         private async Task ValidateConfigurationAsync()
         {
             try
             {
+                ValidateRegionName(configuration.RegionName);
+                ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
+
                 await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName);
-                await ValidateBatchQuotaAsync();
             }
             catch (ValidationException validationException)
             {
