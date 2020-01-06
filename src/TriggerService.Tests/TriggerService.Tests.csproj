@@ -15,7 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\TriggerService\TriggerService.csproj" />
+    <ProjectReference Include="..\TriggerService\TriggerService.csproj" />
   </ItemGroup>
-
 </Project>
