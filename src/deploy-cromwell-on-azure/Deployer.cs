@@ -70,6 +70,8 @@ namespace CromwellOnAzureDeployer
 
         public async Task<bool> DeployAsync()
         {
+            ValidateCommandLineArguments();
+
             var isDeploymentSuccessful = false;
             var mainTimer = Stopwatch.StartNew();
 
@@ -734,11 +736,6 @@ namespace CromwellOnAzureDeployer
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
             const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
 
-            if (string.IsNullOrWhiteSpace(subscriptionId))
-            {
-                throw new ValidationException($"SubcriptionId is required.");
-            }
-
             var azure = Azure
                 .Configure()
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
@@ -822,27 +819,48 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private void ValidateCommandLineArguments()
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(configuration.SubscriptionId))
+                {
+                    throw new ValidationException($"SubcriptionId is required.");
+                }
+
+                ValidateRegionName(configuration.RegionName);
+                ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
+            }
+            catch (ValidationException validationException)
+            {
+                DisplayValidationExceptionAndExit(validationException);
+            }
+        }
+
         private async Task ValidateConfigurationAsync()
         {
             try
             {
-                ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
-                ValidateRegionName(configuration.RegionName);
                 await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName);
                 await ValidateBatchQuotaAsync();
             }
             catch (ValidationException validationException)
             {
-                RefreshableConsole.WriteLine(validationException.Reason, ConsoleColor.Red);
-
-                if (validationException.DisplayExample)
-                {
-                    RefreshableConsole.WriteLine();
-                    RefreshableConsole.WriteLine($"Example: ", ConsoleColor.Green).Write($"deploy-cromwell-on-azure --subscriptionid {Guid.NewGuid()} --regionname westus2 --mainidentifierprefix coa");
-                }
-
-                Environment.Exit(1);
+                DisplayValidationExceptionAndExit(validationException);
             }
+        }
+
+        private static void DisplayValidationExceptionAndExit(ValidationException validationException)
+        {
+            RefreshableConsole.WriteLine(validationException.Reason, ConsoleColor.Red);
+
+            if (validationException.DisplayExample)
+            {
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine($"Example: ", ConsoleColor.Green).Write($"deploy-cromwell-on-azure --subscriptionid {Guid.NewGuid()} --regionname westus2 --mainidentifierprefix coa", ConsoleColor.White);
+            }
+
+            Environment.Exit(1);
         }
 
         private async Task DeleteResourceGroupIfUserConsentsAsync()
