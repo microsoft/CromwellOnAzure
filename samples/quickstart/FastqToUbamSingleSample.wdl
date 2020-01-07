@@ -1,5 +1,3 @@
-
-
 workflow FastqToUbamSingleSample {
 
     Array[File] fastq_pair
@@ -32,8 +30,6 @@ workflow FastqToUbamSingleSample {
 	File unmapped_bam = FastqToUbam.unmapped_bam
     }
 }
-
-
 
 task FastqToUbam {
 
@@ -71,4 +67,3 @@ task FastqToUbam {
         File unmapped_bam = "${output_bam_basename}.bam"
     }
 }
-
