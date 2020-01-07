@@ -70,20 +70,23 @@ namespace CromwellOnAzureDeployer
 
         public async Task<bool> DeployAsync()
         {
+            ValidateInitialCommandLineArgsAsync();
+
             var isDeploymentSuccessful = false;
             var mainTimer = Stopwatch.StartNew();
 
             RefreshableConsole.WriteLine("Running...");
 
             await ValidateTokenProviderAsync();
-
+            
             tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
             azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
             azureClient = GetAzureClient(azureCredentials);
             resourceManagerClient = GetResourceManagerClient(azureCredentials);
 
+            await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName);
             await RegisterResourceProvidersAsync();
-            await ValidateConfigurationAsync();
+            await ValidateBatchQuotaAsync();
 
             try
             {
@@ -728,16 +731,19 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private static void ValidateSubscriptionId(string subscriptionId)
+        {
+            if (string.IsNullOrWhiteSpace(subscriptionId))
+            {
+                throw new ValidationException($"SubscriptionId is required.");
+            }
+        }
+
         private async Task ValidateSubscriptionAndResourceGroupAsync(string subscriptionId, string resourceGroupName)
         {
             const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
             const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
-
-            if (string.IsNullOrWhiteSpace(subscriptionId))
-            {
-                throw new ValidationException($"SubcriptionId is required.");
-            }
 
             var azure = Azure
                 .Configure()
@@ -790,12 +796,19 @@ namespace CromwellOnAzureDeployer
 
         private async Task ValidateBatchQuotaAsync()
         {
-            var accountQuota = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.Location.GetQuotasAsync(configuration.RegionName)).AccountQuota;
-            var existingBatchAccountCount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).AsEnumerable().Count(b => b.Location.Equals(configuration.RegionName));
-
-            if (existingBatchAccountCount >= accountQuota)
+            try
             {
-                throw new ValidationException($"The regional Batch account quota ({accountQuota} account(s) per region) for the specified subscription has been reached. Submit a support request to increase the quota or choose another region.", displayExample: false);
+                var accountQuota = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.Location.GetQuotasAsync(configuration.RegionName)).AccountQuota;
+                var existingBatchAccountCount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).AsEnumerable().Count(b => b.Location.Equals(configuration.RegionName));
+
+                if (existingBatchAccountCount >= accountQuota)
+                {
+                    throw new ValidationException($"The regional Batch account quota ({accountQuota} account(s) per region) for the specified subscription has been reached. Submit a support request to increase the quota or choose another region.", displayExample: false);
+                }
+            }
+            catch (ValidationException validationException)
+            {
+                DisplayValidationExceptionAndExit(validationException);
             }
         }
 
@@ -822,27 +835,31 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task ValidateConfigurationAsync()
+        private void ValidateInitialCommandLineArgsAsync()
         {
             try
             {
-                ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
+                ValidateSubscriptionId(configuration.SubscriptionId);
                 ValidateRegionName(configuration.RegionName);
-                await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName);
-                await ValidateBatchQuotaAsync();
+                ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
             }
             catch (ValidationException validationException)
             {
-                RefreshableConsole.WriteLine(validationException.Reason, ConsoleColor.Red);
-
-                if (validationException.DisplayExample)
-                {
-                    RefreshableConsole.WriteLine();
-                    RefreshableConsole.WriteLine($"Example: ", ConsoleColor.Green).Write($"deploy-cromwell-on-azure --subscriptionid {Guid.NewGuid()} --regionname westus2 --mainidentifierprefix coa");
-                }
-
-                Environment.Exit(1);
+                DisplayValidationExceptionAndExit(validationException);
             }
+        }
+
+        private static void DisplayValidationExceptionAndExit(ValidationException validationException)
+        {
+            RefreshableConsole.WriteLine(validationException.Reason, ConsoleColor.Red);
+
+            if (validationException.DisplayExample)
+            {
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine($"Example: ", ConsoleColor.Green).Write($"deploy-cromwell-on-azure --subscriptionid {Guid.NewGuid()} --regionname westus2 --mainidentifierprefix coa", ConsoleColor.White);
+            }
+
+            Environment.Exit(1);
         }
 
         private async Task DeleteResourceGroupIfUserConsentsAsync()
