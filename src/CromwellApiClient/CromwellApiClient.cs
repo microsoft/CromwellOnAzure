@@ -73,13 +73,13 @@ namespace CromwellApiClient
             byte[] workflowDependenciesData = null)
         {
             var files = new List<FileToPost> {
-                new FileToPost { ParameterName = "workflowSource", Filename = workflowSourceFilename, Data = workflowSourceData },
-                new FileToPost { ParameterName = "workflowInputs", Filename = workflowInputsFilename, Data = workflowInputsData }
+                new FileToPost { ParameterName = "workflowSource", Filename = workflowSourceFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowSourceData) },
+                new FileToPost { ParameterName = "workflowInputs", Filename = workflowInputsFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowInputsData) }
             };
 
             if (workflowOptionsFilename != null && workflowOptionsData != null)
             {
-                files.Add(new FileToPost { ParameterName = "workflowOptions", Filename = workflowOptionsFilename, Data = workflowOptionsData });
+                files.Add(new FileToPost { ParameterName = "workflowOptions", Filename = workflowOptionsFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowOptionsData) });
             }
 
             if (workflowDependenciesFilename != null && workflowDependenciesData != null)
@@ -93,6 +93,23 @@ namespace CromwellApiClient
         public async Task<PostQueryResponse> PostQueryAsync(string queryJson)
         {
             return await PostAsync<PostQueryResponse>("/query", queryJson);
+        }
+
+        /// <summary>
+        /// Encodes a byte array to Utf8, removes tabs, and decodes back to a byte array.
+        /// As of 1/10/2020, Cromwell has a bug that requires tabs to be removed from JSON data
+        /// https://github.com/broadinstitute/cromwell/issues/3487
+        /// </summary>
+        /// <param name="data">The byte array of the file</param>
+        /// <returns>A new byte array of the file</returns>
+        private byte[] EncodeToUtf8AndRemoveTabsAndDecode(byte[] data)
+        {
+            if (data?.Length == 0)
+            {
+                return data;
+            }
+
+            return Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(data).Replace("\t", ""));
         }
 
         private string GetApiUrl(string path)
@@ -118,6 +135,9 @@ namespace CromwellApiClient
                 messageBuilder.AppendLine($"URL: {url}");
                 messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
                 messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
+
+                await AppendResponseBodyAsync(response, messageBuilder);
+
                 throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
             }
             catch (Exception exc)
@@ -152,31 +172,9 @@ namespace CromwellApiClient
                 messageBuilder.AppendLine($"URL: {url}");
                 messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
                 messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
-                throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
-            }
-            catch (Exception exc)
-            {
-                throw new CromwellApiException(exc.Message, exc, response?.StatusCode);
-            }
-        }
-        private async Task<string> GetAsyncAsString(string path)
-        {
-            HttpResponseMessage response = null;
-            var url = string.Empty;
 
-            try
-            {
-                url = GetApiUrl(path);
-                response = await httpClient.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsStringAsync();
-            }
-            catch (HttpRequestException httpRequestException)
-            {
-                var messageBuilder = new StringBuilder();
-                messageBuilder.AppendLine($"URL: {url}");
-                messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
-                messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
+                await AppendResponseBodyAsync(response, messageBuilder);
+
                 throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
             }
             catch (Exception exc)
@@ -204,6 +202,9 @@ namespace CromwellApiClient
                 messageBuilder.AppendLine($"URL: {url}");
                 messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
                 messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
+
+                await AppendResponseBodyAsync(response, messageBuilder);
+
                 throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
             }
             catch (Exception exc)
@@ -230,6 +231,9 @@ namespace CromwellApiClient
                 messageBuilder.AppendLine($"URL: {url}");
                 messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
                 messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
+
+                await AppendResponseBodyAsync(response, messageBuilder);
+
                 throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
             }
             catch (Exception exc)
@@ -264,11 +268,28 @@ namespace CromwellApiClient
                 messageBuilder.AppendLine($"URL: {url}");
                 messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
                 messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
+
+                await AppendResponseBodyAsync(response, messageBuilder);
+
                 throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
             }
             catch (Exception exc)
             {
                 throw new CromwellApiException(exc.Message, exc, response?.StatusCode);
+            }
+        }
+
+        private async Task AppendResponseBodyAsync(HttpResponseMessage response, StringBuilder messageBuilder)
+        {
+            try
+            {
+                // Attempt to append the response body for additional error info
+                var contents = await response.Content.ReadAsStringAsync();
+                messageBuilder.AppendLine(contents);
+            }
+            catch
+            {
+                // Ignore exceptions. Retrieve extra error info only if possible
             }
         }
 
