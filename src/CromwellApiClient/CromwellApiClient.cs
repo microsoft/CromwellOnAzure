@@ -96,8 +96,9 @@ namespace CromwellApiClient
         }
 
         /// <summary>
-        /// Encodes a byte array to Utf8, remove tabs, and decodes back to a byte array.
+        /// Encodes a byte array to Utf8, removes tabs, and decodes back to a byte array.
         /// As of 1/10/2020, Cromwell has a bug that requires tabs to be removed from JSON data
+        /// https://github.com/broadinstitute/cromwell/issues/3487
         /// </summary>
         /// <param name="data">The byte array of the file</param>
         /// <returns>A new byte array of the file</returns>
