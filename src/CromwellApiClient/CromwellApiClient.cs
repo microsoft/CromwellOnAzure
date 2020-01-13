@@ -103,7 +103,7 @@ namespace CromwellApiClient
         /// <returns>A new byte array of the file</returns>
         private byte[] EncodeToUtf8AndRemoveTabsAndDecode(byte[] data)
         {
-            if (data == null || data.Length == 0)
+            if (data?.Length == 0)
             {
                 return data;
             }
