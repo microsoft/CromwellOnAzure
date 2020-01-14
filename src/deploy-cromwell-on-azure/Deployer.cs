@@ -141,7 +141,7 @@ namespace CromwellOnAzureDeployer
                 await AssignVmAsDataReaderToStorageAccountAsync(vmManagedIdentity, storageAccount);
 
                 await DelayAsync(
-                    $"Waiting ({armPropagationDelay.TotalMinutes:n0}) minutes for ARM to fully propagate permissions...", 
+                    $"Waiting ({armPropagationDelay.TotalMinutes:n0}) minutes for Azure to fully propagate role assignments...", 
                     armPropagationDelay);
 
                 await RestartVmAsync(linuxVm);
