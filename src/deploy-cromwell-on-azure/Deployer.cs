@@ -43,6 +43,7 @@ namespace CromwellOnAzureDeployer
         private const string ConfigurationContainerName = "configuration";
         private const string InputsContainerName = "inputs";
 
+        private readonly TimeSpan armPropagationDelay = TimeSpan.FromMinutes(5);
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
 
         private readonly List<string> requiredResourceProviders = new List<string>
@@ -112,8 +113,8 @@ namespace CromwellOnAzureDeployer
                     Task.Run(async () => cosmosDb = await CreateCosmosDbAsync(), cts.Token),
                     Task.Run(async () => storageAccount = await CreateStorageAccountAsync(), cts.Token),
 
-                    Task.Run(async () => 
-                        { 
+                    Task.Run(async () =>
+                        {
                             linuxVm = await CreateVirtualMachineAsync();
 
                             var nic = linuxVm.GetPrimaryNetworkInterface();
@@ -138,6 +139,10 @@ namespace CromwellOnAzureDeployer
                 await AssignVmAsContributorToBatchAccountAsync(vmManagedIdentity, batchAccount);
                 await AssignVmAsContributorToStorageAccountAsync(vmManagedIdentity, storageAccount);
                 await AssignVmAsDataReaderToStorageAccountAsync(vmManagedIdentity, storageAccount);
+
+                await DelayAsync(
+                    $"Waiting ({armPropagationDelay.TotalMinutes:n0}) minutes for ARM to fully propagate permissions...", 
+                    armPropagationDelay);
 
                 await RestartVmAsync(linuxVm);
                 await WaitForSshConnectivityAsync(sshConnectionInfo);
@@ -170,6 +175,17 @@ namespace CromwellOnAzureDeployer
             RefreshableConsole.WriteLine($"Completed in {mainTimer.Elapsed.TotalMinutes:n1} minutes.");
 
             return isDeploymentSuccessful;
+        }
+
+        private async Task DelayAsync(string message, TimeSpan duration)
+        {
+            await Execute(
+                message,
+                async () =>
+                {
+                    await Task.Delay(duration);
+                    return Task.FromResult(false);
+                });
         }
 
         private Task WaitForSshConnectivityAsync(ConnectionInfo sshConnectionInfo)
