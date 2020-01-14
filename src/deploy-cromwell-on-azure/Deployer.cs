@@ -43,7 +43,7 @@ namespace CromwellOnAzureDeployer
         private const string ConfigurationContainerName = "configuration";
         private const string InputsContainerName = "inputs";
 
-        private readonly TimeSpan armPropagationDelay = TimeSpan.FromMinutes(5);
+        private readonly TimeSpan azurePropagationDelay = TimeSpan.FromMinutes(5);
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
 
         private readonly List<string> requiredResourceProviders = new List<string>
@@ -141,8 +141,8 @@ namespace CromwellOnAzureDeployer
                 await AssignVmAsDataReaderToStorageAccountAsync(vmManagedIdentity, storageAccount);
 
                 await DelayAsync(
-                    $"Waiting ({armPropagationDelay.TotalMinutes:n0}) minutes for Azure to fully propagate role assignments...", 
-                    armPropagationDelay);
+                    $"Waiting ({azurePropagationDelay.TotalMinutes:n0}) minutes for Azure to fully propagate role assignments...", 
+                    azurePropagationDelay);
 
                 await RestartVmAsync(linuxVm);
                 await WaitForSshConnectivityAsync(sshConnectionInfo);
