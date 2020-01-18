@@ -94,12 +94,14 @@ for x in "${!accessible_containers[@]}"; do
   for include_pattern in "${!include_patterns[@]}"; do [[ $x == $include_pattern ]] && include="true"; done
   for exclude_pattern in "${exclude_patterns[@]}"; do [[ $x == $exclude_pattern ]] && include="false"; done
 
-  [[ $include == "true" ]] \
-    && account_name=$(expr "$x" : '\(.*\)/.*') \
+  [[ $include == "false" ]] && continue
+  [[ $(ps aux | grep -c $x) -eq 2 ]] && continue
+
+  account_name=$(expr "$x" : '\(.*\)/.*') \
     && container_name=$(expr "$x" : '.*/\(.*\)') \
     && mount_path="/mnt/$account_name/$container_name" \
     && { [[ $account_name == $default_storage_account && ( $container_name == "configuration" || $container_name == "cromwell-executions" || $container_name == "cromwell-workflow-logs" ) ]] && mount_path_in_docker_container="/$container_name" || mount_path_in_docker_container="/$account_name/$container_name" ; } \
-    && mkdir -p $mount_path \
+    && mkdir -p $mount_path || (umount -l $mount_path && mkdir -p $mount_path) \
     && sudo echo "/usr/sbin/mount.blobfuse $mount_path fuse _netdev,account_name=$account_name,container_name=$container_name,account_key=$account_key" >> /etc/fstab \
     && echo "Added entry in fstab for container $container_name from account $account_name with mount path $mount_path on host and $mount_path_in_docker_container in docker using the account key." \
     && cromwell_volumes+="      - type: bind\n        source: $mount_path\n        target: $mount_path_in_docker_container\n" ;
@@ -112,12 +114,14 @@ for x in "${!include_patterns[@]}"; do
   include="true"
   for exclude_pattern in "${exclude_patterns[@]}"; do [[ $x == $exclude_pattern ]] && include="false"; done
 
-  [[ $include == "true" ]] \
-    && account_name=$(expr "$x" : '\(.*\)/.*') \
+  [[ $include == "false" ]] && continue
+  [[ $(ps aux | grep -c $x) -eq 2 ]] && continue
+
+  account_name=$(expr "$x" : '\(.*\)/.*') \
     && container_name=$(expr "$x" : '.*/\(.*\)') \
     && mount_path="/mnt/$account_name/$container_name" \
     && mount_path_in_docker_container="/$account_name/$container_name" \
-    && mkdir -p $mount_path \
+    && mkdir -p $mount_path || (umount -l $mount_path && mkdir -p $mount_path) \
     && sudo echo "/usr/sbin/mount.blobfuse $mount_path fuse _netdev,account_name=$account_name,container_name=$container_name,sas_token=$sas_token" >> /etc/fstab \
     && echo "Added entry in fstab for container $container_name from account $account_name with mount path $mount_path on host and $mount_path_in_docker_container in docker using the SAS token." \
     && tes_ext_storage_containers+="https://$account_name.blob.core.windows.net/$container_name$sas_token;" \
