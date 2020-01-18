@@ -29,4 +29,7 @@ echo
 echo "Startup complete"
 
 # keep the process alive so blobfuse mounts stay mounted
-while true; do sleep 10000; done
+while true; do 
+    sleep 30; 
+    ./mount_containers.sh -a STORAGEACCOUNTNAME || [[ $? == 32 || $? == 0 ]]
+done
