@@ -761,52 +761,59 @@ namespace CromwellOnAzureDeployer
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
             const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
 
-            var azure = Azure
-                .Configure()
-                .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
-                .Authenticate(azureCredentials);
-
-            var subscriptionExists = (await azure.Subscriptions.ListAsync()).Any(sub => sub.SubscriptionId.Equals(subscriptionId, StringComparison.OrdinalIgnoreCase));
-
-            if (!subscriptionExists)
+            try
             {
-                throw new ValidationException($"Invalid or inaccessible subcription id '{subscriptionId}'. Make sure that subscription exists and that you are either an Owner or have Contributor and User Access Administrator roles on the subscription.", displayExample: false);
-            }
+                var azure = Azure
+                    .Configure()
+                    .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                    .Authenticate(azureCredentials);
 
-            var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
-            var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
+                var subscriptionExists = (await azure.Subscriptions.ListAsync()).Any(sub => sub.SubscriptionId.Equals(subscriptionId, StringComparison.OrdinalIgnoreCase));
 
-            var currentPrincipalSubscriptionRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{subscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
-                .Body
-                .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
-
-            if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId)))
-            {
-                var rgExists = await azureClient.ResourceGroups.ContainAsync(resourceGroupName);
-
-                if (!rgExists)
+                if (!subscriptionExists)
                 {
-                    throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
+                    throw new ValidationException($"Invalid or inaccessible subcription id '{subscriptionId}'. Make sure that subscription exists and that you are either an Owner or have Contributor and User Access Administrator roles on the subscription.", displayExample: false);
                 }
 
-                var currentPrincipalRgRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
+                var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
+                var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
+
+                var currentPrincipalSubscriptionRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{subscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
                     .Body
                     .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
-                if (!currentPrincipalRgRoleIds.Contains(ownerRoleId))
+                if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId)))
                 {
-                    throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
+                    var rgExists = await azureClient.ResourceGroups.ContainAsync(resourceGroupName);
+
+                    if (!rgExists)
+                    {
+                        throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
+                    }
+
+                    var currentPrincipalRgRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
+                        .Body
+                        .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
+
+                    if (!currentPrincipalRgRoleIds.Contains(ownerRoleId))
+                    {
+                        throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
+                    }
+
+                    SkipBillingReaderRoleAssignment = true;
+
+                    RefreshableConsole.WriteLine("Warning: insufficient subscription access level to assign the Billing Reader", ConsoleColor.Yellow);
+                    RefreshableConsole.WriteLine("role for the VM to your Azure Subscription.", ConsoleColor.Yellow);
+                    RefreshableConsole.WriteLine("Deployment will continue, but only default VM prices will be used for your workflows,", ConsoleColor.Yellow);
+                    RefreshableConsole.WriteLine("since the Billing Reader role is required to access RateCard API pricing data.", ConsoleColor.Yellow);
+                    RefreshableConsole.WriteLine("To resolve this in the future, have your Azure subscription Owner or Contributor", ConsoleColor.Yellow);
+                    RefreshableConsole.WriteLine("assign the Billing Reader role for the VM's managed identity to your Azure Subscription scope.", ConsoleColor.Yellow);
+                    RefreshableConsole.WriteLine("More info: https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access", ConsoleColor.Yellow);
                 }
-
-                SkipBillingReaderRoleAssignment = true;
-
-                RefreshableConsole.WriteLine("Warning: insufficient subscription access level to assign the Billing Reader", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("role for the VM to your Azure Subscription.", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("Deployment will continue, but only default VM prices will be used for your workflows,", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("since the Billing Reader role is required to access RateCard API pricing data.", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("To resolve this in the future, have your Azure subscription Owner or Contributor", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("assign the Billing Reader role for the VM's managed identity to your Azure Subscription scope.", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("More info: https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access", ConsoleColor.Yellow);
+            }
+            catch (ValidationException validationException)
+            {
+                DisplayValidationExceptionAndExit(validationException);
             }
         }
 
