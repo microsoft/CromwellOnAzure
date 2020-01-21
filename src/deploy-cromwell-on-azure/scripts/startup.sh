@@ -28,7 +28,7 @@ docker-compose -f /cromwellazure/docker-compose.yml -f /cromwellazure/docker-com
 echo
 echo "Startup complete"
 
-# keep the process alive so blobfuse mounts stay mounted
+# run mount_containers.sh periodically to repair in case some of the blobfuses have crashed
 while true; do 
     sleep 30; 
     ./mount_containers.sh -a STORAGEACCOUNTNAME || [[ $? == 32 || $? == 0 ]]
