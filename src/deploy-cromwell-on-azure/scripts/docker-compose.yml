@@ -14,6 +14,10 @@ services:
       - AzureOfferDurableId=MS-AZR-0003p
     expose:
       - "80"
+    restart_policy:
+      condition: on-failure
+      delay: 5s
+      window: 60s
   mysqldb:
     image: "mysql:latest"
     environment:
@@ -29,6 +33,10 @@ services:
     command: ["echo \"CREATE USER 'cromwell'@'localhost' IDENTIFIED BY 'cromwell'; GRANT ALL PRIVILEGES ON cromwell_db.* TO 'cromwell'@'localhost' WITH GRANT OPTION; CREATE USER 'cromwell'@'%' IDENTIFIED BY 'cromwell'; GRANT ALL PRIVILEGES ON cromwell_db.* TO 'cromwell'@'%' WITH GRANT OPTION;\" > /docker-entrypoint-initdb.d/init_user.sql && docker-entrypoint.sh mysqld && echo \"Deleting change log lock table...\" && mysql -u cromwell -p cromwell -e \"DELETE FROM DATABASECHANGELOGLOCK;\""]
     expose:
       - "3306"
+    restart_policy:
+      condition: on-failure
+      delay: 5s
+      window: 60s
   cromwell:
     image: "CROMWELLIMAGENAME"
     volumes:
@@ -44,6 +52,10 @@ services:
     depends_on:
       - "mysqldb"
       - "tes"
+    restart_policy:
+      condition: on-failure
+      delay: 5s
+      window: 60s
   triggerservice:
     image: "TRIGGERSERVICEIMAGENAME"
     environment:
@@ -52,3 +64,7 @@ services:
       - ApplicationInsightsAccountName=VARAPPLICATIONINSIGHTSACCOUNTNAME
     depends_on:
       - "cromwell"
+    restart_policy:
+      condition: on-failure
+      delay: 5s
+      window: 60s
