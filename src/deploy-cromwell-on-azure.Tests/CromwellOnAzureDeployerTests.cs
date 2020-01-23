@@ -25,7 +25,7 @@ namespace CromwellOnAzureDeployer.Tests
         }
 
         [TestMethod]
-        public void CloudErrorTypeNullCheck()
+        public void ToCloudErrorTypeHandlesNull()
         {
             CloudException exception = null;
             var error = exception.ToCloudErrorType();
