@@ -2,7 +2,7 @@
 This quickstart describes how to deploy Cromwell on Azure and run a sample workflow. 
 
 The main steps are:
-1. **Deploy.** Download prerequisites and use the deployment executable to configure the Azure resources needed to run Cromwell on Azure .
+1. **Deploy.** Download prerequisites and use the deployment executable to configure the Azure resources needed to run Cromwell on Azure.
 1. **Prepare your workflow.** Create a JSON trigger file with required URLs for your workflow.
 1. **Execute.** Upload the trigger file so that Cromwell starts running your workflow.
 
@@ -47,20 +47,20 @@ Run the following at the command line or terminal after navigating to where your
 .\deploy-cromwell-on-azure.exe --SubscriptionId 00000000-0000-0000-0000-000000000000 --RegionName westus2 --MainIdentifierPrefix coa 
 ```
 
-Deployment can take up to 20 minutes to complete.
+Deployment can take up to 40 minutes to complete.
 
 ## Cromwell on Azure deployed resources
 Once deployed, Cromwell on Azure configures the following Azure resources:
 
-* [Host VM](https://azure.microsoft.com/en-us/services/virtual-machines/) - The host VM runs the Cromwell server.  It includes the virtual machine, disk, network interface, public IP address, and virtual network. 
-* [Batch account](https://docs.microsoft.com/en-us/azure/batch/) - The Batch account is connected to the host VM by default and will spin up the virtual machines that run each task in a workflow.  After deployment, create an Azure support request to increase your core quotas if you plan on running large workflows.  [Learn more here](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas).
-* [Storage account](https://docs.microsoft.com/en-us/azure/storage/) - This Storage account is mounted to the host VM. By default, it includes the following Blob containers - "cromwell-executions", "cromwell-workflow-logs", "inputs", "outputs", and "workflows".
-* [Application Insights](https://docs.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview) - This contains all logs from the workflow to enable debugging at the task level. 
-* [Cosmos DB](https://docs.microsoft.com/en-us/azure/cosmos-db/introduction) - This database includes information and metadata about each task in each workflow run by the host VM.
+* [Host VM](https://azure.microsoft.com/en-us/services/virtual-machines/) - runs [Ubuntu 16.04 LTS](https://github.com/microsoft/CromwellOnAzure/blob/421ccd163bfd53807413ed696c0dab31fb2478aa/src/deploy-cromwell-on-azure/Configuration.cs#L16) and [Docker Compose with four containers](https://github.com/microsoft/CromwellOnAzure/blob/master/src/deploy-cromwell-on-azure/scripts/docker-compose.yml) (Cromwell, MySQL, TES, TriggerService).  [Blobfuse](https://github.com/Azure/azure-storage-fuse) is used to mount the default storage account as a local file system available to the four containers.  Also created are an OS and data disk, network interface, public IP address, virtual network, and network security group. [Learn more] (https://docs.microsoft.com/en-us/azure/virtual-machines/linux/)
+* [Batch account](https://docs.microsoft.com/en-us/azure/batch/) - The Batch account is used by TES to spin up the virtual machines that run each task in a workflow.  After deployment, create an Azure support request to increase your core quotas if you plan on running large workflows.  [Learn more](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas).
+* [Storage account](https://docs.microsoft.com/en-us/azure/storage/) - This Storage account is mounted to the host VM using [blobfuse](https://github.com/Azure/azure-storage-fuse), which Azure Block Blobs to be mounted as a local file system available to the four containers running in Docker. By default, it includes the following Blob containers - `cromwell-executions`, `cromwell-workflow-logs`, `inputs`, `outputs`, and `workflows`.
+* [Application Insights](https://docs.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview) - This contains logs from TES and the Trigger Service to enable debugging.
+* [Cosmos DB](https://docs.microsoft.com/en-us/azure/cosmos-db/introduction) - This database is used by TES, and includes information and metadata about each TES task that is run as part of a workflow.
 
  All of these resources will be grouped under a single resource group in your account, which you can view on the [Azure Portal](https://portal.azure.com). Note that your specific resource group name, host VM name and host VM password for username "vmadmin" are printed to the screen during deployment. You can store these for your future use, or you can reset the VM's password at a later date via the Azure Portal.<br/>
 
-Note that as part of the Cromwell on Azure deployment, a "Hello World" workflow is automatically run. The input files for this workflow are found in the "inputs" container, and the output files can be found in the "cromwell-executions" container.<br/>
+Note that as part of the Cromwell on Azure deployment, a "Hello World" workflow is automatically run. The input files for this workflow are found in the `inputs` container, and the output files can be found in the `cromwell-executions` container.<br/>
 
 If you expect to run at scale, you will likely want to increase your Azure Batch quota after deployment.  [Learn more here.](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas)
 
@@ -108,7 +108,7 @@ Alternatively, you can use http or https paths for your input files [using share
 
 ## Configure your Cromwell on Azure trigger file
 Cromwell on Azure uses a JSON trigger file to note the paths to all input information and to initiate the workflow. [A sample trigger file can be downloaded from this GitHub repo](https://github.com/microsoft/CromwellOnAzure/blob/master/samples/quickstart/FastqToUbamSingleSample.chr21.json) and includes the following information:
-- The "WorkflowUrl" is the url for your WDL file. You can get this from the Azure Portal.
+- The "WorkflowUrl" is the url for your WDL file.
 - The "WorkflowInputsUrl" is the url for your input JSON file.
 - The "WorkflowOptionsUrl" is only used with some WDL files. If you are not using it set this to `null`.
 - The "WorkflowDependenciesUrl" is only used with some WDL files. If you are not using it set this to `null`.
@@ -141,9 +141,9 @@ This can be done programatically using the [Azure Storage SDKs](https://azure.mi
 ### Via Azure Storage Explorer
 ![Select a blob to upload from Azure Storage Explorer](screenshots/newexplorer.PNG)
 
-For example, a trigger JSON file with name `task1.json` in the "new" directory, will be move to "inprogress" directory with a modified name `task1.guid.json`. This guid is a workflow id assigned by Cromwell.<br/>
+For example, a trigger JSON file with name `task1.json` in the "new" directory, will be move to the "inprogress" directory with a modified name `task1.uuid.json`. This uuid is a workflow ID assigned by Cromwell.<br/>
 
-Once your workflow completes, you can view the output files of your workflow in the `cromwell-executions` container within your Azure Storage Account. Additional output files from the cromwell endpoint, including metadata and the timing file, are found in the `outputs` container. To learn more about Cromwell's metadata and timing information, visit the [Cromwell documentation](https://cromwell.readthedocs.io/en/stable/).<br/>
+Once your workflow completes, you can view the output files of your workflow in the `cromwell-executions` container within your Azure Storage Account. Additional output files from the Cromwell endpoint, including metadata and the timing file, are found in the `outputs` container. To learn more about Cromwell's metadata and timing information, visit the [Cromwell documentation](https://cromwell.readthedocs.io/en/stable/).<br/>
 
 ## Abort an in-progress workflow
 To abort a workflow that is in-progress, go to your Cromwell on Azure Storage account associated with your host VM. In the `workflows` container, place an empty file in the "abort" virtual directory named `cromwellID.json`, where "cromwellID" is the Cromwell workflow ID you wish to abort.
