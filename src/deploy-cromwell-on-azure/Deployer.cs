@@ -159,7 +159,19 @@ namespace CromwellOnAzureDeployer
             catch (Microsoft.Rest.Azure.CloudException cloudException)
             {
                 var json = cloudException.Response.Content;
-                RefreshableConsole.WriteLine(json);
+                RefreshableConsole.WriteLine();
+
+                if (cloudException.ToCloudErrorType() == CloudErrorType.SkuNotAvailable 
+                    && json.Contains("Microsoft.Compute", StringComparison.OrdinalIgnoreCase))
+                {
+                    RefreshableConsole.WriteLine($"Your subscription does not have any quota for the VM SKU {configuration.VmSize} in {configuration.RegionName}.  To view your quota, please navigate to the Azure Portal (https://portal.azure.com), select Subscriptions -> your subscription -> Usage + Quotas, select the Microsoft.Compute provider, the {configuration.RegionName} region, and 'Show only items with usage'.  Verify whether you have quota for 'Standard Dv2 Family vCPUs'.  You can click 'Request Increase' if you do not have any quota available.", ConsoleColor.Red);
+                }
+                else
+                {
+                    RefreshableConsole.WriteLine(json);
+                }
+
+                RefreshableConsole.WriteLine();
                 Debugger.Break();
                 WriteGeneralRetryMessageToConsole();
                 await DeleteResourceGroupIfUserConsentsAsync();
