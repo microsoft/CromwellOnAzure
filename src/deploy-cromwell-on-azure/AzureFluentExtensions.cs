@@ -11,9 +11,16 @@ namespace CromwellOnAzureDeployer
     {
         public static CloudError ToCloudError(this CloudException cloudException)
         {
+            var content = cloudException?.Response?.Content;
+
+            if (content == null)
+            {
+                return null;
+            }
+
             try
             {
-                return JsonConvert.DeserializeObject<CloudErrorWrapper>(cloudException.Response.Content).Error;
+                return JsonConvert.DeserializeObject<CloudErrorWrapper>(content)?.Error;
             }
             catch
             {
