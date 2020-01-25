@@ -396,7 +396,7 @@ namespace TesApi.Web
                     foreach (var r in registries)
                     {
                         var server = await r.GetCredentialsAsync();
-                        var info = new ContainerRegistryInfo { RegistryServer = r.Name, Username = server.Username, Password = server.AccessKeys[AccessKeyType.Primary] };
+                        var info = new ContainerRegistryInfo { RegistryServer = r.LoginServerUrl, Username = server.Username, Password = server.AccessKeys[AccessKeyType.Primary] };
                         infos.Add(info);
                     }
                 }
