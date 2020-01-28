@@ -86,7 +86,7 @@ namespace TriggerService.Tests
             var accountName = accountAuthority;
             var subdomainEndIndex = accountAuthority.IndexOf(".");
 
-            if (subdomainEndIndex >= 0)
+            if (subdomainEndIndex > 0)
             {
                 accountName = accountAuthority.Substring(0, accountAuthority.IndexOf("."));
             }
