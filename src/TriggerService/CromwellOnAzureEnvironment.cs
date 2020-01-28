@@ -108,7 +108,7 @@ namespace TriggerService
                 }
                 catch (Exception exc)
                 {
-                    logger.LogError(exc, $"Exception in ExecuteNewWorkflowsAsync for {blobTrigger}");
+                    logger.LogError(exc, $"Exception in ExecuteNewWorkflowsAsync for {blobTrigger.Uri.AbsoluteUri}");
                     await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Failed);
                 }
             }
@@ -201,11 +201,13 @@ namespace TriggerService
 
             byte[] data;
 
-            if (((Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase))
-                || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase))
+            if ((Uri.TryCreate(url, UriKind.Absolute, out var uri) 
+                && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase)
                 && uri.ParseQueryString().Get("sig") == null)
+                || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase))
             {
-                // use known credentials, unless the URL specifies a shared-access signature
+                // If a URL is specified, and it uses the default storage account, and it doesn't use a SAS
+                // OR if it's specified as a local path to the default storage account
                 data = await storage.DownloadBlockBlobAsync(url);
             }
             else

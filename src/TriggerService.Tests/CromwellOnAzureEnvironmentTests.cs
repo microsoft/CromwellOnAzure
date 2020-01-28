@@ -17,10 +17,26 @@ namespace TriggerService.Tests
         private byte[] httpClientData = new byte[1] { 1 };
 
         [TestMethod]
-        public async Task GetBlobFileNameAndDataWithDefaultStorageAccount()
+        public async Task GetBlobFileNameAndDataWithDefaultStorageAccountUsingUrl()
         {
             const string url = "https://fake.azure.storage.account/test/test.wdl";
             var accountAuthority = new Uri(url).Authority;
+
+            (var name, var data) = await GetBlobFileNameAndDataUsingMocksAsync(url, accountAuthority);
+
+            Assert.IsNotNull(name);
+            Assert.IsNotNull(data);
+            Assert.IsTrue(data.Length > 0);
+
+            // Test if Azure credentials code path is used
+            Assert.AreEqual(data, blobData);
+        }
+
+        [TestMethod]
+        public async Task GetBlobFileNameAndDataWithDefaultStorageAccountUsingLocalPath()
+        {
+            var accountAuthority = "fake";
+            string url = $"/{accountAuthority}/test/test.wdl";
 
             (var name, var data) = await GetBlobFileNameAndDataUsingMocksAsync(url, accountAuthority);
 
@@ -66,6 +82,16 @@ namespace TriggerService.Tests
                 .Returns(Task.FromResult(httpClientData));
 
             azStorageMock.SetupGet(az => az.AccountAuthority).Returns(accountAuthority);
+
+            string accountName = accountAuthority;
+            var subdomainEndIndex = accountAuthority.IndexOf(".");
+
+            if (subdomainEndIndex >= 0)
+            {
+                accountName = accountAuthority.Substring(0, accountAuthority.IndexOf("."));
+            }
+            
+            azStorageMock.SetupGet(az => az.AccountName).Returns(accountName);
 
             var environment = new CromwellOnAzureEnvironment(
                 serviceProvider.GetRequiredService<ILoggerFactory>(),

@@ -4,6 +4,7 @@
 using System;
 using System.Configuration;
 using System.Threading.Tasks;
+using Microsoft.Azure.Management.Sql.Fluent.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -27,8 +28,12 @@ namespace TriggerService
                 {
                     if (!string.IsNullOrWhiteSpace(instrumentationKey))
                     {
-                        loggingBuilder.AddApplicationInsights(instrumentationKey);
-                    }
+                        loggingBuilder.AddApplicationInsights(instrumentationKey,
+                            options =>
+                            {
+                                options.TrackExceptionsAsExceptionTelemetry = false;
+                            });
+        }
                     else
                     {
                         Console.WriteLine("Warning: AppInsights key was null, and so AppInsights logging will not be enabled.  Check if this VM has Contributor access to the Application Insights instance.");
