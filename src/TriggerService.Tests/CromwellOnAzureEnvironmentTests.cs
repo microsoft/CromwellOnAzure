@@ -88,7 +88,7 @@ namespace TriggerService.Tests
 
             if (subdomainEndIndex > 0)
             {
-                accountName = accountAuthority.Substring(0, accountAuthority.IndexOf("."));
+                accountName = accountAuthority.Substring(0, subdomainEndIndex);
             }
             
             azStorageMock.SetupGet(az => az.AccountName).Returns(accountName);
