@@ -4,7 +4,6 @@
 using System;
 using System.Configuration;
 using System.Threading.Tasks;
-using Microsoft.Azure.Management.Sql.Fluent.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

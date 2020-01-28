@@ -36,7 +36,7 @@ namespace TriggerService.Tests
         public async Task GetBlobFileNameAndDataWithDefaultStorageAccountUsingLocalPath()
         {
             var accountAuthority = "fake";
-            string url = $"/{accountAuthority}/test/test.wdl";
+            var url = $"/{accountAuthority}/test/test.wdl";
 
             (var name, var data) = await GetBlobFileNameAndDataUsingMocksAsync(url, accountAuthority);
 
@@ -83,7 +83,7 @@ namespace TriggerService.Tests
 
             azStorageMock.SetupGet(az => az.AccountAuthority).Returns(accountAuthority);
 
-            string accountName = accountAuthority;
+            var accountName = accountAuthority;
             var subdomainEndIndex = accountAuthority.IndexOf(".");
 
             if (subdomainEndIndex >= 0)
