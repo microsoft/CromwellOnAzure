@@ -14,7 +14,7 @@ namespace CromwellOnAzureDeployer
         public string RegionName { get; set; } = "westus";
         public string MainIdentifierPrefix { get; set; } = "coa";
         public KnownLinuxVirtualMachineImage VmImage { get; set; } = KnownLinuxVirtualMachineImage.UbuntuServer16_04_Lts;
-        public VirtualMachineSizeTypes VmSize { get; set; } = VirtualMachineSizeTypes.StandardD2V2;
+        public string VmSize { get; set; } = "Standard_D2_v2";
         public string VnetAddressSpace { get; set; } = "10.0.0.0/24";
         public string VmUsername { get; set; } = "vmadmin";
         public string VmPassword { get; set; } = Utility.GeneratePassword();
