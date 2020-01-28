@@ -32,7 +32,7 @@ namespace TriggerService
                             {
                                 options.TrackExceptionsAsExceptionTelemetry = false;
                             });
-        }
+                    }
                     else
                     {
                         Console.WriteLine("Warning: AppInsights key was null, and so AppInsights logging will not be enabled.  Check if this VM has Contributor access to the Application Insights instance.");
