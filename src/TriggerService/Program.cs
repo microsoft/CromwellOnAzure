@@ -27,7 +27,11 @@ namespace TriggerService
                 {
                     if (!string.IsNullOrWhiteSpace(instrumentationKey))
                     {
-                        loggingBuilder.AddApplicationInsights(instrumentationKey);
+                        loggingBuilder.AddApplicationInsights(instrumentationKey,
+                            options =>
+                            {
+                                options.TrackExceptionsAsExceptionTelemetry = false;
+                            });
                     }
                     else
                     {
