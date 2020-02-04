@@ -31,5 +31,5 @@ echo "Startup complete"
 # run mount_containers.sh periodically to repair in case some of the blobfuses have crashed
 while true; do 
     sleep 30; 
-    ./mount_containers.sh -a STORAGEACCOUNTNAME || [[ $? == 32 || $? == 0 ]]
+    mount -a -t fuse || [[ $? == 32 || $? == 0 ]]
 done

@@ -7,19 +7,13 @@ touch $log_file
 exec 1>>$log_file
 exec 2>&1
 
-echo "$1"
-echo "$3"
 account_name=$(echo $3 | grep -Po '(?i)account_name=\K([^,]*)')
 container_name=$(echo $3 | grep -Po '(?i)container_name=\K([^,]*)')
 account_key=$(echo $3 | grep -Po '(?i)account_key=\K([^,]*)')
 sas_token=$(echo $3 | grep -Po '(?i)sas_token=\K([^,]*)')
 
 mountpoint -q $1 && echo "$1 already mounted" && exit 32
-
-echo "account_name = $account_name"
-echo "container_name = $container_name"
-echo "account_key = $account_key"
-echo "sas_token = $sas_token"
+[[ $(grep -c " $1 " /etc/mtab) -eq 1 ]] && umount -f $1
 
 tmp_dir="/blobfusetmp/$account_name/$container_name"
 mkdir -p $tmp_dir
