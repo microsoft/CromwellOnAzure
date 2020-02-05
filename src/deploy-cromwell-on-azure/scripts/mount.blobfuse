@@ -13,7 +13,7 @@ account_key=$(echo $3 | grep -Po '(?i)account_key=\K([^,]*)')
 sas_token=$(echo $3 | grep -Po '(?i)sas_token=\K([^,]*)')
 
 mountpoint -q $1 && echo "$1 already mounted" && exit 32
-[[ $(grep -c " $1 " /etc/mtab) -eq 1 ]] && umount -f $1
+[[ $(grep -c " $1 " /etc/mtab) -eq 1 ]] && umount -f $1 || echo "umount error code:  $?"
 
 tmp_dir="/blobfusetmp/$account_name/$container_name"
 mkdir -p $tmp_dir
