@@ -15,7 +15,7 @@ services:
     expose:
       - "80"
     restart_policy:
-      condition: on-failure
+      condition: unless-stopped
       delay: 5s
       window: 60s
   mysqldb:
@@ -34,7 +34,7 @@ services:
     expose:
       - "3306"
     restart_policy:
-      condition: on-failure
+      condition: unless-stopped
       delay: 5s
       window: 60s
   cromwell:
@@ -53,7 +53,7 @@ services:
       - "mysqldb"
       - "tes"
     restart_policy:
-      condition: on-failure
+      condition: unless-stopped
       delay: 5s
       window: 60s
   triggerservice:
@@ -65,6 +65,6 @@ services:
     depends_on:
       - "cromwell"
     restart_policy:
-      condition: on-failure
+      condition: unless-stopped
       delay: 5s
       window: 60s
