@@ -9,11 +9,12 @@ The main steps are:
 # Deployment
 ## Prerequisites
 1. You will need an [Azure Subscription](https://portal.azure.com/) to deploy Cromwell on Azure, if you don't already have one.
-1. You must have the proper [Azure role assignments](https://docs.microsoft.com/en-us/azure/role-based-access-control/overview) to deploy Cromwell on Azure.  You must have one of the following combinations of [role assignments](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles):
+1. You must have the proper [Azure role assignments](https://docs.microsoft.com/en-us/azure/role-based-access-control/overview) to deploy Cromwell on Azure.  To check your current role assignments, please follow [these instructions](https://docs.microsoft.com/en-us/azure/role-based-access-control/check-access).  You must have one of the following combinations of [role assignments](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles):
    1. `Owner` of the subscription<br/>
    1. `Contributor` and `User Access Administrator` of the subscription
    1. `Owner` of the resource group.
       1. *Note: this level of access will result in a warning during deployment, and will not use the latest VM pricing data.</i>  [Learn more](https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access).  Also, you must specify the resource group name during deployment with this level of access (see below).*
+   1.  Note: if you only have `Service Administrator` as a role assignment, please assign yourself as `Owner` of the subscription.
 1. Install the [Azure Command Line Interface (az cli)](https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest), a command line experience for managing Azure resources.
 1. Run `az login` to authenticate with Azure
 
