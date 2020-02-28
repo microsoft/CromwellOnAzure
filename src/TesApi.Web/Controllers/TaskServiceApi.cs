@@ -17,6 +17,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Web;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -177,7 +178,11 @@ namespace TesApi.Controllers
                 pageSize.HasValue ? (int)pageSize : 256,
                 pageToken);
 
-            var response = new TesListTasksResponse { Tasks = tasks.Select(t => t.Value).ToList(), NextPageToken = nextPageToken?.Replace("\"", "'") };
+            var encodedNextPageToken = ! string.IsNullOrEmpty(nextPageToken) 
+                ? HttpUtility.UrlEncode(nextPageToken.Replace("\"", "'"))
+                : nextPageToken;
+            
+            var response = new TesListTasksResponse { Tasks = tasks.Select(t => t.Value).ToList(), NextPageToken = encodedNextPageToken};
 
             return TesJsonResult(response, view);
         }
