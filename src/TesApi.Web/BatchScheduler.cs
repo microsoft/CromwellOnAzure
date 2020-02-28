@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -390,7 +391,7 @@ namespace TesApi.Web
             // WORKAROUND: Get the list of files in the execution directory and add them to task inputs.
             var executionDirectoryUri = new Uri(await MapLocalPathToSasUrlAsync(cromwellExecutionDirectoryPath, getContainerSas: true));
             var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.EndsWith($"/{DownloadFilesScriptFileName}"));
-            var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Type = TesFileType.FILEEnum });
+            var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
             var filesToDownload = await Task.WhenAll(inputFiles.Union(additionalInputFiles).Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
 
             foreach (var output in task.Outputs)
@@ -399,7 +400,7 @@ namespace TesApi.Web
                 {
                     throw new Exception($"Unsupported output path '{output.Path}' for task Id {task.Id}. Must start with {CromwellPathPrefix}");
                 }
-            }
+            } 
 
             var downloadFilesScriptContent = string.Join(" && ", filesToDownload.Select(f => $"blobxfer download --verbose --enable-azure-storage-logger --storage-url '{f.Url}' --local-path '{f.Path}' --rename --no-recursive"));
             var downloadFilesScriptPath = $"{cromwellExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
