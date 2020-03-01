@@ -87,6 +87,7 @@ namespace CromwellOnAzureDeployer
 
             await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName);
             await RegisterResourceProvidersAsync();
+            await ValidateVmAsync();
             await ValidateBatchQuotaAsync();
 
             try
@@ -158,15 +159,18 @@ namespace CromwellOnAzureDeployer
             }
             catch (Microsoft.Rest.Azure.CloudException cloudException)
             {
-                var json = cloudException.Response.Content;
-                RefreshableConsole.WriteLine(json);
-                Debugger.Break();
+                RefreshableConsole.WriteLine();
+                RefreshableConsole.WriteLine(cloudException.Response.Content);
+                RefreshableConsole.WriteLine();
                 WriteGeneralRetryMessageToConsole();
+                Debugger.Break();
                 await DeleteResourceGroupIfUserConsentsAsync();
             }
             catch (Exception exc)
             {
+                RefreshableConsole.WriteLine();
                 RefreshableConsole.WriteLine(exc.ToString());
+                RefreshableConsole.WriteLine();
                 Debugger.Break();
                 WriteGeneralRetryMessageToConsole();
                 await DeleteResourceGroupIfUserConsentsAsync();
@@ -827,6 +831,30 @@ namespace CromwellOnAzureDeployer
                 if (existingBatchAccountCount >= accountQuota)
                 {
                     throw new ValidationException($"The regional Batch account quota ({accountQuota} account(s) per region) for the specified subscription has been reached. Submit a support request to increase the quota or choose another region.", displayExample: false);
+                }
+            }
+            catch (ValidationException validationException)
+            {
+                DisplayValidationExceptionAndExit(validationException);
+            }
+        }
+
+        private async Task ValidateVmAsync()
+        {
+            try
+            {
+                var computeSkus = (await azureClient.ComputeSkus.ListByRegionAsync(configuration.RegionName))
+                    .Where(s => s.ResourceType == ComputeResourceType.VirtualMachines && !s.Restrictions.Any())
+                    .Select(s => s.Name.ToString())
+                    .ToList();
+
+                if (!computeSkus.Any())
+                {
+                    throw new ValidationException($"Your subscription doesn't support virtual machine creation in {configuration.RegionName}.  Please create an Azure Support case: https://docs.microsoft.com/en-us/azure/azure-portal/supportability/how-to-create-azure-support-request", displayExample: false);
+                }
+                else if (!computeSkus.Any(s => s.Equals(configuration.VmSize, StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new ValidationException($"The VmSize {configuration.VmSize} is not available or does not exist in {configuration.RegionName}.  You can use 'az vm list-skus --location {configuration.RegionName} --output table' to find an available VM.", displayExample: false);
                 }
             }
             catch (ValidationException validationException)
