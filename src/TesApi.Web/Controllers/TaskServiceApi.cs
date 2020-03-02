@@ -16,8 +16,10 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Swashbuckle.AspNetCore.Annotations;
@@ -166,6 +168,10 @@ namespace TesApi.Controllers
         [SwaggerResponse(statusCode: 200, type: typeof(TesListTasksResponse), description: "")]
         public virtual async Task<IActionResult> ListTasks([FromQuery]string namePrefix, [FromQuery]long? pageSize, [FromQuery]string pageToken, [FromQuery]string view)
         {
+
+            var decodedPageToken =
+                pageToken != null ? Encoding.UTF8.GetString(Base64UrlTextEncoder.Decode(pageToken)) : null;
+            
             if (pageSize < 1 || pageSize > 2047)
             {
                 logger.LogError($"pageSize invalid {pageSize}");
@@ -175,9 +181,10 @@ namespace TesApi.Controllers
             (var nextPageToken, var tasks) = await repository.GetItemsAsync(
                 t => string.IsNullOrWhiteSpace(namePrefix) || t.Name.StartsWith(namePrefix),
                 pageSize.HasValue ? (int)pageSize : 256,
-                pageToken);
-
-            var response = new TesListTasksResponse { Tasks = tasks.Select(t => t.Value).ToList(), NextPageToken = nextPageToken?.Replace("\"", "'") };
+                decodedPageToken);
+            
+            var encodedNextPageToken = nextPageToken != null ? Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(nextPageToken)) : null;
+            var response = new TesListTasksResponse { Tasks = tasks.Select(t => t.Value).ToList(), NextPageToken = encodedNextPageToken};
 
             return TesJsonResult(response, view);
         }
