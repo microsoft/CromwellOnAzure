@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Auth;
@@ -262,77 +263,115 @@ namespace TesApi.Web
         /// <returns>Job state information</returns>
         public async Task<AzureBatchJobAndTaskState> GetBatchJobAndTaskStateAsync(string tesTaskId)
         {
-            var nodeAllocationFailed = false;
-            TaskState? taskState = null;
-            int? taskExitCode = null;
-            TaskFailureInformation taskFailureInformation = null;
-
-            var jobFilter = new ODATADetailLevel
+            try
             {
-                FilterClause = $"startswith(id,'{tesTaskId}{BatchJobAttemptSeparator}')",
-                SelectClause = "*"
-            };
+                var nodeAllocationFailed = false;
+                var nodeDiskFull = false;
+                var activeJobWithMissingAutoPool = false;
+                TaskState? taskState = null;
+                TaskExecutionInformation taskExecutionInformation = null;
 
-            var jobInfos = (await batchClient.JobOperations.ListJobs(jobFilter).ToListAsync())
-                .Select(j => new { Job = j, AttemptNumber = int.Parse(j.Id.Split(BatchJobAttemptSeparator)[1]) });
+                var jobFilter = new ODATADetailLevel
+                {
+                    FilterClause = $"startswith(id,'{tesTaskId}{BatchJobAttemptSeparator}')",
+                    SelectClause = "*"
+                };
 
-            if (!jobInfos.Any())
-            {
-                return new AzureBatchJobAndTaskState { JobState = null };
-            }
+                var jobInfos = (await batchClient.JobOperations.ListJobs(jobFilter).ToListAsync())
+                    .Select(j => new { Job = j, AttemptNumber = int.Parse(j.Id.Split(BatchJobAttemptSeparator)[1]) });
 
-            if (jobInfos.Count(j => j.Job.State == JobState.Active) > 1)
-            {
-                return new AzureBatchJobAndTaskState { MoreThanOneActiveJobFound = true };
-            }
+                if (!jobInfos.Any())
+                {
+                    return new AzureBatchJobAndTaskState { JobState = null };
+                }
 
-            var lastJobInfo = jobInfos.OrderBy(j => j.AttemptNumber).Last();
+                if (jobInfos.Count(j => j.Job.State == JobState.Active) > 1)
+                {
+                    return new AzureBatchJobAndTaskState { MoreThanOneActiveJobFound = true };
+                }
 
-            var job = lastJobInfo.Job;
-            var attemptNumber = lastJobInfo.AttemptNumber;
+                var lastJobInfo = jobInfos.OrderBy(j => j.AttemptNumber).Last();
 
-            if (job.State == JobState.Active)
-            {
+                var job = lastJobInfo.Job;
+                var attemptNumber = lastJobInfo.AttemptNumber;
+
+                if (job.State == JobState.Active && job.ExecutionInformation?.PoolId != null)
+                {
+                    var poolFilter = new ODATADetailLevel
+                    {
+                        FilterClause = $"id eq '{job.ExecutionInformation.PoolId}'",
+                        SelectClause = "*"
+                    };
+
+                    var pool = (await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync()).FirstOrDefault();
+
+                    if (pool != null)
+                    {
+                        nodeAllocationFailed = pool.ResizeErrors?.Count > 0;
+
+                        var node = (await pool.ListComputeNodes().ToListAsync()).FirstOrDefault();
+
+                        if (node != null)
+                        {
+                            nodeDiskFull = node.Errors?.FirstOrDefault()?.Code?.Equals("DiskFull", StringComparison.OrdinalIgnoreCase) ?? false;
+                        }
+                    }
+                    else
+                    {
+                        if(job.CreationTime.HasValue && DateTime.UtcNow.Subtract(job.CreationTime.Value) > TimeSpan.FromMinutes(30))
+                        {
+                            activeJobWithMissingAutoPool = true;
+                        }
+                    }
+                }
+
+                var jobPreparationTaskExecutionInformation = (await batchClient.JobOperations.ListJobPreparationAndReleaseTaskStatus(job.Id).ToListAsync()).FirstOrDefault()?.JobPreparationTaskExecutionInformation;
+
                 try
                 {
-                    nodeAllocationFailed = job.ExecutionInformation?.PoolId != null
-                        && (await batchClient.PoolOperations.GetPoolAsync(job.ExecutionInformation.PoolId)).ResizeErrors?.Count > 0;
+                    var batchTask = await batchClient.JobOperations.GetTaskAsync(job.Id, tesTaskId);
+                    taskState = batchTask.State;
+                    taskExecutionInformation = batchTask.ExecutionInformation;
                 }
                 catch (Exception ex)
                 {
-                    // assume that node allocation failed
-                    nodeAllocationFailed = true;
-                    logger.LogError(ex, $"Failed to determine if the node allocation failed for TesTask {tesTaskId} with PoolId {job.ExecutionInformation?.PoolId}.");
+                    logger.LogError(ex, $"Failed to get task for TesTask {tesTaskId}");
                 }
-            }
-            var jobPreparationTaskExecutionInformation = (await batchClient.JobOperations.ListJobPreparationAndReleaseTaskStatus(job.Id).ToListAsync()).FirstOrDefault()?.JobPreparationTaskExecutionInformation;
-            var jobPreparationTaskExitCode = jobPreparationTaskExecutionInformation?.ExitCode;
-            var jobPreparationTaskState = jobPreparationTaskExecutionInformation?.State;
 
-            try
-            {
-                var batchTask = await batchClient.JobOperations.GetTaskAsync(job.Id, tesTaskId);
-                taskState = batchTask.State;
-                taskExitCode = batchTask.ExecutionInformation?.ExitCode;
-                taskFailureInformation = batchTask.ExecutionInformation.FailureInformation;
+                return new AzureBatchJobAndTaskState
+                {
+                    MoreThanOneActiveJobFound = false,
+                    ActiveJobWithMissingAutoPool = activeJobWithMissingAutoPool,
+                    AttemptNumber = attemptNumber,
+                    NodeAllocationFailed = nodeAllocationFailed,
+                    NodeDiskFull = nodeDiskFull,
+                    JobState = job.State,
+                    JobStartTime = job.ExecutionInformation?.StartTime,
+                    JobEndTime = job.ExecutionInformation?.EndTime,
+                    JobSchedulingError = job.ExecutionInformation?.SchedulingError,
+                    JobPreparationTaskState = jobPreparationTaskExecutionInformation?.State,
+                    JobPreparationTaskExecutionResult = jobPreparationTaskExecutionInformation?.Result,
+                    JobPreparationTaskStartTime = jobPreparationTaskExecutionInformation?.StartTime,
+                    JobPreparationTaskEndTime = jobPreparationTaskExecutionInformation?.EndTime,
+                    JobPreparationTaskExitCode = jobPreparationTaskExecutionInformation?.ExitCode,
+                    JobPreparationTaskFailureInformation = jobPreparationTaskExecutionInformation?.FailureInformation,
+                    JobPreparationTaskContainerState = jobPreparationTaskExecutionInformation?.ContainerInformation?.State,
+                    JobPreparationTaskContainerError = jobPreparationTaskExecutionInformation?.ContainerInformation?.Error,
+                    TaskState = taskState,
+                    TaskExecutionResult = taskExecutionInformation?.Result,
+                    TaskStartTime = taskExecutionInformation?.StartTime,
+                    TaskEndTime = taskExecutionInformation?.EndTime,
+                    TaskExitCode = taskExecutionInformation?.ExitCode,
+                    TaskFailureInformation = taskExecutionInformation?.FailureInformation,
+                    TaskContainerState = taskExecutionInformation?.ContainerInformation?.State,
+                    TaskContainerError = taskExecutionInformation?.ContainerInformation?.Error
+                };
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
-                logger.LogError(ex, $"Failed to get task for TesTask {tesTaskId}");
+                logger.LogError(ex, $"GetBatchJobAndTaskStateAsync failed for TesTask {tesTaskId}");
+                throw;
             }
-
-            return new AzureBatchJobAndTaskState
-            {
-                JobState = job.State,
-                JobPreparationTaskState = jobPreparationTaskState,
-                JobPreparationTaskExitCode = jobPreparationTaskExitCode,
-                TaskState = taskState,
-                MoreThanOneActiveJobFound = false,
-                NodeAllocationFailed = nodeAllocationFailed,
-                TaskExitCode = taskExitCode,
-                TaskFailureInformation = taskFailureInformation,
-                AttemptNumber = attemptNumber
-            };
         }
 
         /// <summary>
@@ -375,6 +414,40 @@ namespace TesApi.Web
             };
 
             return (await batchClient.JobOperations.ListJobs(filter).ToListAsync()).Select(c => c.Id);
+        }
+
+        /// <summary>
+        /// Gets the list of active pool ids matching the prefix and with creation time older than the minAge
+        /// </summary>
+        /// <returns>Active pool ids</returns>
+        public async Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken = default)
+        {
+            var activePoolsFilter = new ODATADetailLevel
+            {
+                FilterClause = $"state eq 'active' and startswith(id, '{prefix}') and creationTime lt DateTime'{DateTime.UtcNow.Subtract(minAge):yyyy-MM-ddTHH:mm:ssZ}'",
+                SelectClause = "id"
+            };
+
+            return (await batchClient.PoolOperations.ListPools(activePoolsFilter).ToListAsync(cancellationToken)).Select(p => p.Id);
+        }
+
+        /// <summary>
+        /// Gets the list of pool ids referenced by the jobs
+        /// </summary>
+        /// <returns>Pool ids</returns>
+        public async Task<IEnumerable<string>> GetPoolIdsReferencedByJobsAsync(CancellationToken cancellationToken = default)
+        {
+            return (await batchClient.JobOperations.ListJobs(new ODATADetailLevel(selectClause: "executionInfo")).ToListAsync(cancellationToken))
+                .Where(j => !string.IsNullOrEmpty(j.ExecutionInformation?.PoolId))
+                .Select(j => j.ExecutionInformation.PoolId);
+        }
+
+        /// <summary>
+        /// Deletes the specified pool
+        /// </summary>
+        public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default)
+        {
+            return batchClient.PoolOperations.DeletePoolAsync(poolId, cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -751,15 +824,31 @@ namespace TesApi.Web
 
         public struct AzureBatchJobAndTaskState
         {
+            public bool MoreThanOneActiveJobFound { get; set; }
+            public bool ActiveJobWithMissingAutoPool { get; set; }
+            public int AttemptNumber { get; set; }
+            public bool NodeAllocationFailed { get; set; }
+            public bool NodeDiskFull { get; set; }
             public JobState? JobState { get; set; }
+            public DateTime? JobStartTime { get; set; }
+            public DateTime? JobEndTime { get; set; }
+            public JobSchedulingError JobSchedulingError { get; set; }
             public JobPreparationTaskState? JobPreparationTaskState { get; set; }
             public int? JobPreparationTaskExitCode { get; set; }
+            public TaskExecutionResult? JobPreparationTaskExecutionResult { get; set; }
+            public DateTime? JobPreparationTaskStartTime { get; set; }
+            public DateTime? JobPreparationTaskEndTime { get; set; }
+            public TaskFailureInformation JobPreparationTaskFailureInformation { get; set; }
+            public string JobPreparationTaskContainerState { get; set; }
+            public string JobPreparationTaskContainerError { get; set; }
             public TaskState? TaskState { get; set; }
             public int? TaskExitCode { get; set; }
+            public TaskExecutionResult? TaskExecutionResult { get; set; }
+            public DateTime? TaskStartTime { get; set; }
+            public DateTime? TaskEndTime { get; set; }
             public TaskFailureInformation TaskFailureInformation { get; set; }
-            public bool NodeAllocationFailed { get; set; }
-            public bool MoreThanOneActiveJobFound { get; set; }
-            public int AttemptNumber { get; set; }
+            public string TaskContainerState { get; set; }
+            public string TaskContainerError { get; set; }
         }
 
         public struct AzureBatchNodeCount

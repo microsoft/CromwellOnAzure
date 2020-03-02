@@ -87,6 +87,7 @@ namespace TesApi.Web
 
             services.AddHostedService<Scheduler>();
             services.AddHostedService<DeleteCompletedBatchJobsHostedService>();
+            services.AddHostedService<DeleteOrphanedAutoPoolsHostedService>();
 
             // Configure AppInsights Azure Service when in PRODUCTION environment
             if (hostingEnvironment.IsProduction())

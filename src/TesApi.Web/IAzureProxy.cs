@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Management.Batch.Models;
@@ -128,5 +129,22 @@ namespace TesApi.Web
         /// </summary>
         /// <returns>List of Batch job ids</returns>
         Task<IEnumerable<string>> ListOldJobsToDeleteAsync(TimeSpan oldestJobAge);
+
+        /// <summary>
+        /// Gets the list of active pool ids matching the prefix and with creation time older than the minAge
+        /// </summary>
+        /// <returns>Active pool ids</returns>
+        Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Gets the list of pool ids referenced by the jobs
+        /// </summary>
+        /// <returns>Pool ids</returns>
+        Task<IEnumerable<string>> GetPoolIdsReferencedByJobsAsync(CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Deletes the specified pool
+        /// </summary>
+        Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken);
     }
 }

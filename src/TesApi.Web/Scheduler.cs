@@ -147,10 +147,11 @@ namespace TesApi.Web
                         if (++tesTask.Value.ErrorCount > 3) // TODO: Should we increment this for exceptions here (current behaviour) or the attempted executions on the batch?
                         {
                             tesTask.Value.State = TesState.SYSTEMERROREnum;
+                            tesTask.Value.EndTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo);
+                            tesTask.Value.WriteToSystemLog(exc.Message, exc.StackTrace);
                         }
 
                         logger.LogError(exc, $"TES Task '{tesTask.Value.Id}' threw an exception.");
-                        tesTask.Value.EndTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo);
                         await repository.UpdateItemAsync(tesTask.Value.Id, tesTask);
                     }
                 }

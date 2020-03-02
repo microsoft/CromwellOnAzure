@@ -32,6 +32,11 @@ namespace TesApi.Web
         CompletedWithErrors,
 
         /// <summary>
+        /// Batch job is active and has non-null ExecutionInformation.PoolId but pool does not exist
+        /// </summary>
+        ActiveJobWithMissingAutoPool,
+
+        /// <summary>
         /// Batch job is either not found or is being deleted
         /// </summary>
         JobNotFound,
@@ -50,6 +55,11 @@ namespace TesApi.Web
         /// Azure Batch was unable to allocate a machine for the job.  This could be due to either a temporary or permanent unavailability of the given VM SKU
         /// </summary>
         NodeAllocationFailed,
+
+        /// <summary>
+        /// Azure Batch machine disk was too small for the task.
+        /// </summary>
+        NodeDiskFull,
 
         /// <summary>
         /// Azure Batch pre-empted the execution of this task while running on a low-priority node

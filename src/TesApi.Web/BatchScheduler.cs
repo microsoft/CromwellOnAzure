@@ -79,6 +79,8 @@ namespace TesApi.Web
                 new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.CompletedSuccessfully, TesState.COMPLETEEnum),
                 new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.CompletedWithErrors, TesState.EXECUTORERROREnum),
                 new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.PreparationTaskFailed, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.EXECUTORERROREnum),
+                new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.NodeDiskFull, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.EXECUTORERROREnum),
+                new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.ActiveJobWithMissingAutoPool, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum),
                 new TesTaskStateTransition(tesStateIsInitializingOrRunning, BatchTaskState.JobNotFound, TesState.SYSTEMERROREnum),
                 new TesTaskStateTransition(tesStateIsInitializingOrRunning, BatchTaskState.MissingBatchTask, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.SYSTEMERROREnum),
                 new TesTaskStateTransition(tesStateIsInitializingOrRunning, BatchTaskState.NodePreempted, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum) // TODO: Implement preemption detection
@@ -92,8 +94,8 @@ namespace TesApi.Web
         /// <returns>True if the TES task needs to be persisted.</returns>
         public async Task<bool> ProcessTesTaskAsync(TesTask tesTask)
         {
-            var batchTaskState = await GetBatchTaskStateAsync(tesTask.Id);
-            var tesTaskChanged = await HandleTesTaskTransitionAsync(tesTask, batchTaskState);
+            var (batchTaskState, executionInfo) = await GetBatchTaskStateAsync(tesTask.Id);
+            var tesTaskChanged = await HandleTesTaskTransitionAsync(tesTask, batchTaskState, executionInfo);
             return tesTaskChanged;
         }
 
@@ -155,7 +157,7 @@ namespace TesApi.Web
             catch (Exception exc)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
-                tesTask.Logs = new List<TesTaskLog> { new TesTaskLog { SystemLogs = new List<string> { exc.Message, exc.StackTrace } } };
+                tesTask.WriteToSystemLog(exc.Message, exc.StackTrace);
                 logger.LogError(exc, exc.Message);
             }
         }
@@ -261,25 +263,37 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="tesTaskId">The unique ID of the <see cref="TesTask"/></param>
         /// <returns>A higher-level abstraction of the current state of the Azure Batch task</returns>
-        private async Task<BatchTaskState> GetBatchTaskStateAsync(string tesTaskId)
+        private async Task<(BatchTaskState, string)> GetBatchTaskStateAsync(string tesTaskId)
         {
             var batchJobAndTaskState = await azureProxy.GetBatchJobAndTaskStateAsync(tesTaskId);
 
+            if (batchJobAndTaskState.ActiveJobWithMissingAutoPool)
+            {
+                var batchJobInfo = JsonConvert.SerializeObject(batchJobAndTaskState);
+                logger.LogWarning($"Found active job without auto pool for TES task {tesTaskId}. Deleting the job and requeuing the task. BatchJobInfo: {batchJobInfo}");
+                return (BatchTaskState.ActiveJobWithMissingAutoPool, null);
+            }
+
             if (batchJobAndTaskState.MoreThanOneActiveJobFound)
             {
-                return BatchTaskState.MoreThanOneActiveJobFound;
+                return (BatchTaskState.MoreThanOneActiveJobFound, null);
             }
 
             switch (batchJobAndTaskState.JobState)
             {
                 case null:
                 case JobState.Deleting:
-                    return BatchTaskState.JobNotFound; // Treating the deleting job as if it doesn't exist
+                    return (BatchTaskState.JobNotFound, null); // Treating the deleting job as if it doesn't exist
                 case JobState.Active:
                     {
                         if (batchJobAndTaskState.NodeAllocationFailed)
                         {
-                            return BatchTaskState.NodeAllocationFailed;
+                            return (BatchTaskState.NodeAllocationFailed, null);
+                        }
+
+                        if (batchJobAndTaskState.NodeDiskFull)
+                        {
+                            return (BatchTaskState.NodeDiskFull, "There is not enough disk space on the VM that was selected for the task.");
                         }
 
                         break;
@@ -291,11 +305,6 @@ namespace TesApi.Web
                     throw new Exception($"Found batch job {tesTaskId} in unexpected state: {batchJobAndTaskState.JobState}");
             }
 
-            if (batchJobAndTaskState.TaskFailureInformation != null)
-            {
-                logger.LogError($"Task {tesTaskId} failed. ExitCode: {batchJobAndTaskState.TaskExitCode}, FailureInformation: {JsonConvert.SerializeObject(batchJobAndTaskState.TaskFailureInformation)}");
-            }
-
             switch (batchJobAndTaskState.JobPreparationTaskState)
             {
                 case null:
@@ -304,8 +313,9 @@ namespace TesApi.Web
                 case JobPreparationTaskState.Completed:
                     if (batchJobAndTaskState.JobPreparationTaskExitCode != 0)
                     {
-                        logger.LogError($"Job preparation task for batch job {tesTaskId} failed. ExitCode: {batchJobAndTaskState.JobPreparationTaskExitCode}");
-                        return BatchTaskState.PreparationTaskFailed;
+                        var batchJobInfo = JsonConvert.SerializeObject(batchJobAndTaskState);
+                        logger.LogError($"Job preparation task for batch job {tesTaskId} failed. ExitCode: {batchJobAndTaskState.JobPreparationTaskExitCode}, BatchJobInfo: {batchJobInfo}");
+                        return (BatchTaskState.PreparationTaskFailed, $"Job preparation task for batch job {tesTaskId} failed. ExitCode: {batchJobAndTaskState.JobPreparationTaskExitCode}, BatchJobInfo: {batchJobInfo}");
                     }
 
                     break;
@@ -316,14 +326,24 @@ namespace TesApi.Web
             switch (batchJobAndTaskState.TaskState)
             {
                 case null:
-                    return BatchTaskState.MissingBatchTask;
+                    return (BatchTaskState.MissingBatchTask, null);
                 case TaskState.Active:
                 case TaskState.Preparing:
-                    return BatchTaskState.Initializing;
+                    return (BatchTaskState.Initializing, null);
                 case TaskState.Running:
-                    return BatchTaskState.Running;
+                    return (BatchTaskState.Running, null);
                 case TaskState.Completed:
-                    return batchJobAndTaskState.TaskExitCode == 0 && batchJobAndTaskState.TaskFailureInformation == null ? BatchTaskState.CompletedSuccessfully : BatchTaskState.CompletedWithErrors;
+                    var batchJobInfo = JsonConvert.SerializeObject(batchJobAndTaskState);
+
+                    if (batchJobAndTaskState.TaskExitCode == 0 && batchJobAndTaskState.TaskFailureInformation == null)
+                    {
+                        return (BatchTaskState.CompletedSuccessfully, batchJobInfo);
+                    }
+                    else
+                    {
+                        logger.LogError($"Task {tesTaskId} failed. ExitCode: {batchJobAndTaskState.TaskExitCode}, BatchJobInfo: {batchJobInfo}");
+                        return (BatchTaskState.CompletedWithErrors, $"ExitCode: {batchJobAndTaskState.TaskExitCode}, BatchJobInfo: {batchJobInfo}"); 
+                    }
                 default:
                     throw new Exception($"Found batch task {tesTaskId} in unexpected state: {batchJobAndTaskState.TaskState}");
             }
@@ -334,8 +354,9 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="tesTask">TES task</param>
         /// <param name="batchTaskState">Current Azure Batch task state</param>
+        /// <param name="executionInfo">Batch job execution info</param>
         /// <returns>True if the TES task was changed.</returns>
-        private async Task<bool> HandleTesTaskTransitionAsync(TesTask tesTask, BatchTaskState batchTaskState)
+        private async Task<bool> HandleTesTaskTransitionAsync(TesTask tesTask, BatchTaskState batchTaskState, string executionInfo)
         {
             var tesTaskChanged = false;
 
@@ -347,12 +368,24 @@ namespace TesApi.Web
                 if (mapItem.Action != null)
                 {
                     await mapItem.Action(tesTask);
+
+                    if (executionInfo != null)
+                    {
+                        tesTask.WriteToSystemLog(executionInfo);
+                    }
+
                     tesTaskChanged = true;
                 }
 
                 if (mapItem.NewTesTaskState != null && mapItem.NewTesTaskState != tesTask.State)
                 {
                     tesTask.State = mapItem.NewTesTaskState.Value;
+
+                    if (executionInfo != null)
+                    {
+                        tesTask.WriteToSystemLog(executionInfo);
+                    }
+
                     tesTaskChanged = true;
                 }
             }
