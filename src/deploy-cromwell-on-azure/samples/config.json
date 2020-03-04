@@ -1,6 +1,6 @@
 ﻿{
   "SubscriptionId": "",
-  "RegionName": "westus2",
+  "RegionName": "westus",
   "MainIdentifierPrefix": "coa",
   "VmImage": 1,
   "VmSize": "Standard_D2_v2",
