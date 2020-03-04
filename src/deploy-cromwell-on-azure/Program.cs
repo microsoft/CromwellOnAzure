@@ -15,9 +15,24 @@ namespace CromwellOnAzureDeployer
 
         private static async Task InitializeAndDeployAsync(string[] args)
         {
-            var configuration = Configuration.BuildConfiguration(args);
+            Configuration configuration = null;
 
-            PrintWelcomeScreen(configuration.Silent);
+            try
+            {
+                configuration = Configuration.BuildConfiguration(args);
+            }
+            catch(ArgumentException ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(ex.Message);
+                Console.ResetColor();
+                Environment.Exit(1);
+            }
+
+            if (!configuration.Silent)
+            {
+                PrintWelcomeScreen();
+            }
 
             var isSuccessful = await new Deployer(configuration).DeployAsync();
 
@@ -31,13 +46,8 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private static void PrintWelcomeScreen(bool isSilent)
+        private static void PrintWelcomeScreen()
         {
-            if(isSilent)
-            {
-                return;
-            }
-
             Console.WriteLine("Copyright (c) Microsoft Corporation.");
             Console.WriteLine("Licensed under the MIT License.");
             Console.WriteLine("Privacy & Cookies: https://go.microsoft.com/fwlink/?LinkId=521839");
