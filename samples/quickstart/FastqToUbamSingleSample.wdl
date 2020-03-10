@@ -27,7 +27,7 @@ workflow FastqToUbamSingleSample {
         gotc_path = gotc_path
     }
     output {
-	File unmapped_bam = FastqToUbam.unmapped_bam
+    File unmapped_bam = FastqToUbam.unmapped_bam
     }
 }
 
@@ -42,11 +42,10 @@ task FastqToUbam {
     String platform
     String platform_unit
     
-    #scale file size appropriately for differing inputs. There are 2 FASTQ files, and you need to write out the new combined uBAM, plus buffer 
-    Int disk_size = ceil(size(fastqs[0], "GB") + size(fastqs[1], "GB")) * 2.5 
-
     String docker_image
     String gotc_path
+
+    Int disk_size = ceil(size(${fastqs[0]}, "GB") + size(${fastqs[1]}, "GB")) * 2.5 
 
     command {
         java  -jar ${gotc_path}picard.jar FastqToSam \
