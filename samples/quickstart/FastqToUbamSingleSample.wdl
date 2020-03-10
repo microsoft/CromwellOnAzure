@@ -43,7 +43,7 @@ task FastqToUbam {
     String platform_unit
     
     #scale file size appropriately for differing inputs. There are 2 FASTQ files, and you need to write out the new combined uBAM, plus buffer 
-    Int disk_size = ceil((size(fastqs[0]) + size(fastqs[1])) * 2.5)
+    Int disk_size = ceil((size(fastqs[0]) + size(fastqs[1])) * 2.5) 
 
     String docker_image
     String gotc_path
@@ -64,7 +64,7 @@ task FastqToUbam {
         docker: docker_image
         memory: "32 GB"
         cpu: "16"
-        disk: disk_size
+        disk: disk_size + " GB"
     }
 
     output {
