@@ -45,7 +45,7 @@ task FastqToUbam {
     String docker_image
     String gotc_path
 
-    Int disk_size = ceil(size(${fastqs[0]}, "GB") + size(${fastqs[1]}, "GB")) * 2.5 
+    Int disk_size = ceil(size(fastqs[0], "GB") + size(fastqs[1], "GB")) * 3 
 
     command {
         java  -jar ${gotc_path}picard.jar FastqToSam \
