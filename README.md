@@ -7,6 +7,7 @@ Cromwell on Azure configures all Azure resources needed to run workflows through
 
 ![Cromwell-On-Azure](/docs/screenshots/cromwellonazure.png)
 
+A brief [Demo Video](https://youtu.be/QlRQ63n_mKw) on how to run workflows using Cromwell on Azure<br/>
 Get started in a few quick steps! See our [Quickstart](docs/quickstart-cromwell-on-azure.md) guide<br/>
 Run Broad Insitute of MIT and Harvard's Best Practices [Genome Analysis Pipeline on Cromwell on Azure](docs/germline-alignment-variantcalling-azure.md)<br/>
 Need to debug or configure your Cromwell on Azure runs? See [Advanced configuration](docs/advanced-configuration.md) instructions<br/>
