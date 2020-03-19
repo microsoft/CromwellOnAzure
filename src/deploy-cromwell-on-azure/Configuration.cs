@@ -1,8 +1,11 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Microsoft.Azure.Management.Compute.Fluent;
-using Microsoft.Azure.Management.Compute.Fluent.Models;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Extensions.Configuration;
 
@@ -45,18 +48,26 @@ namespace CromwellOnAzureDeployer
                 configBuilder.AddJsonFile(configFilename);
             }
 
+            var configurationSource = configBuilder.AddCommandLine(args).Build();
+            var configurationProperties = typeof(Configuration).GetTypeInfo().DeclaredProperties.Select(p => p.Name).ToList();
+
+            var invalidArguments = configurationSource.Providers
+                .SelectMany(p => p.GetChildKeys(new List<string>(), null))
+                .Where(k => !configurationProperties.Contains(k, StringComparer.OrdinalIgnoreCase));
+
+            if (invalidArguments.Any())
+            {
+                throw new ArgumentException($"Invalid argument(s): {string.Join(", ", invalidArguments)}");
+            }
+
             var configuration = new Configuration();
-
-            configBuilder.AddCommandLine(args)
-                .Build()
-                .Bind(configuration);
-
+            configurationSource.Bind(configuration);
             configuration.SetDefaultsAndOverrides();
 
             return configuration;
         }
 
-        public void SetDefaultsAndOverrides()
+        private void SetDefaultsAndOverrides()
         {
             if (string.IsNullOrWhiteSpace(ResourceGroupName))
             {
