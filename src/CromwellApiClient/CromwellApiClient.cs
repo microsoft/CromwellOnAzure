@@ -76,9 +76,9 @@ namespace CromwellApiClient
                 new FileToPost { ParameterName = "workflowSource", Filename = workflowSourceFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowSourceData) },
             };
 
-            for (int i = 1; i <= workflowInputsFilenames.Count; i++)
+            for (var i = 0; i < workflowInputsFilenames.Count; i++)
             {
-                var parameterName = i == 1 ? "workflowInputs" : "workflowInputs_" + i;
+                var parameterName = i == 0 ? "workflowInputs" : "workflowInputs_" + (i + 1);
                 files.Add(new FileToPost { ParameterName = parameterName, Filename = workflowInputsFilenames[i], Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowInputsData[i]) });
             }
 
