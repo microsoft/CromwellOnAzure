@@ -65,8 +65,8 @@ namespace CromwellApiClient
         public async Task<PostWorkflowResponse> PostWorkflowAsync(
             string workflowSourceFilename,
             byte[] workflowSourceData,
-            string workflowInputsFilename,
-            byte[] workflowInputsData,
+            List<string> workflowInputsFilenames,
+            List<byte[]> workflowInputsData,
             string workflowOptionsFilename = null,
             byte[] workflowOptionsData = null,
             string workflowDependenciesFilename = null,
@@ -74,8 +74,13 @@ namespace CromwellApiClient
         {
             var files = new List<FileToPost> {
                 new FileToPost { ParameterName = "workflowSource", Filename = workflowSourceFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowSourceData) },
-                new FileToPost { ParameterName = "workflowInputs", Filename = workflowInputsFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowInputsData) }
             };
+
+            for (int i = 1; i <= workflowInputsFilenames.Count; i++)
+            {
+                var parameterName = i == 1 ? "workflowInputs" : "workflowInputs_" + i;
+                files.Add(new FileToPost { ParameterName = parameterName, Filename = workflowInputsFilenames[i], Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowInputsData[i]) });
+            }
 
             if (workflowOptionsFilename != null && workflowOptionsData != null)
             {

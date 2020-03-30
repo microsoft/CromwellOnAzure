@@ -88,16 +88,23 @@ namespace TriggerService
                     var blobTriggerJson = await blobTrigger.DownloadTextAsync();
                     var triggerInfo = JsonConvert.DeserializeObject<Workflow>(blobTriggerJson);
                     var tasks = new List<Task>();
+                    var workflowInputsFilenames = new List<string>();
+                    var workflowInputsData = new List<byte[]>();
 
                     (var workflowSourceFilename, var workflowSourceData) = await GetBlobFileNameAndData(triggerInfo.WorkflowUrl);
-                    (var workflowInputsFilename, var workflowInputsData) = await GetBlobFileNameAndData(triggerInfo.WorkflowInputsUrl);
+                    foreach (var workflowInputsUrl in triggerInfo.WorkflowInputsUrls)
+                    {
+                        (var workflowInputsFilename, var workflowInputsFileData) = await GetBlobFileNameAndData(workflowInputsUrl);
+                        workflowInputsFilenames.Add(workflowInputsFilename);
+                        workflowInputsData.Add(workflowInputsFileData);
+                    }
                     (var workflowOptionsFilename, var workflowOptionsData) = await GetBlobFileNameAndData(triggerInfo.WorkflowOptionsUrl);
                     (var workflowDependenciesFilename, var workflowDependenciesData) = await GetBlobFileNameAndData(triggerInfo.WorkflowDependenciesUrl);
 
                     var response = await cromwellApiClient.PostWorkflowAsync(
                         workflowSourceFilename,
                         workflowSourceData,
-                        workflowInputsFilename,
+                        workflowInputsFilenames,
                         workflowInputsData,
                         workflowOptionsFilename,
                         workflowOptionsData,

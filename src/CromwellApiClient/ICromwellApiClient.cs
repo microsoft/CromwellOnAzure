@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace CromwellApiClient
@@ -11,8 +12,8 @@ namespace CromwellApiClient
         string GetUrl();
         Task<PostWorkflowResponse> PostWorkflowAsync(string workflowSourceFilename,
             byte[] workflowSourceData,
-            string workflowInputsFilename,
-            byte[] workflowInputsData,
+            List<string> workflowInputsFilenames,
+            List<byte[]> workflowInputsData,
             string workflowOptionsFilename = null,
             byte[] workflowOptionsData = null,
             string workflowDependenciesFilename = null,
