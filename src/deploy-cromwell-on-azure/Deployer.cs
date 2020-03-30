@@ -972,7 +972,7 @@ namespace CromwellOnAzureDeployer
             var workflow = new Workflow
             {
                 WorkflowUrl = $"/{configuration.StorageAccountName}/{InputsContainerName}/test/test.wdl",
-                WorkflowInputsUrls = new List<string> { $"/{configuration.StorageAccountName}/{InputsContainerName}/test/test.json" }
+                WorkflowInputsUrl = $"/{configuration.StorageAccountName}/{InputsContainerName}/test/test.json"
             };
 
             var json = JsonConvert.SerializeObject(workflow, Formatting.Indented);
