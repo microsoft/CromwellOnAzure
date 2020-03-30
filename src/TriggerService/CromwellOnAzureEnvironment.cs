@@ -92,11 +92,20 @@ namespace TriggerService
                     var workflowInputsData = new List<byte[]>();
 
                     (var workflowSourceFilename, var workflowSourceData) = await GetBlobFileNameAndData(triggerInfo.WorkflowUrl);
-                    foreach (var workflowInputsUrl in triggerInfo.WorkflowInputsUrls)
+                    if (triggerInfo.WorkflowInputsUrl != null)
                     {
-                        (var workflowInputsFilename, var workflowInputsFileData) = await GetBlobFileNameAndData(workflowInputsUrl);
+                        (var workflowInputsFilename, var workflowInputsFileData) = await GetBlobFileNameAndData(triggerInfo.WorkflowInputsUrl);
                         workflowInputsFilenames.Add(workflowInputsFilename);
                         workflowInputsData.Add(workflowInputsFileData);
+                    }
+                    if (triggerInfo.WorkflowInputsUrls != null)
+                    {
+                        foreach (var workflowInputsUrl in triggerInfo.WorkflowInputsUrls)
+                        {
+                            (var workflowInputsFilename, var workflowInputsFileData) = await GetBlobFileNameAndData(workflowInputsUrl);
+                            workflowInputsFilenames.Add(workflowInputsFilename);
+                            workflowInputsData.Add(workflowInputsFileData);
+                        }
                     }
                     (var workflowOptionsFilename, var workflowOptionsData) = await GetBlobFileNameAndData(triggerInfo.WorkflowOptionsUrl);
                     (var workflowDependenciesFilename, var workflowDependenciesData) = await GetBlobFileNameAndData(triggerInfo.WorkflowDependenciesUrl);
