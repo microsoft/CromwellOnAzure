@@ -85,8 +85,8 @@ namespace TesApi.Tests
             (_, var cloudTask, _) = await ProcessTesTaskAndGetBatchJobArgumentsAsync();
 
             Assert.AreEqual(2, cloudTask.ResourceFiles.Count());
-            Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/upload_files_script")));
-            Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/download_files_script")));
+            Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/_batch/upload_files_script")));
+            Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/_batch/download_files_script")));
         }
 
         [TestMethod]
