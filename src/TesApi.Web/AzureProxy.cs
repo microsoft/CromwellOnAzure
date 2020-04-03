@@ -56,6 +56,7 @@ namespace TesApi.Web
         /// The constructor
         /// </summary>
         /// <param name="batchAccountName">Batch account name</param>
+        /// <param name="azureOfferDurableId">Azure offer id</param>
         /// <param name="logger">The logger</param>
         public AzureProxy(string batchAccountName, string azureOfferDurableId, ILogger logger)
         {
@@ -227,14 +228,12 @@ namespace TesApi.Web
         /// Creates a new Azure Batch job
         /// </summary>
         /// <param name="jobId"></param>
-        /// <param name="jobPreparationTask"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
         /// <returns></returns>
-        public async Task CreateBatchJobAsync(string jobId, JobPreparationTask jobPreparationTask, CloudTask cloudTask, PoolInformation poolInformation)
+        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
-            job.JobPreparationTask = jobPreparationTask;
 
             await job.CommitAsync();
 
@@ -325,8 +324,6 @@ namespace TesApi.Web
                     }
                 }
 
-                var jobPreparationTaskExecutionInformation = (await batchClient.JobOperations.ListJobPreparationAndReleaseTaskStatus(job.Id).ToListAsync()).FirstOrDefault()?.JobPreparationTaskExecutionInformation;
-
                 try
                 {
                     var batchTask = await batchClient.JobOperations.GetTaskAsync(job.Id, tesTaskId);
@@ -349,14 +346,6 @@ namespace TesApi.Web
                     JobStartTime = job.ExecutionInformation?.StartTime,
                     JobEndTime = job.ExecutionInformation?.EndTime,
                     JobSchedulingError = job.ExecutionInformation?.SchedulingError,
-                    JobPreparationTaskState = jobPreparationTaskExecutionInformation?.State,
-                    JobPreparationTaskExecutionResult = jobPreparationTaskExecutionInformation?.Result,
-                    JobPreparationTaskStartTime = jobPreparationTaskExecutionInformation?.StartTime,
-                    JobPreparationTaskEndTime = jobPreparationTaskExecutionInformation?.EndTime,
-                    JobPreparationTaskExitCode = jobPreparationTaskExecutionInformation?.ExitCode,
-                    JobPreparationTaskFailureInformation = jobPreparationTaskExecutionInformation?.FailureInformation,
-                    JobPreparationTaskContainerState = jobPreparationTaskExecutionInformation?.ContainerInformation?.State,
-                    JobPreparationTaskContainerError = jobPreparationTaskExecutionInformation?.ContainerInformation?.Error,
                     TaskState = taskState,
                     TaskExecutionResult = taskExecutionInformation?.Result,
                     TaskStartTime = taskExecutionInformation?.StartTime,
@@ -833,14 +822,6 @@ namespace TesApi.Web
             public DateTime? JobStartTime { get; set; }
             public DateTime? JobEndTime { get; set; }
             public JobSchedulingError JobSchedulingError { get; set; }
-            public JobPreparationTaskState? JobPreparationTaskState { get; set; }
-            public int? JobPreparationTaskExitCode { get; set; }
-            public TaskExecutionResult? JobPreparationTaskExecutionResult { get; set; }
-            public DateTime? JobPreparationTaskStartTime { get; set; }
-            public DateTime? JobPreparationTaskEndTime { get; set; }
-            public TaskFailureInformation JobPreparationTaskFailureInformation { get; set; }
-            public string JobPreparationTaskContainerState { get; set; }
-            public string JobPreparationTaskContainerError { get; set; }
             public TaskState? TaskState { get; set; }
             public int? TaskExitCode { get; set; }
             public TaskExecutionResult? TaskExecutionResult { get; set; }

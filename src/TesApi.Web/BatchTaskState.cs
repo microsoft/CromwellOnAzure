@@ -69,11 +69,6 @@ namespace TesApi.Web
         /// <summary>
         /// Batch job exists but task is missing. This can happen if scheduler goes down after creating the job but before creating the task.
         /// </summary>
-        MissingBatchTask,
-
-        /// <summary>
-        /// Preparation task failed
-        /// </summary>
-        PreparationTaskFailed
+        MissingBatchTask
     }
 }

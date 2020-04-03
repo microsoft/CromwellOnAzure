@@ -25,6 +25,7 @@ namespace TesApi.Web
         private readonly ILogger<Scheduler> logger;
         private readonly CancellationTokenSource mainProcess = new CancellationTokenSource();
         private bool isStopped;
+        private readonly TimeSpan runInterval = TimeSpan.FromSeconds(5);
 
         /// <summary>
         /// Default constructor
@@ -77,7 +78,6 @@ namespace TesApi.Web
         /// </summary>
         private async Task RunAsync()
         {
-            var runInterval = TimeSpan.FromSeconds(1);
             logger.LogInformation("Scheduler started.");
 
             while (!mainProcess.IsCancellationRequested)
@@ -91,7 +91,7 @@ namespace TesApi.Web
                     logger.LogError(exc, exc.Message);
                 }
 
-                await Task.Delay(runInterval);
+                await Task.Delay(this.runInterval);
             }
 
             isStopped = true;
@@ -126,7 +126,7 @@ namespace TesApi.Web
                         if (isModified)
                         {
                             //task has transitioned
-                            if (tesTask.Value.State == TesState.CANCELEDEnum
+                             if (tesTask.Value.State == TesState.CANCELEDEnum
                                 || tesTask.Value.State == TesState.COMPLETEEnum
                                 || tesTask.Value.State == TesState.EXECUTORERROREnum
                                 || tesTask.Value.State == TesState.SYSTEMERROREnum)
