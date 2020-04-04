@@ -69,6 +69,11 @@ namespace TesApi.Web
         /// <summary>
         /// Batch job exists but task is missing. This can happen if scheduler goes down after creating the job but before creating the task.
         /// </summary>
-        MissingBatchTask
+        MissingBatchTask,
+
+        /// <summary>
+        /// Node failed to download the docker image
+        /// </summary>
+        ImageDownloadFailed
     }
 }

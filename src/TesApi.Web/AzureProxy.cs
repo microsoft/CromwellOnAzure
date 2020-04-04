@@ -265,6 +265,8 @@ namespace TesApi.Web
             try
             {
                 var nodeAllocationFailed = false;
+                var imageDownloadFailed = false;
+                string imageDownloadErrorMessage = null;
                 var nodeDiskFull = false;
                 var activeJobWithMissingAutoPool = false;
                 TaskState? taskState = null;
@@ -312,7 +314,15 @@ namespace TesApi.Web
 
                         if (node != null)
                         {
-                            nodeDiskFull = node.Errors?.FirstOrDefault()?.Code?.Equals("DiskFull", StringComparison.OrdinalIgnoreCase) ?? false;
+                            var nodeError = node.Errors?.FirstOrDefault();
+
+                            if (nodeError != null)
+                            {
+                                imageDownloadFailed = nodeError.Code?.Equals("ContainerInvalidImage", StringComparison.OrdinalIgnoreCase) ?? false;
+                                imageDownloadErrorMessage = imageDownloadFailed ? nodeError.ErrorDetails?.LastOrDefault()?.Value : null;
+
+                                nodeDiskFull = nodeError.Code?.Equals("DiskFull", StringComparison.OrdinalIgnoreCase) ?? false;
+                            }
                         }
                     }
                     else
@@ -341,6 +351,8 @@ namespace TesApi.Web
                     ActiveJobWithMissingAutoPool = activeJobWithMissingAutoPool,
                     AttemptNumber = attemptNumber,
                     NodeAllocationFailed = nodeAllocationFailed,
+                    ImageDownloadFailed = imageDownloadFailed,
+                    ImageDownloadErrorMessage = imageDownloadErrorMessage,
                     NodeDiskFull = nodeDiskFull,
                     JobState = job.State,
                     JobStartTime = job.ExecutionInformation?.StartTime,
@@ -817,6 +829,8 @@ namespace TesApi.Web
             public bool ActiveJobWithMissingAutoPool { get; set; }
             public int AttemptNumber { get; set; }
             public bool NodeAllocationFailed { get; set; }
+            public bool ImageDownloadFailed { get; set; }
+            public string ImageDownloadErrorMessage { get; set; }
             public bool NodeDiskFull { get; set; }
             public JobState? JobState { get; set; }
             public DateTime? JobStartTime { get; set; }

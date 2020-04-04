@@ -85,8 +85,8 @@ namespace TesApi.Tests
             (_, var cloudTask, _) = await ProcessTesTaskAndGetBatchJobArgumentsAsync();
 
             Assert.AreEqual(2, cloudTask.ResourceFiles.Count());
-            Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/_batch/upload_files_script")));
-            Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/_batch/download_files_script")));
+            Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/upload_files_script")));
+            Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/download_files_script")));
         }
 
         [TestMethod]
@@ -178,6 +178,7 @@ namespace TesApi.Tests
             Assert.AreEqual(TesState.SYSTEMERROREnum, await GetNewTesTaskStateAsync(TesState.INITIALIZINGEnum, BatchJobAndTaskStates.MoreThanOneJobFound));
             Assert.AreEqual(TesState.EXECUTORERROREnum, await GetNewTesTaskStateAsync(TesState.INITIALIZINGEnum, BatchJobAndTaskStates.NodeDiskFull));
             Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(TesState.INITIALIZINGEnum, BatchJobAndTaskStates.NodeAllocationFailed));
+            Assert.AreEqual(TesState.EXECUTORERROREnum, await GetNewTesTaskStateAsync(TesState.INITIALIZINGEnum, BatchJobAndTaskStates.ImageDownloadFailed));
             Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(TesState.INITIALIZINGEnum, BatchJobAndTaskStates.ActiveJobWithMissingAutoPool));
         }
 
@@ -356,6 +357,54 @@ namespace TesApi.Tests
             Assert.IsTrue(filesToDownload[1].StorageUrl.StartsWith("https://defaultstorageaccount/cromwell-executions/workflow1/workflowId1/call-Task1/execution/script?sv="));
         }
 
+        [TestMethod]
+        public async Task PrivateImagesArePulledUsingPoolConfiguration()
+        {
+            var tesTask = GetTesTask();
+
+            (_, var cloudTask, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+
+            Assert.IsNotNull(poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration);
+            Assert.AreEqual("registryServer1", poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.FirstOrDefault()?.RegistryServer);
+            Assert.AreEqual(1, Regex.Matches(cloudTask.CommandLine, tesTask.Executors.First().Image, RegexOptions.IgnoreCase).Count);
+            Assert.IsFalse(cloudTask.CommandLine.Contains($"docker pull --quiet {tesTask.Executors.First().Image}"));
+        }
+
+        [TestMethod]
+        public async Task PublicImagesArePulledInTaskCommand()
+        {
+            var tesTask = GetTesTask();
+            tesTask.Executors.First().Image = "ubuntu";
+
+            (_, var cloudTask, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+
+            Assert.IsNull(poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration);
+            Assert.AreEqual(2, Regex.Matches(cloudTask.CommandLine, tesTask.Executors.First().Image, RegexOptions.IgnoreCase).Count);
+            Assert.IsTrue(cloudTask.CommandLine.Contains("docker pull --quiet ubuntu"));
+        }
+
+        [TestMethod]
+        public async Task PrivateContainersRunInsideDockerInDockerContainer()
+        {
+            var tesTask = GetTesTask();
+
+            (_, var cloudTask, _) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+
+            Assert.IsNotNull(cloudTask.ContainerSettings);
+            Assert.AreEqual("docker", cloudTask.ContainerSettings.ImageName);
+        }
+
+        [TestMethod]
+        public async Task PublicContainersRunInsideRegularTaskCommand()
+        {
+            var tesTask = GetTesTask();
+            tesTask.Executors.First().Image = "ubuntu";
+
+            (_, var cloudTask, _) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+
+            Assert.IsNull(cloudTask.ContainerSettings);
+        }
+
         private static async Task<string> ProcessTesTaskAndGetFirstLogMessageAsync(TesTask tesTask, AzureProxy.AzureBatchJobAndTaskState? azureBatchJobAndTaskState = null)
         {
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
@@ -467,6 +516,7 @@ namespace TesApi.Tests
             public static AzureProxy.AzureBatchJobAndTaskState NodeAllocationFailed => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, NodeAllocationFailed = true };
             public static AzureProxy.AzureBatchJobAndTaskState NodeDiskFull => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, NodeDiskFull = true };
             public static AzureProxy.AzureBatchJobAndTaskState ActiveJobWithMissingAutoPool => new AzureProxy.AzureBatchJobAndTaskState { ActiveJobWithMissingAutoPool = true };
+            public static AzureProxy.AzureBatchJobAndTaskState ImageDownloadFailed => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, ImageDownloadFailed = true };
         }
 
         private class AzureProxyReturnValues

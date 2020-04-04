@@ -29,8 +29,11 @@ namespace TesApi.Web
         private const int DefaultDiskGb = 10;
         private const string CromwellPathPrefix = "/cromwell-executions/";
         private const string CromwellScriptFileName = "script";
-        private const string DownloadFilesScriptFileName = "_batch/download_files_script";
-        private const string UploadFilesScriptFileName = "_batch/upload_files_script";
+        private const string BatchExecutionDirectoryName = "__batch";
+        private const string UploadFilesScriptFileName = "upload_files_script";
+        private const string DownloadFilesScriptFileName = "download_files_script";
+        private const string DockerInDockerImageName = "docker";
+        private const string BlobxferImageName = "mcr.microsoft.com/blobxfer";
         private static readonly Regex queryStringRegex = new Regex(@"[^\?.]*(\?.*)");
         private static readonly Regex externalStorageContainerRegex = new Regex(@"(https://([^\.]*).blob.core.windows.net/)([^\?/]+)/*?(\?.+)");
         private static readonly TimeSpan sasTokenDuration = TimeSpan.FromDays(3);
@@ -75,6 +78,7 @@ namespace TesApi.Web
                 new TesTaskStateTransition(TesState.QUEUEDEnum, BatchTaskState.MissingBatchTask, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum),
                 new TesTaskStateTransition(TesState.QUEUEDEnum, BatchTaskState.Initializing, TesState.INITIALIZINGEnum),
                 new TesTaskStateTransition(TesState.INITIALIZINGEnum, BatchTaskState.NodeAllocationFailed, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum),
+                new TesTaskStateTransition(TesState.INITIALIZINGEnum, BatchTaskState.ImageDownloadFailed, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.EXECUTORERROREnum),
                 new TesTaskStateTransition(tesStateIsQueuedOrInitializing, BatchTaskState.Running, TesState.RUNNINGEnum),
                 new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.MoreThanOneActiveJobFound, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.SYSTEMERROREnum),
                 new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.CompletedSuccessfully, TesState.COMPLETEEnum),
@@ -291,6 +295,11 @@ namespace TesApi.Web
                             return (BatchTaskState.NodeAllocationFailed, null);
                         }
 
+                        if(batchJobAndTaskState.ImageDownloadFailed)
+                        {
+                            return (BatchTaskState.ImageDownloadFailed, batchJobAndTaskState.ImageDownloadErrorMessage);
+                        }
+
                         if (batchJobAndTaskState.NodeDiskFull)
                         {
                             return (BatchTaskState.NodeDiskFull, "There is not enough disk space on the VM that was selected for the task.");
@@ -409,15 +418,17 @@ namespace TesApi.Web
                 }
             }
 
+            var batchExecutionDirectoryPath = $"{cromwellExecutionDirectoryPath}/{BatchExecutionDirectoryName}";
+
             // TODO: Cromwell bug: Cromwell command write_tsv() generates a file in the execution directory, for example execution/write_tsv_3922310b441805fc43d52f293623efbc.tmp. These are not passed on to TES inputs.
             // WORKAROUND: Get the list of files in the execution directory and add them to task inputs.
             var executionDirectoryUri = new Uri(await MapLocalPathToSasUrlAsync(cromwellExecutionDirectoryPath, getContainerSas: true));
-            var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.EndsWith($"/{DownloadFilesScriptFileName}"));
+            var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.Contains($"/{BatchExecutionDirectoryName}/"));
             var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
             var filesToDownload = await Task.WhenAll(inputFiles.Union(additionalInputFiles).Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
 
             var downloadFilesScriptContent = string.Join(" && ", filesToDownload.Select(f => $"blobxfer download --storage-url '{f.Url}' --local-path '{f.Path}' --chunk-size-bytes 104857600 --rename --no-recursive"));
-            var downloadFilesScriptPath = $"{cromwellExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
+            var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
             var writableDownloadFilesScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(downloadFilesScriptPath, getContainerSas: true));
             var downloadFilesScriptUrl = await MapLocalPathToSasUrlAsync(downloadFilesScriptPath);
             await azureProxy.UploadBlobAsync(writableDownloadFilesScriptUrl, downloadFilesScriptContent);
@@ -426,32 +437,50 @@ namespace TesApi.Web
                 task.Outputs.Select(async f =>
                     new TesOutput { Path = f.Path, Url = await MapLocalPathToSasUrlAsync(f.Path, getContainerSas: true), Name = f.Name, Type = f.Type }));
 
-            var uploadFilesScriptContent = string.Join(" && ", filesToUpload.Select(f => $"blobxfer upload --storage-url '{f.Url}' --local-path '{f.Path}' --chunk-size-bytes 104857600 --one-shot-bytes 104857600 {(f.Type == TesFileType.FILEEnum ? "--rename --no-recursive" : "")}"));
-            var uploadFilesScriptPath = $"{cromwellExecutionDirectoryPath}/{UploadFilesScriptFileName}";
+            var uploadFilesScriptContent = string.Join(" && ", filesToUpload.Select(f => $"blobxfer upload --storage-url '{f.Url}' --local-path '{f.Path}' --one-shot-bytes 104857600 {(f.Type == TesFileType.FILEEnum ? "--rename --no-recursive" : "")}"));
+            var uploadFilesScriptPath = $"{batchExecutionDirectoryPath}/{UploadFilesScriptFileName}";
             var writableUploadFilesScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(uploadFilesScriptPath, getContainerSas: true));
             var uploadFilesScriptUrl = await MapLocalPathToSasUrlAsync(uploadFilesScriptPath);
             await azureProxy.UploadBlobAsync(writableUploadFilesScriptUrl, uploadFilesScriptContent);
 
             var executor = task.Executors.First();
+
             var volumeMountsOption = $"-v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash}";
 
-            var dockerPullCommand = $"docker pull docker --quiet && docker pull mcr.microsoft.com/blobxfer --quiet && docker pull {executor.Image} --quiet";
-            var downloadFilesCommand = $"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh mcr.microsoft.com/blobxfer {downloadFilesScriptPath}";
-            var updateFilePermissionsCommand = $"chmod -R o+rwx {cromwellPathPrefixWithoutEndSlash}";
-            var mainCommand = $"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{string.Join(" && ", executor.Command.Skip(1))}\"";
-            var uploadFilesCommand = $"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh mcr.microsoft.com/blobxfer {uploadFilesScriptPath}";
+            var executorImageIsPublic = (await GetContainerRegistryAsync(executor.Image)) == null;
 
-            var taskCommand = $"/bin/sh -c '{string.Join(" && ", dockerPullCommand, downloadFilesCommand, updateFilePermissionsCommand, mainCommand, uploadFilesCommand)}'";
+            var taskCommand = $@"
+                docker pull --quiet {BlobxferImageName} && \
+                {(executorImageIsPublic ? $"docker pull --quiet {executor.Image} &&" : "")} \
+                docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {downloadFilesScriptPath} && \
+                chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \
+                docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c '{ string.Join(" && ", executor.Command.Skip(1))}' && \
+                docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath}
+            ";
 
-            var imageName = "docker";
-            var containerRunOptions = $"--rm -t -v /var/run/docker.sock:/var/run/docker.sock {volumeMountsOption} "; // allow the docker client to access the host's docker daemon
+            var batchExecutionDirectoryUrl = await MapLocalPathToSasUrlAsync($"{batchExecutionDirectoryPath}", getContainerSas: true);
 
-            var cloudTask = new CloudTask(taskId, taskCommand)
+            var cloudTask = new CloudTask(taskId, $"/bin/sh -c '{taskCommand}'")
             {
-                ContainerSettings = new TaskContainerSettings(imageName, containerRunOptions),
-                UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Task)),
-                ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptUrl, $"/mnt{uploadFilesScriptPath}") }
+                UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptUrl, $"/mnt{uploadFilesScriptPath}") },
+                OutputFiles = new List<OutputFile> {
+                    new OutputFile(
+                        "../std*.txt",
+                        new OutputFileDestination(new OutputFileBlobContainerDestination(batchExecutionDirectoryUrl)),
+                        new OutputFileUploadOptions(OutputFileUploadCondition.TaskFailure))
+                }
             };
+
+            if (!executorImageIsPublic)
+            {
+                // If the executor image is private, and in order to run multiple containers in the main task, the image has to be downloaded via pool ContainerConfiguration.
+                // This also requires that the main task runs inside a container. So we run the "docker" container that in turn runs other containers.
+                // If the executor image is public, there is no need for pool ContainerConfiguration and task can run normally, without being wrapped in a docker container.
+                // Volume mapping for docker.sock below allows the docker client in the container to access host's docker daemon.
+                var containerRunOptions = $"--rm -v /var/run/docker.sock:/var/run/docker.sock -v /mnt{cromwellPathPrefixWithoutEndSlash}:/mnt{cromwellPathPrefixWithoutEndSlash} ";
+                cloudTask.ContainerSettings = new TaskContainerSettings(DockerInDockerImageName, containerRunOptions);
+            }
 
             return cloudTask;
         }
@@ -527,7 +556,6 @@ namespace TesApi.Web
         /// <param name="image">The image name for the current <see cref="TesTask"/></param>
         /// <param name="vmSize">The Azure VM sku</param>
         /// <param name="preemptible">True if preemptible machine should be used</param>
-        /// <param name="diskSizeInGb">Requested disk size</param>
         /// <returns></returns>
         private async Task<PoolInformation> CreatePoolInformation(string image, string vmSize, bool preemptible)
         {
@@ -535,13 +563,18 @@ namespace TesApi.Web
                 imageReference: new ImageReference("ubuntu-server-container", "microsoft-azure-batch", "16-04-lts", "latest"),
                 nodeAgentSkuId: "batch.node.ubuntu 16.04");
 
-            var containerRegistry = await GetContainerRegistry(image);
+            var containerRegistry = await GetContainerRegistryAsync(image);
 
-            vmConfig.ContainerConfiguration = new ContainerConfiguration
+            if (containerRegistry != null)
             {
-                ContainerImageNames = new List<string> { image },
-                ContainerRegistries = containerRegistry != null ? new List<ContainerRegistry> { containerRegistry } : null
-            };
+                // Download private images at node startup, since those cannot be downloaded in the main task that runs multiple containers.
+                // Doing this also requires that the main task runs inside a container, hence downloading the "docker" image (contains docker client) as well.
+                vmConfig.ContainerConfiguration = new ContainerConfiguration
+                {
+                    ContainerImageNames = new List<string> { image, DockerInDockerImageName },
+                    ContainerRegistries = new List<ContainerRegistry> { containerRegistry }
+                };
+            }
 
             var poolSpecification = new PoolSpecification
             {
@@ -570,7 +603,7 @@ namespace TesApi.Web
         /// Gets the <see cref="ContainerRegistryInfo"/> associated with the given image
         /// </summary>
         /// <returns>The <see cref="ContainerRegistry"/></returns>
-        private async Task<ContainerRegistry> GetContainerRegistry(string imageName)
+        private async Task<ContainerRegistry> GetContainerRegistryAsync(string imageName)
         {
             if (containerRegistryCache == null || !containerRegistryCache.Any(reg => imageName.StartsWith(reg.RegistryServer, StringComparison.OrdinalIgnoreCase)))
             {
