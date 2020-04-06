@@ -21,7 +21,7 @@ namespace TriggerService
     {
         private static readonly Regex blobNameRegex = new Regex("^(?:https?://|/)?[^/]+/[^/]+/([^?.]+)");  // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs in the trigger file.
         private IAzureStorage storage { get; set; }
-        private ICromwellApiClient cromwellApiClient { get; set; }
+        internal ICromwellApiClient cromwellApiClient { get; set; }
         private readonly ILogger<AzureStorage> logger;
 
         public CromwellOnAzureEnvironment(ILoggerFactory loggerFactory, IAzureStorage storage, ICromwellApiClient cromwellApiClient)

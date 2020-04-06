@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
-using TriggerService;
 
 namespace TriggerService.Tests
 {
@@ -106,13 +105,18 @@ namespace TriggerService.Tests
                 serviceProvider.GetRequiredService<ILoggerFactory>(),
                 azStorageMock.Object,
                 new CromwellApiClient.CromwellApiClient("http://cromwell:8000"));
+
             return environment;
         }
 
-        private async Task<(string, byte[], List<string>, List<byte[]>, string, byte[], string, byte[])> ProcessBlobTriggerWithMocksAsync(string triggerData)
+        private async Task<(string, byte[], List<string>, List<byte[]>, string, byte[], string, byte[], CromwellOnAzureEnvironment)> ProcessBlobTriggerWithMocksAsync(string triggerData)
         {
             var environment = SetCromwellOnAzureEnvironment("fake");
-            return await environment.ProcessBlobTrigger(triggerData);
+            (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
+                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData) = await environment.ProcessBlobTrigger(triggerData);
+
+            return (workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename,
+                        workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
         }
 
         [TestMethod]
@@ -182,7 +186,7 @@ namespace TriggerService.Tests
         public async Task ProcessBlobTrigger_NoInput()
         {
             (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData)
+                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
                 = await ProcessBlobTriggerWithMocksAsync(@"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
@@ -197,13 +201,16 @@ namespace TriggerService.Tests
             AssertBytesEqual(workflowInputsData, 0, httpClientData);
 
             AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+
+            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
+            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_SingleInput()
         {
             (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData)
+                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
                 = await ProcessBlobTriggerWithMocksAsync(@"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
@@ -218,13 +225,16 @@ namespace TriggerService.Tests
             AssertBytesEqual(workflowInputsData, 1, httpClientData);
 
             AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+
+            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
+            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_MultiInput()
         {
             (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData)
+                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
                 = await ProcessBlobTriggerWithMocksAsync(@"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
@@ -239,13 +249,17 @@ namespace TriggerService.Tests
             AssertBytesEqual(workflowInputsData, fakeAzureInputs.Count, httpClientData);
 
             AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+
+            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
+            Assert.AreEqual(workflowInputsFilenames.Count + 1, files.Count);
+            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_CombinedInputs()
         {
             (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData)
+                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
                 = await ProcessBlobTriggerWithMocksAsync(@"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
@@ -261,13 +275,16 @@ namespace TriggerService.Tests
             AssertBytesEqual(workflowInputsData, fakeAzureInputs.Count + 1, httpClientData);
 
             AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+
+            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
+            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_SingleInputWithNull()
         {
             (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData)
+                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
                 = await ProcessBlobTriggerWithMocksAsync(@"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
@@ -283,13 +300,16 @@ namespace TriggerService.Tests
             AssertBytesEqual(workflowInputsData, 1, httpClientData);
 
             AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+
+            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
+            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_MultiInputWithNull()
         {
             (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData)
+                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
                 = await ProcessBlobTriggerWithMocksAsync(@"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
@@ -305,13 +325,16 @@ namespace TriggerService.Tests
             AssertBytesEqual(workflowInputsData, fakeAzureInputs.Count, httpClientData);
 
             AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+
+            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
+            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_AllInputsNull()
         {
             (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData)
+                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
                 = await ProcessBlobTriggerWithMocksAsync(@"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
@@ -327,6 +350,9 @@ namespace TriggerService.Tests
             AssertBytesEqual(workflowInputsData, 0, httpClientData);
 
             AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+
+            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
+            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
         }
 
         private static void AssertExtraDataNull(string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData)
@@ -365,6 +391,41 @@ namespace TriggerService.Tests
             {
                 Assert.AreEqual(expectedData[i], workflowInputsData[i]);
             }
+        }
+
+        private static List<CromwellApiClient.CromwellApiClient.FileToPost> RetrievePostFiles(string workflowSourceFilename, byte[] workflowSourceData, List<string> workflowInputsFilenames, List<byte[]> workflowInputsData, string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData, CromwellOnAzureEnvironment environment)
+        {
+            var cromwellApiClient = environment.cromwellApiClient;
+            var files = ((CromwellApiClient.CromwellApiClient)cromwellApiClient).AccumulatePostFiles(workflowSourceFilename, workflowSourceData,
+                        workflowInputsFilenames, workflowInputsData, workflowOptionsFilename,
+                        workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+            return files;
+        }
+
+        private void VerifyPostFiles(string workflowSourceFilename, byte[] workflowSourceData, 
+            List<string> workflowInputsFilenames, List<byte[]> workflowInputsData,
+            List<CromwellApiClient.CromwellApiClient.FileToPost> files)
+        {
+            Assert.AreEqual(workflowInputsFilenames.Count + 1, files.Count);
+
+            Assert.AreEqual("workflowSource", files[0].ParameterName);
+            Assert.AreEqual(workflowSourceFilename, files[0].Filename);
+            AssertBytesEqual(workflowSourceData, files[0].Data);
+
+            for (var i = 0; i < workflowInputsFilenames.Count; i++)
+            {
+                if (i == 0)
+                {
+                    Assert.AreEqual("workflowInputs", files[i + 1].ParameterName);
+                }
+                else
+                {
+                    Assert.AreEqual("workflowInputs_" + (i + 1), files[i + 1].ParameterName);
+                }
+                Assert.AreEqual(workflowInputsFilenames[i], files[i + 1].Filename);
+                AssertBytesEqual(workflowInputsData[i], files[i + 1].Data);
+            }
+
         }
     }
 }

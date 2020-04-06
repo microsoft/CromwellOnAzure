@@ -5,9 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
+[assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace CromwellApiClient
 {
     public class CromwellApiClient : ICromwellApiClient
@@ -72,6 +74,13 @@ namespace CromwellApiClient
             string workflowDependenciesFilename = null,
             byte[] workflowDependenciesData = null)
         {
+            var files = AccumulatePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+
+            return await PostAsync<PostWorkflowResponse>(string.Empty, files);
+        }
+
+        internal List<FileToPost> AccumulatePostFiles(string workflowSourceFilename, byte[] workflowSourceData, List<string> workflowInputsFilenames, List<byte[]> workflowInputsData, string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData)
+        {
             var files = new List<FileToPost> {
                 new FileToPost { ParameterName = "workflowSource", Filename = workflowSourceFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowSourceData) },
             };
@@ -92,7 +101,7 @@ namespace CromwellApiClient
                 files.Add(new FileToPost { ParameterName = "workflowDependencies", Filename = workflowDependenciesFilename, Data = workflowDependenciesData });
             }
 
-            return await PostAsync<PostWorkflowResponse>(string.Empty, files);
+            return files;
         }
 
         public async Task<PostQueryResponse> PostQueryAsync(string queryJson)
@@ -298,7 +307,7 @@ namespace CromwellApiClient
             }
         }
 
-        private class FileToPost
+        internal class FileToPost
         {
             public string ParameterName { get; set; }
             public string Filename { get; set; }
