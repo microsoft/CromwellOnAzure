@@ -5,13 +5,16 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Common;
 using CromwellApiClient;
+using Microsoft.Azure.KeyVault.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
+[assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace TriggerService
 {
     public class CromwellOnAzureEnvironment
@@ -86,29 +89,8 @@ namespace TriggerService
                 {
                     logger.LogInformation($"Processing new workflow trigger: {blobTrigger.Uri.AbsoluteUri}");
                     var blobTriggerJson = await blobTrigger.DownloadTextAsync();
-                    var triggerInfo = JsonConvert.DeserializeObject<Workflow>(blobTriggerJson);
-                    var tasks = new List<Task>();
-                    var workflowInputsFilenames = new List<string>();
-                    var workflowInputsData = new List<byte[]>();
-
-                    (var workflowSourceFilename, var workflowSourceData) = await GetBlobFileNameAndData(triggerInfo.WorkflowUrl);
-                    if (triggerInfo.WorkflowInputsUrl != null)
-                    {
-                        (var workflowInputsFilename, var workflowInputsFileData) = await GetBlobFileNameAndData(triggerInfo.WorkflowInputsUrl);
-                        workflowInputsFilenames.Add(workflowInputsFilename);
-                        workflowInputsData.Add(workflowInputsFileData);
-                    }
-                    if (triggerInfo.WorkflowInputsUrls != null)
-                    {
-                        foreach (var workflowInputsUrl in triggerInfo.WorkflowInputsUrls)
-                        {
-                            (var workflowInputsFilename, var workflowInputsFileData) = await GetBlobFileNameAndData(workflowInputsUrl);
-                            workflowInputsFilenames.Add(workflowInputsFilename);
-                            workflowInputsData.Add(workflowInputsFileData);
-                        }
-                    }
-                    (var workflowOptionsFilename, var workflowOptionsData) = await GetBlobFileNameAndData(triggerInfo.WorkflowOptionsUrl);
-                    (var workflowDependenciesFilename, var workflowDependenciesData) = await GetBlobFileNameAndData(triggerInfo.WorkflowDependenciesUrl);
+                    (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename, 
+                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData) = await ProcessBlobTrigger(blobTriggerJson);
 
                     var response = await cromwellApiClient.PostWorkflowAsync(
                         workflowSourceFilename,
@@ -128,6 +110,44 @@ namespace TriggerService
                     await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Failed);
                 }
             }
+        }
+
+        internal async Task<(string, byte[], List<string>, List<byte[]>, string, byte[], string, byte[])> ProcessBlobTrigger(string blobTriggerJson)
+        {
+            var triggerInfo = JsonConvert.DeserializeObject<Workflow>(blobTriggerJson);
+            if (triggerInfo == null)
+            {
+                throw new ArgumentNullException("must have data in the Trigger File");
+            }
+            var tasks = new List<Task>();
+            var workflowInputsFilenames = new List<string>();
+            var workflowInputsData = new List<byte[]>();
+            if (string.IsNullOrWhiteSpace(triggerInfo.WorkflowUrl))
+            {
+                throw new ArgumentNullException("must specify a WorkflowUrl in the Trigger File");
+            }
+            (var workflowSourceFilename, var workflowSourceData) = await GetBlobFileNameAndData(triggerInfo.WorkflowUrl);
+            if (triggerInfo.WorkflowInputsUrl != null)
+            {
+                (var workflowInputsFilename, var workflowInputsFileData) = await GetBlobFileNameAndData(triggerInfo.WorkflowInputsUrl);
+                workflowInputsFilenames.Add(workflowInputsFilename);
+                workflowInputsData.Add(workflowInputsFileData);
+            }
+            if (triggerInfo.WorkflowInputsUrls != null)
+            {
+                foreach (var workflowInputsUrl in triggerInfo.WorkflowInputsUrls)
+                {
+                    (var workflowInputsFilename, var workflowInputsFileData) = await GetBlobFileNameAndData(workflowInputsUrl);
+                    workflowInputsFilenames.Add(workflowInputsFilename);
+                    workflowInputsData.Add(workflowInputsFileData);
+                }
+            }
+            (var workflowOptionsFilename, var workflowOptionsData) = await GetBlobFileNameAndData(triggerInfo.WorkflowOptionsUrl);
+            (var workflowDependenciesFilename, var workflowDependenciesData) = await GetBlobFileNameAndData(triggerInfo.WorkflowDependenciesUrl);
+
+            return (workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData,
+                workflowDependenciesFilename, workflowDependenciesData);
+
         }
 
         public async Task UpdateWorkflowStatusesAsync()
@@ -214,6 +234,10 @@ namespace TriggerService
             }
 
             var blobName = GetBlobName(url);
+            if (string.IsNullOrEmpty(blobName))
+            {
+                throw new ArgumentException(@"url object submitted ({url}) is not valid URL");
+            }
 
             byte[] data;
 
