@@ -199,7 +199,7 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
                 }";
 
-            await VerifyTriggerFileTest(triggerFileContent, 0);
+            await ExecuteTriggerFileTest(triggerFileContent, 0);
         }
 
         [TestMethod]
@@ -213,7 +213,7 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
                 }";
 
-            await VerifyTriggerFileTest(triggerFileContent, 1);
+            await ExecuteTriggerFileTest(triggerFileContent, 1);
         }
 
         [TestMethod]
@@ -227,7 +227,7 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
                 }";
 
-            await VerifyTriggerFileTest(triggerFileContent, fakeAzureInputs.Count);
+            await ExecuteTriggerFileTest(triggerFileContent, fakeAzureInputs.Count);
         }
 
         [TestMethod]
@@ -242,7 +242,7 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
                 }";
 
-            await VerifyTriggerFileTest(triggerFileContent, fakeAzureInputs.Count + 1);
+            await ExecuteTriggerFileTest(triggerFileContent, fakeAzureInputs.Count + 1);
         }
 
         [TestMethod]
@@ -257,7 +257,7 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
                 }";
 
-            await VerifyTriggerFileTest(triggerFileContent, 1);
+            await ExecuteTriggerFileTest(triggerFileContent, 1);
         }
 
         [TestMethod]
@@ -272,7 +272,7 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
                 }";
 
-            await VerifyTriggerFileTest(triggerFileContent, fakeAzureInputs.Count);
+            await ExecuteTriggerFileTest(triggerFileContent, fakeAzureInputs.Count);
         }
 
         [TestMethod]
@@ -287,10 +287,10 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
                 }";
 
-            await VerifyTriggerFileTest(triggerFileContent, 0);
+            await ExecuteTriggerFileTest(triggerFileContent, 0);
         }
 
-        private async Task VerifyTriggerFileTest(string triggerFileContent, int inputFilesCount)
+        private async Task ExecuteTriggerFileTest(string triggerFileContent, int inputFilesCount)
         {
             (var workflowSourceFilename, var workflowSourceData, 
                 var workflowInputsFilenames, var workflowInputsData, 
