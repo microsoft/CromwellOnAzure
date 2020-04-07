@@ -194,16 +194,11 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
             }");
 
-            Assert.AreEqual(azureName, workflowSourceFilename);
-            AssertBytesEqual(workflowSourceData, httpClientData);
-
-            AssertNamesEqual(workflowInputsFilenames, 0, azureName);
-            AssertBytesEqual(workflowInputsData, 0, httpClientData);
-
-            AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
-
-            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
-            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
+            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
+                workflowInputsFilenames, workflowInputsData,
+                workflowOptionsFilename, workflowOptionsData,
+                workflowDependenciesFilename, workflowDependenciesData,
+                environment, 0);
         }
 
         [TestMethod]
@@ -218,16 +213,11 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
             }");
 
-            Assert.AreEqual(azureName, workflowSourceFilename);
-            AssertBytesEqual(workflowSourceData, httpClientData);
-
-            AssertNamesEqual(workflowInputsFilenames, 1, azureName);
-            AssertBytesEqual(workflowInputsData, 1, httpClientData);
-
-            AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
-
-            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
-            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
+            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
+                workflowInputsFilenames, workflowInputsData,
+                workflowOptionsFilename, workflowOptionsData,
+                workflowDependenciesFilename, workflowDependenciesData,
+                environment, 1);
         }
 
         [TestMethod]
@@ -242,17 +232,11 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
             }");
 
-            Assert.AreEqual(azureName, workflowSourceFilename);
-            AssertBytesEqual(workflowSourceData, httpClientData);
-
-            AssertNamesEqual(workflowInputsFilenames, fakeAzureInputs.Count, azureName);
-            AssertBytesEqual(workflowInputsData, fakeAzureInputs.Count, httpClientData);
-
-            AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
-
-            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
-            Assert.AreEqual(workflowInputsFilenames.Count + 1, files.Count);
-            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
+            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
+                workflowInputsFilenames, workflowInputsData,
+                workflowOptionsFilename, workflowOptionsData,
+                workflowDependenciesFilename, workflowDependenciesData,
+                environment, fakeAzureInputs.Count);
         }
 
         [TestMethod]
@@ -268,16 +252,11 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
             }");
 
-            Assert.AreEqual(azureName, workflowSourceFilename);
-            AssertBytesEqual(workflowSourceData, httpClientData);
-
-            AssertNamesEqual(workflowInputsFilenames, fakeAzureInputs.Count + 1, azureName);
-            AssertBytesEqual(workflowInputsData, fakeAzureInputs.Count + 1, httpClientData);
-
-            AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
-
-            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
-            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
+            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
+                workflowInputsFilenames, workflowInputsData,
+                workflowOptionsFilename, workflowOptionsData,
+                workflowDependenciesFilename, workflowDependenciesData,
+                environment, fakeAzureInputs.Count + 1);
         }
 
         [TestMethod]
@@ -293,16 +272,11 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
             }");
 
-            Assert.AreEqual(azureName, workflowSourceFilename);
-            AssertBytesEqual(workflowSourceData, httpClientData);
-
-            AssertNamesEqual(workflowInputsFilenames, 1, azureName);
-            AssertBytesEqual(workflowInputsData, 1, httpClientData);
-
-            AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
-
-            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
-            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
+            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
+                workflowInputsFilenames, workflowInputsData,
+                workflowOptionsFilename, workflowOptionsData,
+                workflowDependenciesFilename, workflowDependenciesData,
+                environment, 1);
         }
 
         [TestMethod]
@@ -318,16 +292,11 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
             }");
 
-            Assert.AreEqual(azureName, workflowSourceFilename);
-            AssertBytesEqual(workflowSourceData, httpClientData);
-
-            AssertNamesEqual(workflowInputsFilenames, fakeAzureInputs.Count, azureName);
-            AssertBytesEqual(workflowInputsData, fakeAzureInputs.Count, httpClientData);
-
-            AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
-
-            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
-            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
+            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
+                workflowInputsFilenames, workflowInputsData,
+                workflowOptionsFilename, workflowOptionsData,
+                workflowDependenciesFilename, workflowDependenciesData,
+                environment, fakeAzureInputs.Count);
         }
 
         [TestMethod]
@@ -343,16 +312,41 @@ namespace TriggerService.Tests
                     ""WorkflowDependenciesUrl"":null
             }");
 
+            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData, 
+                workflowInputsFilenames, workflowInputsData, 
+                workflowOptionsFilename, workflowOptionsData, 
+                workflowDependenciesFilename, workflowDependenciesData, 
+                environment, 0);
+        }
+
+        private void VerifyTriggerFileTest(string workflowSourceFilename, byte[] workflowSourceData, List<string> workflowInputsFilenames, List<byte[]> workflowInputsData, string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData, CromwellOnAzureEnvironment environment, int inputFilesCount)
+        {
+            VerifyTriggerFileProcessing(workflowSourceFilename, workflowSourceData,
+                workflowInputsFilenames, workflowInputsData,
+                workflowOptionsFilename, workflowOptionsData,
+                workflowDependenciesFilename, workflowDependenciesData,
+                inputFilesCount);
+
+            VerifyPostFiles(workflowSourceFilename, workflowSourceData,
+                workflowInputsFilenames, workflowInputsData,
+                workflowOptionsFilename, workflowOptionsData,
+                workflowDependenciesFilename, workflowDependenciesData,
+                environment);
+        }
+
+        private void VerifyTriggerFileProcessing(string workflowSourceFilename, byte[] workflowSourceData, 
+            List<string> workflowInputsFilenames, List<byte[]> workflowInputsData, 
+            string workflowOptionsFilename, byte[] workflowOptionsData, 
+            string workflowDependenciesFilename, byte[] workflowDependenciesData, 
+            int inputFilesCount)
+        {
             Assert.AreEqual(azureName, workflowSourceFilename);
             AssertBytesEqual(workflowSourceData, httpClientData);
 
-            AssertNamesEqual(workflowInputsFilenames, 0, azureName);
-            AssertBytesEqual(workflowInputsData, 0, httpClientData);
+            AssertNamesEqual(workflowInputsFilenames, inputFilesCount, azureName);
+            AssertBytesEqual(workflowInputsData, inputFilesCount, httpClientData);
 
             AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
-
-            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
-            VerifyPostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, files);
         }
 
         private static void AssertExtraDataNull(string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData)
@@ -396,16 +390,21 @@ namespace TriggerService.Tests
         private static List<CromwellApiClient.CromwellApiClient.FileToPost> RetrievePostFiles(string workflowSourceFilename, byte[] workflowSourceData, List<string> workflowInputsFilenames, List<byte[]> workflowInputsData, string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData, CromwellOnAzureEnvironment environment)
         {
             var cromwellApiClient = environment.cromwellApiClient;
-            var files = ((CromwellApiClient.CromwellApiClient)cromwellApiClient).AccumulatePostFiles(workflowSourceFilename, workflowSourceData,
+            return ((CromwellApiClient.CromwellApiClient)cromwellApiClient).AccumulatePostFiles(workflowSourceFilename, workflowSourceData,
                         workflowInputsFilenames, workflowInputsData, workflowOptionsFilename,
                         workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
-            return files;
         }
 
         private void VerifyPostFiles(string workflowSourceFilename, byte[] workflowSourceData, 
             List<string> workflowInputsFilenames, List<byte[]> workflowInputsData,
-            List<CromwellApiClient.CromwellApiClient.FileToPost> files)
+                string workflowOptionsFilename, byte[] workflowOptionsData,
+                string workflowDependenciesFilename, byte[] workflowDependenciesData, 
+                CromwellOnAzureEnvironment environment)
         {
+            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, 
+                workflowInputsFilenames, workflowInputsData, 
+                workflowOptionsFilename, workflowOptionsData, 
+                workflowDependenciesFilename, workflowDependenciesData, environment);
             Assert.AreEqual(workflowInputsFilenames.Count + 1, files.Count);
 
             Assert.AreEqual("workflowSource", files[0].ParameterName);

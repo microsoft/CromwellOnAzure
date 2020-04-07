@@ -75,7 +75,6 @@ namespace CromwellApiClient
             byte[] workflowDependenciesData = null)
         {
             var files = AccumulatePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
-
             return await PostAsync<PostWorkflowResponse>(string.Empty, files);
         }
 

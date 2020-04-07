@@ -89,8 +89,11 @@ namespace TriggerService
                 {
                     logger.LogInformation($"Processing new workflow trigger: {blobTrigger.Uri.AbsoluteUri}");
                     var blobTriggerJson = await blobTrigger.DownloadTextAsync();
-                    (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename, 
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData) = await ProcessBlobTrigger(blobTriggerJson);
+                    (var workflowSourceFilename, var workflowSourceData, 
+                        var workflowInputsFilenames, var workflowInputsData, 
+                        var workflowOptionsFilename, var workflowOptionsData, 
+                        var workflowDependenciesFilename, var workflowDependenciesData) 
+                            = await ProcessBlobTrigger(blobTriggerJson);
 
                     var response = await cromwellApiClient.PostWorkflowAsync(
                         workflowSourceFilename,
