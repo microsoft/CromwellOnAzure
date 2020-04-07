@@ -138,7 +138,8 @@ namespace TriggerService.Tests
         [ExpectedException(typeof(ArgumentNullException), "must specify a WorkflowUrl in the Trigger File")]
         public async Task ProcessBlobTrigger_WorkflowUrlMissing()
         {
-            await ProcessBlobTriggerWithMocksAsync(@"{
+            await ProcessBlobTriggerWithMocksAsync(
+                @"{
                 }"
             );
         }
@@ -147,7 +148,8 @@ namespace TriggerService.Tests
         [ExpectedException(typeof(ArgumentNullException), "must specify a WorkflowUrl in the Trigger File")]
         public async Task ProcessBlobTrigger_WorkflowUrlEmpty()
         {
-            await ProcessBlobTriggerWithMocksAsync(@"{
+            await ProcessBlobTriggerWithMocksAsync(
+                @"{
                     ""WorkflowUrl"":""""
                 }"
             );
@@ -157,7 +159,8 @@ namespace TriggerService.Tests
         [ExpectedException(typeof(ArgumentNullException), "must specify a WorkflowUrl in the Trigger File")]
         public async Task ProcessBlobTrigger_WorkflowUrlWhitespace()
         {
-            await ProcessBlobTriggerWithMocksAsync(@"{
+            await ProcessBlobTriggerWithMocksAsync(
+                @"{
                     ""WorkflowUrl"":"" ""
                 }"
             );
@@ -167,7 +170,8 @@ namespace TriggerService.Tests
         [ExpectedException(typeof(ArgumentException))]
         public async Task ProcessBlobTrigger_WorkflowUrlNotUrl()
         {
-            await ProcessBlobTriggerWithMocksAsync(@"{
+            await ProcessBlobTriggerWithMocksAsync(
+                @"{
                     ""WorkflowUrl"":""not url""
                 }"
             );
@@ -177,7 +181,8 @@ namespace TriggerService.Tests
         [ExpectedException(typeof(ArgumentNullException), "'must specify a WorkflowUrl in the Trigger File")]
         public async Task ProcessBlobTrigger_WorkflowUrlNull()
         {
-            await ProcessBlobTriggerWithMocksAsync(@"{
+            await ProcessBlobTriggerWithMocksAsync(
+                @"{
                     ""WorkflowUrl"":null
                 }"
             );
@@ -200,12 +205,13 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_SingleInput()
         {
-            var triggerFileContent = @"{
+            var triggerFileContent = 
+                @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }";
+                }";
 
             await VerifyTriggerFileTest(triggerFileContent, 1);
         }
@@ -213,12 +219,13 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_MultiInput()
         {
-            var triggerFileContent = @"{
+            var triggerFileContent = 
+                @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }";
+                }";
 
             await VerifyTriggerFileTest(triggerFileContent, fakeAzureInputs.Count);
         }
@@ -226,13 +233,14 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_CombinedInputs()
         {
-            var triggerFileContent = @"{
+            var triggerFileContent = 
+                @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }";
+                }";
 
             await VerifyTriggerFileTest(triggerFileContent, fakeAzureInputs.Count + 1);
         }
@@ -240,13 +248,14 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_SingleInputWithNull()
         {
-            var triggerFileContent = @"{
+            var triggerFileContent = 
+                @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
                     ""WorkflowInputsUrls"":null,
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }";
+                }";
 
             await VerifyTriggerFileTest(triggerFileContent, 1);
         }
@@ -254,13 +263,14 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_MultiInputWithNull()
         {
-            var triggerFileContent = @"{
+            var triggerFileContent =
+                @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }";
+                }";
 
             await VerifyTriggerFileTest(triggerFileContent, fakeAzureInputs.Count);
         }
@@ -268,13 +278,14 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_AllInputsNull()
         {
-            var triggerFileContent = @"{
+            var triggerFileContent = 
+                @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
                     ""WorkflowInputsUrls"":null,
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }";
+                }";
 
             await VerifyTriggerFileTest(triggerFileContent, 0);
         }
