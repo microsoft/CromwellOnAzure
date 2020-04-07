@@ -17,8 +17,8 @@ namespace TriggerService.Tests
     public class CromwellOnAzureEnvironmentTests
     {
         private const string azureName = "test";
-        private byte[] blobData = new byte[1] { 0 };
-        private byte[] httpClientData = new byte[1] { 1 };
+        private byte[] blobData = new byte[3] { 1, 2, 3 };
+        private byte[] httpClientData = new byte[4] { 4, 3, 2, 1 };
         private string fakeAzureWdl = $"https://fake.azure.storage.account/{azureName}/test.wdl";
         private string fakeAzureInput = $"https://fake.azure.storage.account/{azureName}/test.input.json";
         private List<string> fakeAzureInputs = new List<string>() { 
@@ -36,8 +36,11 @@ namespace TriggerService.Tests
 
             Assert.AreEqual(azureName, name);
             Assert.IsNotNull(data);
-            Assert.AreEqual(data.Length, 1);
-            Assert.AreEqual(blobData[0], data[0]);
+            Assert.AreEqual(blobData.Length, data.Length);
+            for (var i = 0; i < blobData.Length; i++)
+            {
+                Assert.AreEqual(blobData[i], data[i]);
+            }
         }
 
         [TestMethod]
@@ -50,8 +53,11 @@ namespace TriggerService.Tests
 
             Assert.AreEqual(azureName, name);
             Assert.IsNotNull(data);
-            Assert.AreEqual(data.Length, 1);
-            Assert.AreEqual(blobData[0], data[0]);
+            Assert.AreEqual(blobData.Length, data.Length);
+            for (var i = 0; i < blobData.Length; i++)
+            {
+                Assert.AreEqual(blobData[i], data[i]);
+            }
         }
 
         [TestMethod]
@@ -63,8 +69,11 @@ namespace TriggerService.Tests
 
             Assert.AreEqual(azureName, name);
             Assert.IsNotNull(data);
-            Assert.AreEqual(data.Length, 1);
-            Assert.AreEqual(httpClientData[0], data[0]);
+            Assert.AreEqual(httpClientData.Length, data.Length);
+            for (var i = 0; i < httpClientData.Length; i++)
+            {
+                Assert.AreEqual(httpClientData[i], data[i]);
+            }
         }
 
         private async Task<(string, byte[])> GetBlobFileNameAndDataUsingMocksAsync(string url, string accountAuthority)
