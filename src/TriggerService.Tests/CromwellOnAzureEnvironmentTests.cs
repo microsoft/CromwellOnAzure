@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Azure.KeyVault.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -185,142 +186,109 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_NoInput()
         {
-            (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
-                = await ProcessBlobTriggerWithMocksAsync(@"{
+            var triggerFileContent = 
+                @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }");
+                }";
 
-            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
-                workflowInputsFilenames, workflowInputsData,
-                workflowOptionsFilename, workflowOptionsData,
-                workflowDependenciesFilename, workflowDependenciesData,
-                environment, 0);
+            await VerifyTriggerFileTest(triggerFileContent, 0);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_SingleInput()
         {
-            (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
-                = await ProcessBlobTriggerWithMocksAsync(@"{
+            var triggerFileContent = @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }");
+            }";
 
-            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
-                workflowInputsFilenames, workflowInputsData,
-                workflowOptionsFilename, workflowOptionsData,
-                workflowDependenciesFilename, workflowDependenciesData,
-                environment, 1);
+            await VerifyTriggerFileTest(triggerFileContent, 1);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_MultiInput()
         {
-            (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
-                = await ProcessBlobTriggerWithMocksAsync(@"{
+            var triggerFileContent = @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }");
+            }";
 
-            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
-                workflowInputsFilenames, workflowInputsData,
-                workflowOptionsFilename, workflowOptionsData,
-                workflowDependenciesFilename, workflowDependenciesData,
-                environment, fakeAzureInputs.Count);
+            await VerifyTriggerFileTest(triggerFileContent, fakeAzureInputs.Count);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_CombinedInputs()
         {
-            (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
-                = await ProcessBlobTriggerWithMocksAsync(@"{
+            var triggerFileContent = @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }");
+            }";
 
-            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
-                workflowInputsFilenames, workflowInputsData,
-                workflowOptionsFilename, workflowOptionsData,
-                workflowDependenciesFilename, workflowDependenciesData,
-                environment, fakeAzureInputs.Count + 1);
+            await VerifyTriggerFileTest(triggerFileContent, fakeAzureInputs.Count + 1);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_SingleInputWithNull()
         {
-            (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
-                = await ProcessBlobTriggerWithMocksAsync(@"{
+            var triggerFileContent = @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
                     ""WorkflowInputsUrls"":null,
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }");
+            }";
 
-            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
-                workflowInputsFilenames, workflowInputsData,
-                workflowOptionsFilename, workflowOptionsData,
-                workflowDependenciesFilename, workflowDependenciesData,
-                environment, 1);
+            await VerifyTriggerFileTest(triggerFileContent, 1);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_MultiInputWithNull()
         {
-            (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
-                = await ProcessBlobTriggerWithMocksAsync(@"{
+            var triggerFileContent = @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }");
+            }";
 
-            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData,
-                workflowInputsFilenames, workflowInputsData,
-                workflowOptionsFilename, workflowOptionsData,
-                workflowDependenciesFilename, workflowDependenciesData,
-                environment, fakeAzureInputs.Count);
+            await VerifyTriggerFileTest(triggerFileContent, fakeAzureInputs.Count);
         }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_AllInputsNull()
         {
-            (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData, var environment)
-                = await ProcessBlobTriggerWithMocksAsync(@"{
+            var triggerFileContent = @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
                     ""WorkflowInputsUrls"":null,
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
-            }");
+            }";
 
-            VerifyTriggerFileTest(workflowSourceFilename, workflowSourceData, 
-                workflowInputsFilenames, workflowInputsData, 
-                workflowOptionsFilename, workflowOptionsData, 
-                workflowDependenciesFilename, workflowDependenciesData, 
-                environment, 0);
+            await VerifyTriggerFileTest(triggerFileContent, 0);
         }
 
-        private void VerifyTriggerFileTest(string workflowSourceFilename, byte[] workflowSourceData, List<string> workflowInputsFilenames, List<byte[]> workflowInputsData, string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData, CromwellOnAzureEnvironment environment, int inputFilesCount)
+        private async Task VerifyTriggerFileTest(string triggerFileContent, int inputFilesCount)
         {
+            (var workflowSourceFilename, var workflowSourceData, 
+                var workflowInputsFilenames, var workflowInputsData, 
+                var workflowOptionsFilename, var workflowOptionsData, 
+                var workflowDependenciesFilename, var workflowDependenciesData, 
+                var environment)
+                    = await ProcessBlobTriggerWithMocksAsync(triggerFileContent);
+
+
             VerifyTriggerFileProcessing(workflowSourceFilename, workflowSourceData,
                 workflowInputsFilenames, workflowInputsData,
                 workflowOptionsFilename, workflowOptionsData,
