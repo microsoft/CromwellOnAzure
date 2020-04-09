@@ -265,9 +265,8 @@ namespace TesApi.Web
             try
             {
                 var nodeAllocationFailed = false;
-                var imageDownloadFailed = false;
-                string imageDownloadErrorMessage = null;
-                var nodeDiskFull = false;
+                string nodeErrorCode = null;
+                IEnumerable<string> nodeErrorDetails = null;
                 var activeJobWithMissingAutoPool = false;
                 TaskState? taskState = null;
                 TaskExecutionInformation taskExecutionInformation = null;
@@ -316,12 +315,10 @@ namespace TesApi.Web
                         {
                             var nodeError = node.Errors?.FirstOrDefault();
 
-                            if (nodeError != null)
+                            if (nodeError != null && nodeError.Code != null)
                             {
-                                imageDownloadFailed = nodeError.Code?.Equals("ContainerInvalidImage", StringComparison.OrdinalIgnoreCase) ?? false;
-                                imageDownloadErrorMessage = imageDownloadFailed ? nodeError.ErrorDetails?.LastOrDefault()?.Value : null;
-
-                                nodeDiskFull = nodeError.Code?.Equals("DiskFull", StringComparison.OrdinalIgnoreCase) ?? false;
+                                nodeErrorCode = nodeError.Code;
+                                nodeErrorDetails = nodeError.ErrorDetails?.Select(e => e.Value);
                             }
                         }
                     }
@@ -351,9 +348,8 @@ namespace TesApi.Web
                     ActiveJobWithMissingAutoPool = activeJobWithMissingAutoPool,
                     AttemptNumber = attemptNumber,
                     NodeAllocationFailed = nodeAllocationFailed,
-                    ImageDownloadFailed = imageDownloadFailed,
-                    ImageDownloadErrorMessage = imageDownloadErrorMessage,
-                    NodeDiskFull = nodeDiskFull,
+                    NodeErrorCode = nodeErrorCode,
+                    NodeErrorDetails = nodeErrorDetails,
                     JobState = job.State,
                     JobStartTime = job.ExecutionInformation?.StartTime,
                     JobEndTime = job.ExecutionInformation?.EndTime,
@@ -829,9 +825,8 @@ namespace TesApi.Web
             public bool ActiveJobWithMissingAutoPool { get; set; }
             public int AttemptNumber { get; set; }
             public bool NodeAllocationFailed { get; set; }
-            public bool ImageDownloadFailed { get; set; }
-            public string ImageDownloadErrorMessage { get; set; }
-            public bool NodeDiskFull { get; set; }
+            public string NodeErrorCode { get; set; }
+            public IEnumerable<string> NodeErrorDetails { get; set; }
             public JobState? JobState { get; set; }
             public DateTime? JobStartTime { get; set; }
             public DateTime? JobEndTime { get; set; }

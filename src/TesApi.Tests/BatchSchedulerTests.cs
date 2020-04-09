@@ -57,9 +57,10 @@ namespace TesApi.Tests
             var errorMessage = await ProcessTesTaskAndGetFirstLogMessageAsync(tesTask, BatchJobAndTaskStates.NodeDiskFull);
 
             Assert.AreEqual(TesState.EXECUTORERROREnum, tesTask.State);
-            Assert.AreEqual($"There is not enough disk space on the VM that was selected for the task.", errorMessage);
+            Assert.IsTrue(errorMessage.StartsWith("DiskFull"));
         }
 
+        [TestMethod]
         public async Task TesTaskRemainsQueuedWhenBatchQuotaIsTemporarilyUnavailable()
         {
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
@@ -68,15 +69,15 @@ namespace TesApi.Tests
                 new VirtualMachineInfo { VmSize = "VmSize1", LowPriority = false, NumberOfCores = 2, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 1 },
                 new VirtualMachineInfo { VmSize = "VmSize1", LowPriority = true, NumberOfCores = 2, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 2 }};
 
-            azureProxyReturnValues.BatchQuotas = new AzureProxy.AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 10, LowPriorityCoreQuota = 20 };
+            azureProxyReturnValues.BatchQuotas = new AzureProxy.AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 9, LowPriorityCoreQuota = 17 };
 
             azureProxyReturnValues.ActiveNodeCountByVmSize = new List<AzureProxy.AzureBatchNodeCount> {
                 new AzureProxy.AzureBatchNodeCount { VirtualMachineSize = "VmSize1", DedicatedNodeCount = 4, LowPriorityNodeCount = 8 }  // 8 (4 * 2) dedicated and 16 ( 8 * 2) low pri cores are used
             };
 
-            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 3, RamGb = 1, Preemptible = false }, azureProxyReturnValues));
-            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 5, RamGb = 1, Preemptible = true }, azureProxyReturnValues));
-            Assert.AreEqual(TesState.INITIALIZINGEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 4, RamGb = 1, Preemptible = true }, azureProxyReturnValues));
+            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 2, RamGb = 1, Preemptible = false }, azureProxyReturnValues));
+            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 2, RamGb = 1, Preemptible = true }, azureProxyReturnValues));
+            Assert.AreEqual(TesState.INITIALIZINGEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 1, RamGb = 1, Preemptible = true }, azureProxyReturnValues));
         }
 
         [TestMethod]
@@ -514,9 +515,9 @@ namespace TesApi.Tests
             public static AzureProxy.AzureBatchJobAndTaskState TaskNotFound => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = null };
             public static AzureProxy.AzureBatchJobAndTaskState MoreThanOneJobFound => new AzureProxy.AzureBatchJobAndTaskState { MoreThanOneActiveJobFound = true };
             public static AzureProxy.AzureBatchJobAndTaskState NodeAllocationFailed => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, NodeAllocationFailed = true };
-            public static AzureProxy.AzureBatchJobAndTaskState NodeDiskFull => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, NodeDiskFull = true };
+            public static AzureProxy.AzureBatchJobAndTaskState NodeDiskFull => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, NodeErrorCode = "DiskFull" };
             public static AzureProxy.AzureBatchJobAndTaskState ActiveJobWithMissingAutoPool => new AzureProxy.AzureBatchJobAndTaskState { ActiveJobWithMissingAutoPool = true };
-            public static AzureProxy.AzureBatchJobAndTaskState ImageDownloadFailed => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, ImageDownloadFailed = true };
+            public static AzureProxy.AzureBatchJobAndTaskState ImageDownloadFailed => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, NodeErrorCode = "ContainerInvalidImage" };
         }
 
         private class AzureProxyReturnValues
