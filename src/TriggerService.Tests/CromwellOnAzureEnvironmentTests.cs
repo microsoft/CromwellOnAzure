@@ -4,7 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Azure.KeyVault.Models;
+using System.Linq;
+using CromwellApiClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -32,14 +33,14 @@ namespace TriggerService.Tests
         {
             var accountAuthority = new Uri(fakeAzureWdl).Authority;
 
-            (var name, var data) = await GetBlobFileNameAndDataUsingMocksAsync(fakeAzureWdl, accountAuthority);
+            var processedWorkflowItem = await GetBlobFileNameAndDataUsingMocksAsync(fakeAzureWdl, accountAuthority);
 
-            Assert.AreEqual(azureName, name, "azureName compared with name");
-            Assert.IsNotNull(data, "data");
-            Assert.AreEqual(blobData.Length, data.Length, "length of blobData vs length of data");
+            Assert.AreEqual(azureName, processedWorkflowItem.Filename, "azureName compared with Filename");
+            Assert.IsNotNull(processedWorkflowItem.Data, "data");
+            Assert.AreEqual(blobData.Length, processedWorkflowItem.Data.Length, "unexpected length of Data");
             for (var i = 0; i < blobData.Length; i++)
             {
-                Assert.AreEqual(blobData[i], data[i], $"comparing blobData[{i}] to data[{i}]");
+                Assert.AreEqual(blobData[i], processedWorkflowItem.Data[i], $"unexpected value of Data[{i}]");
             }
         }
 
@@ -49,14 +50,14 @@ namespace TriggerService.Tests
             var accountAuthority = "fake";
             var url = $"/{accountAuthority}/test/test.wdl";
 
-            (var name, var data) = await GetBlobFileNameAndDataUsingMocksAsync(url, accountAuthority);
+            var processedWorkflowItem  = await GetBlobFileNameAndDataUsingMocksAsync(url, accountAuthority);
 
-            Assert.AreEqual(azureName, name, "azureName compared with name");
-            Assert.IsNotNull(data, "data");
-            Assert.AreEqual(blobData.Length, data.Length, "length of blobData vs length of data");
+            Assert.AreEqual(azureName, processedWorkflowItem.Filename, "azureName compared with Filename");
+            Assert.IsNotNull(processedWorkflowItem.Data, "data");
+            Assert.AreEqual(blobData.Length, processedWorkflowItem.Data.Length, "unexpected length of Data");
             for (var i = 0; i < blobData.Length; i++)
             {
-                Assert.AreEqual(blobData[i], data[i], $"comparing blobData[{i}] to data[{i}]");
+                Assert.AreEqual(blobData[i], processedWorkflowItem.Data[i], $"unexpected value of Data[{i}]");
             }
         }
 
@@ -65,19 +66,20 @@ namespace TriggerService.Tests
         {
             var accountAuthority = new Uri(fakeAzureWdlWithSas).Authority;
 
-            (var name, var data) = await GetBlobFileNameAndDataUsingMocksAsync(fakeAzureWdlWithSas, accountAuthority);
+            var processedWorkflowItem = await GetBlobFileNameAndDataUsingMocksAsync(fakeAzureWdlWithSas, accountAuthority);
 
-            Assert.AreEqual(azureName, name, "azureName compared with name");
-            Assert.IsNotNull(data, "data");
-            Assert.AreEqual(httpClientData.Length, data.Length, "length of httpClientData vs length of data");
+            Assert.AreEqual(azureName, processedWorkflowItem.Filename, "azureName compared with Filename");
+            Assert.IsNotNull(processedWorkflowItem.Data, "data");
+            Assert.AreEqual(httpClientData.Length, processedWorkflowItem.Data.Length, "unexpected length of Data");
             for (var i = 0; i < httpClientData.Length; i++)
             {
-                Assert.AreEqual(httpClientData[i], data[i], $"comparing httpClientData[{i}] to data[{i}]");
+                Assert.AreEqual(httpClientData[i], processedWorkflowItem.Data[i], $"unexpected value of Data[{i}]");
             }
+
 
         }
 
-        private async Task<(string, byte[])> GetBlobFileNameAndDataUsingMocksAsync(string url, string accountAuthority)
+        private async Task<ProcessedWorkflowItem> GetBlobFileNameAndDataUsingMocksAsync(string url, string accountAuthority)
         {
             var environment = SetCromwellOnAzureEnvironment(accountAuthority);
             return await environment.GetBlobFileNameAndData(url);
@@ -120,14 +122,12 @@ namespace TriggerService.Tests
             return environment;
         }
 
-        private async Task<(string, byte[], List<string>, List<byte[]>, string, byte[], string, byte[], CromwellOnAzureEnvironment)> ProcessBlobTriggerWithMocksAsync(string triggerData)
+        private async Task<(ProcessedTriggerInfo, CromwellOnAzureEnvironment)> ProcessBlobTriggerWithMocksAsync(string triggerData)
         {
             var environment = SetCromwellOnAzureEnvironment("fake");
-            (var workflowSourceFilename, var workflowSourceData, var workflowInputsFilenames, var workflowInputsData, var workflowOptionsFilename,
-                        var workflowOptionsData, var workflowDependenciesFilename, var workflowDependenciesData) = await environment.ProcessBlobTrigger(triggerData);
+            var processedTriggerInfo = await environment.ProcessBlobTrigger(triggerData);
 
-            return (workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename,
-                        workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData, environment);
+            return (processedTriggerInfo, environment);
         }
 
         [TestMethod]
@@ -302,48 +302,26 @@ namespace TriggerService.Tests
 
         private async Task ExecuteTriggerFileTest(string triggerFileContent, int inputFilesCount)
         {
-            (var workflowSourceFilename, var workflowSourceData, 
-                var workflowInputsFilenames, var workflowInputsData, 
-                var workflowOptionsFilename, var workflowOptionsData, 
-                var workflowDependenciesFilename, var workflowDependenciesData, 
-                var environment)
-                    = await ProcessBlobTriggerWithMocksAsync(triggerFileContent);
-
-
-            VerifyTriggerFileProcessing(workflowSourceFilename, workflowSourceData,
-                workflowInputsFilenames, workflowInputsData,
-                workflowOptionsFilename, workflowOptionsData,
-                workflowDependenciesFilename, workflowDependenciesData,
-                inputFilesCount);
-
-            VerifyPostFiles(workflowSourceFilename, workflowSourceData,
-                workflowInputsFilenames, workflowInputsData,
-                workflowOptionsFilename, workflowOptionsData,
-                workflowDependenciesFilename, workflowDependenciesData,
-                environment);
+            (var processedTriggerInfo, var environment) = await ProcessBlobTriggerWithMocksAsync(triggerFileContent);
+            VerifyTriggerFileProcessing(processedTriggerInfo, inputFilesCount);
+            VerifyPostFiles(processedTriggerInfo, environment);
         }
 
-        private void VerifyTriggerFileProcessing(string workflowSourceFilename, byte[] workflowSourceData, 
-            List<string> workflowInputsFilenames, List<byte[]> workflowInputsData, 
-            string workflowOptionsFilename, byte[] workflowOptionsData, 
-            string workflowDependenciesFilename, byte[] workflowDependenciesData, 
-            int inputFilesCount)
+        private void VerifyTriggerFileProcessing(ProcessedTriggerInfo processedTriggerInfo, int inputFilesCount)
         {
-            Assert.AreEqual(azureName, workflowSourceFilename, "comparing azureName to workflowSourceFilename");
-            AssertBytesEqual(workflowSourceData, httpClientData, "workflowSourceData");
+            Assert.AreEqual(azureName, processedTriggerInfo.WorkflowSource.Filename, "comparing azureName to workflowSourceFilename");
+            AssertBytesEqual(processedTriggerInfo.WorkflowSource.Data, httpClientData, "workflowSourceData");
 
-            AssertNamesEqual(workflowInputsFilenames, inputFilesCount, azureName, "workflowInputsFilenames");
-            AssertBytesEqual(workflowInputsData, inputFilesCount, httpClientData, "workflowInputsData");
+            AssertNamesEqual(processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(), inputFilesCount, azureName, "workflowInputsFilenames");
+            AssertBytesEqual(processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(), inputFilesCount, httpClientData, "workflowInputsData");
 
-            AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+            AssertExtraDataNull(processedTriggerInfo);
         }
 
-        private static void AssertExtraDataNull(string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData)
+        private static void AssertExtraDataNull(ProcessedTriggerInfo processedTriggerInfo)
         {
-            Assert.IsNull(workflowOptionsFilename, "workflowOptionsFilename");
-            Assert.IsNull(workflowOptionsData, "workflowOptionsData");
-            Assert.IsNull(workflowDependenciesFilename, "workflowDependenciesFilename");
-            Assert.IsNull(workflowDependenciesData, "workflowDependenciesData");
+            Assert.IsNull(processedTriggerInfo.WorkflowOptions, "WorkflowOptions");
+            Assert.IsNull(processedTriggerInfo.WorkflowDependencies, "WorkflowDependencies");
         }
 
         private static void AssertNamesEqual(List<string> filenames, int expectedLength, string expectedName, string filenameType)
@@ -376,32 +354,23 @@ namespace TriggerService.Tests
             }
         }
 
-        private static List<CromwellApiClient.CromwellApiClient.FileToPost> RetrievePostFiles(string workflowSourceFilename, byte[] workflowSourceData, List<string> workflowInputsFilenames, List<byte[]> workflowInputsData, string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData, CromwellOnAzureEnvironment environment)
+        private static List<CromwellApiClient.CromwellApiClient.FileToPost> RetrievePostFiles(ProcessedTriggerInfo processedTriggerInfo, CromwellOnAzureEnvironment environment)
         {
             var cromwellApiClient = environment.cromwellApiClient;
-            return ((CromwellApiClient.CromwellApiClient)cromwellApiClient).AccumulatePostFiles(workflowSourceFilename, workflowSourceData,
-                        workflowInputsFilenames, workflowInputsData, workflowOptionsFilename,
-                        workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+            return ((CromwellApiClient.CromwellApiClient)cromwellApiClient).AccumulatePostFiles(processedTriggerInfo);
         }
 
-        private void VerifyPostFiles(string workflowSourceFilename, byte[] workflowSourceData, 
-            List<string> workflowInputsFilenames, List<byte[]> workflowInputsData,
-                string workflowOptionsFilename, byte[] workflowOptionsData,
-                string workflowDependenciesFilename, byte[] workflowDependenciesData, 
-                CromwellOnAzureEnvironment environment)
+        private void VerifyPostFiles(ProcessedTriggerInfo processedTriggerInfo, CromwellOnAzureEnvironment environment)
         {
-            var files = RetrievePostFiles(workflowSourceFilename, workflowSourceData, 
-                workflowInputsFilenames, workflowInputsData, 
-                workflowOptionsFilename, workflowOptionsData, 
-                workflowDependenciesFilename, workflowDependenciesData, environment);
+            var files = RetrievePostFiles(processedTriggerInfo, environment);
          
-            Assert.AreEqual(workflowInputsFilenames.Count + 1, files.Count, "unexpected number of files");
+            Assert.AreEqual(processedTriggerInfo.WorkflowInputs.Count + 1, files.Count, "unexpected number of files");
 
             Assert.AreEqual("workflowSource", files[0].ParameterName, $"unexpected ParameterName for the 0th file");
-            Assert.AreEqual(workflowSourceFilename, files[0].Filename, $"unexpected Filename for the 0th file");
-            AssertBytesEqual(workflowSourceData, files[0].Data, "files[0].Data");
+            Assert.AreEqual(processedTriggerInfo.WorkflowSource.Filename, files[0].Filename, $"unexpected Filename for the 0th file");
+            AssertBytesEqual(processedTriggerInfo.WorkflowSource.Data, files[0].Data, "files[0].Data");
 
-            for (var i = 0; i < workflowInputsFilenames.Count; i++)
+            for (var i = 0; i < processedTriggerInfo.WorkflowInputs.Count; i++)
             {
                 var ip1 = i + 1;
                 if (i == 0)
@@ -412,8 +381,8 @@ namespace TriggerService.Tests
                 {
                     Assert.AreEqual("workflowInputs_" + ip1, files[ip1].ParameterName, $"unexpected ParameterName for file #{ip1}");
                 }
-                Assert.AreEqual(workflowInputsFilenames[i], files[ip1].Filename, $"unexpected Filename for file #{ip1}");
-                AssertBytesEqual(workflowInputsData[i], files[ip1].Data, $"files[{ip1}].Data");
+                Assert.AreEqual(processedTriggerInfo.WorkflowInputs[i].Filename, files[ip1].Filename, $"unexpected Filename for file #{ip1}");
+                AssertBytesEqual(processedTriggerInfo.WorkflowInputs[i].Data, files[ip1].Data, $"files[{ip1}].Data");
             }
         }
     }

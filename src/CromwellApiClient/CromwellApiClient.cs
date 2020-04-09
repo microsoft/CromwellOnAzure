@@ -64,40 +64,32 @@ namespace CromwellApiClient
             return await PostAsync<PostAbortResponse>($"/{id}/abort", id);
         }
 
-        public async Task<PostWorkflowResponse> PostWorkflowAsync(
-            string workflowSourceFilename,
-            byte[] workflowSourceData,
-            List<string> workflowInputsFilenames,
-            List<byte[]> workflowInputsData,
-            string workflowOptionsFilename = null,
-            byte[] workflowOptionsData = null,
-            string workflowDependenciesFilename = null,
-            byte[] workflowDependenciesData = null)
+        public async Task<PostWorkflowResponse> PostWorkflowAsync(ProcessedTriggerInfo processedTriggerInfo)
         {
-            var files = AccumulatePostFiles(workflowSourceFilename, workflowSourceData, workflowInputsFilenames, workflowInputsData, workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
+            var files = AccumulatePostFiles(processedTriggerInfo);
             return await PostAsync<PostWorkflowResponse>(string.Empty, files);
         }
 
-        internal List<FileToPost> AccumulatePostFiles(string workflowSourceFilename, byte[] workflowSourceData, List<string> workflowInputsFilenames, List<byte[]> workflowInputsData, string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData)
+        internal List<FileToPost> AccumulatePostFiles(ProcessedTriggerInfo processedTriggerInfo)
         {
             var files = new List<FileToPost> {
-                new FileToPost { ParameterName = "workflowSource", Filename = workflowSourceFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowSourceData) },
+                new FileToPost(processedTriggerInfo.WorkflowSource, "workflowSource")
             };
 
-            for (var i = 0; i < workflowInputsFilenames.Count; i++)
+            for (var i = 0; i < processedTriggerInfo.WorkflowInputs.Count; i++)
             {
                 var parameterName = i == 0 ? "workflowInputs" : "workflowInputs_" + (i + 1);
-                files.Add(new FileToPost { ParameterName = parameterName, Filename = workflowInputsFilenames[i], Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowInputsData[i]) });
+                files.Add(new FileToPost(processedTriggerInfo.WorkflowInputs[i], parameterName));
             }
 
-            if (workflowOptionsFilename != null && workflowOptionsData != null)
+            if (processedTriggerInfo.WorkflowOptions != null)
             {
-                files.Add(new FileToPost { ParameterName = "workflowOptions", Filename = workflowOptionsFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowOptionsData) });
+                files.Add(new FileToPost(processedTriggerInfo.WorkflowOptions, "workflowOptions"));
             }
 
-            if (workflowDependenciesFilename != null && workflowDependenciesData != null)
+            if (processedTriggerInfo.WorkflowDependencies != null)
             {
-                files.Add(new FileToPost { ParameterName = "workflowDependencies", Filename = workflowDependenciesFilename, Data = workflowDependenciesData });
+                files.Add(new FileToPost(processedTriggerInfo.WorkflowDependencies, "workflowDependencies"));
             }
 
             return files;
@@ -106,23 +98,6 @@ namespace CromwellApiClient
         public async Task<PostQueryResponse> PostQueryAsync(string queryJson)
         {
             return await PostAsync<PostQueryResponse>("/query", queryJson);
-        }
-
-        /// <summary>
-        /// Encodes a byte array to Utf8, removes tabs, and decodes back to a byte array.
-        /// As of 1/10/2020, Cromwell has a bug that requires tabs to be removed from JSON data
-        /// https://github.com/broadinstitute/cromwell/issues/3487
-        /// </summary>
-        /// <param name="data">The byte array of the file</param>
-        /// <returns>A new byte array of the file</returns>
-        private byte[] EncodeToUtf8AndRemoveTabsAndDecode(byte[] data)
-        {
-            if (data?.Length == 0)
-            {
-                return data;
-            }
-
-            return Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(data).Replace("\t", ""));
         }
 
         private string GetApiUrl(string path)
@@ -311,6 +286,30 @@ namespace CromwellApiClient
             public string ParameterName { get; set; }
             public string Filename { get; set; }
             public byte[] Data { get; set; }
+
+            public FileToPost(ProcessedWorkflowItem processedWorkflowItem, string parameterName)
+            {
+                this.Filename = processedWorkflowItem.Filename;
+                this.Data = EncodeToUtf8AndRemoveTabsAndDecode(processedWorkflowItem.Data);
+                this.ParameterName = parameterName;
+            }
+
+            /// <summary>
+            /// Encodes a byte array to Utf8, removes tabs, and decodes back to a byte array.
+            /// As of 1/10/2020, Cromwell has a bug that requires tabs to be removed from JSON data
+            /// https://github.com/broadinstitute/cromwell/issues/3487
+            /// </summary>
+            /// <param name="data">The byte array of the file</param>
+            /// <returns>A new byte array of the file</returns>
+            private byte[] EncodeToUtf8AndRemoveTabsAndDecode(byte[] data)
+            {
+                if (data?.Length == 0)
+                {
+                    return data;
+                }
+
+                return Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(data).Replace("\t", ""));
+            }
         }
     }
 }
