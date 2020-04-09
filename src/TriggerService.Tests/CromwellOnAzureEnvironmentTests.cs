@@ -34,12 +34,12 @@ namespace TriggerService.Tests
 
             (var name, var data) = await GetBlobFileNameAndDataUsingMocksAsync(fakeAzureWdl, accountAuthority);
 
-            Assert.AreEqual(azureName, name);
-            Assert.IsNotNull(data);
-            Assert.AreEqual(blobData.Length, data.Length);
+            Assert.AreEqual(azureName, name, "azureName compared with name");
+            Assert.IsNotNull(data, "data");
+            Assert.AreEqual(blobData.Length, data.Length, "length of blobData vs length of data");
             for (var i = 0; i < blobData.Length; i++)
             {
-                Assert.AreEqual(blobData[i], data[i]);
+                Assert.AreEqual(blobData[i], data[i], $"comparing blobData[{i}] to data[{i}]");
             }
         }
 
@@ -51,12 +51,12 @@ namespace TriggerService.Tests
 
             (var name, var data) = await GetBlobFileNameAndDataUsingMocksAsync(url, accountAuthority);
 
-            Assert.AreEqual(azureName, name);
-            Assert.IsNotNull(data);
-            Assert.AreEqual(blobData.Length, data.Length);
+            Assert.AreEqual(azureName, name, "azureName compared with name");
+            Assert.IsNotNull(data, "data");
+            Assert.AreEqual(blobData.Length, data.Length, "length of blobData vs length of data");
             for (var i = 0; i < blobData.Length; i++)
             {
-                Assert.AreEqual(blobData[i], data[i]);
+                Assert.AreEqual(blobData[i], data[i], $"comparing blobData[{i}] to data[{i}]");
             }
         }
 
@@ -67,13 +67,14 @@ namespace TriggerService.Tests
 
             (var name, var data) = await GetBlobFileNameAndDataUsingMocksAsync(fakeAzureWdlWithSas, accountAuthority);
 
-            Assert.AreEqual(azureName, name);
-            Assert.IsNotNull(data);
-            Assert.AreEqual(httpClientData.Length, data.Length);
+            Assert.AreEqual(azureName, name, "azureName compared with name");
+            Assert.IsNotNull(data, "data");
+            Assert.AreEqual(httpClientData.Length, data.Length, "length of httpClientData vs length of data");
             for (var i = 0; i < httpClientData.Length; i++)
             {
-                Assert.AreEqual(httpClientData[i], data[i]);
+                Assert.AreEqual(httpClientData[i], data[i], $"comparing httpClientData[{i}] to data[{i}]");
             }
+
         }
 
         private async Task<(string, byte[])> GetBlobFileNameAndDataUsingMocksAsync(string url, string accountAuthority)
@@ -328,50 +329,50 @@ namespace TriggerService.Tests
             string workflowDependenciesFilename, byte[] workflowDependenciesData, 
             int inputFilesCount)
         {
-            Assert.AreEqual(azureName, workflowSourceFilename);
-            AssertBytesEqual(workflowSourceData, httpClientData);
+            Assert.AreEqual(azureName, workflowSourceFilename, "comparing azureName to workflowSourceFilename");
+            AssertBytesEqual(workflowSourceData, httpClientData, "workflowSourceData");
 
-            AssertNamesEqual(workflowInputsFilenames, inputFilesCount, azureName);
-            AssertBytesEqual(workflowInputsData, inputFilesCount, httpClientData);
+            AssertNamesEqual(workflowInputsFilenames, inputFilesCount, azureName, "workflowInputsFilenames");
+            AssertBytesEqual(workflowInputsData, inputFilesCount, httpClientData, "workflowInputsData");
 
             AssertExtraDataNull(workflowOptionsFilename, workflowOptionsData, workflowDependenciesFilename, workflowDependenciesData);
         }
 
         private static void AssertExtraDataNull(string workflowOptionsFilename, byte[] workflowOptionsData, string workflowDependenciesFilename, byte[] workflowDependenciesData)
         {
-            Assert.IsNull(workflowOptionsFilename);
-            Assert.IsNull(workflowOptionsData);
-            Assert.IsNull(workflowDependenciesFilename);
-            Assert.IsNull(workflowDependenciesData);
+            Assert.IsNull(workflowOptionsFilename, "workflowOptionsFilename");
+            Assert.IsNull(workflowOptionsData, "workflowOptionsData");
+            Assert.IsNull(workflowDependenciesFilename, "workflowDependenciesFilename");
+            Assert.IsNull(workflowDependenciesData, "workflowDependenciesData");
         }
 
-        private static void AssertNamesEqual(List<string> workflowInputsFilenames, int expectedLength, string expectedName)
+        private static void AssertNamesEqual(List<string> filenames, int expectedLength, string expectedName, string filenameType)
         {
-            Assert.IsNotNull(workflowInputsFilenames);
-            Assert.AreEqual(expectedLength, workflowInputsFilenames.Count);
+            Assert.IsNotNull(filenames, filenameType);
+            Assert.AreEqual(expectedLength, filenames.Count, $"unexpected length of {filenameType}");
             for (var i = 0; i < expectedLength; i++)
             {
-                Assert.AreEqual(expectedName, workflowInputsFilenames[i]);
+                Assert.AreEqual(expectedName, filenames[i], $"unexpected name for {filenameType}[{i}]");
             }
         }
 
-        private void AssertBytesEqual(List<byte[]> workflowInputsData, int expectedLength, byte[] expectedData)
+        private void AssertBytesEqual(List<byte[]> data, int expectedLength, byte[] expectedData, string dataName)
         {
-            Assert.IsNotNull(workflowInputsData);
-            Assert.AreEqual(expectedLength, workflowInputsData.Count);
+            Assert.IsNotNull(data, dataName);
+            Assert.AreEqual(expectedLength, data.Count, $"comparing expectedLength to the length of {dataName}");
             for (var i = 0; i < expectedLength; i++)
             {
-                AssertBytesEqual(workflowInputsData[i], expectedData);
+                AssertBytesEqual(expectedData, data[i], $"{dataName}[{i}]");
             }
         }
 
-        private void AssertBytesEqual(byte[] workflowInputsData, byte[] expectedData)
+        private void AssertBytesEqual(byte[] data, byte[] expectedData, string dataName)
         {
-            Assert.IsNotNull(workflowInputsData);
-            Assert.AreEqual(expectedData.Length, workflowInputsData.Length);
+            Assert.IsNotNull(data, dataName);
+            Assert.AreEqual(expectedData.Length, data.Length, $"unexpected length of {dataName}");
             for (var i = 0; i < expectedData.Length; i++)
             {
-                Assert.AreEqual(expectedData[i], workflowInputsData[i]);
+                Assert.AreEqual(expectedData[i], data[i], $"unexpected value of {dataName}[{i}]");
             }
         }
 
@@ -393,26 +394,27 @@ namespace TriggerService.Tests
                 workflowInputsFilenames, workflowInputsData, 
                 workflowOptionsFilename, workflowOptionsData, 
                 workflowDependenciesFilename, workflowDependenciesData, environment);
-            Assert.AreEqual(workflowInputsFilenames.Count + 1, files.Count);
+         
+            Assert.AreEqual(workflowInputsFilenames.Count + 1, files.Count, "unexpected number of files");
 
-            Assert.AreEqual("workflowSource", files[0].ParameterName);
-            Assert.AreEqual(workflowSourceFilename, files[0].Filename);
-            AssertBytesEqual(workflowSourceData, files[0].Data);
+            Assert.AreEqual("workflowSource", files[0].ParameterName, $"unexpected ParameterName for the 0th file");
+            Assert.AreEqual(workflowSourceFilename, files[0].Filename, $"unexpected Filename for the 0th file");
+            AssertBytesEqual(workflowSourceData, files[0].Data, "files[0].Data");
 
             for (var i = 0; i < workflowInputsFilenames.Count; i++)
             {
+                var ip1 = i + 1;
                 if (i == 0)
                 {
-                    Assert.AreEqual("workflowInputs", files[i + 1].ParameterName);
+                    Assert.AreEqual("workflowInputs", files[ip1].ParameterName, $"unexpected ParameterName for file #{ip1}");
                 }
                 else
                 {
-                    Assert.AreEqual("workflowInputs_" + (i + 1), files[i + 1].ParameterName);
+                    Assert.AreEqual("workflowInputs_" + ip1, files[ip1].ParameterName, $"unexpected ParameterName for file #{ip1}");
                 }
-                Assert.AreEqual(workflowInputsFilenames[i], files[i + 1].Filename);
-                AssertBytesEqual(workflowInputsData[i], files[i + 1].Data);
+                Assert.AreEqual(workflowInputsFilenames[i], files[ip1].Filename, $"unexpected Filename for file #{ip1}");
+                AssertBytesEqual(workflowInputsData[i], files[ip1].Data, $"files[{ip1}].Data");
             }
-
         }
     }
 }
