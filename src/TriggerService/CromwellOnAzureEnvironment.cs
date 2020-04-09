@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
@@ -90,7 +91,12 @@ namespace TriggerService
                     var blobTriggerJson = await blobTrigger.DownloadTextAsync();
                     var processedTriggerInfo = await ProcessBlobTrigger(blobTriggerJson);
 
-                    var response = await cromwellApiClient.PostWorkflowAsync(processedTriggerInfo);
+                    var response = await cromwellApiClient.PostWorkflowAsync(
+                                        processedTriggerInfo.WorkflowSource.Filename, processedTriggerInfo.WorkflowSource.Data,
+                                        processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
+                                        processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
+                                        processedTriggerInfo.WorkflowOptions.Filename, processedTriggerInfo.WorkflowOptions.Data,
+                                        processedTriggerInfo.WorkflowDependencies.Filename, processedTriggerInfo.WorkflowDependencies.Data);
 
                     await storage.SetStateToInProgressAsync(blobTrigger.Container.Name, blobTrigger.Name, response.Id.ToString());
                 }
@@ -214,7 +220,7 @@ namespace TriggerService
         {
             if (string.IsNullOrWhiteSpace(url))
             {
-                return null;
+                return new ProcessedWorkflowItem(null, null);
             }
 
             var blobName = GetBlobName(url);

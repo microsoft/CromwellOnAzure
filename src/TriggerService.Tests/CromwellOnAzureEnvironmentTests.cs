@@ -320,8 +320,10 @@ namespace TriggerService.Tests
 
         private static void AssertExtraDataNull(ProcessedTriggerInfo processedTriggerInfo)
         {
-            Assert.IsNull(processedTriggerInfo.WorkflowOptions, "WorkflowOptions");
-            Assert.IsNull(processedTriggerInfo.WorkflowDependencies, "WorkflowDependencies");
+            Assert.IsNull(processedTriggerInfo.WorkflowOptions.Filename, "WorkflowOptions.Filename");
+            Assert.IsNull(processedTriggerInfo.WorkflowOptions.Data, "WorkflowOptions.Data");
+            Assert.IsNull(processedTriggerInfo.WorkflowDependencies.Filename, "WorkflowDependencies.Filename");
+            Assert.IsNull(processedTriggerInfo.WorkflowDependencies.Data, "WorkflowDependencies.Data");
         }
 
         private static void AssertNamesEqual(List<string> filenames, int expectedLength, string expectedName, string filenameType)
@@ -357,7 +359,12 @@ namespace TriggerService.Tests
         private static List<CromwellApiClient.CromwellApiClient.FileToPost> RetrievePostFiles(ProcessedTriggerInfo processedTriggerInfo, CromwellOnAzureEnvironment environment)
         {
             var cromwellApiClient = environment.cromwellApiClient;
-            return ((CromwellApiClient.CromwellApiClient)cromwellApiClient).AccumulatePostFiles(processedTriggerInfo);
+            return ((CromwellApiClient.CromwellApiClient)cromwellApiClient).AccumulatePostFiles(
+                processedTriggerInfo.WorkflowSource.Filename, processedTriggerInfo.WorkflowSource.Data,
+                processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
+                processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
+                processedTriggerInfo.WorkflowOptions.Filename, processedTriggerInfo.WorkflowOptions.Data,
+                processedTriggerInfo.WorkflowDependencies.Filename, processedTriggerInfo.WorkflowDependencies.Data);
         }
 
         private void VerifyPostFiles(ProcessedTriggerInfo processedTriggerInfo, CromwellOnAzureEnvironment environment)
