@@ -117,15 +117,19 @@ namespace TriggerService
             }
             var tasks = new List<Task>();
             var workflowInputs = new List<ProcessedWorkflowItem>();
+
             if (string.IsNullOrWhiteSpace(triggerInfo.WorkflowUrl))
             {
                 throw new ArgumentNullException("must specify a WorkflowUrl in the Trigger File");
             }
+
             var workflowSource = await GetBlobFileNameAndData(triggerInfo.WorkflowUrl);
+
             if (triggerInfo.WorkflowInputsUrl != null)
             {
                 workflowInputs.Add(await GetBlobFileNameAndData(triggerInfo.WorkflowInputsUrl));
             }
+
             if (triggerInfo.WorkflowInputsUrls != null)
             {
                 foreach (var workflowInputsUrl in triggerInfo.WorkflowInputsUrls)
@@ -133,6 +137,7 @@ namespace TriggerService
                     workflowInputs.Add(await GetBlobFileNameAndData(workflowInputsUrl));
                 }
             }
+
             var workflowOptions = await GetBlobFileNameAndData(triggerInfo.WorkflowOptionsUrl);
             var workflowDependencies = await GetBlobFileNameAndData(triggerInfo.WorkflowDependenciesUrl);
 

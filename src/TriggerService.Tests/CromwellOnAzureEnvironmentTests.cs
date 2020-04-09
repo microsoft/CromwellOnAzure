@@ -330,6 +330,7 @@ namespace TriggerService.Tests
         {
             Assert.IsNotNull(filenames, filenameType);
             Assert.AreEqual(expectedLength, filenames.Count, $"unexpected length of {filenameType}");
+
             for (var i = 0; i < expectedLength; i++)
             {
                 Assert.AreEqual(expectedName, filenames[i], $"unexpected name for {filenameType}[{i}]");
@@ -340,6 +341,7 @@ namespace TriggerService.Tests
         {
             Assert.IsNotNull(data, dataName);
             Assert.AreEqual(expectedLength, data.Count, $"comparing expectedLength to the length of {dataName}");
+
             for (var i = 0; i < expectedLength; i++)
             {
                 AssertBytesEqual(expectedData, data[i], $"{dataName}[{i}]");
@@ -350,6 +352,7 @@ namespace TriggerService.Tests
         {
             Assert.IsNotNull(data, dataName);
             Assert.AreEqual(expectedData.Length, data.Length, $"unexpected length of {dataName}");
+
             for (var i = 0; i < expectedData.Length; i++)
             {
                 Assert.AreEqual(expectedData[i], data[i], $"unexpected value of {dataName}[{i}]");
@@ -358,8 +361,8 @@ namespace TriggerService.Tests
 
         private static List<CromwellApiClient.CromwellApiClient.FileToPost> RetrievePostFiles(ProcessedTriggerInfo processedTriggerInfo, CromwellOnAzureEnvironment environment)
         {
-            var cromwellApiClient = environment.cromwellApiClient;
-            return ((CromwellApiClient.CromwellApiClient)cromwellApiClient).AccumulatePostFiles(
+            var cromwellApiClient = (CromwellApiClient.CromwellApiClient)environment.cromwellApiClient;
+            return cromwellApiClient.AccumulatePostFiles(
                 processedTriggerInfo.WorkflowSource.Filename, processedTriggerInfo.WorkflowSource.Data,
                 processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
                 processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
@@ -380,6 +383,7 @@ namespace TriggerService.Tests
             for (var i = 0; i < processedTriggerInfo.WorkflowInputs.Count; i++)
             {
                 var ip1 = i + 1;
+
                 if (i == 0)
                 {
                     Assert.AreEqual("workflowInputs", files[ip1].ParameterName, $"unexpected ParameterName for file #{ip1}");
@@ -388,6 +392,7 @@ namespace TriggerService.Tests
                 {
                     Assert.AreEqual("workflowInputs_" + ip1, files[ip1].ParameterName, $"unexpected ParameterName for file #{ip1}");
                 }
+
                 Assert.AreEqual(processedTriggerInfo.WorkflowInputs[i].Filename, files[ip1].Filename, $"unexpected Filename for file #{ip1}");
                 AssertBytesEqual(processedTriggerInfo.WorkflowInputs[i].Data, files[ip1].Data, $"files[{ip1}].Data");
             }
