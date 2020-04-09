@@ -1,4 +1,5 @@
 {
+  "$schema": "http://json.schemastore.org/launchsettings.json",
   "iisSettings": {
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
@@ -7,28 +8,23 @@
       "sslPort": 44301
     }
   },
-  "$schema": "http://json.schemastore.org/launchsettings.json",
   "profiles": {
     "IIS Express": {
       "commandName": "IISExpress",
       "launchBrowser": true,
+      "launchUrl": "",
       "environmentVariables": {
-        "AzureOfferDurableId": "MS-AZR-0003p",
-        "BatchAccountName": "benchmarkb57914",
-        "UsePreemptibleVmsOnly": "true",
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "CosmosDbAccountName": "benchmarkb-39136",
-        "ApplicationInsightsAccountName": "benchmarkb-44345",
-        "DefaultStorageAccountName": "benchmarkb16532541e90"
+        "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
     "WebApplication1": {
       "commandName": "Project",
       "launchBrowser": true,
+      "launchUrl": "",
+      "applicationUrl": "https://localhost:5001;http://localhost:5000",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "applicationUrl": "https://localhost:5001;http://localhost:5000"
+      }
     }
   }
 }
