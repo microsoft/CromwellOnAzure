@@ -115,7 +115,7 @@ namespace TriggerService
             {
                 throw new ArgumentNullException("must have data in the Trigger File");
             }
-            var tasks = new List<Task>();
+
             var workflowInputs = new List<ProcessedWorkflowItem>();
 
             if (string.IsNullOrWhiteSpace(triggerInfo.WorkflowUrl))
