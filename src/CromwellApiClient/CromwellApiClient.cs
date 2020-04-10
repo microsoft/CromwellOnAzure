@@ -5,9 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
+[assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace CromwellApiClient
 {
     public class CromwellApiClient : ICromwellApiClient
@@ -63,53 +65,63 @@ namespace CromwellApiClient
         }
 
         public async Task<PostWorkflowResponse> PostWorkflowAsync(
-            string workflowSourceFilename,
+            string workflowSourceFilename, 
             byte[] workflowSourceData,
-            string workflowInputsFilename,
-            byte[] workflowInputsData,
-            string workflowOptionsFilename = null,
+            List<string> workflowInputsFilename, 
+            List<byte[]> workflowInputsData,
+            string workflowOptionsFilename = null, 
             byte[] workflowOptionsData = null,
-            string workflowDependenciesFilename = null,
+            string workflowDependenciesFilename = null, 
+            byte[] workflowDependenciesData = null)
+        {
+            var files = AccumulatePostFiles(
+                workflowSourceFilename, 
+                workflowSourceData,
+                workflowInputsFilename, 
+                workflowInputsData,
+                workflowOptionsFilename, 
+                workflowOptionsData,
+                workflowDependenciesFilename, 
+                workflowDependenciesData);
+            return await PostAsync<PostWorkflowResponse>(string.Empty, files);
+        }
+
+        internal List<FileToPost> AccumulatePostFiles(
+            string workflowSourceFilename, 
+            byte[] workflowSourceData,
+            List<string> workflowInputsFilename, 
+            List<byte[]> workflowInputsData,
+            string workflowOptionsFilename = null, 
+            byte[] workflowOptionsData = null,
+            string workflowDependenciesFilename = null, 
             byte[] workflowDependenciesData = null)
         {
             var files = new List<FileToPost> {
-                new FileToPost { ParameterName = "workflowSource", Filename = workflowSourceFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowSourceData) },
-                new FileToPost { ParameterName = "workflowInputs", Filename = workflowInputsFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowInputsData) }
+                new FileToPost(workflowSourceFilename, workflowSourceData, "workflowSource")
             };
+
+            for (var i = 0; i < workflowInputsFilename.Count; i++)
+            {
+                var parameterName = i == 0 ? "workflowInputs" : "workflowInputs_" + (i + 1);
+                files.Add(new FileToPost(workflowInputsFilename[i], workflowInputsData[i], parameterName));
+            }
 
             if (workflowOptionsFilename != null && workflowOptionsData != null)
             {
-                files.Add(new FileToPost { ParameterName = "workflowOptions", Filename = workflowOptionsFilename, Data = EncodeToUtf8AndRemoveTabsAndDecode(workflowOptionsData) });
+                files.Add(new FileToPost(workflowOptionsFilename, workflowOptionsData, "workflowOptions"));
             }
 
             if (workflowDependenciesFilename != null && workflowDependenciesData != null)
             {
-                files.Add(new FileToPost { ParameterName = "workflowDependencies", Filename = workflowDependenciesFilename, Data = workflowDependenciesData });
+                files.Add(new FileToPost(workflowDependenciesFilename, workflowDependenciesData, "workflowDependencies"));
             }
 
-            return await PostAsync<PostWorkflowResponse>(string.Empty, files);
+            return files;
         }
 
         public async Task<PostQueryResponse> PostQueryAsync(string queryJson)
         {
             return await PostAsync<PostQueryResponse>("/query", queryJson);
-        }
-
-        /// <summary>
-        /// Encodes a byte array to Utf8, removes tabs, and decodes back to a byte array.
-        /// As of 1/10/2020, Cromwell has a bug that requires tabs to be removed from JSON data
-        /// https://github.com/broadinstitute/cromwell/issues/3487
-        /// </summary>
-        /// <param name="data">The byte array of the file</param>
-        /// <returns>A new byte array of the file</returns>
-        private byte[] EncodeToUtf8AndRemoveTabsAndDecode(byte[] data)
-        {
-            if (data?.Length == 0)
-            {
-                return data;
-            }
-
-            return Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(data).Replace("\t", ""));
         }
 
         private string GetApiUrl(string path)
@@ -293,11 +305,35 @@ namespace CromwellApiClient
             }
         }
 
-        private class FileToPost
+        internal class FileToPost
         {
             public string ParameterName { get; set; }
             public string Filename { get; set; }
             public byte[] Data { get; set; }
+
+            internal FileToPost(string filename, byte[] data, string parameterName)
+            {
+                this.Filename = filename;
+                this.Data = EncodeToUtf8AndRemoveTabsAndDecode(data);
+                this.ParameterName = parameterName;
+            }
+
+            /// <summary>
+            /// Encodes a byte array to Utf8, removes tabs, and decodes back to a byte array.
+            /// As of 1/10/2020, Cromwell has a bug that requires tabs to be removed from JSON data
+            /// https://github.com/broadinstitute/cromwell/issues/3487
+            /// </summary>
+            /// <param name="data">The byte array of the file</param>
+            /// <returns>A new byte array of the file</returns>
+            private byte[] EncodeToUtf8AndRemoveTabsAndDecode(byte[] data)
+            {
+                if (data?.Length == 0)
+                {
+                    return data;
+                }
+
+                return Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(data).Replace("\t", ""));
+            }
         }
     }
 }
