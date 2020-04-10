@@ -363,11 +363,14 @@ namespace TriggerService.Tests
         {
             var cromwellApiClient = (CromwellApiClient.CromwellApiClient)environment.cromwellApiClient;
             return cromwellApiClient.AccumulatePostFiles(
-                processedTriggerInfo.WorkflowSource.Filename, processedTriggerInfo.WorkflowSource.Data,
+                processedTriggerInfo.WorkflowSource.Filename, 
+                processedTriggerInfo.WorkflowSource.Data,
                 processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
                 processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
-                processedTriggerInfo.WorkflowOptions.Filename, processedTriggerInfo.WorkflowOptions.Data,
-                processedTriggerInfo.WorkflowDependencies.Filename, processedTriggerInfo.WorkflowDependencies.Data);
+                processedTriggerInfo.WorkflowOptions.Filename, 
+                processedTriggerInfo.WorkflowOptions.Data,
+                processedTriggerInfo.WorkflowDependencies.Filename, 
+                processedTriggerInfo.WorkflowDependencies.Data);
         }
 
         private void VerifyPostFiles(ProcessedTriggerInfo processedTriggerInfo, CromwellOnAzureEnvironment environment)

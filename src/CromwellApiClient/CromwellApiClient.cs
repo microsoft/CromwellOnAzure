@@ -65,24 +65,36 @@ namespace CromwellApiClient
         }
 
         public async Task<PostWorkflowResponse> PostWorkflowAsync(
-            string workflowSourceFilename, byte[] workflowSourceData,
-            List<string> workflowInputsFilename, List<byte[]> workflowInputsData,
-            string workflowOptionsFilename = null, byte[] workflowOptionsData = null,
-            string workflowDependenciesFilename = null, byte[] workflowDependenciesData = null)
+            string workflowSourceFilename, 
+            byte[] workflowSourceData,
+            List<string> workflowInputsFilename, 
+            List<byte[]> workflowInputsData,
+            string workflowOptionsFilename = null, 
+            byte[] workflowOptionsData = null,
+            string workflowDependenciesFilename = null, 
+            byte[] workflowDependenciesData = null)
         {
             var files = AccumulatePostFiles(
-                workflowSourceFilename, workflowSourceData,
-                workflowInputsFilename, workflowInputsData,
-                workflowOptionsFilename, workflowOptionsData,
-                workflowDependenciesFilename, workflowDependenciesData);
+                workflowSourceFilename, 
+                workflowSourceData,
+                workflowInputsFilename, 
+                workflowInputsData,
+                workflowOptionsFilename, 
+                workflowOptionsData,
+                workflowDependenciesFilename, 
+                workflowDependenciesData);
             return await PostAsync<PostWorkflowResponse>(string.Empty, files);
         }
 
         internal List<FileToPost> AccumulatePostFiles(
-            string workflowSourceFilename, byte[] workflowSourceData,
-            List<string> workflowInputsFilename, List<byte[]> workflowInputsData,
-            string workflowOptionsFilename = null, byte[] workflowOptionsData = null,
-            string workflowDependenciesFilename = null, byte[] workflowDependenciesData = null)
+            string workflowSourceFilename, 
+            byte[] workflowSourceData,
+            List<string> workflowInputsFilename, 
+            List<byte[]> workflowInputsData,
+            string workflowOptionsFilename = null, 
+            byte[] workflowOptionsData = null,
+            string workflowDependenciesFilename = null, 
+            byte[] workflowDependenciesData = null)
         {
             var files = new List<FileToPost> {
                 new FileToPost(workflowSourceFilename, workflowSourceData, "workflowSource")
