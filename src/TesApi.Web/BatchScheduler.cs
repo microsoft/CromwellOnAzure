@@ -455,7 +455,7 @@ namespace TesApi.Web
 
             var batchExecutionDirectoryUrl = await MapLocalPathToSasUrlAsync($"{batchExecutionDirectoryPath}", getContainerSas: true);
 
-            var cloudTask = new CloudTask(taskId, $"/bin/sh -c '{taskCommand}'")
+            var cloudTask = new CloudTask(taskId, $"/bin/sh -c \"{taskCommand.Trim()}\"")
             {
                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                 ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptUrl, $"/mnt{uploadFilesScriptPath}") },
