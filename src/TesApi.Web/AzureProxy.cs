@@ -56,6 +56,7 @@ namespace TesApi.Web
         /// The constructor
         /// </summary>
         /// <param name="batchAccountName">Batch account name</param>
+        /// <param name="azureOfferDurableId">Azure offer id</param>
         /// <param name="logger">The logger</param>
         public AzureProxy(string batchAccountName, string azureOfferDurableId, ILogger logger)
         {
@@ -227,14 +228,12 @@ namespace TesApi.Web
         /// Creates a new Azure Batch job
         /// </summary>
         /// <param name="jobId"></param>
-        /// <param name="jobPreparationTask"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
         /// <returns></returns>
-        public async Task CreateBatchJobAsync(string jobId, JobPreparationTask jobPreparationTask, CloudTask cloudTask, PoolInformation poolInformation)
+        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
-            job.JobPreparationTask = jobPreparationTask;
 
             await job.CommitAsync();
 
@@ -266,7 +265,8 @@ namespace TesApi.Web
             try
             {
                 var nodeAllocationFailed = false;
-                var nodeDiskFull = false;
+                string nodeErrorCode = null;
+                IEnumerable<string> nodeErrorDetails = null;
                 var activeJobWithMissingAutoPool = false;
                 TaskState? taskState = null;
                 TaskExecutionInformation taskExecutionInformation = null;
@@ -313,7 +313,13 @@ namespace TesApi.Web
 
                         if (node != null)
                         {
-                            nodeDiskFull = node.Errors?.FirstOrDefault()?.Code?.Equals("DiskFull", StringComparison.OrdinalIgnoreCase) ?? false;
+                            var nodeError = node.Errors?.FirstOrDefault();
+
+                            if (nodeError != null && nodeError.Code != null)
+                            {
+                                nodeErrorCode = nodeError.Code;
+                                nodeErrorDetails = nodeError.ErrorDetails?.Select(e => e.Value);
+                            }
                         }
                     }
                     else
@@ -324,8 +330,6 @@ namespace TesApi.Web
                         }
                     }
                 }
-
-                var jobPreparationTaskExecutionInformation = (await batchClient.JobOperations.ListJobPreparationAndReleaseTaskStatus(job.Id).ToListAsync()).FirstOrDefault()?.JobPreparationTaskExecutionInformation;
 
                 try
                 {
@@ -344,19 +348,12 @@ namespace TesApi.Web
                     ActiveJobWithMissingAutoPool = activeJobWithMissingAutoPool,
                     AttemptNumber = attemptNumber,
                     NodeAllocationFailed = nodeAllocationFailed,
-                    NodeDiskFull = nodeDiskFull,
+                    NodeErrorCode = nodeErrorCode,
+                    NodeErrorDetails = nodeErrorDetails,
                     JobState = job.State,
                     JobStartTime = job.ExecutionInformation?.StartTime,
                     JobEndTime = job.ExecutionInformation?.EndTime,
                     JobSchedulingError = job.ExecutionInformation?.SchedulingError,
-                    JobPreparationTaskState = jobPreparationTaskExecutionInformation?.State,
-                    JobPreparationTaskExecutionResult = jobPreparationTaskExecutionInformation?.Result,
-                    JobPreparationTaskStartTime = jobPreparationTaskExecutionInformation?.StartTime,
-                    JobPreparationTaskEndTime = jobPreparationTaskExecutionInformation?.EndTime,
-                    JobPreparationTaskExitCode = jobPreparationTaskExecutionInformation?.ExitCode,
-                    JobPreparationTaskFailureInformation = jobPreparationTaskExecutionInformation?.FailureInformation,
-                    JobPreparationTaskContainerState = jobPreparationTaskExecutionInformation?.ContainerInformation?.State,
-                    JobPreparationTaskContainerError = jobPreparationTaskExecutionInformation?.ContainerInformation?.Error,
                     TaskState = taskState,
                     TaskExecutionResult = taskExecutionInformation?.Result,
                     TaskStartTime = taskExecutionInformation?.StartTime,
@@ -828,19 +825,12 @@ namespace TesApi.Web
             public bool ActiveJobWithMissingAutoPool { get; set; }
             public int AttemptNumber { get; set; }
             public bool NodeAllocationFailed { get; set; }
-            public bool NodeDiskFull { get; set; }
+            public string NodeErrorCode { get; set; }
+            public IEnumerable<string> NodeErrorDetails { get; set; }
             public JobState? JobState { get; set; }
             public DateTime? JobStartTime { get; set; }
             public DateTime? JobEndTime { get; set; }
             public JobSchedulingError JobSchedulingError { get; set; }
-            public JobPreparationTaskState? JobPreparationTaskState { get; set; }
-            public int? JobPreparationTaskExitCode { get; set; }
-            public TaskExecutionResult? JobPreparationTaskExecutionResult { get; set; }
-            public DateTime? JobPreparationTaskStartTime { get; set; }
-            public DateTime? JobPreparationTaskEndTime { get; set; }
-            public TaskFailureInformation JobPreparationTaskFailureInformation { get; set; }
-            public string JobPreparationTaskContainerState { get; set; }
-            public string JobPreparationTaskContainerError { get; set; }
             public TaskState? TaskState { get; set; }
             public int? TaskExitCode { get; set; }
             public TaskExecutionResult? TaskExecutionResult { get; set; }

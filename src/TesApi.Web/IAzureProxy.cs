@@ -35,10 +35,9 @@ namespace TesApi.Web
         /// Creates a new Azure Batch job
         /// </summary>
         /// <param name="jobId"></param>
-        /// <param name="jobPreparationTask"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
-        Task CreateBatchJobAsync(string jobId, JobPreparationTask jobPreparationTask, CloudTask cloudTask, PoolInformation poolInformation);
+        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation);
 
         /// <summary>
         /// Retrieves the list of container registries that the TES server has access to.
