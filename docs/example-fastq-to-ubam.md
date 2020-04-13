@@ -1,6 +1,6 @@
 # Example workflow to convert FASTQ files to uBAM files
 
-This document describes how to run an example workflow that converts input FASTQ  files to uBAM files. This may be combined to other WDL (Workflow Description Language) files and used as part of a larger workflow. 
+This document describes how to run an example workflow that converts input FASTQ files to uBAM files. This may be combined to other WDL (Workflow Description Language) files and used as part of a larger workflow. 
 
 ## Run a sample workflow
 
@@ -43,7 +43,7 @@ The inputs JSON file should contain the following:
 The input path consists of 3 parts - the storage account name, the blob container name, file path with extension. Example file path for an "inputs" container in a storage account "msgenpublicdata" will look like
 `"/msgenpublicdata/inputs/chr21/chr21.read1.fq.gz"`
 
-If you chose to host these files on your own Storage account, replace the name "msgenpublicdata/inputs" to your `<storageaccountname>/<containername>`. <br/>
+If you chose to host these files on your own storage account, replace the name "msgenpublicdata/inputs" to your `<storageaccountname>/<containername>`. <br/>
  
 Alternatively, you can use http or https paths for your input files [using shared access signatures (SAS)](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for files in a private Azure Storage account container or refer to any public file location. 
 

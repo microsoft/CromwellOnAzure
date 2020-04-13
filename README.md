@@ -1,17 +1,19 @@
 # Welcome to Cromwell on Azure
 
-What is [Cromwell on Azure?](#Cromwell-on-Azure) <br/>
-Deploy Cromwell on Azure now using this [guide](#Deploy-your-instance-of-Cromwell-on-Azure)<br/>
-A brief [demo video](https://youtu.be/QlRQ63n_mKw) on how to run workflows using Cromwell on Azure<br/>
+#### Getting started
+ * What is [Cromwell on Azure?](#Cromwell-on-Azure) <br/>
+ * Deploy Cromwell on Azure now using this [guide](#Deploy-your-instance-of-Cromwell-on-Azure)<br/>
+ * A brief [demo video](https://youtu.be/QlRQ63n_mKw) on how to run workflows using Cromwell on Azure<br/>
 
-Prepare, start or abort your worklow [using this guide](docs/managing-your-workflow.md/#Managing-your-workflow)<br/>
-Here is an example workflow to [convert FASTQ files to uBAM files](docs/example-fastq-to-ubam.md/#Example-workflow-to-convert-FASTQ-files-to-uBAM-files)<br/>
-Have an existing WDL file that you want to run on Azure? [Modify your existing WDL with these adaptations for Azure](docs/change-existing-WDL-for-Azure.md/#How-to-modify-an-existing-WDL-file-to-run-on-Cromwell-on-Azure)<br/>
+#### Running workflows
+ * Prepare, start or abort your workflow [using this guide](docs/managing-your-workflow.md/#Managing-your-workflow)<br/>
+ * Here is an example workflow to [convert FASTQ files to uBAM files](docs/example-fastq-to-ubam.md/#Example-workflow-to-convert-FASTQ-files-to-uBAM-files)<br/>
+ * Have an existing WDL file that you want to run on Azure? [Modify your existing WDL with these adaptations for Azure](docs/change-existing-WDL-for-Azure.md/#How-to-modify-an-existing-WDL-file-to-run-on-Cromwell-on-Azure)<br/>
+ * Want to run commonly used workflows? [Find links to ready-to-use workflows here](#Run-Common-Workflows)<br/>
 
-Want to run commonly used workflows? [Find links to ready-to-use workflows here](#Run-Common-Workflows)<br/>
-
-Questions? See our [Troubleshooting Guide](docs/troubleshooting-guide.md/#FAQs,-advanced-troubleshooting-and-known-issues-for-Crowmwell-on-Azure) for more information.<br/>
-Known issues and work-arounds are [documented here](docs/troubleshooting-guide.md/#Known-Issues-And-Mitigation)<br/>
+#### Questions?
+ * See our [Troubleshooting Guide](docs/troubleshooting-guide.md/#FAQs,-advanced-troubleshooting-and-known-issues-for-Cromwell-on-Azure) for more information.<br/>
+ * Known issues and work-arounds are [documented here](docs/troubleshooting-guide.md/#Known-Issues-And-Mitigation)<br/>
 
 If you are running into an issue and cannot find any information in the troubleshooting guide, please open a GitHub issue!<br/>
 
@@ -28,7 +30,7 @@ Cromwell on Azure configures all Azure resources needed to run workflows through
 
 ### Prerequisites
 
-1. You will need an [Azure Subscription](https://portal.azure.com/) to deploy Cromwell on Azure, if you don't already have one.
+1. You will need an [Azure Subscription](https://portal.azure.com/) to deploy Cromwell on Azure.
 2. You must have the proper [Azure role assignments](https://docs.microsoft.com/en-us/azure/role-based-access-control/overview) to deploy Cromwell on Azure.  To check your current role assignments, please follow [these instructions](https://docs.microsoft.com/en-us/azure/role-based-access-control/check-access).  You must have one of the following combinations of [role assignments](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles):
    1. `Owner` of the subscription<br/>
    2. `Contributor` and `User Access Administrator` of the subscription
@@ -36,7 +38,7 @@ Cromwell on Azure configures all Azure resources needed to run workflows through
       . *Note: this level of access will result in a warning during deployment, and will not use the latest VM pricing data.</i>  [Learn more](/docs/troubleshooting-guide.md/#How-are-Batch-VMs-selected-to-run-tasks-in-a-workflow?).  Also, you must specify the resource group name during deployment with this level of access (see below).*
    4.  Note: if you only have `Service Administrator` as a role assignment, please assign yourself as `Owner` of the subscription.
 3. Install the [Azure Command Line Interface (az cli)](https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest), a command line experience for managing Azure resources.
-4. Run `az login` to authenticate with Azure
+4. Run `az login` to authenticate with Azure.
 
 
 ### Download the deployment executable
@@ -103,7 +105,7 @@ For convenience, some configuration files are hosted on your Cromwell on Azure S
 ![Edit Configuration](/docs/screenshots/edit-config.png)
 
 
-See [this section in the advanced configuration on details of how to connect a different Storage account, Batch account, or a private Azure Container Registry](/docs/troubleshooting-guide.md/#Customizing-your-Cromwell-on-Azure-instance).<br/>
+See [this section in the advanced configuration on details of how to connect a different storage account, batch account, or a private Azure Container Registry](/docs/troubleshooting-guide.md/#Customizing-your-Cromwell-on-Azure-instance).<br/>
 
 
 For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`.
@@ -113,7 +115,7 @@ For these changes to take effect, be sure to restart your Cromwell on Azure VM t
 
 ### Hello World WDL test
 
-As part of the Cromwell on Azure deployment, a "Hello World" workflow is automatically run as a check. The input files for this workflow are found in the `inputs` container, and the output files can be found in the `cromwell-executions` container of your default Storage account. 
+As part of the Cromwell on Azure deployment, a "Hello World" workflow is automatically run as a check. The input files for this workflow are found in the `inputs` container, and the output files can be found in the `cromwell-executions` container of your default storage account. 
 Once it runs to completion you can find the trigger JSON file that started the workflow in the `workflows` container in the `succeeded` directory, if it ran successfully.<br/>
 
 Hello World WDL file:
@@ -144,7 +146,7 @@ Hello World inputs.json file:
 }
 ```
 
-Hello World trigger JSON file as seen in your Storage account's `workflows` container in the `succeeded` directory:
+Hello World trigger JSON file as seen in your storage account's `workflows` container in the `succeeded` directory:
 ```
 {
   "WorkflowUrl": "/<storageaccountname>/inputs/test/test.wdl",

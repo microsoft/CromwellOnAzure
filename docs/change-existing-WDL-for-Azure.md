@@ -1,6 +1,6 @@
 # How to modify an existing WDL file to run on Cromwell on Azure
 
-For any pipeline, you can create a [WDL](https://software.broadinstitute.org/wdl/) file that calls your tools in docker containers. Please note that Cromwell on Azure only supports tasks with docker containers defined for security reasons.<br/>
+For any pipeline, you can create a [WDL](https://software.broadinstitute.org/wdl/) file that calls your tools in Docker containers. Please note that Cromwell on Azure only supports tasks with Docker containers defined for security reasons.<br/>
 
 In order to run a WDL file, you must modify/create a workflow with the following runtime attributes for the tasks that are compliant with the [TES or Task Execution Schemas](https://cromwell.readthedocs.io/en/develop/backends/TES/):
 
@@ -20,7 +20,9 @@ Ensure that the attributes `memory` and `disk` (note: use the singular form for 
 > GB - "GB", "G", "GiB", "Gi"<br/>
 > TB - "TB", "T", "TiB", "Ti"<br/>
 
-`preemptible` and `zones` attributes are currently not being passed through Broad's Cromwell to the TES backend, and hence are not supported.<br/>
+The `preemptible` attribute is a boolean (not an integer). You can specify `preemptible` as `true` or `false` for each task. When set to `true` Cromwell on Azure will use a [low-priority batch VM](https://docs.microsoft.com/en-us/azure/batch/batch-low-pri-vms#use-cases-for-low-priority-vms) to run the task.<br/>
+
+`bootDiskSizeGb` and `zones` attributes are not supported by the TES backend.<br/>
 Each of these runtime attributes are specific to your workflow and tasks within those workflows. The default values for resource requirements are as set above.<br/>
 Learn more about Cromwell's runtime attributes [here](https://cromwell.readthedocs.io/en/develop/RuntimeAttributes).
 
@@ -34,11 +36,12 @@ Left panel shows a WDL file created for GCP whereas the right panel is the modif
 
 ## Using maxRetries to replace the preemptible attribute
 
-If you want to use the `preemptible` attribute but don’t use `maxRetries` for a task, consider replacing `preemptible` by `maxRetries` to keep the retry functionality. Remember that for Cromwell on Azure, you can either use low-priority VMs in Batch (default configuration) for all tasks or use dedicated VMs for all task by changing the `docker-compose.yml` setting `UsePreemptibleVmsOnly` as described in [this section](/docs/troubleshooting-guide.md/#How-can-I-configure-my-Cromwell-on-Azure-instance-to-use-dedicated-Batch-VMs-to-avoid-getting-preempted?)
+For a GCP WDL, `preemptible` is an integer - specifying the number of retries when using the flag. For Cromwell on Azure, if you want to use the `preemptible` attribute but don’t use `maxRetries` for a task, consider also adding `maxRetries` to keep the retry functionality. Remember that for each task in a workflow, you can either use a low-priority VM in batch (default configuration) or use a dedicated VM by setting `preemptible` to either `true` or `false` respectively.
 
 
 ![Preemptible Attribute](/docs/screenshots/preemptible.PNG)
 
+You can choose to ALWAYS run dedicated VMs for every task, by modifying the `docker-compose.yml` setting `UsePreemptibleVmsOnly` as described in [this section](/docs/troubleshooting-guide.md/#How-can-I-configure-my-Cromwell-on-Azure-instance-to-use-dedicated-Batch-VMs-to-avoid-getting-preempted?). The `preemptible` runtime attribute will overwrite the environment variable setting.
 
 ## Accompanying index files for BAM or VCF files
 

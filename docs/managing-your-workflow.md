@@ -8,7 +8,7 @@
 
 ### How to prepare a Workflow Description Language (WDL) file that runs a workflow on Cromwell on Azure
 
-For any pipeline, you can create a [WDL](https://software.broadinstitute.org/wdl/) file that calls your tools in docker containers. Please note that Cromwell on Azure only supports tasks with docker containers defined for security reasons.<br/>
+For any pipeline, you can create a [WDL](https://software.broadinstitute.org/wdl/) file that calls your tools in Docker containers. Please note that Cromwell on Azure only supports tasks with Docker containers defined for security reasons.<br/>
 
 In order to run a WDL file, you must modify/create a workflow with the following runtime attributes for the tasks that are compliant with the [TES or Task Execution Schemas](https://cromwell.readthedocs.io/en/develop/backends/TES/):
 
@@ -28,7 +28,9 @@ Ensure that the attributes `memory` and `disk` (note: use the singular form for 
 > GB - "GB", "G", "GiB", "Gi"<br/>
 > TB - "TB", "T", "TiB", "Ti"<br/>
 
-`preemptible` and `zones` attributes are currently not being passed through Broad's Cromwell to the TES backend, and hence are not supported.<br/>
+The `preemptible` attribute is a boolean (not an integer). You can specify `preemptible` as `true` or `false` for each task. When set to `true` Cromwell on Azure will use a [low-priority batch VM](https://docs.microsoft.com/en-us/azure/batch/batch-low-pri-vms#use-cases-for-low-priority-vms) to run the task.<br/>
+
+`bootDiskSizeGb` and `zones` attributes are not supported by the TES backend.<br/>
 Each of these runtime attributes are specific to your workflow and tasks within those workflows. The default values for resource requirements are as set above.<br/>
 Learn more about Cromwell's runtime attributes [here](https://cromwell.readthedocs.io/en/develop/RuntimeAttributes).
 
@@ -69,7 +71,7 @@ When using WDL and inputs JSON file hosted on your private Azure Storage account
 https://<storageaccountname>.blob.core.windows.net/inputs/test/test.wdl
 ```
 
-You can also use the `/<storageaccountname>/<containername>/<blobName>` format for any Storage account that is mounted to your Cromwell on Azure instance. By default, Cromwell on Azure mounts a Storage account to your instance, which is found in your resource group after a successful deployment. You can [follow these steps](/docs/troubleshooting-guide.md/#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using) to mount a different Storage account that you manage or own, to your Cromwell on Azure instance.
+You can also use the `/<storageaccountname>/<containername>/<blobName>` format for any storage account that is mounted to your Cromwell on Azure instance. By default, Cromwell on Azure mounts a storage account to your instance, which is found in your resource group after a successful deployment. You can [follow these steps](/docs/troubleshooting-guide.md/#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using) to mount a different storage account that you manage or own, to your Cromwell on Azure instance.
 
 Alternatively, you can use any http or https path to a TES compliant WDL and inputs.json [using shared access signatures (SAS)](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for files in a private Azure Storage account container or refer to any public file location like raw GitHub URLs.
 
@@ -78,7 +80,7 @@ Alternatively, you can use any http or https path to a TES compliant WDL and inp
 
 To start a WDL workflow, go to your Cromwell on Azure Storage account associated with your host VM. In the `workflows` container, place the trigger JSON file in the "new" virtual directory (note: virtual directories do not exist on their own, they are just part of a blob's name). This initiates a Cromwell workflow, and returns a workflow ID that is appended to the trigger JSON file name and transferred to the "inprogress" directory in the `workflows` container.<br/>
 
-This can be done programatically using the [Azure Storage SDKs](https://azure.microsoft.com/en-us/downloads/), or manually via the [Azure Portal](https://portal.azure.com) or [Azure Storage Explorer](https://azure.microsoft.com/en-us/features/storage-explorer/).
+This can be done programmatically using the [Azure Storage SDKs](https://azure.microsoft.com/en-us/downloads/), or manually via the [Azure Portal](https://portal.azure.com) or [Azure Storage Explorer](https://azure.microsoft.com/en-us/features/storage-explorer/).
 
 ### Via the Azure Portal
 ![Select a blob to upload from the portal](screenshots/newportal.PNG)<br/>
