@@ -36,6 +36,7 @@ namespace CromwellOnAzureDeployer
         public string CustomCromwellImagePath { get; set; }
         public string CustomTesImagePath { get; set; }
         public string CustomTriggerServiceImagePath { get; set; }
+        public bool RequireTestWorkflow { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {
