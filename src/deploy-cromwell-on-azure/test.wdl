@@ -9,6 +9,7 @@ task hello {
   }
   runtime {
 	docker: 'ubuntu:16.04'
+    preemptible: true
   }
 }
 

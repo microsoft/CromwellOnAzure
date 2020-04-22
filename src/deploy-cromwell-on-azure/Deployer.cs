@@ -150,12 +150,25 @@ namespace CromwellOnAzureDeployer
                 await WaitForDockerComposeAsync(sshConnectionInfo);
                 await WaitForCromwellAsync(sshConnectionInfo);
 
-                isDeploymentSuccessful = await VerifyInstallationAsync(storageAccount);
-
-                if (!isDeploymentSuccessful)
+                if (batchAccount.LowPriorityCoreQuota > 0 || batchAccount.DedicatedCoreQuota > 0)
                 {
-                    await DeleteResourceGroupIfUserConsentsAsync();
+                    isDeploymentSuccessful = await VerifyInstallationAsync(storageAccount, usePreemptibleVm: batchAccount.LowPriorityCoreQuota > 0);
+
+                    if (!isDeploymentSuccessful)
+                    {
+                        await DeleteResourceGroupIfUserConsentsAsync();
+                    }
                 }
+                else
+                {
+                    RefreshableConsole.WriteLine($"No default Batch core quota was available to run a test workflow.", ConsoleColor.Yellow);
+                    RefreshableConsole.WriteLine($"Request core quota: https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit", ConsoleColor.Yellow);
+                    RefreshableConsole.WriteLine($"After receiving core quota, read the docs to run a test workflow and confirm successful deployment.", ConsoleColor.Yellow);
+
+                    isDeploymentSuccessful = !configuration.RequireTestWorkflow;
+                }
+
+                RefreshableConsole.WriteLine($"Completed in {mainTimer.Elapsed.TotalMinutes:n1} minutes.");
             }
             catch (Microsoft.Rest.Azure.CloudException cloudException)
             {
@@ -930,11 +943,11 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task<bool> VerifyInstallationAsync(IStorageAccount storageAccount)
+        private async Task<bool> VerifyInstallationAsync(IStorageAccount storageAccount, bool usePreemptibleVm = true)
         {
             var startTime = DateTime.UtcNow;
             var line = RefreshableConsole.WriteLine("Running a test workflow...");
-            var isTestWorkflowSuccessful = await TestWorkflowAsync(storageAccount);
+            var isTestWorkflowSuccessful = await TestWorkflowAsync(storageAccount, usePreemptibleVm);
             WriteExecutionTime(line, startTime);
 
             if (isTestWorkflowSuccessful)
@@ -962,17 +975,29 @@ namespace CromwellOnAzureDeployer
             RefreshableConsole.WriteLine("Please try deployment again, and create an issue if this continues to fail: https://github.com/microsoft/CromwellOnAzure/issues");
         }
 
-        private async Task<bool> TestWorkflowAsync(IStorageAccount storageAccount)
+        private async Task<bool> TestWorkflowAsync(IStorageAccount storageAccount, bool usePreemptibleVm = true)
         {
+            const string testDirectoryName = "test";
+            const string testWdlFilename = "test.wdl";
+            const string testTriggerFilename = "test.json";
+
             var id = Guid.NewGuid();
             var blobClient = await GetBlobClientAsync(storageAccount);
-            await UploadFileTextAsync(blobClient, File.ReadAllText(GetPathFromAppRelativePath("test.wdl")), InputsContainerName, "test/test.wdl");
-            await UploadFileTextAsync(blobClient, File.ReadAllText(GetPathFromAppRelativePath("test.json")), InputsContainerName, "test/test.json");
+            var wdlText = await File.ReadAllTextAsync(GetPathFromAppRelativePath(testWdlFilename));
+            var triggerJson = await File.ReadAllTextAsync(GetPathFromAppRelativePath(testTriggerFilename));
+
+            if (!usePreemptibleVm)
+            {
+                wdlText = wdlText.Replace("preemptible: true", "preemptible: false", StringComparison.OrdinalIgnoreCase);
+            }
+
+            await UploadFileTextAsync(blobClient, wdlText, InputsContainerName, $"{testDirectoryName}/{testWdlFilename}");
+            await UploadFileTextAsync(blobClient, triggerJson, InputsContainerName, $"{testDirectoryName}/{testTriggerFilename}");
 
             var workflow = new Workflow
             {
-                WorkflowUrl = $"/{configuration.StorageAccountName}/{InputsContainerName}/test/test.wdl",
-                WorkflowInputsUrl = $"/{configuration.StorageAccountName}/{InputsContainerName}/test/test.json"
+                WorkflowUrl = $"/{configuration.StorageAccountName}/{InputsContainerName}/{testDirectoryName}/{testWdlFilename}",
+                WorkflowInputsUrl = $"/{configuration.StorageAccountName}/{InputsContainerName}/{testDirectoryName}/{testTriggerFilename}"
             };
 
             var json = JsonConvert.SerializeObject(workflow, Formatting.Indented);
