@@ -20,6 +20,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Azure.Documents;
+using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Swashbuckle.AspNetCore.Annotations;
@@ -34,6 +36,7 @@ namespace TesApi.Controllers
     /// </summary>
     public class TaskServiceApiController : ControllerBase
     {
+        private const string rootExecutionPath = "/cromwell-executions";
         private readonly IRepository<TesTask> repository;
         private readonly ILogger<TaskServiceApiController> logger;
 
@@ -114,6 +117,16 @@ namespace TesApi.Controllers
             tesTask.Id = $"{tesTaskIdPrefix}{Guid.NewGuid().ToString("N")}";
             tesTask.State = TesState.QUEUEDEnum;
             tesTask.CreationTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo);
+
+            // example: /cromwell-executions/test/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script
+            tesTask.WorkflowId = tesTask
+                ?.Inputs
+                ?.FirstOrDefault(i => i.Path.StartsWith(rootExecutionPath, StringComparison.OrdinalIgnoreCase))
+                ?.Path
+                ?.Split('/', StringSplitOptions.RemoveEmptyEntries)
+                ?.Skip(2)
+                ?.FirstOrDefault();
+            
             logger.LogDebug($"Creating task with id {tesTask.Id} state {tesTask.State}");
             await repository.CreateItemAsync(tesTask);
             return StatusCode(200, new TesCreateTaskResponse { Id = tesTask.Id });

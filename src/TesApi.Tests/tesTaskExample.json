@@ -99,5 +99,6 @@
   "creation_time": "string",
   "error_count": 0,
   "is_cancel_requested": false,
-  "end_time": "string"
+  "end_time": "string",
+  "workflow_id": "string"
 }
