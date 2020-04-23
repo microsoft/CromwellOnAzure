@@ -25,5 +25,12 @@ namespace TesApi.Models
         /// <value>Date + time the task was completed, in RFC 3339 format. This is set by the system, not the client.</value>
         [DataMember(Name = "end_time")]
         public string EndTime { get; set; }
+
+
+        /// <summary>
+        /// Top-most parent workflow ID from the workflow engine
+        /// </summary>
+        [DataMember(Name = "workflow_id")]
+        public string WorkflowId { get; set; }
     }
 }

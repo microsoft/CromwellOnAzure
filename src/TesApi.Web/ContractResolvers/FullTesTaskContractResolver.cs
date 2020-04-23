@@ -25,7 +25,8 @@ namespace TesApi.Web
                 Tuple.Create(typeof(TesTask), nameof(TesTask.IsCancelRequested)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.ErrorCount)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.EndTime)),
-                Tuple.Create(typeof(TesResources), nameof(TesResources.VmInfo))
+                Tuple.Create(typeof(TesTask), nameof(TesTask.WorkflowId)),
+                Tuple.Create(typeof(TesResources), nameof(TesResources.VmInfo)),
             };
 
         /// <summary>

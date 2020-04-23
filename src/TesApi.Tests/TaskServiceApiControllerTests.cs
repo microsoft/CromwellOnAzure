@@ -248,5 +248,71 @@ namespace TesApi.Tests
             Assert.AreEqual(1, listOfTesTasks.Tasks.Count);
             Assert.AreEqual(200, result.StatusCode);
         }
+
+        [TestMethod]
+        public async Task CreateTaskAsync_ExtractsWorkflowId()
+        {
+            var repo = new Mock<IRepository<TesTask>>();
+            var cromwellWorkflowId = "daf1a044-d741-4db9-8eb5-d6fd0519b1f1";
+            var taskDescription = $"{cromwellWorkflowId}:BackendJobDescriptorKey_CommandCallNode_wf_hello.hello:-1:1";
+
+            var tesTask = new TesTask() { 
+                Description = taskDescription, 
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Inputs = new List<TesInput> { new TesInput { Path = "/cromwell-executions/test/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script" } }
+            };
+
+            var controller = new TaskServiceApiController(repo.Object, new NullLogger<TaskServiceApiController>());
+            await controller.CreateTaskAsync(tesTask);
+            Assert.AreEqual(cromwellWorkflowId, tesTask.WorkflowId);
+        }
+
+        [TestMethod]
+        public async Task CreateTaskAsync_InvalidInputsAndPathDoNotThrow()
+        {
+            var repo = new Mock<IRepository<TesTask>>();
+            var cromwellWorkflowId = "daf1a044-d741-4db9-8eb5-d6fd0519b1f1";
+            var taskDescription = $"{cromwellWorkflowId}:BackendJobDescriptorKey_CommandCallNode_wf_hello.hello:-1:1";
+            var controller = new TaskServiceApiController(repo.Object, new NullLogger<TaskServiceApiController>());
+
+            var tesTask1 = new TesTask()
+            {
+                Description = taskDescription,
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } }
+            };
+
+            await controller.CreateTaskAsync(tesTask1);
+            Assert.IsNull(tesTask1.WorkflowId);
+
+            var tesTask2 = new TesTask()
+            {
+                Description = taskDescription,
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Inputs = new List<TesInput> { new TesInput { Path = "/cromwell-executions/" } }
+            };
+
+            await controller.CreateTaskAsync(tesTask2);
+            Assert.IsNull(tesTask2.WorkflowId);
+
+            var tesTask3 = new TesTask()
+            {
+                Description = taskDescription,
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Inputs = new List<TesInput> { new TesInput { Path = "/cromwell-executions/" } }
+            };
+
+            await controller.CreateTaskAsync(tesTask3);
+            Assert.IsNull(tesTask3.WorkflowId);
+
+            var tesTask4 = new TesTask()
+            {
+                Description = taskDescription,
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Inputs = new List<TesInput> { new TesInput { Path = "/cromwell-executions/test/" } }
+            };
+
+            await controller.CreateTaskAsync(tesTask4);
+            Assert.IsNull(tesTask4.WorkflowId);
+        }
     }
 }
