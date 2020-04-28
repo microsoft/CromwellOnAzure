@@ -21,7 +21,6 @@ using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Services.AppAuthentication;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage.Blob;
@@ -42,15 +41,13 @@ namespace TesApi.Web
 
         private static readonly HttpClient httpClient = new HttpClient();
 
-        private readonly string batchAccountName;
         private readonly ILogger logger;
+        private readonly string batchAccountId;
         private readonly BatchClient batchClient;
         private readonly string subscriptionId;
         private readonly string location;
         private readonly string billingRegionName;
         private readonly string azureOfferDurableId;
-
-        private MemoryCache cache { get; set; } = new MemoryCache(new MemoryCacheOptions());
 
         /// <summary>
         /// The constructor
@@ -61,14 +58,14 @@ namespace TesApi.Web
         public AzureProxy(string batchAccountName, string azureOfferDurableId, ILogger logger)
         {
             this.logger = logger;
-            this.batchAccountName = batchAccountName;
-            var batchAccount = GetBatchAccountAsync(batchAccountName).Result;
+            var batchAccount = FindBatchAccountAsync(batchAccountName).Result;
+            batchAccountId = batchAccount.Id;
             batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{batchAccount.AccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
             subscriptionId = batchAccount.Manager.SubscriptionId;
             location = batchAccount.RegionName;
             this.azureOfferDurableId = azureOfferDurableId;
 
-            if (AzureRegionUtils.TryGetBillingRegionName(location, out string azureBillingRegionName))
+            if (AzureRegionUtils.TryGetBillingRegionName(location, out var azureBillingRegionName))
             {
                 billingRegionName = azureBillingRegionName;
             }
@@ -118,7 +115,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="cosmosDbAccountName"></param>
         /// <returns>The CosmosDB endpoint and key of the specified account</returns>
-        public async Task<(Uri, string)> GetCosmosDbEndpointAndKey(string cosmosDbAccountName)
+        public async Task<(Uri, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName)
         {
             var azureClient = await GetAzureManagementClientAsync();
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
@@ -206,14 +203,14 @@ namespace TesApi.Web
             return batchClient.JobOperations.ListJobs(activeJobsFilter).Count();
         }
 
-        // TODO: Cache this
         /// <summary>
         /// Gets the batch quotas
         /// </summary>
         /// <returns>Batch quotas</returns>
         public async Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
         {
-            var batchAccount = (await GetBatchAccountAsync(batchAccountName)).Inner;
+            // retry
+            var batchAccount = (await GetBatchAccountAsync(batchAccountId)).Inner;
 
             return new AzureBatchAccountQuotas
             {
@@ -222,6 +219,20 @@ namespace TesApi.Web
                 LowPriorityCoreQuota = batchAccount.LowPriorityCoreQuota,
                 PoolQuota = batchAccount.PoolQuota
             };
+        }
+
+        private async Task<IBatchAccount> GetBatchAccountAsync(string batchAccountId)
+        {
+            try
+            {
+                var azureClient = await GetAzureManagementClientAsync();
+                return await azureClient.WithSubscription(subscriptionId).BatchAccounts.GetByIdAsync(batchAccountId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"An exception occurred when getting the batch account with id {batchAccountId}.");
+                throw;
+            }
         }
 
         /// <summary>
@@ -324,7 +335,7 @@ namespace TesApi.Web
                     }
                     else
                     {
-                        if(job.CreationTime.HasValue && DateTime.UtcNow.Subtract(job.CreationTime.Value) > TimeSpan.FromMinutes(30))
+                        if (job.CreationTime.HasValue && DateTime.UtcNow.Subtract(job.CreationTime.Value) > TimeSpan.FromMinutes(30))
                         {
                             activeJobWithMissingAutoPool = true;
                         }
@@ -364,7 +375,7 @@ namespace TesApi.Web
                     TaskContainerError = taskExecutionInformation?.ContainerInformation?.Error
                 };
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 logger.LogError(ex, $"GetBatchJobAndTaskStateAsync failed for TesTask {tesTaskId}");
                 throw;
@@ -451,7 +462,7 @@ namespace TesApi.Web
         /// Gets the list of container registries that the TES server has access to
         /// </summary>
         /// <returns>List of container registries</returns>
-        public async Task<IEnumerable<ContainerRegistryInfo>> GetAccessibleContainerRegistriesAsync()
+        private async Task<IEnumerable<ContainerRegistryInfo>> GetAccessibleContainerRegistriesAsync()
         {
             var azureClient = await GetAzureManagementClientAsync();
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
@@ -504,10 +515,18 @@ namespace TesApi.Web
         /// <returns>The primary key</returns>
         public async Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
         {
-            var azureClient = await GetAzureManagementClientAsync();
-            var storageAccount = await azureClient.WithSubscription(storageAccountInfo.SubscriptionId).StorageAccounts.GetByIdAsync(storageAccountInfo.Id);
+            try
+            {
+                var azureClient = await GetAzureManagementClientAsync();
+                var storageAccount = await azureClient.WithSubscription(storageAccountInfo.SubscriptionId).StorageAccounts.GetByIdAsync(storageAccountInfo.Id);
 
-            return (await storageAccount.GetKeysAsync()).First().Value;
+                return (await storageAccount.GetKeysAsync()).First().Value;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"An exception occurred when getting the storage account key for account {storageAccountInfo.Name}.");
+                throw;
+            }
         }
 
         /// <summary>
@@ -561,17 +580,8 @@ namespace TesApi.Web
         /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
         public async Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
         {
-            const string key = "vmSizesAndPrices";
-
-            if (cache.TryGetValue(key, out List<VirtualMachineInfo> cachedVmSizesAndPrices))
-            {
-                return cachedVmSizesAndPrices;
-            }
-            else
-            {
-                var vmSizesAndPrices = await GetVmSizesAndPricesRawAsync();
-                return cache.Set(key, vmSizesAndPrices.ToList(), TimeSpan.FromDays(1));
-            }
+            var vmSizesAndPrices = await GetVmSizesAndPricesRawAsync();
+            return vmSizesAndPrices.ToList();
         }
 
         private async Task<string> GetPricingContentJsonAsync()
@@ -680,7 +690,7 @@ namespace TesApi.Web
             return azureClient;
         }
 
-        private static async Task<IBatchAccount> GetBatchAccountAsync(string batchAccountName)
+        private static async Task<IBatchAccount> FindBatchAccountAsync(string batchAccountName)
         {
             var azureClient = await GetAzureManagementClientAsync();
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
@@ -691,7 +701,7 @@ namespace TesApi.Web
 
             if (account == null)
             {
-                throw new Exception($"Batch account '{batchAccountName} does not exist or the TES app service does not have Contributor role on the account.");
+                throw new Exception($"Batch account '{batchAccountName}' does not exist or the TES app service does not have Contributor role on the account.");
             }
 
             return account;
@@ -817,6 +827,20 @@ namespace TesApi.Web
                 "Standard_L4s",
                 "Standard_L8s"
             };
+        }
+
+        ///<inheritdoc/>
+        public async Task<ContainerRegistryInfo> GetContainerRegistryInfoAsync(string imageName)
+        {
+            return (await GetAccessibleContainerRegistriesAsync())
+                .FirstOrDefault(reg => reg.RegistryServer.Equals(imageName.Split('/').FirstOrDefault(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        ///<inheritdoc/>
+        public async Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName)
+        {
+            return (await GetAccessibleStorageAccountsAsync())
+                .FirstOrDefault(storageAccount => storageAccount.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase));
         }
 
         public struct AzureBatchJobAndTaskState

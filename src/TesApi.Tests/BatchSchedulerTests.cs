@@ -423,7 +423,7 @@ namespace TesApi.Tests
 
         private static async Task<(string JobId, CloudTask CloudTask, PoolInformation PoolInformation)> ProcessTesTaskAndGetBatchJobArgumentsAsync(TesTask tesTask, IConfiguration configuration, Mock<IAzureProxy> azureProxy)
         {
-            var batchScheduler = new BatchScheduler(new Mock<ILogger>().Object, configuration, azureProxy.Object);
+            var batchScheduler = new BatchScheduler(new Mock<ILogger>().Object, configuration, new CachingAzureProxy(azureProxy.Object, new Mock<ILogger<CachingAzureProxy>>().Object));
 
             await batchScheduler.ProcessTesTaskAsync(tesTask);
 
@@ -469,8 +469,9 @@ namespace TesApi.Tests
 
             azureProxy.Setup(a => a.GetBatchJobAndTaskStateAsync(It.IsAny<string>())).Returns(Task.FromResult(azureProxyReturnValues.BatchJobAndTaskState));
             azureProxy.Setup(a => a.GetNextBatchJobIdAsync(It.IsAny<string>())).Returns(Task.FromResult(azureProxyReturnValues.NextBatchJobId));
-            azureProxy.Setup(a => a.GetAccessibleStorageAccountsAsync()).Returns(Task.FromResult(azureProxyReturnValues.AccessibleStorageAccounts));
-            azureProxy.Setup(a => a.GetAccessibleContainerRegistriesAsync()).Returns(Task.FromResult(azureProxyReturnValues.AccessibleContainerRegistries));
+            azureProxy.Setup(a => a.GetStorageAccountInfoAsync("defaultstorageaccount")).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["defaultstorageaccount"]));
+            azureProxy.Setup(a => a.GetStorageAccountInfoAsync("storageAccount1")).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["storageAccount1"]));
+            azureProxy.Setup(a => a.GetContainerRegistryInfoAsync("registryServer1/imageName1:tag1")).Returns(Task.FromResult(azureProxyReturnValues.ContainerRegistryInfo));
             azureProxy.Setup(a => a.GetStorageAccountKeyAsync(It.IsAny<StorageAccountInfo>())).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountKey));
             azureProxy.Setup(a => a.GetVmSizesAndPricesAsync()).Returns(Task.FromResult(azureProxyReturnValues.VmSizesAndPrices));
             azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
@@ -522,8 +523,8 @@ namespace TesApi.Tests
 
         private class AzureProxyReturnValues
         {
-            public IEnumerable<StorageAccountInfo> AccessibleStorageAccounts { get; set; }
-            public IEnumerable<ContainerRegistryInfo> AccessibleContainerRegistries { get; set; }
+            public Dictionary<string, StorageAccountInfo> StorageAccountInfos { get; set; }
+            public ContainerRegistryInfo ContainerRegistryInfo { get; set; }
             public List<VirtualMachineInfo> VmSizesAndPrices { get; set; }
             public AzureProxy.AzureBatchAccountQuotas BatchQuotas { get; set; }
             public IEnumerable<AzureProxy.AzureBatchNodeCount> ActiveNodeCountByVmSize { get; set; }
@@ -536,13 +537,11 @@ namespace TesApi.Tests
 
             public static AzureProxyReturnValues Defaults => new AzureProxyReturnValues
             {
-                AccessibleStorageAccounts = new List<StorageAccountInfo> {
-                    new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount/", SubscriptionId = "SubId" },
-                    new StorageAccountInfo { Name = "storageAccount1", Id = "Id", BlobEndpoint = "https://storageAccount1/", SubscriptionId = "SubId" }
+                StorageAccountInfos = new Dictionary<string, StorageAccountInfo> {
+                    { "defaultstorageaccount", new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount/", SubscriptionId = "SubId" } },
+                    { "storageAccount1", new StorageAccountInfo { Name = "storageAccount1", Id = "Id", BlobEndpoint = "https://storageAccount1/", SubscriptionId = "SubId" } }
                 },
-                AccessibleContainerRegistries = new List<ContainerRegistryInfo> {
-                    new ContainerRegistryInfo { RegistryServer = "registryServer1", Username = "default", Password = "placeholder"}
-                },
+                ContainerRegistryInfo = new ContainerRegistryInfo { RegistryServer = "registryServer1", Username = "default", Password = "placeholder" },
                 VmSizesAndPrices = new List<VirtualMachineInfo> {
                     new VirtualMachineInfo { VmSize = "VmSizeLowPri1", LowPriority = true, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 1 },
                     new VirtualMachineInfo { VmSize = "VmSizeLowPri2", LowPriority = true, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 2 },
