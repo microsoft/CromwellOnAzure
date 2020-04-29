@@ -40,9 +40,9 @@ namespace TesApi.Web
         Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation);
 
         /// <summary>
-        /// Gets the <see cref="ContainerRegistryInfo"/> for the given registry name
+        /// Gets the <see cref="ContainerRegistryInfo"/> for the given image name
         /// </summary>
-        /// <param name="imageName">Executor image name</param>
+        /// <param name="imageName">Image name</param>
         /// <returns><see cref="ContainerRegistryInfo"/></returns>
         Task<ContainerRegistryInfo> GetContainerRegistryInfoAsync(string imageName);
 

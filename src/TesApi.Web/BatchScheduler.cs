@@ -40,7 +40,7 @@ namespace TesApi.Web
         private static readonly TimeSpan sasTokenDuration = TimeSpan.FromDays(3);
         
         private readonly ILogger logger;
-        private readonly IAzureProxy cachingAzureProxy;
+        private readonly IAzureProxy azureProxy;
         private readonly string defaultStorageAccountName;
         private readonly List<TesTaskStateTransition> tesTaskStateTransitions;
         private readonly bool usePreemptibleVmsOnly;
@@ -55,7 +55,7 @@ namespace TesApi.Web
         public BatchScheduler(ILogger logger, IConfiguration configuration, IAzureProxy cachingAzureProxy)
         {
             this.logger = logger;
-            this.cachingAzureProxy = cachingAzureProxy;
+            this.azureProxy = cachingAzureProxy;
 
             defaultStorageAccountName = configuration["DefaultStorageAccountName"];    // This account contains the cromwell-executions container
             usePreemptibleVmsOnly = bool.TryParse(configuration["UsePreemptibleVmsOnly"], out var temp) ? temp : false;
@@ -74,20 +74,20 @@ namespace TesApi.Web
 
             tesTaskStateTransitions = new List<TesTaskStateTransition>()
             {
-                new TesTaskStateTransition(tesTask => tesTask.State == TesState.CANCELEDEnum && tesTask.IsCancelRequested, batchTaskState: null, async tesTask => { await this.cachingAzureProxy.DeleteBatchJobAsync(tesTask.Id); tesTask.IsCancelRequested = false; }),
+                new TesTaskStateTransition(tesTask => tesTask.State == TesState.CANCELEDEnum && tesTask.IsCancelRequested, batchTaskState: null, async tesTask => { await this.azureProxy.DeleteBatchJobAsync(tesTask.Id); tesTask.IsCancelRequested = false; }),
                 new TesTaskStateTransition(TesState.QUEUEDEnum, BatchTaskState.JobNotFound, tesTask => AddBatchJobAsync(tesTask)),
-                new TesTaskStateTransition(TesState.QUEUEDEnum, BatchTaskState.MissingBatchTask, tesTask => this.cachingAzureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum),
+                new TesTaskStateTransition(TesState.QUEUEDEnum, BatchTaskState.MissingBatchTask, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum),
                 new TesTaskStateTransition(TesState.QUEUEDEnum, BatchTaskState.Initializing, TesState.INITIALIZINGEnum),
-                new TesTaskStateTransition(TesState.INITIALIZINGEnum, BatchTaskState.NodeAllocationFailed, tesTask => this.cachingAzureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum),
+                new TesTaskStateTransition(TesState.INITIALIZINGEnum, BatchTaskState.NodeAllocationFailed, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum),
                 new TesTaskStateTransition(tesStateIsQueuedOrInitializing, BatchTaskState.Running, TesState.RUNNINGEnum),
-                new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.MoreThanOneActiveJobFound, tesTask => this.cachingAzureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.SYSTEMERROREnum),
+                new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.MoreThanOneActiveJobFound, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.SYSTEMERROREnum),
                 new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.CompletedSuccessfully, TesState.COMPLETEEnum),
                 new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.CompletedWithErrors, TesState.EXECUTORERROREnum),
-                new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.ActiveJobWithMissingAutoPool, tesTask => this.cachingAzureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum),
-                new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.NodeFailedDuringStartupOrExecution, tesTask => this.cachingAzureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.EXECUTORERROREnum),
+                new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.ActiveJobWithMissingAutoPool, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum),
+                new TesTaskStateTransition(tesStateIsQueuedInitializingOrRunning, BatchTaskState.NodeFailedDuringStartupOrExecution, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.EXECUTORERROREnum),
                 new TesTaskStateTransition(tesStateIsInitializingOrRunning, BatchTaskState.JobNotFound, TesState.SYSTEMERROREnum),
-                new TesTaskStateTransition(tesStateIsInitializingOrRunning, BatchTaskState.MissingBatchTask, tesTask => this.cachingAzureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.SYSTEMERROREnum),
-                new TesTaskStateTransition(tesStateIsInitializingOrRunning, BatchTaskState.NodePreempted, tesTask => this.cachingAzureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum) // TODO: Implement preemption detection
+                new TesTaskStateTransition(tesStateIsInitializingOrRunning, BatchTaskState.MissingBatchTask, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.SYSTEMERROREnum),
+                new TesTaskStateTransition(tesStateIsInitializingOrRunning, BatchTaskState.NodePreempted, tesTask => this.azureProxy.DeleteBatchJobAsync(tesTask.Id), TesState.QUEUEDEnum) // TODO: Implement preemption detection
             };
         }
 
@@ -139,7 +139,7 @@ namespace TesApi.Web
         {
             try
             {
-                var jobId = await cachingAzureProxy.GetNextBatchJobIdAsync(tesTask.Id);
+                var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask.Resources);
 
                 await CheckBatchAccountQuotas((int)tesTask.Resources.CpuCores.GetValueOrDefault(DefaultCoreCount), virtualMachineInfo.LowPriority);
@@ -151,7 +151,7 @@ namespace TesApi.Web
                 tesTask.Resources.VmInfo = virtualMachineInfo;
 
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo}.");
-                await cachingAzureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
+                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
                 tesTask.State = TesState.INITIALIZINGEnum;
             }
@@ -213,7 +213,7 @@ namespace TesApi.Web
 
                 try
                 {
-                    storageAccountInfo = await cachingAzureProxy.GetStorageAccountInfoAsync(accountName);
+                    storageAccountInfo = await azureProxy.GetStorageAccountInfoAsync(accountName);
                 }
                 catch (Exception ex)
                 {
@@ -229,7 +229,7 @@ namespace TesApi.Web
 
                 try
                 {
-                    var accountKey = await cachingAzureProxy.GetStorageAccountKeyAsync(storageAccountInfo);
+                    var accountKey = await azureProxy.GetStorageAccountKeyAsync(storageAccountInfo);
 
                     url = path.Replace(storageAccountInfo.Name + "/", storageAccountInfo.BlobEndpoint, StringComparison.OrdinalIgnoreCase).Trim('/');
 
@@ -268,7 +268,7 @@ namespace TesApi.Web
         /// <returns>A higher-level abstraction of the current state of the Azure Batch task</returns>
         private async Task<(BatchTaskState, string)> GetBatchTaskStateAsync(string tesTaskId)
         {
-            var batchJobAndTaskState = await cachingAzureProxy.GetBatchJobAndTaskStateAsync(tesTaskId);
+            var batchJobAndTaskState = await azureProxy.GetBatchJobAndTaskStateAsync(tesTaskId);
 
             if (batchJobAndTaskState.ActiveJobWithMissingAutoPool)
             {
@@ -418,7 +418,7 @@ namespace TesApi.Web
             // TODO: Cromwell bug: Cromwell command write_tsv() generates a file in the execution directory, for example execution/write_tsv_3922310b441805fc43d52f293623efbc.tmp. These are not passed on to TES inputs.
             // WORKAROUND: Get the list of files in the execution directory and add them to task inputs.
             var executionDirectoryUri = new Uri(await MapLocalPathToSasUrlAsync(cromwellExecutionDirectoryPath, getContainerSas: true));
-            var blobsInExecutionDirectory = (await cachingAzureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.Contains($"/{BatchExecutionDirectoryName}/"));
+            var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.Contains($"/{BatchExecutionDirectoryName}/"));
             var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
             var filesToDownload = await Task.WhenAll(inputFiles.Union(additionalInputFiles).Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
 
@@ -426,7 +426,7 @@ namespace TesApi.Web
             var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
             var writableDownloadFilesScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(downloadFilesScriptPath, getContainerSas: true));
             var downloadFilesScriptUrl = await MapLocalPathToSasUrlAsync(downloadFilesScriptPath);
-            await cachingAzureProxy.UploadBlobAsync(writableDownloadFilesScriptUrl, downloadFilesScriptContent);
+            await azureProxy.UploadBlobAsync(writableDownloadFilesScriptUrl, downloadFilesScriptContent);
 
             var filesToUpload = await Task.WhenAll(
                 task.Outputs.Select(async f =>
@@ -436,13 +436,13 @@ namespace TesApi.Web
             var uploadFilesScriptPath = $"{batchExecutionDirectoryPath}/{UploadFilesScriptFileName}";
             var writableUploadFilesScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(uploadFilesScriptPath, getContainerSas: true));
             var uploadFilesScriptUrl = await MapLocalPathToSasUrlAsync(uploadFilesScriptPath);
-            await cachingAzureProxy.UploadBlobAsync(writableUploadFilesScriptUrl, uploadFilesScriptContent);
+            await azureProxy.UploadBlobAsync(writableUploadFilesScriptUrl, uploadFilesScriptContent);
 
             var executor = task.Executors.First();
 
             var volumeMountsOption = $"-v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash}";
 
-            var executorImageIsPublic = (await cachingAzureProxy.GetContainerRegistryInfoAsync(executor.Image)) == null;
+            var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) == null;
 
             var taskCommand = $@"
                 docker pull --quiet {BlobxferImageName} && \
@@ -518,10 +518,10 @@ namespace TesApi.Web
                 inputFileUrl = await MapLocalPathToSasUrlAsync(inputFile.Path);
                 var writableUrl = new Uri(await MapLocalPathToSasUrlAsync(inputFile.Path, getContainerSas: true));
 
-                var content = inputFile.Content ?? await cachingAzureProxy.DownloadBlobAsync(new Uri(inputFileUrl));
+                var content = inputFile.Content ?? await azureProxy.DownloadBlobAsync(new Uri(inputFileUrl));
                 content = IsCromwellCommandScript(inputFile) ? RemoveQueryStringsFromLocalFilePaths(content, queryStringsToRemoveFromLocalFilePaths) : content;
 
-                await cachingAzureProxy.UploadBlobAsync(writableUrl, content);
+                await azureProxy.UploadBlobAsync(writableUrl, content);
             }
             else if (inputFile.Url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
             {
@@ -558,7 +558,7 @@ namespace TesApi.Web
                 imageReference: new ImageReference("ubuntu-server-container", "microsoft-azure-batch", "16-04-lts", "latest"),
                 nodeAgentSkuId: "batch.node.ubuntu 16.04");
 
-            var containerRegistryInfo = await cachingAzureProxy.GetContainerRegistryInfoAsync(image);
+            var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(image);
 
             if (containerRegistryInfo != null)
             {
@@ -629,15 +629,15 @@ namespace TesApi.Web
         /// <param name="preemptible">True if preemptible cores are required.</param>
         private async Task CheckBatchAccountQuotas(int workflowCoresRequirement, bool preemptible)
         {
-            var batchQuotas = await cachingAzureProxy.GetBatchAccountQuotasAsync();
+            var batchQuotas = await azureProxy.GetBatchAccountQuotasAsync();
             var coreQuota = preemptible ? batchQuotas.LowPriorityCoreQuota : batchQuotas.DedicatedCoreQuota;
             var poolQuota = batchQuotas.PoolQuota;
             var activeJobAndJobScheduleQuota = batchQuotas.ActiveJobAndJobScheduleQuota;
 
-            var activeJobsCount = cachingAzureProxy.GetBatchActiveJobCount();
-            var activePoolsCount = cachingAzureProxy.GetBatchActivePoolCount();
-            var activeNodeCountByVmSize = cachingAzureProxy.GetBatchActiveNodeCountByVmSize();
-            var virtualMachineInfoList = await cachingAzureProxy.GetVmSizesAndPricesAsync();
+            var activeJobsCount = azureProxy.GetBatchActiveJobCount();
+            var activePoolsCount = azureProxy.GetBatchActivePoolCount();
+            var activeNodeCountByVmSize = azureProxy.GetBatchActiveNodeCountByVmSize();
+            var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
 
             var totalCoresInUse = activeNodeCountByVmSize
                 .Sum(x => virtualMachineInfoList.FirstOrDefault(vm => vm.VmSize.Equals(x.VirtualMachineSize, StringComparison.OrdinalIgnoreCase)).NumberOfCores * (preemptible ? x.LowPriorityNodeCount : x.DedicatedNodeCount));
@@ -677,7 +677,7 @@ namespace TesApi.Web
             var requiredDiskSizeInGB = tesResources.DiskGb.GetValueOrDefault(DefaultDiskGb);
             var preemptible = usePreemptibleVmsOnly || tesResources.Preemptible.GetValueOrDefault(false);
 
-            var virtualMachineInfoList = await cachingAzureProxy.GetVmSizesAndPricesAsync();
+            var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
 
             var selectedVm = virtualMachineInfoList
                 .Where(x =>
