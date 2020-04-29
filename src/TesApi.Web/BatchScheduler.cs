@@ -51,11 +51,11 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="logger">Logger instance provided by ASP.NET Core DI</param>
         /// <param name="configuration">Configuration</param>
-        /// <param name="cachingAzureProxy">Azure proxy</param>
-        public BatchScheduler(ILogger logger, IConfiguration configuration, IAzureProxy cachingAzureProxy)
+        /// <param name="azureProxy">Azure proxy</param>
+        public BatchScheduler(ILogger logger, IConfiguration configuration, IAzureProxy azureProxy)
         {
             this.logger = logger;
-            this.azureProxy = cachingAzureProxy;
+            this.azureProxy = azureProxy;
 
             defaultStorageAccountName = configuration["DefaultStorageAccountName"];    // This account contains the cromwell-executions container
             usePreemptibleVmsOnly = bool.TryParse(configuration["UsePreemptibleVmsOnly"], out var temp) ? temp : false;
