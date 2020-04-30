@@ -6,12 +6,13 @@ using System.IO;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Swashbuckle.AspNetCore.Swagger;
-using Swashbuckle.AspNetCore.SwaggerGen;
+using Microsoft.OpenApi.Models;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
 using TesApi.Filters;
 using TesApi.Models;
 
@@ -29,13 +30,13 @@ namespace TesApi.Web
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        private readonly IHostingEnvironment hostingEnvironment;
+        private readonly IWebHostEnvironment hostingEnvironment;
         private readonly string azureOfferDurableId;
 
         /// <summary>
         /// Startup class for ASP.NET core
         /// </summary>
-        public Startup(IConfiguration configuration, ILoggerFactory loggerFactory, IHostingEnvironment hostingEnvironment)
+        public Startup(IConfiguration configuration, ILoggerFactory loggerFactory, IWebHostEnvironment hostingEnvironment)
         {
             Configuration = configuration;
             this.hostingEnvironment = hostingEnvironment;
@@ -59,7 +60,13 @@ namespace TesApi.Web
             IAzureProxy cachingAzureProxy = new CachingAzureProxy(azureProxy, loggerFactory.CreateLogger<CachingAzureProxy>());
 
             services.AddSingleton(cachingAzureProxy);
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Latest);
+            services
+                .AddControllers()
+                .AddNewtonsoftJson(opts =>
+                {
+                    opts.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+                    opts.SerializerSettings.Converters.Add(new StringEnumConverter(new CamelCaseNamingStrategy()));
+                });
 
             (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
             services.AddSingleton<IRepository<TesTask>>(new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, CosmosDbDatabaseId, CosmosDbCollectionId, CosmosDbPartitionId));
@@ -68,21 +75,18 @@ namespace TesApi.Web
             services
                 .AddSwaggerGen(c =>
                 {
-                    c.SwaggerDoc("0.3.0", new Info
+                    c.SwaggerDoc("0.3.0", new OpenApiInfo
                     {
                         Version = "0.3.0",
                         Title = "Task Execution Service",
-                        Description = "Task Execution Service (ASP.NET Core 2.0)",
-                        Contact = new Contact()
+                        Description = "Task Execution Service (ASP.NET Core 3.1)",
+                        Contact = new OpenApiContact()
                         {
-                            Name = "OpenAPI-Generator Contributors",
-                            Url = "https://github.com/openapitools/openapi-generator",
-                            Email = ""
+                            Name = "Microsoft Genomics",
+                            Url = new Uri("https://github.com/microsoft/CromwellOnAzure")
                         },
-                        TermsOfService = ""
                     });
-                    c.CustomSchemaIds(type => type.FriendlyId(true));
-                    c.DescribeAllEnumsAsStrings();
+                    c.CustomSchemaIds(type => type.FullName);
                     c.IncludeXmlComments($"{AppContext.BaseDirectory}{Path.DirectorySeparatorChar}{Assembly.GetEntryAssembly().GetName().Name}.xml");
                     c.OperationFilter<GeneratePathParamsValidationFilter>();
                 });
@@ -113,11 +117,17 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="app"></param>
         /// <param name="env"></param>
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+            app.UseRouting();
+            app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapControllers();
+                });
+
             app.UseHttpsRedirection();
+
             app
-                .UseMvc()
                 .UseDefaultFiles()
                 .UseStaticFiles()
                 .UseSwagger(c =>

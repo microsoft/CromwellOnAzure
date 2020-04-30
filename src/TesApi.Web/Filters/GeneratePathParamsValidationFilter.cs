@@ -1,10 +1,10 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc.Controllers;
-using Swashbuckle.AspNetCore.Swagger;
+using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace TesApi.Filters
@@ -19,7 +19,7 @@ namespace TesApi.Filters
         /// </summary>
         /// <param name="operation">Operation</param>
         /// <param name="context">OperationFilterContext</param>
-        public void Apply(Operation operation, OperationFilterContext context)
+        public void Apply(OpenApiOperation operation, OperationFilterContext context)
         {
             var pars = context.ApiDescription.ParameterDescriptions;
 
@@ -43,9 +43,9 @@ namespace TesApi.Filters
                     if (regexAttr != null)
                     {
                         var regex = (string)regexAttr.ConstructorArguments[0].Value;
-                        if (swaggerParam is NonBodyParameter)
+                        if (swaggerParam is OpenApiParameter)
                         {
-                            ((NonBodyParameter)swaggerParam).Pattern = regex;
+                            ((OpenApiParameter)swaggerParam).Schema.Pattern = regex;
                         }
                     }
 
@@ -73,10 +73,10 @@ namespace TesApi.Filters
                         maxLength = (int)maxLengthAttr.ConstructorArguments[0].Value;
                     }
 
-                    if (swaggerParam is NonBodyParameter)
+                    if (swaggerParam is OpenApiParameter)
                     {
-                        ((NonBodyParameter)swaggerParam).MinLength = minLenght;
-                        ((NonBodyParameter)swaggerParam).MaxLength = maxLength;
+                        ((OpenApiParameter)swaggerParam).Schema.MinLength = minLenght;
+                        ((OpenApiParameter)swaggerParam).Schema.MaxLength = maxLength;
                     }
 
                     // Range [Range]
@@ -86,10 +86,10 @@ namespace TesApi.Filters
                         var rangeMin = (int)rangeAttr.ConstructorArguments[0].Value;
                         var rangeMax = (int)rangeAttr.ConstructorArguments[1].Value;
 
-                        if (swaggerParam is NonBodyParameter)
+                        if (swaggerParam is OpenApiParameter)
                         {
-                            ((NonBodyParameter)swaggerParam).Minimum = rangeMin;
-                            ((NonBodyParameter)swaggerParam).Maximum = rangeMax;
+                            ((OpenApiParameter)swaggerParam).Schema.Minimum = rangeMin;
+                            ((OpenApiParameter)swaggerParam).Schema.Maximum = rangeMax;
                         }
                     }
                 }
