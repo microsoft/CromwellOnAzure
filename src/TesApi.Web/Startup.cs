@@ -54,14 +54,16 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="services"></param>
         public void ConfigureServices(IServiceCollection services)
-        {           
+        {
             IAzureProxy azureProxy = new AzureProxy(Configuration["BatchAccountName"], azureOfferDurableId, loggerFactory.CreateLogger<AzureProxy>());
-            services.AddSingleton<IAzureProxy>(azureProxy);
+            IAzureProxy cachingAzureProxy = new CachingAzureProxy(azureProxy, loggerFactory.CreateLogger<CachingAzureProxy>());
+
+            services.AddSingleton(cachingAzureProxy);
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Latest);
 
-            (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKey(Configuration["CosmosDbAccountName"]).Result;
+            (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
             services.AddSingleton<IRepository<TesTask>>(new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, CosmosDbDatabaseId, CosmosDbCollectionId, CosmosDbPartitionId));
-            services.AddSingleton<IBatchScheduler>(new BatchScheduler(loggerFactory.CreateLogger<BatchScheduler>(), Configuration, azureProxy));
+            services.AddSingleton<IBatchScheduler>(new BatchScheduler(loggerFactory.CreateLogger<BatchScheduler>(), Configuration, cachingAzureProxy));
 
             services
                 .AddSwaggerGen(c =>
@@ -103,21 +105,6 @@ namespace TesApi.Web
             else
             {
                 services.AddApplicationInsightsTelemetry();
-            }
-
-            CacheVmSizesAndPrices(azureProxy);
-        }
-
-        private void CacheVmSizesAndPrices(IAzureProxy azureProxy)
-        {
-            try
-            {
-                var vms = azureProxy.GetVmSizesAndPricesAsync().Result;
-                logger.LogInformation($"Successfully retrieved info about {vms.Count} VMs.");
-            }
-            catch (Exception exc)
-            {
-                logger.LogError(exc, "Exception trying to GetVmSizesAndPrices on startup.  Check if machine has Billing Reader writes on the subscription");
             }
         }
 

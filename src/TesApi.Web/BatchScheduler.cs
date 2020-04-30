@@ -34,14 +34,14 @@ namespace TesApi.Web
         private const string DownloadFilesScriptFileName = "download_files_script";
         private const string DockerInDockerImageName = "docker";
         private const string BlobxferImageName = "mcr.microsoft.com/blobxfer";
+        
         private static readonly Regex queryStringRegex = new Regex(@"[^\?.]*(\?.*)");
         private static readonly Regex externalStorageContainerRegex = new Regex(@"(https://([^\.]*).blob.core.windows.net/)([^\?/]+)/*?(\?.+)");
         private static readonly TimeSpan sasTokenDuration = TimeSpan.FromDays(3);
+        
         private readonly ILogger logger;
         private readonly IAzureProxy azureProxy;
         private readonly string defaultStorageAccountName;
-        private List<StorageAccountInfo> storageAccountCache;
-        private List<ContainerRegistry> containerRegistryCache;
         private readonly List<TesTaskStateTransition> tesTaskStateTransitions;
         private readonly bool usePreemptibleVmsOnly;
         private readonly List<ExternalStorageContainerInfo> externalStorageContainers;
@@ -56,6 +56,7 @@ namespace TesApi.Web
         {
             this.logger = logger;
             this.azureProxy = azureProxy;
+
             defaultStorageAccountName = configuration["DefaultStorageAccountName"];    // This account contains the cromwell-executions container
             usePreemptibleVmsOnly = bool.TryParse(configuration["UsePreemptibleVmsOnly"], out var temp) ? temp : false;
 
@@ -140,6 +141,7 @@ namespace TesApi.Web
             {
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask.Resources);
+
                 await CheckBatchAccountQuotas((int)tesTask.Resources.CpuCores.GetValueOrDefault(DefaultCoreCount), virtualMachineInfo.LowPriority);
 
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
@@ -207,20 +209,17 @@ namespace TesApi.Web
             }
             else
             {
+                StorageAccountInfo storageAccountInfo;
+
                 try
                 {
-                    if (storageAccountCache == null || !storageAccountCache.Any(a => a.Name.Equals(accountName, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        storageAccountCache = (await azureProxy.GetAccessibleStorageAccountsAsync()).ToList();
-                    }
+                    storageAccountInfo = await azureProxy.GetStorageAccountInfoAsync(accountName);
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, $"Could not get the list of storage accounts when trying to get URL of the path '{path}'. Most likely the TES app service does not have permission to any storage accounts.");
                     return null;
                 }
-
-                var storageAccountInfo = storageAccountCache.FirstOrDefault(a => a.Name.Equals(accountName, StringComparison.OrdinalIgnoreCase));
 
                 if (storageAccountInfo == null)
                 {
@@ -231,6 +230,7 @@ namespace TesApi.Web
                 try
                 {
                     var accountKey = await azureProxy.GetStorageAccountKeyAsync(storageAccountInfo);
+
                     url = path.Replace(storageAccountInfo.Name + "/", storageAccountInfo.BlobEndpoint, StringComparison.OrdinalIgnoreCase).Trim('/');
 
                     if (isContainerPath || getContainerSas)
@@ -328,7 +328,7 @@ namespace TesApi.Web
                     else
                     {
                         logger.LogError($"Task {tesTaskId} failed. ExitCode: {batchJobAndTaskState.TaskExitCode}, BatchJobInfo: {batchJobInfo}");
-                        return (BatchTaskState.CompletedWithErrors, $"ExitCode: {batchJobAndTaskState.TaskExitCode}, BatchJobInfo: {batchJobInfo}"); 
+                        return (BatchTaskState.CompletedWithErrors, $"ExitCode: {batchJobAndTaskState.TaskExitCode}, BatchJobInfo: {batchJobInfo}");
                     }
                 default:
                     throw new Exception($"Found batch task {tesTaskId} in unexpected state: {batchJobAndTaskState.TaskState}");
@@ -442,7 +442,7 @@ namespace TesApi.Web
 
             var volumeMountsOption = $"-v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash}";
 
-            var executorImageIsPublic = (await GetContainerRegistryAsync(executor.Image)) == null;
+            var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) == null;
 
             var taskCommand = $@"
                 docker pull --quiet {BlobxferImageName} && \
@@ -558,10 +558,15 @@ namespace TesApi.Web
                 imageReference: new ImageReference("ubuntu-server-container", "microsoft-azure-batch", "16-04-lts", "latest"),
                 nodeAgentSkuId: "batch.node.ubuntu 16.04");
 
-            var containerRegistry = await GetContainerRegistryAsync(image);
+            var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(image);
 
-            if (containerRegistry != null)
+            if (containerRegistryInfo != null)
             {
+                var containerRegistry = new ContainerRegistry(
+                    userName: containerRegistryInfo.Username,
+                    registryServer: containerRegistryInfo.RegistryServer,
+                    password: containerRegistryInfo.Password);
+
                 // Download private images at node startup, since those cannot be downloaded in the main task that runs multiple containers.
                 // Doing this also requires that the main task runs inside a container, hence downloading the "docker" image (contains docker client) as well.
                 vmConfig.ContainerConfiguration = new ContainerConfiguration
@@ -592,22 +597,6 @@ namespace TesApi.Web
             };
 
             return poolInformation;
-        }
-
-        /// <summary>
-        /// Gets the <see cref="ContainerRegistryInfo"/> associated with the given image
-        /// </summary>
-        /// <returns>The <see cref="ContainerRegistry"/></returns>
-        private async Task<ContainerRegistry> GetContainerRegistryAsync(string imageName)
-        {
-            if (containerRegistryCache == null || !containerRegistryCache.Any(reg => imageName.StartsWith(reg.RegistryServer, StringComparison.OrdinalIgnoreCase)))
-            {
-                containerRegistryCache = (await azureProxy.GetAccessibleContainerRegistriesAsync())
-                    .Select(c => new ContainerRegistry(userName: c.Username, registryServer: c.RegistryServer, password: c.Password))
-                    .ToList();
-            }
-
-            return containerRegistryCache.FirstOrDefault(reg => imageName.StartsWith(reg.RegistryServer, StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>

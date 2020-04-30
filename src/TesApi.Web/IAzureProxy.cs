@@ -22,7 +22,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="cosmosDbAccountName"></param>
         /// <returns>The CosmosDB endpoint and key of the specified account</returns>
-        Task<(Uri, string)> GetCosmosDbEndpointAndKey(string cosmosDbAccountName);
+        Task<(Uri, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName);
 
         /// <summary>
         /// Gets a new Azure Batch job id to schedule another task
@@ -40,10 +40,18 @@ namespace TesApi.Web
         Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation);
 
         /// <summary>
-        /// Retrieves the list of container registries that the TES server has access to.
+        /// Gets the <see cref="ContainerRegistryInfo"/> for the given image name
         /// </summary>
-        /// <returns>List of container registries</returns>
-        Task<IEnumerable<ContainerRegistryInfo>> GetAccessibleContainerRegistriesAsync();
+        /// <param name="imageName">Image name</param>
+        /// <returns><see cref="ContainerRegistryInfo"/></returns>
+        Task<ContainerRegistryInfo> GetContainerRegistryInfoAsync(string imageName);
+
+        /// <summary>
+        /// Gets the <see cref="StorageAccountInfo"/> for the given storage account name
+        /// </summary>
+        /// <param name="storageAccountName">Storage account name</param>
+        /// <returns><see cref="StorageAccountInfo"/></returns>
+        Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName);
 
         /// <summary>
         /// Get the current states of the Azure Batch job and task corresponding to the given TES task
@@ -61,7 +69,7 @@ namespace TesApi.Web
         /// <summary>
         /// Get Batch account quota
         /// </summary>
-        /// <returns></returns>
+        /// <returns><see cref="AzureBatchAccountQuotas"/></returns>
         Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync();
 
         /// <summary>
@@ -87,12 +95,6 @@ namespace TesApi.Web
         /// </summary>
         /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
         Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync();
-
-        /// <summary>
-        /// Gets the list of storage accounts that the TES server has access to
-        /// </summary>
-        /// <returns>List of storage accounts</returns>
-        Task<IEnumerable<StorageAccountInfo>> GetAccessibleStorageAccountsAsync();
 
         /// <summary>
         /// Gets the primary key of the given storage account.
