@@ -122,7 +122,7 @@ namespace TesApi.Web
             {
                 // retry
                 var vmSizesAndPrices = await azureProxy.GetVmSizesAndPricesAsync();
-                cache.Set(key, vmSizesAndPrices.ToList(), DateTimeOffset.MaxValue);
+                cache.Set(key, vmSizesAndPrices.ToList(), TimeSpan.FromDays(1));
             }
 
             return cachedVmSizesAndPrices;
