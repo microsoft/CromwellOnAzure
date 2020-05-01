@@ -132,5 +132,8 @@ namespace TesApi.Web
         public Task<IEnumerable<string>> ListOldJobsToDeleteAsync(TimeSpan oldestJobAge) => azureProxy.ListOldJobsToDeleteAsync(oldestJobAge);
         public Task UploadBlobAsync(Uri blobAbsoluteUri, string content) => azureProxy.UploadBlobAsync(blobAbsoluteUri, content);
         public Task<(Uri, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName) => azureProxy.GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
+        public Task UploadBlobFromFileAsync(Uri blobAbsoluteUri, string filePath) => azureProxy.UploadBlobFromFileAsync(blobAbsoluteUri, filePath);
+        public bool LocalFileExists(string path) => azureProxy.LocalFileExists(path);
+        public bool TryReadCwlFile(string workflowId, out string content) => azureProxy.TryReadCwlFile(workflowId, out content);
     }
 }

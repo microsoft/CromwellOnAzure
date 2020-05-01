@@ -112,6 +112,14 @@ namespace TesApi.Web
         Task UploadBlobAsync(Uri blobAbsoluteUri, string content);
 
         /// <summary>
+        /// Uploads the file content to a blob
+        /// </summary>
+        /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
+        /// <param name="filePath">File path</param>
+        /// <returns>A task to await</returns>
+        Task UploadBlobFromFileAsync(Uri blobAbsoluteUri, string filePath);
+
+        /// <summary>
         /// Downloads a blob
         /// </summary>
         /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
@@ -147,5 +155,18 @@ namespace TesApi.Web
         /// Deletes the specified pool
         /// </summary>
         Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Checks if a local file exists
+        /// </summary>
+        bool LocalFileExists(string path);
+
+        /// <summary>
+        /// Reads the content of the Common Workflow Language (CWL) file associated with the parent workflow of the TES task
+        /// </summary>
+        /// <param name="workflowId">Parent workflow</param>
+        /// <param name="content">Content of the file</param>
+        /// <returns>True if file was found</returns>
+        bool TryReadCwlFile(string workflowId, out string content);
     }
 }

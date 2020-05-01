@@ -22,16 +22,11 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task CreateTaskAsync_ReturnsBadRequest_ForInvalidId()
         {
-            // Arrange
-            var mockRepo = new Mock<IRepository<TesTask>>();
             var tesTask = new TesTask { Id = "ClientProvidedId", Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } } };
+            var controller = this.GetTaskServiceApiController();
 
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
-
-            // Act
             var result = await controller.CreateTaskAsync(tesTask) as BadRequestObjectResult;
 
-            // Assert
             Assert.IsNotNull(result);
             Assert.AreEqual(400, result.StatusCode);
         }
@@ -39,16 +34,11 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task CreateTaskAsync_ReturnsBadRequest_ForMissingDockerImage()
         {
-            // Arrange
-            var mockRepo = new Mock<IRepository<TesTask>>();
             var tesTask = new TesTask();
+            var controller = this.GetTaskServiceApiController();
 
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
-
-            // Act
             var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
 
-            // Assert
             Assert.IsNotNull(result);
             Assert.AreEqual(400, result.StatusCode);
         }
@@ -56,18 +46,15 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task CreateTaskAsync_ReturnsTesCreateTaskResponse()
         {
-            // Arrange
-            var mockRepo = new Mock<IRepository<TesTask>>();
             var tesTask = new TesTask() { Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } } };
 
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
+            var repository = new Mock<IRepository<TesTask>>();
+            var controller = this.GetTaskServiceApiController(repository.Object);
 
-            // Act
             var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
 
-            // Assert
             Assert.IsNotNull(result);
-            mockRepo.Verify(x => x.CreateItemAsync(tesTask));
+            repository.Verify(x => x.CreateItemAsync(tesTask));
             Assert.AreEqual(32, tesTask.Id.Length);
             Assert.AreEqual(TesState.QUEUEDEnum, tesTask.State);
             Assert.AreEqual(200, result.StatusCode);
@@ -76,11 +63,11 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task CreateTaskAsync_CromwellJobIdIsUsedAsTaskIdPrefix()
         {
-            var mockRepo = new Mock<IRepository<TesTask>>();
             var cromwellJobId = Guid.NewGuid().ToString();
             var taskDescription = $"{cromwellJobId}:BackendJobDescriptorKey_CommandCallNode_wf_hello.hello:-1:1";
             var tesTask = new TesTask() { Description = taskDescription, Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } } };
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
+
+            var controller = this.GetTaskServiceApiController();
 
             await controller.CreateTaskAsync(tesTask);
 
@@ -91,17 +78,15 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task CancelTaskAsync_ReturnsBadRequest_ForInvalidId()
         {
-            // Arrange
-            var mockRepo = new Mock<IRepository<TesTask>>();
             var tesTaskId = "IdDoesNotExist";
 
+            var mockRepo = new Mock<IRepository<TesTask>>();
             mockRepo.Setup(repo => repo.GetItemAsync(tesTaskId)).ReturnsAsync((RepositoryItem<TesTask>)null);
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
 
-            // Act
+            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+
             var result = await controller.CancelTask(tesTaskId) as BadRequestObjectResult;
 
-            // Assert
             Assert.IsNotNull(result);
             Assert.AreEqual(400, result.StatusCode);
         }
@@ -109,18 +94,16 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task CancelTaskAsync_ReturnsEmptyObject()
         {
-            // Arrange
             var tesTask = new TesTask() { Id = "testTaskId", State = TesState.QUEUEDEnum };
             var repositoryItem = new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = tesTask };
 
             var mockRepo = new Mock<IRepository<TesTask>>();
             mockRepo.Setup(repo => repo.GetItemAsync(tesTask.Id)).ReturnsAsync(repositoryItem);
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
 
-            // Act
+            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+
             var result = await controller.CancelTask(tesTask.Id) as ObjectResult;
 
-            // Assert
             Assert.IsNotNull(result);
             Assert.AreEqual(200, result.StatusCode);
             Assert.AreEqual(TesState.CANCELEDEnum, repositoryItem.Value.State);
@@ -130,14 +113,10 @@ namespace TesApi.Tests
         [TestMethod]
         public void GetServiceInfo_ReturnsInfo()
         {
-            // Arrange
-            var mockRepo = new Mock<IRepository<TesTask>>();
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
+            var controller = this.GetTaskServiceApiController();
 
-            // Act
             var result = controller.GetServiceInfo() as ObjectResult;
 
-            // Assert
             Assert.IsNotNull(result);
             Assert.AreEqual(200, result.StatusCode);
         }
@@ -145,17 +124,15 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task GetTaskAsync_ReturnsNotFound_ForInvalidId()
         {
-            // Arrange
-            var mockRepo = new Mock<IRepository<TesTask>>();
             var tesTaskId = "IdDoesNotExist";
 
+            var mockRepo = new Mock<IRepository<TesTask>>();
             mockRepo.Setup(repo => repo.GetItemAsync(tesTaskId)).ReturnsAsync((RepositoryItem<TesTask>)null);
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
 
-            // Act
+            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+
             var result = await controller.GetTaskAsync(tesTaskId, "MINIMAL") as NotFoundObjectResult;
 
-            // Assert
             Assert.IsNotNull(result);
             Assert.AreEqual(404, result.StatusCode);
         }
@@ -163,18 +140,16 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task GetTaskAsync_ReturnsBadRequest_ForInvalidViewValue()
         {
-            // Arrange
-            var mockRepo = new Mock<IRepository<TesTask>>();
             var tesTask = new TesTask();
 
+            var mockRepo = new Mock<IRepository<TesTask>>();
             var repositoryItem = new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = tesTask };
             mockRepo.Setup(repo => repo.GetItemAsync(tesTask.Id)).ReturnsAsync(repositoryItem);
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
 
-            // Act
+            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+
             var result = await controller.GetTaskAsync(tesTask.Id, "INVALID") as BadRequestObjectResult;
 
-            // Assert
             Assert.IsNotNull(result);
             Assert.AreEqual(400, result.StatusCode);
         }
@@ -182,21 +157,19 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task GetTaskAsync_ReturnsJsonResult()
         {
-            // Arrange
-            var mockRepo = new Mock<IRepository<TesTask>>();
             var tesTask = new TesTask
             {
                 State = TesState.RUNNINGEnum
             };
 
+            var mockRepo = new Mock<IRepository<TesTask>>();
             var repositoryItem = new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = tesTask };
             mockRepo.Setup(repo => repo.GetItemAsync(tesTask.Id)).ReturnsAsync(repositoryItem);
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
 
-            // Act
+            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+
             var result = await controller.GetTaskAsync(tesTask.Id, "MINIMAL") as JsonResult;
 
-            // Assert
             Assert.IsNotNull(result);
             mockRepo.Verify(x => x.GetItemAsync(tesTask.Id));
             Assert.AreEqual(TesState.RUNNINGEnum, tesTask.State);
@@ -206,13 +179,10 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ListTasks_ReturnsBadRequest_ForInvalidPageSize()
         {
-            // Arrange
-            var controller = new TaskServiceApiController(new Mock<IRepository<TesTask>>().Object, new NullLogger<TaskServiceApiController>());
+            var controller = this.GetTaskServiceApiController();
 
-            // Act
             var result = await controller.ListTasks(null, 0, null, "BASIC") as BadRequestObjectResult;
 
-            // Assert
             Assert.IsNotNull(result);
             Assert.AreEqual(400, result.StatusCode);
         }
@@ -220,8 +190,6 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ListTasks_ReturnsJsonResult()
         {
-            // Arrange
-            var mockRepo = new Mock<IRepository<TesTask>>();
             var firstTesTask = new TesTask { Id = "tesTaskId1", State = TesState.COMPLETEEnum, Name = "tesTask" };
             var secondTesTask = new TesTask { Id = "tesTaskId2", State = TesState.EXECUTORERROREnum, Name = "tesTask2" };
             var thirdTesTask = new TesTask { Id = "tesTaskId3", State = TesState.EXECUTORERROREnum, Name = "someOtherTask2" };
@@ -232,18 +200,18 @@ namespace TesApi.Tests
             var repositoryItem3 = new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = thirdTesTask };
             var repositoryItems = new[] { repositoryItem1, repositoryItem2, repositoryItem3 };
 
+            var mockRepo = new Mock<IRepository<TesTask>>();
+
             mockRepo.Setup(repo => repo
                 .GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>(), It.IsAny<int>(), It.IsAny<string>()))
                 .ReturnsAsync((Expression<Func<TesTask, bool>> predicate, int pageSize, string continuationToken) =>
                     ("", repositoryItems.Where(i => predicate.Compile().Invoke(i.Value)).Take(pageSize)));
 
-            var controller = new TaskServiceApiController(mockRepo.Object, new NullLogger<TaskServiceApiController>());
+            var controller = this.GetTaskServiceApiController(mockRepo.Object);
 
-            // Act
             var result = await controller.ListTasks(namePrefix, 1, null, "BASIC") as JsonResult;
             var listOfTesTasks = (TesListTasksResponse)result.Value;
 
-            // Assert
             Assert.IsNotNull(result);
             Assert.AreEqual(1, listOfTesTasks.Tasks.Count);
             Assert.AreEqual(200, result.StatusCode);
@@ -252,7 +220,6 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task CreateTaskAsync_ExtractsWorkflowId()
         {
-            var repo = new Mock<IRepository<TesTask>>();
             var cromwellWorkflowId = "daf1a044-d741-4db9-8eb5-d6fd0519b1f1";
             var taskDescription = $"{cromwellWorkflowId}:BackendJobDescriptorKey_CommandCallNode_wf_hello.hello:-1:1";
 
@@ -262,18 +229,18 @@ namespace TesApi.Tests
                 Inputs = new List<TesInput> { new TesInput { Path = "/cromwell-executions/test/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script" } }
             };
 
-            var controller = new TaskServiceApiController(repo.Object, new NullLogger<TaskServiceApiController>());
+            var controller = this.GetTaskServiceApiController();
+
             await controller.CreateTaskAsync(tesTask);
+
             Assert.AreEqual(cromwellWorkflowId, tesTask.WorkflowId);
         }
 
         [TestMethod]
         public async Task CreateTaskAsync_InvalidInputsAndPathDoNotThrow()
         {
-            var repo = new Mock<IRepository<TesTask>>();
             var cromwellWorkflowId = "daf1a044-d741-4db9-8eb5-d6fd0519b1f1";
             var taskDescription = $"{cromwellWorkflowId}:BackendJobDescriptorKey_CommandCallNode_wf_hello.hello:-1:1";
-            var controller = new TaskServiceApiController(repo.Object, new NullLogger<TaskServiceApiController>());
 
             var tesTask1 = new TesTask()
             {
@@ -281,7 +248,10 @@ namespace TesApi.Tests
                 Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } }
             };
 
+            var controller = this.GetTaskServiceApiController();
+
             await controller.CreateTaskAsync(tesTask1);
+
             Assert.IsNull(tesTask1.WorkflowId);
 
             var tesTask2 = new TesTask()
@@ -292,6 +262,7 @@ namespace TesApi.Tests
             };
 
             await controller.CreateTaskAsync(tesTask2);
+
             Assert.IsNull(tesTask2.WorkflowId);
 
             var tesTask3 = new TesTask()
@@ -302,6 +273,7 @@ namespace TesApi.Tests
             };
 
             await controller.CreateTaskAsync(tesTask3);
+
             Assert.IsNull(tesTask3.WorkflowId);
 
             var tesTask4 = new TesTask()
@@ -312,7 +284,162 @@ namespace TesApi.Tests
             };
 
             await controller.CreateTaskAsync(tesTask4);
+
             Assert.IsNull(tesTask4.WorkflowId);
+        }
+
+        [TestMethod]
+        public async Task CreateCwlTaskAsync_CwlDiskSizeIsUsedIfTesTaskHasItNull()
+        {
+            var cwlFileContent = @"
+                hints:
+                  - class: ResourceRequirement
+                    tmpdirMin: 1024
+                    outdirMin: 2048";
+
+            var tesTask = await CreateCwlTesTaskAsync(cwlFileContent, tesResourcesReceivedFromCromwell: null);
+
+            Assert.AreEqual(3, tesTask.Resources.DiskGb);
+
+            cwlFileContent = @"
+                hints:
+                  - class: ResourceRequirement
+                    tmpdirMin: 1024";
+
+            tesTask = await CreateCwlTesTaskAsync(cwlFileContent, tesResourcesReceivedFromCromwell: null);
+
+            Assert.AreEqual(1, tesTask.Resources.DiskGb);
+
+            cwlFileContent = @"
+                hints:
+                  - class: ResourceRequirement
+                    tmpdirMax: 1024
+                    outdirMax: 2048";
+
+            tesTask = await CreateCwlTesTaskAsync(cwlFileContent, tesResourcesReceivedFromCromwell: null);
+
+            Assert.AreEqual(3, tesTask.Resources.DiskGb);
+        }
+
+        [TestMethod]
+        public async Task CreateCwlTaskAsync_TesResourceNamingCanBeUsedInCwl()
+        {
+            var cwlFileContent = @"
+                hints:
+                  - class: ResourceRequirement
+                    cpu: 11
+                    memory: 22 GB
+                    disk: 33 GB";
+
+            var tesTask = await CreateCwlTesTaskAsync(cwlFileContent, tesResourcesReceivedFromCromwell: null);
+
+            Assert.AreEqual(11, tesTask.Resources.CpuCores);
+            Assert.AreEqual(22, tesTask.Resources.RamGb);
+            Assert.AreEqual(33, tesTask.Resources.DiskGb);
+        }
+
+        [TestMethod]
+        public async Task CreateCwlTaskAsync_TesTaskDiskOverridesCwl()
+        {
+            // Cromwell is currently ignoring any disk specification in CWL workflows and not passing it on to TES.
+            // When this is fixed, we want the Cromwell value to be used instead of retrieving it from the CWL file.
+            var cwlFileContent = @"
+                hints:
+                  - class: ResourceRequirement
+                    tmpdirMin: 1024
+                    outdirMin: 2048
+                    disk: 15 GB";
+
+            var tesTask = await CreateCwlTesTaskAsync(cwlFileContent, tesResourcesReceivedFromCromwell: new TesResources { DiskGb = 5 });
+
+            Assert.AreEqual(5, tesTask.Resources.DiskGb);
+        }
+
+        [TestMethod]
+        public async Task CreateCwlTaskAsync_TesTaskCpuAndMemoryOverrideCwl()
+        {
+            var cwlFileContent = @"
+                hints:
+                  - class: ResourceRequirement
+                    cpu: 11
+                    memory: 22 GB";
+
+            var tesTask = await CreateCwlTesTaskAsync(cwlFileContent, tesResourcesReceivedFromCromwell: new TesResources { CpuCores = 33, RamGb = 44 });
+
+            Assert.AreEqual(33, tesTask.Resources.CpuCores);
+            Assert.AreEqual(44, tesTask.Resources.RamGb);
+        }
+
+        [TestMethod]
+        public async Task CreateCwlTaskAsync_NonNullCwlPreemptibleOverridesTesTaskPreemptible()
+        {
+            // CWL has no concept of preemptible and Cromwell always passes the defualt value (TRUE).
+            // Cromwell ignores any hints in CWL workflow that it does not know about.
+            // If preemptible hint exists in CWL, it needs to override the default one passed by Cromwell to TES.
+            var cwlFileContent = @"
+                hints:
+                  - class: ResourceRequirement
+                    preemptible: false";
+
+            var tesTask = await CreateCwlTesTaskAsync(cwlFileContent, tesResourcesReceivedFromCromwell: new TesResources { Preemptible = true });
+
+            Assert.AreEqual(false, tesTask.Resources.Preemptible);
+
+            cwlFileContent = @"
+                hints:
+                  - class: ResourceRequirement
+                    preemptible: true";
+
+            tesTask = await CreateCwlTesTaskAsync(cwlFileContent, tesResourcesReceivedFromCromwell: new TesResources { Preemptible = false });
+
+            Assert.AreEqual(true, tesTask.Resources.Preemptible);
+
+            cwlFileContent = @"
+                hints:
+                  - class: ResourceRequirement
+                    preemptible: false";
+
+            tesTask = await CreateCwlTesTaskAsync(cwlFileContent, tesResourcesReceivedFromCromwell: null);
+
+            Assert.AreEqual(false, tesTask.Resources.Preemptible);
+
+            cwlFileContent = @"
+                hints:
+                  - class: ResourceRequirement";
+
+            tesTask = await CreateCwlTesTaskAsync(cwlFileContent, tesResourcesReceivedFromCromwell: new TesResources { Preemptible = true });
+
+            Assert.AreEqual(true, tesTask.Resources.Preemptible);
+        }
+
+        private TaskServiceApiController GetTaskServiceApiController() => GetTaskServiceApiController(new Mock<IRepository<TesTask>>().Object, new Mock<IAzureProxy>().Object);
+
+        private TaskServiceApiController GetTaskServiceApiController(IRepository<TesTask> repository) => GetTaskServiceApiController(repository, new Mock<IAzureProxy>().Object);
+
+        private TaskServiceApiController GetTaskServiceApiController(IAzureProxy azureProxy) => GetTaskServiceApiController(new Mock<IRepository<TesTask>>().Object, azureProxy);
+
+        private TaskServiceApiController GetTaskServiceApiController(IRepository<TesTask> repository, IAzureProxy azureProxy)
+        {
+            return new TaskServiceApiController(repository, new NullLogger<TaskServiceApiController>(), azureProxy);
+        }
+
+        private async Task<TesTask> CreateCwlTesTaskAsync(string cwlFileContent, TesResources tesResourcesReceivedFromCromwell)
+        {
+            var tesTask = new TesTask()
+            {
+                Name = "test.cwl",
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Inputs = new List<TesInput> { new TesInput { Path = "/cromwell-executions/test/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script" } },
+                Resources = tesResourcesReceivedFromCromwell
+            };
+
+            var azureProxy = new Mock<IAzureProxy>();
+            azureProxy.Setup(a => a.TryReadCwlFile(It.IsAny<string>(), out cwlFileContent)).Returns(true);
+            var controller = this.GetTaskServiceApiController(azureProxy.Object);
+
+            await controller.CreateTaskAsync(tesTask);
+
+            return tesTask;
         }
     }
 }

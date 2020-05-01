@@ -7,8 +7,8 @@
     {
       "name": "file1.txt",
       "description": "File1",
-      "url": "/storageAccount1/container1/file1.txt",
-      "path": "/cromwell-executions/workflow1/workflowId1/call-Task1/inputs/storageAccount1/container1/file1.txt",
+      "url": "/storageaccount1/container1/file1.txt",
+      "path": "/cromwell-executions/workflow1/workflowId1/call-Task1/inputs/storageaccount1/container1/file1.txt",
       "type": "FILE"
     },
     {

@@ -541,6 +541,17 @@ namespace TesApi.Web
         }
 
         /// <summary>
+        /// Uploads the file content to a blob
+        /// </summary>
+        /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
+        /// <param name="filePath">File path</param>
+        /// <returns>A task to await</returns>
+        public Task UploadBlobFromFileAsync(Uri blobAbsoluteUri, string filePath)
+        {
+            return new CloudBlockBlob(blobAbsoluteUri).UploadFromFileAsync(filePath);
+        }
+
+        /// <summary>
         /// Downloads a blob
         /// </summary>
         /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
@@ -582,6 +593,43 @@ namespace TesApi.Web
         {
             var vmSizesAndPrices = await GetVmSizesAndPricesRawAsync();
             return vmSizesAndPrices.ToList();
+        }
+		
+		/// <summary>
+        /// Checks if a local file exists
+        /// </summary>
+        public bool LocalFileExists(string path)
+        {
+            return File.Exists(path);
+        }
+
+        /// <summary>
+        /// Reads the content of the Common Workflow Language (CWL) file associated with the parent workflow of the TES task
+        /// </summary>
+        /// <param name="workflowId">Parent workflow</param>
+        /// <param name="content">Content of the file</param>
+        /// <returns>True if file was found</returns>
+        public bool TryReadCwlFile(string workflowId, out string content)
+        {
+            var fileName = $"cwl_temp_file_{workflowId}.cwl";
+
+            try
+            {
+                var filePath = Directory.GetFiles("/cromwell-tmp", fileName, SearchOption.AllDirectories).FirstOrDefault();
+
+                if (filePath != null)
+                {
+                    content = File.ReadAllText(filePath);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"Error looking up or retrieving contents of file '{fileName}'");
+            }
+
+            content = null;
+            return false;
         }
 
         private async Task<string> GetPricingContentJsonAsync()

@@ -37,6 +37,7 @@ namespace TesApi.Controllers
         private const string rootExecutionPath = "/cromwell-executions";
         private readonly IRepository<TesTask> repository;
         private readonly ILogger<TaskServiceApiController> logger;
+        private readonly IAzureProxy azureProxy;
 
         private static readonly Dictionary<TesView, JsonSerializerSettings> TesJsonSerializerSettings = new Dictionary<TesView, JsonSerializerSettings>
         {
@@ -50,10 +51,11 @@ namespace TesApi.Controllers
         /// </summary>
         /// <param name="repository">The main <see cref="TesTask"/> database repository</param>
         /// <param name="logger">The logger instance</param>
-        public TaskServiceApiController(IRepository<TesTask> repository, ILogger<TaskServiceApiController> logger)
+        public TaskServiceApiController(IRepository<TesTask> repository, ILogger<TaskServiceApiController> logger, IAzureProxy azureProxy)
         {
             this.repository = repository;
             this.logger = logger;
+            this.azureProxy = azureProxy;
         }
 
         /// <summary>
@@ -124,7 +126,26 @@ namespace TesApi.Controllers
                 ?.Split('/', StringSplitOptions.RemoveEmptyEntries)
                 ?.Skip(2)
                 ?.FirstOrDefault();
-            
+
+            // For CWL workflows, if disk size is not specified in TES object (always), try to retrieve it from the corresponding workflow stored by Cromwell in /cromwell-tmp directory
+            // Also allow for TES-style "memory" and "cpu" hints in CWL.
+            if (tesTask.Name != null 
+                && tesTask.Name.EndsWith(".cwl") 
+                && tesTask.WorkflowId != null
+                && azureProxy.TryReadCwlFile(tesTask.WorkflowId, out var cwlContent) 
+                && CwlDocument.TryCreate(cwlContent, out var cwlDocument))
+            {
+                tesTask.Resources = tesTask.Resources ?? new TesResources();
+                tesTask.Resources.DiskGb = tesTask.Resources.DiskGb ?? cwlDocument.DiskGb;
+                tesTask.Resources.CpuCores = tesTask.Resources.CpuCores ?? cwlDocument.Cpu;
+                tesTask.Resources.RamGb = tesTask.Resources.RamGb ?? cwlDocument.MemoryGb;
+
+                // Preemptible is not passed on from CWL workflows to Cromwell, so Cromwell sends the default (TRUE) to TES, 
+                // instead of NULL like the other values above.
+                // If CWL document has it specified, override the value sent by Cromwell
+                tesTask.Resources.Preemptible = cwlDocument.Preemptible ?? tesTask.Resources.Preemptible;
+            }
+
             logger.LogDebug($"Creating task with id {tesTask.Id} state {tesTask.State}");
             await repository.CreateItemAsync(tesTask);
             return StatusCode(200, new TesCreateTaskResponse { Id = tesTask.Id });
