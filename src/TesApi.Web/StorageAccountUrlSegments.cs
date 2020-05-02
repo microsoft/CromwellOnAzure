@@ -48,7 +48,7 @@ namespace TesApi.Web
         /// <returns>True if parsing was successful</returns>
         public static bool TryCreate(string uriString, out StorageAccountUrlSegments result)
         {
-            if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri))
+            if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri) && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
             {
                 result = new StorageAccountUrlSegments
                 {
