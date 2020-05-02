@@ -220,7 +220,7 @@ namespace CromwellOnAzureDeployer
                         try
                         {
                             using var sshClient = new SshClient(sshConnectionInfo);
-                            sshClient.Connect();
+                            sshClient.ConnectWithRetries();
                             sshClient.Disconnect();
                         }
                         catch
@@ -1074,12 +1074,12 @@ namespace CromwellOnAzureDeployer
 
         private async Task<(string Output, string Error, int ExitStatus)> ExecuteCommandOnVirtualMachineAsync(ConnectionInfo sshConnectionInfo, string command, bool throwOnNonZeroExitCode = true)
         {
-            using var sshClient = new SshClient(sshConnectionInfo);
-            sshClient.Connect();
-            var (output, error, exitStatus) = await sshClient.ExecuteCommandAsync(command, throwOnNonZeroExitCode, cts.Token);
-            sshClient.Disconnect();
+                using var sshClient = new SshClient(sshConnectionInfo);
+                sshClient.ConnectWithRetries();
+                var (output, error, exitStatus) = await sshClient.ExecuteCommandAsync(command, throwOnNonZeroExitCode, cts.Token);
+                sshClient.Disconnect();
 
-            return (output, error, exitStatus);
+                return (output, error, exitStatus);
         }
 
         private async Task UploadFileToVirtualMachineAsync(ConnectionInfo sshConnectionInfo, string fileContent, string remoteFilePath, bool makeExecutable)
@@ -1095,7 +1095,7 @@ namespace CromwellOnAzureDeployer
             using var sshClient = new SshClient(sshConnectionInfo);
             using var sftpClient = new SftpClient(sshConnectionInfo);
 
-            sshClient.Connect();
+            sshClient.ConnectWithRetries();
 
             // Create destination directory if needed and make it writable for the current user
             var (output, _, _) = await sshClient.ExecuteCommandAsync($"sudo mkdir -p {dir} && owner=$(stat -c '%U' {dir}) && mask=$(stat -c '%a' {dir}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {dir} && echo 1 ))", true, cts.Token);

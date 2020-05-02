@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Common;
 using Renci.SshNet;
 
 namespace CromwellOnAzureDeployer
@@ -28,6 +29,11 @@ namespace CromwellOnAzureDeployer
             }
 
             return (sshCommand.Result.Trim(), sshCommand.Error, sshCommand.ExitStatus);
+        }
+
+        public static void ConnectWithRetries(this SshClient sshClient)
+        {
+            Retry.Do(() => sshClient.Connect(), retryInterval: TimeSpan.FromSeconds(5), retryCount: 5);
         }
     }
 }
