@@ -5,13 +5,18 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Common;
+using Polly;
+using Polly.Retry;
 using Renci.SshNet;
 
 namespace CromwellOnAzureDeployer
 {
     public static class SshExtensions
     {
+        private static readonly RetryPolicy retryPolicy = Policy
+            .Handle<Exception>()
+            .WaitAndRetry(5, retryAttempt => TimeSpan.FromSeconds(5));
+
         // TODO: cancellationToken
         public static Task UploadFileAsync(this SftpClient sftpClient, Stream input, string path, bool canOverride = true, CancellationToken cancellationToken = default)
         {
@@ -33,7 +38,7 @@ namespace CromwellOnAzureDeployer
 
         public static void ConnectWithRetries(this SshClient sshClient)
         {
-            Retry.Do(() => sshClient.Connect(), retryInterval: TimeSpan.FromSeconds(5), retryCount: 5);
+            retryPolicy.Execute(() => sshClient.Connect());
         }
     }
 }
