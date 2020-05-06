@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 using TesApi.Models;
 using static TesApi.Web.AzureProxy;
 
@@ -23,7 +24,7 @@ namespace TesApi.Web
         private readonly IAzureProxy azureProxy;
         private readonly ILogger<CachingAzureProxy> logger;
 
-        private MemoryCache cache { get; set; } = new MemoryCache(new MemoryCacheOptions());
+        private readonly MemoryCache cache = new MemoryCache(new MemoryCacheOptions());
 
         /// <summary>
         /// Contructor to create a cache of <see cref="IAzureProxy"/>
@@ -44,18 +45,15 @@ namespace TesApi.Web
         public Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken) => azureProxy.GetActivePoolIdsAsync(prefix, minAge, cancellationToken);
 
         ///<inheritdoc/>
-        public async Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
+        public Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
         {
             const string key = "batchAccountQuotas";
 
-            if (!cache.TryGetValue(key, out AzureBatchAccountQuotas azureBatchAccountQuotas))
+            return cache.GetOrCreateAsync(key, azureBatchAccountQuotas =>
             {
-                // retry
-                var batchAccountQuotas = await azureProxy.GetBatchAccountQuotasAsync();
-                return cache.Set(key, batchAccountQuotas, TimeSpan.FromHours(1));
-            }
-
-            return azureBatchAccountQuotas;
+                azureBatchAccountQuotas.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+                return azureProxy.GetBatchAccountQuotasAsync();
+            });
         }
 
         public int GetBatchActiveJobCount() => azureProxy.GetBatchActiveJobCount();
@@ -84,16 +82,13 @@ namespace TesApi.Web
         public Task<IEnumerable<string>> GetPoolIdsReferencedByJobsAsync(CancellationToken cancellationToken) => azureProxy.GetPoolIdsReferencedByJobsAsync(cancellationToken);
 
         ///<inheritdoc/>
-        public async Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
+        public Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
         {
-            if (!cache.TryGetValue(storageAccountInfo.Id, out string accountKey))
+            return cache.GetOrCreateAsync(storageAccountInfo.Id, accountKey =>
             {
-                // retry
-                accountKey = await azureProxy.GetStorageAccountKeyAsync(storageAccountInfo);
-                cache.Set(storageAccountInfo.Id, accountKey, TimeSpan.FromHours(1));
-            }
-
-            return accountKey;
+                accountKey.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+                return azureProxy.GetStorageAccountKeyAsync(storageAccountInfo);
+            });
         }
 
         ///<inheritdoc/>
@@ -114,18 +109,22 @@ namespace TesApi.Web
         }
 
         ///<inheritdoc/>
-        public async Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
+        public Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
         {
             const string key = "vmSizesAndPrices";
 
-            if (!cache.TryGetValue(key, out List<VirtualMachineInfo> cachedVmSizesAndPrices))
+            return cache.GetOrCreateAsync(key, cachedVmSizesAndPrices =>
             {
-                // retry
-                var vmSizesAndPrices = await azureProxy.GetVmSizesAndPricesAsync();
-                cache.Set(key, vmSizesAndPrices.ToList(), TimeSpan.FromDays(1));
-            }
+                cachedVmSizesAndPrices.AddExpirationToken(new CancellationChangeToken(new CancellationTokenSource(TimeSpan.FromDays(1)).Token));
 
-            return cachedVmSizesAndPrices;
+                cachedVmSizesAndPrices.RegisterPostEvictionCallback((key, value, reason, state) =>
+                {
+                    logger.LogInformation("Refreshing cache for VM sizes and prices in the background.");
+                    GetVmSizesAndPricesAsync();
+                });
+
+                return azureProxy.GetVmSizesAndPricesAsync();
+            });
         }
 
         public Task<IEnumerable<string>> ListBlobsAsync(Uri directoryUri) => azureProxy.ListBlobsAsync(directoryUri);
