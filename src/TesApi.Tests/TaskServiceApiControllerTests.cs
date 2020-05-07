@@ -429,7 +429,7 @@ namespace TesApi.Tests
             {
                 Name = "test.cwl",
                 Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
-                Inputs = new List<TesInput> { new TesInput { Path = "/cromwell-executions/test/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script" } },
+                Inputs = new List<TesInput> { new TesInput { Path = "/cromwell-executions/test.cwl/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script" } },
                 Resources = tesResourcesReceivedFromCromwell
             };
 
