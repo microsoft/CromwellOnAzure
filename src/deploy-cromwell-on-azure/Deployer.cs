@@ -79,7 +79,7 @@ namespace CromwellOnAzureDeployer
             RefreshableConsole.WriteLine("Running...");
 
             await ValidateTokenProviderAsync();
-            
+
             tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
             azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
             azureClient = GetAzureClient(azureCredentials);
@@ -142,7 +142,7 @@ namespace CromwellOnAzureDeployer
                 await AssignVmAsDataReaderToStorageAccountAsync(vmManagedIdentity, storageAccount);
 
                 await DelayAsync(
-                    $"Waiting ({azurePropagationDelay.TotalMinutes:n0}) minutes for Azure to fully propagate role assignments...", 
+                    $"Waiting ({azurePropagationDelay.TotalMinutes:n0}) minutes for Azure to fully propagate role assignments...",
                     azurePropagationDelay);
 
                 await RestartVmAsync(linuxVm);
@@ -220,7 +220,7 @@ namespace CromwellOnAzureDeployer
                         try
                         {
                             using var sshClient = new SshClient(sshConnectionInfo);
-                            sshClient.Connect();
+                            sshClient.ConnectWithRetries();
                             sshClient.Disconnect();
                         }
                         catch
@@ -335,7 +335,7 @@ namespace CromwellOnAzureDeployer
                             {
                                 break;
                             }
-                            
+
                             await Task.Delay(TimeSpan.FromSeconds(15));
                         }
 
@@ -361,7 +361,7 @@ namespace CromwellOnAzureDeployer
                 Environment.Exit(1);
             }
         }
-        
+
         private async Task<List<string>> GetRequiredResourceProvidersNotRegisteredAsync()
         {
             var cloudResourceProviders = await resourceManagerClient.Providers.ListAsync();
@@ -652,7 +652,7 @@ namespace CromwellOnAzureDeployer
                 () => azureClient.NetworkSecurityGroups.Define(configuration.NetworkSecurityGroupName)
                     .WithRegion(configuration.RegionName)
                     .WithExistingResourceGroup(configuration.ResourceGroupName)
-                    .DefineRule(ruleName)                        
+                    .DefineRule(ruleName)
                     .AllowInbound()
                     .FromAnyAddress()
                     .FromAnyPort()
@@ -1075,7 +1075,7 @@ namespace CromwellOnAzureDeployer
         private async Task<(string Output, string Error, int ExitStatus)> ExecuteCommandOnVirtualMachineAsync(ConnectionInfo sshConnectionInfo, string command, bool throwOnNonZeroExitCode = true)
         {
             using var sshClient = new SshClient(sshConnectionInfo);
-            sshClient.Connect();
+            sshClient.ConnectWithRetries();
             var (output, error, exitStatus) = await sshClient.ExecuteCommandAsync(command, throwOnNonZeroExitCode, cts.Token);
             sshClient.Disconnect();
 
@@ -1095,7 +1095,7 @@ namespace CromwellOnAzureDeployer
             using var sshClient = new SshClient(sshConnectionInfo);
             using var sftpClient = new SftpClient(sshConnectionInfo);
 
-            sshClient.Connect();
+            sshClient.ConnectWithRetries();
 
             // Create destination directory if needed and make it writable for the current user
             var (output, _, _) = await sshClient.ExecuteCommandAsync($"sudo mkdir -p {dir} && owner=$(stat -c '%U' {dir}) && mask=$(stat -c '%a' {dir}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {dir} && echo 1 ))", true, cts.Token);

@@ -10,10 +10,14 @@ services:
       - CosmosDbAccountName=COSMOSDBNAME
       - BatchAccountName=VARBATCHACCOUNTNAME
       - ApplicationInsightsAccountName=VARAPPLICATIONINSIGHTSACCOUNTNAME
-      - UsePreemptibleVmsOnly=true
+      - UsePreemptibleVmsOnly=false
       - AzureOfferDurableId=MS-AZR-0003p
     expose:
       - "80"
+    volumes:
+      - type: bind
+        source: /cromwellazure/cromwell-tmp
+        target: /cromwell-tmp
     restart: unless-stopped
   mysqldb:
     image: "mysql:latest"
@@ -37,10 +41,13 @@ services:
       - type: bind
         source: /cromwellazure/wait-for-it
         target: /wait-for-it
+      - type: bind
+        source: /cromwellazure/cromwell-tmp
+        target: /cromwell-tmp
     entrypoint:
       - /bin/sh
       - -c
-    command: ["/wait-for-it/wait-for-it.sh mysqldb:3306 -t 255 -- java -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server"]
+    command: ["/wait-for-it/wait-for-it.sh mysqldb:3306 -t 255 -- java -Djava.io.tmpdir=/cromwell-tmp/ -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server"]
     ports:
       - "8000:8000"
     depends_on:

@@ -22,7 +22,8 @@ namespace TesApi.Tests
     [TestClass]
     public class BatchSchedulerTests
     {
-        private static readonly Regex downloadFilesScriptRegex = new Regex(@"--storage-url '([^']*)' --local-path '([^']*)'");
+        private static readonly Regex downloadFilesBlobxferRegex = new Regex(@"blobxfer download --storage-url '([^']*)' --local-path '([^']*)'");
+        private static readonly Regex downloadFilesWgetRegex = new Regex(@"wget -O '([^']*)' '([^']*)'");
 
         [TestMethod]
         public async Task TesTaskFailsWithSystemErrorWhenNoSuitableVmExists()
@@ -236,7 +237,7 @@ namespace TesApi.Tests
 
             tesTask.Inputs.Add(new TesInput
             {
-                Url = "/storageAccount1/container1/file1.txt",
+                Url = "/storageaccount1/container1/file1.txt",
                 Content = "test content"
             });
 
@@ -253,7 +254,7 @@ namespace TesApi.Tests
 
             tesTask.Inputs.Add(new TesInput
             {
-                Url = "/storageAccount1/container1/directory",
+                Url = "/storageaccount1/container1/directory",
                 Type = TesFileType.DIRECTORYEnum
             });
 
@@ -278,17 +279,17 @@ namespace TesApi.Tests
 
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
             azureProxyReturnValues.DownloadedBlobContent = originalCommandScript;
-            var azureproxy = GetMockAzureProxy(azureProxyReturnValues);
+            var azureProxy = GetMockAzureProxy(azureProxyReturnValues);
 
-            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureproxy);
+            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureProxy);
 
-            var modifiedCommandScript = (string)azureproxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.UploadBlobAsync) && i.Arguments[0].ToString().Contains("/script"))?.Arguments[1];
-            var filesToDownload = GetFilesToDownload(azureproxy);
+            var modifiedCommandScript = (string)azureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.UploadBlobAsync) && i.Arguments[0].ToString().Contains("/script"))?.Arguments[1];
+            var filesToDownload = GetFilesToDownload(azureProxy);
 
             Assert.AreEqual(TesState.INITIALIZINGEnum, tesTask.State);
-            Assert.IsFalse(filesToDownload.Any(f => f.LocalPath.Contains("?") || f.LocalPath.Contains("param=1") || f.LocalPath.Contains("param=2")), "Query string was removed from local file path");
-            Assert.AreEqual(1, filesToDownload.Count(f => f.StorageUrl.Contains("?param=1")), "Query string was not removed from blob URL");
-            Assert.IsFalse(modifiedCommandScript.Contains("?param=2"), "Query string was removed from local file path in command script");
+            Assert.IsFalse(filesToDownload.Any(f => f.LocalPath.Contains("?") || f.LocalPath.Contains("param=1") || f.LocalPath.Contains("param=2")), "Query string was not removed from local file path");
+            Assert.AreEqual(1, filesToDownload.Count(f => f.StorageUrl.Contains("?param=1")), "Query string was removed from blob URL");
+            Assert.IsFalse(modifiedCommandScript.Contains("?param=2"), "Query string was not removed from local file path in command script");
         }
 
         [TestMethod]
@@ -304,58 +305,109 @@ namespace TesApi.Tests
                 new TesInput { Url = "http://host/path?param=1", Path = "/cromwell-executions/workflowpath/inputs/host/path?param=2", Type = TesFileType.FILEEnum, Name = "file1", Content = null }
             };
 
-            var azureproxy = GetMockAzureProxy(AzureProxyReturnValues.Defaults);
+            var azureProxy = GetMockAzureProxy(AzureProxyReturnValues.Defaults);
 
-            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureproxy);
+            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureProxy);
 
-            var modifiedCommandScript = (string)azureproxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.UploadBlobAsync) && i.Arguments[0].ToString().Contains("/script"))?.Arguments[1];
-            var filesToDownload = GetFilesToDownload(azureproxy);
+            var modifiedCommandScript = (string)azureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.UploadBlobAsync) && i.Arguments[0].ToString().Contains("/script"))?.Arguments[1];
+            var filesToDownload = GetFilesToDownload(azureProxy);
 
             Assert.AreEqual(TesState.INITIALIZINGEnum, tesTask.State);
-            Assert.IsFalse(filesToDownload.Any(f => f.LocalPath.Contains("?") || f.LocalPath.Contains("param=1") || f.LocalPath.Contains("param=2")), "Query string was removed from local file path");
-            Assert.AreEqual(1, filesToDownload.Count(f => f.StorageUrl.Contains("?param=1")), "Query string was not removed from blob URL");
-            Assert.IsFalse(modifiedCommandScript.Contains("?param=2"), "Query string was removed from local file path in command script");
+            Assert.AreEqual(2, filesToDownload.Count());
+            Assert.IsFalse(filesToDownload.Any(f => f.LocalPath.Contains("?") || f.LocalPath.Contains("param=1") || f.LocalPath.Contains("param=2")), "Query string was not removed from local file path");
+            Assert.AreEqual(1, filesToDownload.Count(f => f.StorageUrl.Contains("?param=1")), "Query string was removed from blob URL");
+            Assert.IsFalse(modifiedCommandScript.Contains("?param=2"), "Query string was not removed from local file path in command script");
         }
 
         [TestMethod]
-        public async Task LocalFilePathsAreResolvedToUrlsWhenStoredInExternalStorageAccounts()
+        public async Task PublicHttpUrlsAreKeptIntact()
         {
             var config = GetMockConfig();
-            config["ExternalStorageContainers"] = "https://externalaccount1.blob.core.windows.net/container1?sas1, https://externalaccount2.blob.core.windows.net/container2/?sas2";
+            config["ExternalStorageContainers"] = "https://externalaccount1.blob.core.windows.net/container1?sas1; https://externalaccount2.blob.core.windows.net/container2/?sas2; https://externalaccount2.blob.core.windows.net?accountsas;";
 
             var tesTask = GetTesTask();
 
             tesTask.Inputs = new List<TesInput>
             {
                 new TesInput { Url = null, Path = "/cromwell-executions/workflowpath/execution/script", Type = TesFileType.FILEEnum, Name = "commandScript", Content = "echo hello" },
-                new TesInput { Url = "/externalaccount1/container1/blob1", Path = "/cromwell-executions/workflowpath/inputs/account1/container1/blob1", Type = TesFileType.FILEEnum, Name = "file1", Content = null },
-                new TesInput { Url = "/externalaccount2/container2/blob2", Path = "/cromwell-executions/workflowpath/inputs/account2/container2/blob2", Type = TesFileType.FILEEnum, Name = "file2", Content = null }
+                new TesInput { Url = "https://storageaccount1.blob.core.windows.net/container1/blob1?sig=sassignature", Path = "/cromwell-executions/workflowpath/inputs/blob1", Type = TesFileType.FILEEnum, Name = "blob1", Content = null },
+                new TesInput { Url = "https://externalaccount1.blob.core.windows.net/container1/blob2?sig=sassignature", Path = "/cromwell-executions/workflowpath/inputs/blob2", Type = TesFileType.FILEEnum, Name = "blob2", Content = null },
+                new TesInput { Url = "https://publicaccount1.blob.core.windows.net/container1/blob3", Path = "/cromwell-executions/workflowpath/inputs/blob3", Type = TesFileType.FILEEnum, Name = "blob3", Content = null }
             };
 
-            var azureproxy = GetMockAzureProxy(AzureProxyReturnValues.Defaults);
+            var azureProxy = GetMockAzureProxy(AzureProxyReturnValues.Defaults);
 
-            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, config, azureproxy);
+            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, config, azureProxy);
 
-            var filesToDownload = GetFilesToDownload(azureproxy).ToArray();
+            var filesToDownload = GetFilesToDownload(azureProxy);
 
-            Assert.AreEqual(3, filesToDownload.Count());
-            Assert.AreEqual("https://externalaccount1.blob.core.windows.net/container1/blob1?sas1", filesToDownload[1].StorageUrl);
-            Assert.AreEqual("https://externalaccount2.blob.core.windows.net/container2/blob2?sas2", filesToDownload[2].StorageUrl);
+            Assert.AreEqual(4, filesToDownload.Count());
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://storageaccount1.blob.core.windows.net/container1/blob1?sig=sassignature")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://externalaccount1.blob.core.windows.net/container1/blob2?sig=sassignature")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://publicaccount1.blob.core.windows.net/container1/blob3")));
         }
 
         [TestMethod]
-        public async Task LocalFilePathsAreResolvedToUrlsWhenStoredInStorageAccountsAccessibleToTesIdentity()
+        public async Task PrivatePathsAndUrlsGetSasToken()
         {
+            var config = GetMockConfig();
+            config["ExternalStorageContainers"] = "https://externalaccount1.blob.core.windows.net/container1?sas1; https://externalaccount2.blob.core.windows.net/container2/?sas2; https://externalaccount2.blob.core.windows.net?accountsas;";
+
             var tesTask = GetTesTask();
-            var azureproxy = GetMockAzureProxy(AzureProxyReturnValues.Defaults);
 
-            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureproxy);
+            tesTask.Inputs = new List<TesInput>
+            {
+                // defaultstorageaccount and storageaccount1 are accessible to TES identity
+                new TesInput { Url = null, Path = "/cromwell-executions/workflowpath/execution/script", Type = TesFileType.FILEEnum, Name = "commandScript", Content = "echo hello" },
 
-            var filesToDownload = GetFilesToDownload(azureproxy).ToArray();
+                new TesInput { Url = "/defaultstorageaccount/container1/blob1", Path = "/cromwell-executions/workflowpath/inputs/blob1", Type = TesFileType.FILEEnum, Name = "blob1", Content = null },
+                new TesInput { Url = "/storageaccount1/container1/blob2", Path = "/cromwell-executions/workflowpath/inputs/blob2", Type = TesFileType.FILEEnum, Name = "blob2", Content = null },
+                new TesInput { Url = "/externalaccount1/container1/blob3", Path = "/cromwell-executions/workflowpath/inputs/blob3", Type = TesFileType.FILEEnum, Name = "blob3", Content = null },
+                new TesInput { Url = "/externalaccount2/container2/blob4", Path = "/cromwell-executions/workflowpath/inputs/blob4", Type = TesFileType.FILEEnum, Name = "blob4", Content = null },
 
-            Assert.AreEqual(2, filesToDownload.Count());
-            Assert.IsTrue(filesToDownload[0].StorageUrl.StartsWith("https://storageAccount1/container1/file1.txt?sv="));
-            Assert.IsTrue(filesToDownload[1].StorageUrl.StartsWith("https://defaultstorageaccount/cromwell-executions/workflow1/workflowId1/call-Task1/execution/script?sv="));
+                new TesInput { Url = "file:///defaultstorageaccount/container1/blob5", Path = "/cromwell-executions/workflowpath/inputs/blob5", Type = TesFileType.FILEEnum, Name = "blob5", Content = null },
+                new TesInput { Url = "file:///storageaccount1/container1/blob6", Path = "/cromwell-executions/workflowpath/inputs/blob6", Type = TesFileType.FILEEnum, Name = "blob6", Content = null },
+                new TesInput { Url = "file:///externalaccount1/container1/blob7", Path = "/cromwell-executions/workflowpath/inputs/blob7", Type = TesFileType.FILEEnum, Name = "blob7", Content = null },
+                new TesInput { Url = "file:///externalaccount2/container2/blob8", Path = "/cromwell-executions/workflowpath/inputs/blob8", Type = TesFileType.FILEEnum, Name = "blob8", Content = null },
+
+                new TesInput { Url = "https://defaultstorageaccount.blob.core.windows.net/container1/blob9", Path = "/cromwell-executions/workflowpath/inputs/blob9", Type = TesFileType.FILEEnum, Name = "blob9", Content = null },
+                new TesInput { Url = "https://storageaccount1.blob.core.windows.net/container1/blob10", Path = "/cromwell-executions/workflowpath/inputs/blob10", Type = TesFileType.FILEEnum, Name = "blob10", Content = null },
+                new TesInput { Url = "https://externalaccount1.blob.core.windows.net/container1/blob11", Path = "/cromwell-executions/workflowpath/inputs/blob11", Type = TesFileType.FILEEnum, Name = "blob11", Content = null },
+                new TesInput { Url = "https://externalaccount2.blob.core.windows.net/container2/blob12", Path = "/cromwell-executions/workflowpath/inputs/blob12", Type = TesFileType.FILEEnum, Name = "blob12", Content = null },
+
+                // ExternalStorageContainers entry exists for externalaccount2/container2 and for externalaccount2 (account level SAS), so this uses account SAS:
+                new TesInput { Url = "https://externalaccount2.blob.core.windows.net/container3/blob13", Path = "/cromwell-executions/workflowpath/inputs/blob12", Type = TesFileType.FILEEnum, Name = "blob12", Content = null },
+
+                // ExternalStorageContainers entry exists for externalaccount1/container1, but not for externalaccount1/publiccontainer, so this is treated as public URL:
+                new TesInput { Url = "https://externalaccount1.blob.core.windows.net/publiccontainer/blob14", Path = "/cromwell-executions/workflowpath/inputs/blob14", Type = TesFileType.FILEEnum, Name = "blob14", Content = null }
+            };
+
+            var azureProxy = GetMockAzureProxy(AzureProxyReturnValues.Defaults);
+
+            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, config, azureProxy);
+
+            var filesToDownload = GetFilesToDownload(azureProxy);
+
+            Assert.AreEqual(15, filesToDownload.Count());
+
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.StartsWith("https://defaultstorageaccount.blob.core.windows.net/container1/blob1?sv=")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.StartsWith("https://storageaccount1.blob.core.windows.net/container1/blob2?sv=")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://externalaccount1.blob.core.windows.net/container1/blob3?sas1")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://externalaccount2.blob.core.windows.net/container2/blob4?sas2")));
+
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.StartsWith("https://defaultstorageaccount.blob.core.windows.net/container1/blob5?sv=")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.StartsWith("https://storageaccount1.blob.core.windows.net/container1/blob6?sv=")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://externalaccount1.blob.core.windows.net/container1/blob7?sas1")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://externalaccount2.blob.core.windows.net/container2/blob8?sas2")));
+
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.StartsWith("https://defaultstorageaccount.blob.core.windows.net/container1/blob9?sv=")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.StartsWith("https://storageaccount1.blob.core.windows.net/container1/blob10?sv=")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://externalaccount1.blob.core.windows.net/container1/blob11?sas1")));
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://externalaccount2.blob.core.windows.net/container2/blob12?sas2")));
+
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://externalaccount2.blob.core.windows.net/container3/blob13?accountsas")));
+
+            Assert.IsNotNull(filesToDownload.SingleOrDefault(f => f.StorageUrl.Equals("https://externalaccount1.blob.core.windows.net/publiccontainer/blob14")));
         }
 
         [TestMethod]
@@ -404,6 +456,33 @@ namespace TesApi.Tests
             (_, var cloudTask, _) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
 
             Assert.IsNull(cloudTask.ContainerSettings);
+        }
+
+        [TestMethod]
+        public async Task LocalFilesInCromwellTmpDirectoryAreDiscoveredAndUploaded()
+        {
+            var config = GetMockConfig();
+            var tesTask = GetTesTask();
+
+            tesTask.Inputs = new List<TesInput>
+            {
+                new TesInput { Url = null, Path = "/cromwell-executions/workflowpath/execution/script", Type = TesFileType.FILEEnum, Name = "commandScript", Content = "echo hello" },
+                new TesInput { Url = "file:///cromwell-tmp/tmp12345/blob1", Path = "/cromwell-executions/workflowpath/inputs/blob1", Type = TesFileType.FILEEnum, Name = "blob1", Content = null },
+            };
+
+            var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
+            azureProxyReturnValues.LocalFileExists = true;
+            var azureProxy = GetMockAzureProxy(azureProxyReturnValues);
+
+            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, config, azureProxy);
+
+            var filesToDownload = GetFilesToDownload(azureProxy);
+
+            Assert.AreEqual(2, filesToDownload.Count());
+            var inputFileUrl = filesToDownload.SingleOrDefault(f => f.StorageUrl.StartsWith("https://defaultstorageaccount.blob.core.windows.net/cromwell-executions/workflowpath/inputs/blob1?sv=")).StorageUrl;
+            Assert.IsNotNull(inputFileUrl);
+            azureProxy.Verify(i => i.LocalFileExists("/cromwell-tmp/tmp12345/blob1"));
+            azureProxy.Verify(i => i.UploadBlobFromFileAsync(It.Is<Uri>(uri => uri.AbsoluteUri.StartsWith("https://defaultstorageaccount.blob.core.windows.net/cromwell-executions/workflowpath/inputs/blob1?sv=")), "/cromwell-tmp/tmp12345/blob1"));
         }
 
         private static async Task<string> ProcessTesTaskAndGetFirstLogMessageAsync(TesTask tesTask, AzureProxy.AzureBatchJobAndTaskState? azureBatchJobAndTaskState = null)
@@ -470,7 +549,7 @@ namespace TesApi.Tests
             azureProxy.Setup(a => a.GetBatchJobAndTaskStateAsync(It.IsAny<string>())).Returns(Task.FromResult(azureProxyReturnValues.BatchJobAndTaskState));
             azureProxy.Setup(a => a.GetNextBatchJobIdAsync(It.IsAny<string>())).Returns(Task.FromResult(azureProxyReturnValues.NextBatchJobId));
             azureProxy.Setup(a => a.GetStorageAccountInfoAsync("defaultstorageaccount")).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["defaultstorageaccount"]));
-            azureProxy.Setup(a => a.GetStorageAccountInfoAsync("storageAccount1")).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["storageAccount1"]));
+            azureProxy.Setup(a => a.GetStorageAccountInfoAsync("storageaccount1")).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["storageaccount1"]));
             azureProxy.Setup(a => a.GetContainerRegistryInfoAsync("registryServer1/imageName1:tag1")).Returns(Task.FromResult(azureProxyReturnValues.ContainerRegistryInfo));
             azureProxy.Setup(a => a.GetStorageAccountKeyAsync(It.IsAny<StorageAccountInfo>())).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountKey));
             azureProxy.Setup(a => a.GetVmSizesAndPricesAsync()).Returns(Task.FromResult(azureProxyReturnValues.VmSizesAndPrices));
@@ -479,6 +558,7 @@ namespace TesApi.Tests
             azureProxy.Setup(a => a.GetBatchActiveJobCount()).Returns(azureProxyReturnValues.ActiveJobCount);
             azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
             azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>())).Returns(Task.FromResult(azureProxyReturnValues.DownloadedBlobContent));
+            azureProxy.Setup(a => a.LocalFileExists(It.IsAny<string>())).Returns(azureProxyReturnValues.LocalFileExists);
 
             return azureProxy;
         }
@@ -500,9 +580,15 @@ namespace TesApi.Tests
                 return new List<FileToDownload>();
             }
 
-            return downloadFilesScriptRegex.Matches(downloadFilesScriptContent)
+            var blobxferFilesToDownload = downloadFilesBlobxferRegex.Matches(downloadFilesScriptContent)
                 .Cast<System.Text.RegularExpressions.Match>()
                 .Select(m => new FileToDownload { StorageUrl = m.Groups[1].Value, LocalPath = m.Groups[2].Value });
+
+            var wgetFilesToDownload = downloadFilesWgetRegex.Matches(downloadFilesScriptContent)
+                .Cast<System.Text.RegularExpressions.Match>()
+                .Select(m => new FileToDownload { StorageUrl = m.Groups[2].Value, LocalPath = m.Groups[1].Value });
+
+            return blobxferFilesToDownload.Union(wgetFilesToDownload);
         }
 
         private struct BatchJobAndTaskStates
@@ -534,12 +620,13 @@ namespace TesApi.Tests
             public string NextBatchJobId { get; set; }
             public string StorageAccountKey { get; set; }
             public string DownloadedBlobContent { get; set; }
+            public bool LocalFileExists { get; set; }
 
             public static AzureProxyReturnValues Defaults => new AzureProxyReturnValues
             {
                 StorageAccountInfos = new Dictionary<string, StorageAccountInfo> {
-                    { "defaultstorageaccount", new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount/", SubscriptionId = "SubId" } },
-                    { "storageAccount1", new StorageAccountInfo { Name = "storageAccount1", Id = "Id", BlobEndpoint = "https://storageAccount1/", SubscriptionId = "SubId" } }
+                    { "defaultstorageaccount", new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount.blob.core.windows.net/", SubscriptionId = "SubId" } },
+                    { "storageaccount1", new StorageAccountInfo { Name = "storageaccount1", Id = "Id", BlobEndpoint = "https://storageaccount1.blob.core.windows.net/", SubscriptionId = "SubId" } }
                 },
                 ContainerRegistryInfo = new ContainerRegistryInfo { RegistryServer = "registryServer1", Username = "default", Password = "placeholder" },
                 VmSizesAndPrices = new List<VirtualMachineInfo> {
@@ -555,7 +642,8 @@ namespace TesApi.Tests
                 BatchJobAndTaskState = BatchJobAndTaskStates.JobNotFound,
                 NextBatchJobId = "JobId-1",
                 StorageAccountKey = "Key1",
-                DownloadedBlobContent = ""
+                DownloadedBlobContent = "",
+                LocalFileExists = true
             };
         }
 

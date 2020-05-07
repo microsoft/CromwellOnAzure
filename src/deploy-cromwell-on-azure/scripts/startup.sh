@@ -32,6 +32,7 @@ docker-compose pull --ignore-pull-failures
 write_log
 
 write_log "docker-compose up:"
+mkdir -p /cromwellazure/cromwell-tmp
 docker-compose -f /cromwellazure/docker-compose.yml -f /cromwellazure/docker-compose.override.yml up -d
 write_log
 
