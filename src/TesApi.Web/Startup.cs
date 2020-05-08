@@ -97,7 +97,6 @@ namespace TesApi.Web
                     c.OperationFilter<GeneratePathParamsValidationFilter>();
                 });
 
-
             services.AddHostedService<Scheduler>();
             services.AddHostedService<DeleteCompletedBatchJobsHostedService>();
             services.AddHostedService<DeleteOrphanedAutoPoolsHostedService>();
