@@ -47,13 +47,7 @@ namespace TesApi.Web
         ///<inheritdoc/>
         public Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
         {
-            const string key = "batchAccountQuotas";
-
-            return cache.GetOrAddAsync(key, azureBatchAccountQuotas =>
-            {
-                azureBatchAccountQuotas.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
-                return azureProxy.GetBatchAccountQuotasAsync();
-            });
+            return cache.GetOrAddAsync("batchAccountQuotas", () => azureProxy.GetBatchAccountQuotasAsync(), DateTimeOffset.Now.AddHours(1));
         }
 
         public int GetBatchActiveJobCount() => azureProxy.GetBatchActiveJobCount();
@@ -72,7 +66,7 @@ namespace TesApi.Web
 
                 if (containerRegistryInfo != null)
                 {
-                    cache.Add(imageName, containerRegistryInfo, TimeSpan.FromHours(1));
+                    cache.Add(imageName, containerRegistryInfo, DateTimeOffset.Now.AddHours(1));
                 }
             }
 
@@ -85,11 +79,7 @@ namespace TesApi.Web
         ///<inheritdoc/>
         public Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
         {
-            return cache.GetOrAddAsync(storageAccountInfo.Id, accountKey =>
-            {
-                accountKey.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
-                return azureProxy.GetStorageAccountKeyAsync(storageAccountInfo);
-            });
+            return cache.GetOrAddAsync(storageAccountInfo.Id, () => azureProxy.GetStorageAccountKeyAsync(storageAccountInfo), DateTimeOffset.Now.AddHours(1));
         }
 
         ///<inheritdoc/>
@@ -113,12 +103,7 @@ namespace TesApi.Web
         ///<inheritdoc/>
         public Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
         {
-            const string key = "vmSizesAndPrices";
-
-            return cache.GetOrAddAsync(key, () => azureProxy.GetVmSizesAndPricesAsync(), new MemoryCacheEntryOptions
-            {
-                Priority = CacheItemPriority.NeverRemove
-            });
+            return cache.GetOrAddAsync("vmSizesAndPrices", () => azureProxy.GetVmSizesAndPricesAsync(), DateTimeOffset.MaxValue);
         }
 
         public Task<IEnumerable<string>> ListBlobsAsync(Uri directoryUri) => azureProxy.ListBlobsAsync(directoryUri);

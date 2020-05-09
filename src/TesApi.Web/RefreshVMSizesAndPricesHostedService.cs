@@ -70,7 +70,7 @@ namespace TesApi.Web
             {
                 try
                 {
-                    await RefreshVMListAsync();
+                    await RefreshVMSizesAndPricesAsync();
                 }
                 catch (Exception exc)
                 {
@@ -81,13 +81,11 @@ namespace TesApi.Web
             }
         }
 
-        private async Task RefreshVMListAsync()
+        private async Task RefreshVMSizesAndPricesAsync()
         {
-            const string key = "vmSizesAndPrices";
-
             logger.LogInformation("VM list cache refresh call to Azure started.");
             var virtualMachineInfos = await azureProxy.GetVmSizesAndPricesAsync();
-            cache.Add(key, virtualMachineInfos);
+            cache.Add("vmSizesAndPrices", virtualMachineInfos, DateTimeOffset.MaxValue);
             logger.LogInformation("VM list cache refresh call to Azure completed.");
         }
     }
