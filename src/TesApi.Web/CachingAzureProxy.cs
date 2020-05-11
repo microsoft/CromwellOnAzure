@@ -3,12 +3,13 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using LazyCache;
 using Microsoft.Azure.Batch;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 using TesApi.Models;
 using static TesApi.Web.AzureProxy;
 
@@ -21,20 +22,20 @@ namespace TesApi.Web
     public class CachingAzureProxy : IAzureProxy
     {
         private readonly IAzureProxy azureProxy;
+        private readonly IAppCache cache;
         private readonly ILogger<CachingAzureProxy> logger;
-
-        private MemoryCache cache { get; set; } = new MemoryCache(new MemoryCacheOptions());
 
         /// <summary>
         /// Contructor to create a cache of <see cref="IAzureProxy"/>
         /// </summary>
-        /// <param name="azureProxy"></param>
-        /// <param name="logger"></param>
-        public CachingAzureProxy(IAzureProxy azureProxy, ILogger<CachingAzureProxy> logger)
+        /// <param name="azureProxy"><see cref="AzureProxy"/></param>
+        /// <param name="cache">Lazy cache using <see cref="IAppCache"/></param>
+        /// <param name="logger"><see cref="ILogger"/> instance</param>
+        public CachingAzureProxy(IAzureProxy azureProxy, IAppCache cache, ILogger<CachingAzureProxy> logger)
         {
             this.azureProxy = azureProxy;
+            this.cache = cache;
             this.logger = logger;
-            GetVmSizesAndPricesAsync().Wait();
         }
 
         public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
@@ -44,69 +45,55 @@ namespace TesApi.Web
         public Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken) => azureProxy.GetActivePoolIdsAsync(prefix, minAge, cancellationToken);
 
         ///<inheritdoc/>
-        public async Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
+        public Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
         {
-            const string key = "batchAccountQuotas";
-
-            if (!cache.TryGetValue(key, out AzureBatchAccountQuotas azureBatchAccountQuotas))
-            {
-                // retry
-                var batchAccountQuotas = await azureProxy.GetBatchAccountQuotasAsync();
-                return cache.Set(key, batchAccountQuotas, TimeSpan.FromHours(1));
-            }
-
-            return azureBatchAccountQuotas;
+            return cache.GetOrAddAsync("batchAccountQuotas", () => azureProxy.GetBatchAccountQuotasAsync(), DateTimeOffset.Now.AddHours(1));
         }
 
         public int GetBatchActiveJobCount() => azureProxy.GetBatchActiveJobCount();
-        public IEnumerable<AzureProxy.AzureBatchNodeCount> GetBatchActiveNodeCountByVmSize() => azureProxy.GetBatchActiveNodeCountByVmSize();
+        public IEnumerable<AzureBatchNodeCount> GetBatchActiveNodeCountByVmSize() => azureProxy.GetBatchActiveNodeCountByVmSize();
         public int GetBatchActivePoolCount() => azureProxy.GetBatchActivePoolCount();
-        public Task<AzureProxy.AzureBatchJobAndTaskState> GetBatchJobAndTaskStateAsync(string tesTaskId) => azureProxy.GetBatchJobAndTaskStateAsync(tesTaskId);
+        public Task<AzureBatchJobAndTaskState> GetBatchJobAndTaskStateAsync(string tesTaskId) => azureProxy.GetBatchJobAndTaskStateAsync(tesTaskId);
 
         ///<inheritdoc/>
         public async Task<ContainerRegistryInfo> GetContainerRegistryInfoAsync(string imageName)
         {
-            if (!cache.TryGetValue(imageName, out ContainerRegistryInfo containerRegistry))
-            {
-                // retry
-                containerRegistry = await azureProxy.GetContainerRegistryInfoAsync(imageName);
+            var containerRegistryInfo = cache.Get<ContainerRegistryInfo>(imageName);
 
-                if (containerRegistry != null)
+            if (containerRegistryInfo == null)
+            {
+                containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(imageName);
+
+                if (containerRegistryInfo != null)
                 {
-                    cache.Set(imageName, containerRegistry, TimeSpan.FromHours(1));
+                    cache.Add(imageName, containerRegistryInfo, DateTimeOffset.Now.AddHours(1));
                 }
             }
 
-            return containerRegistry;
+            return containerRegistryInfo;
         }
 
         public Task<string> GetNextBatchJobIdAsync(string tesTaskId) => azureProxy.GetNextBatchJobIdAsync(tesTaskId);
         public Task<IEnumerable<string>> GetPoolIdsReferencedByJobsAsync(CancellationToken cancellationToken) => azureProxy.GetPoolIdsReferencedByJobsAsync(cancellationToken);
 
         ///<inheritdoc/>
-        public async Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
+        public Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
         {
-            if (!cache.TryGetValue(storageAccountInfo.Id, out string accountKey))
-            {
-                // retry
-                accountKey = await azureProxy.GetStorageAccountKeyAsync(storageAccountInfo);
-                cache.Set(storageAccountInfo.Id, accountKey, TimeSpan.FromHours(1));
-            }
-
-            return accountKey;
+            return cache.GetOrAddAsync(storageAccountInfo.Id, () => azureProxy.GetStorageAccountKeyAsync(storageAccountInfo), DateTimeOffset.Now.AddHours(1));
         }
 
         ///<inheritdoc/>
         public async Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName)
         {
-            if (!cache.TryGetValue(storageAccountName, out StorageAccountInfo storageAccountInfo))
+            var storageAccountInfo = cache.Get<StorageAccountInfo>(storageAccountName);
+
+            if (storageAccountInfo == null)
             {
-                // retry
                 storageAccountInfo = await azureProxy.GetStorageAccountInfoAsync(storageAccountName);
 
                 if (storageAccountInfo != null)
                 {
-                    cache.Set(storageAccountName, storageAccountInfo, DateTimeOffset.MaxValue);
+                    cache.Add(storageAccountName, storageAccountInfo, DateTimeOffset.MaxValue);
                 }
             }
 
@@ -114,18 +101,9 @@ namespace TesApi.Web
         }
 
         ///<inheritdoc/>
-        public async Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
+        public Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
         {
-            const string key = "vmSizesAndPrices";
-
-            if (!cache.TryGetValue(key, out List<VirtualMachineInfo> cachedVmSizesAndPrices))
-            {
-                // retry
-                var vmSizesAndPrices = await azureProxy.GetVmSizesAndPricesAsync();
-                cache.Set(key, vmSizesAndPrices.ToList(), TimeSpan.FromDays(1));
-            }
-
-            return cachedVmSizesAndPrices;
+            return cache.GetOrAddAsync("vmSizesAndPrices", () => azureProxy.GetVmSizesAndPricesAsync(), DateTimeOffset.MaxValue);
         }
 
         public Task<IEnumerable<string>> ListBlobsAsync(Uri directoryUri) => azureProxy.ListBlobsAsync(directoryUri);

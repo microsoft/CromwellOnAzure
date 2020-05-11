@@ -4,6 +4,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using LazyCache;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -56,10 +57,15 @@ namespace TesApi.Web
         /// <param name="services"></param>
         public void ConfigureServices(IServiceCollection services)
         {
-            IAzureProxy azureProxy = new AzureProxy(Configuration["BatchAccountName"], azureOfferDurableId, loggerFactory.CreateLogger<AzureProxy>());
-            IAzureProxy cachingAzureProxy = new CachingAzureProxy(azureProxy, loggerFactory.CreateLogger<CachingAzureProxy>());
+            var cache = new CachingService();
+            services.AddSingleton<IAppCache>(cache);
+
+            var azureProxy = new AzureProxy(Configuration["BatchAccountName"], azureOfferDurableId, loggerFactory.CreateLogger<AzureProxy>());
+            IAzureProxy cachingAzureProxy = new CachingAzureProxy(azureProxy, cache, loggerFactory.CreateLogger<CachingAzureProxy>());
 
             services.AddSingleton(cachingAzureProxy);
+            services.AddSingleton(azureProxy);
+
             services
                 .AddControllers()
                 .AddNewtonsoftJson(opts =>
@@ -94,6 +100,7 @@ namespace TesApi.Web
             services.AddHostedService<Scheduler>();
             services.AddHostedService<DeleteCompletedBatchJobsHostedService>();
             services.AddHostedService<DeleteOrphanedAutoPoolsHostedService>();
+            services.AddHostedService<RefreshVMSizesAndPricesHostedService>();
 
             // Configure AppInsights Azure Service when in PRODUCTION environment
             if (hostingEnvironment.IsProduction())

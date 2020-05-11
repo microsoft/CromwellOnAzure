@@ -7,8 +7,11 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using LazyCache;
+using LazyCache.Providers;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -502,7 +505,9 @@ namespace TesApi.Tests
 
         private static async Task<(string JobId, CloudTask CloudTask, PoolInformation PoolInformation)> ProcessTesTaskAndGetBatchJobArgumentsAsync(TesTask tesTask, IConfiguration configuration, Mock<IAzureProxy> azureProxy)
         {
-            var batchScheduler = new BatchScheduler(new Mock<ILogger>().Object, configuration, new CachingAzureProxy(azureProxy.Object, new Mock<ILogger<CachingAzureProxy>>().Object));
+            var batchScheduler = new BatchScheduler(new Mock<ILogger>().Object, configuration, 
+                new CachingAzureProxy(azureProxy.Object, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()))), 
+                new Mock<ILogger<CachingAzureProxy>>().Object));
 
             await batchScheduler.ProcessTesTaskAsync(tesTask);
 
