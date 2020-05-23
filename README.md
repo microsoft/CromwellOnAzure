@@ -53,7 +53,7 @@ Download the required executable from [Releases](https://github.com/microsoft/Cr
 `chmod +x <fileName>`. Replace `<fileName>` with the correct name: `deploy-cromwell-on-azure-linux` or `deploy-cromwell-on-azure-osx.app`
 1. You must specify the following parameters:
    1. `SubscriptionId` (**required**)
-      1.  This can be obtained by navigating to the [subscriptions blade in the Azure portal](https://portal.azure.com/#blade/Microsoft_Azure_Billing/SubscriptionsBlade)
+      1.  This can be obtained by navigating to the [subscriptions page in the Azure portal](https://portal.azure.com/#blade/Microsoft_Azure_Billing/SubscriptionsBlade)
    1. `RegionName` (**required**)
       1. Specifies the region you would like to use for your Cromwell on Azure instance. To find a list of all available regions, run `az account list-locations` on the command line or in PowerShell and use the desired region's "name" property for `RegionName`.
    1. `MainIdentifierPrefix` (*optional*)
