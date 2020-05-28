@@ -95,15 +95,22 @@ namespace TesApi.Tests
 
         private async Task<Mock<IAzureProxy>> ArrangeTest(TesTask[] tasks)
         {
-            // Arrange
             var repositoryItems = tasks.Select(
                 t => new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = t });
-            mockRepo.Setup(r => r.GetItemAsync(It.IsAny<string>()))
-                    .ReturnsAsync((string id) => repositoryItems.Single(i => i.Value.Id == id));
+
+            foreach (var item in repositoryItems)
+            {
+                mockRepo.Setup(repo => repo.TryGetItemAsync(item.Value.Id, It.IsAny<Action<RepositoryItem<TesTask>>>()))
+                    .Callback<string, Action<RepositoryItem<TesTask>>>((id, action) =>
+                    {
+                        action(item);
+                    })
+                    .ReturnsAsync(true);
+            }
+
             azureProxy.Setup(p => p.ListOldJobsToDeleteAsync(oldestJobAge))
                     .ReturnsAsync(repositoryItems.Select(i => i.Value.Id + "-1"));
 
-            // Act
             await deleteCompletedBatchJobsHostedService.StartAsync(new System.Threading.CancellationToken());
             return azureProxy;
         }

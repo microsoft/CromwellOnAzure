@@ -54,7 +54,7 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
-        public async Task GetVMSizesAndPricesAsync_UsesCache_CalledFromConstructor()
+        public async Task GetVMSizesAndPricesAsync_UsesCache()
         {
             var azureProxy = GetMockAzureProxy();
             var cachingAzureProxy = new CachingAzureProxy(azureProxy.Object, cache, new Mock<ILogger<CachingAzureProxy>>().Object);
@@ -85,7 +85,7 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
-        public async Task GetStorageAccountInfoAsync_UsesCache_NullInfo_DoesNotSetCache()
+        public async Task GetStorageAccountInfoAsync_NullInfo_DoesNotSetCache()
         {
             var azureProxy = GetMockAzureProxy();
 
@@ -120,7 +120,7 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
-        public async Task GetContainerRegistryInfoAsync_UsesCache_NullInfo_DoesNotSetCache()
+        public async Task GetContainerRegistryInfoAsync_NullInfo_DoesNotSetCache()
         {
             var azureProxy = GetMockAzureProxy();
 

@@ -7,9 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using LazyCache;
 using Microsoft.Azure.Batch;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Primitives;
 using TesApi.Models;
 using static TesApi.Web.AzureProxy;
 

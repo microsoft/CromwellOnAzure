@@ -70,21 +70,29 @@ namespace TesApi.Controllers
         [SwaggerResponse(statusCode: 200, type: typeof(object), description: "")]
         public virtual async Task<IActionResult> CancelTask([FromRoute][Required]string id)
         {
-            var tesTask = await repository.GetItemAsync(id);
+            RepositoryItem<TesTask> tesTask = null;
 
-            if (tesTask == null)
+            if (await repository.TryGetItemAsync(id, item => tesTask = item))
             {
-                return BadRequest($"The task with id {id} does not exist.");
+                if (tesTask.Value.State == TesState.COMPLETEEnum || 
+                    tesTask.Value.State == TesState.EXECUTORERROREnum || 
+                    tesTask.Value.State == TesState.SYSTEMERROREnum)
+                {
+                    logger.LogInformation($"Task {id} cannot be canceled because it is in {tesTask.Value.State} state.");
+                }
+                else if (tesTask.Value.State != TesState.CANCELEDEnum)
+                {
+                    logger.LogInformation("Canceling task");
+                    tesTask.Value.IsCancelRequested = true;
+                    tesTask.Value.State = TesState.CANCELEDEnum;
+                    await repository.UpdateItemAsync(id, tesTask);
+                }
+            }
+            else
+            {
+                return NotFound($"The task with id {id} does not exist.");
             }
 
-            // TODO: What happens if tesTask does not exist OR has already completed/failed?
-            if (tesTask.Value.State != TesState.CANCELEDEnum)
-            {
-                logger.LogInformation("Canceling task");
-                tesTask.Value.IsCancelRequested = true;
-                tesTask.Value.State = TesState.CANCELEDEnum;
-                await repository.UpdateItemAsync(id, tesTask);
-            }
 
             return StatusCode(200, new object());
         }
@@ -145,7 +153,6 @@ namespace TesApi.Controllers
                 // If CWL document has it specified, override the value sent by Cromwell
                 tesTask.Resources.Preemptible = cwlDocument.Preemptible ?? tesTask.Resources.Preemptible;
             }
-
             logger.LogDebug($"Creating task with id {tesTask.Id} state {tesTask.State}");
             await repository.CreateItemAsync(tesTask);
             return StatusCode(200, new TesCreateTaskResponse { Id = tesTask.Id });
@@ -180,9 +187,10 @@ namespace TesApi.Controllers
         [SwaggerResponse(statusCode: 200, type: typeof(TesTask), description: "")]
         public virtual async Task<IActionResult> GetTaskAsync([FromRoute][Required]string id, [FromQuery]string view)
         {
-            var tesTask = (await repository.GetItemAsync(id))?.Value;
+            RepositoryItem<TesTask> repositoryItem = null;
+            var itemFound = (await repository.TryGetItemAsync(id, item => repositoryItem = item));
 
-            return tesTask != null ? TesJsonResult(tesTask, view) : NotFound($"The task with id {id} does not exist.");
+            return itemFound ? TesJsonResult(repositoryItem.Value, view) : NotFound($"The task with id {id} does not exist.");
         }
 
         /// <summary>
@@ -203,7 +211,7 @@ namespace TesApi.Controllers
 
             var decodedPageToken =
                 pageToken != null ? Encoding.UTF8.GetString(Base64UrlTextEncoder.Decode(pageToken)) : null;
-            
+
             if (pageSize < 1 || pageSize > 2047)
             {
                 logger.LogError($"pageSize invalid {pageSize}");
@@ -214,9 +222,9 @@ namespace TesApi.Controllers
                 t => string.IsNullOrWhiteSpace(namePrefix) || t.Name.StartsWith(namePrefix),
                 pageSize.HasValue ? (int)pageSize : 256,
                 decodedPageToken);
-            
+
             var encodedNextPageToken = nextPageToken != null ? Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(nextPageToken)) : null;
-            var response = new TesListTasksResponse { Tasks = tasks.Select(t => t.Value).ToList(), NextPageToken = encodedNextPageToken};
+            var response = new TesListTasksResponse { Tasks = tasks.Select(t => t.Value).ToList(), NextPageToken = encodedNextPageToken };
 
             return TesJsonResult(response, view);
         }
