@@ -128,4 +128,4 @@ docker_compose_overrides="version: \"3.6\"\nservices:\n  cromwell:\n    volumes:
 echo -e "$docker_compose_overrides" > "docker-compose.override.yml"
 
 # Execute fstab
-sudo mount -av -t fuse
+echo "$(sudo mount -av -t fuse)"
