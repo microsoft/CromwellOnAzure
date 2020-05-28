@@ -44,6 +44,7 @@ services:
       - type: bind
         source: /cromwellazure/cromwell-tmp
         target: /cromwell-tmp
+      - /cromwellazure/cromwell-application.conf:/configuration/cromwell-application.conf:rw
     entrypoint:
       - /bin/sh
       - -c
