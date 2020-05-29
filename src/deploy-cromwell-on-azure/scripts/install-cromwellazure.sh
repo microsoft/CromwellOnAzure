@@ -4,12 +4,12 @@
 
 # Install Docker and Docker Compose
 sudo apt update
-sudo apt install apt-transport-https ca-certificates curl software-properties-common
+sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
+sudo add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
 sudo apt update
 sudo apt-cache policy docker-ce
-sudo apt -y install docker-ce
+sudo apt install -y docker-ce
 sudo curl -L https://github.com/docker/compose/releases/download/1.24.1/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
 sudo docker-compose --version
@@ -17,8 +17,8 @@ sudo docker-compose --version
 # Install Blobfuse
 sudo wget https://packages.microsoft.com/config/ubuntu/16.04/packages-microsoft-prod.deb
 sudo dpkg -i packages-microsoft-prod.deb
-sudo apt-get update
-sudo apt-get -y install blobfuse fuse
+sudo apt update
+sudo apt install -y blobfuse=1.2.1 fuse
 
 # Mount data disk and set to mount on startup
 sudo fdisk /dev/sdc <<EOF
