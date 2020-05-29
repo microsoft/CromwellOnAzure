@@ -404,7 +404,7 @@ namespace CromwellOnAzureDeployer
         {
             var startTime = DateTime.UtcNow;
             var line = RefreshableConsole.WriteLine("Running installation script on the VM...");
-            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"/cromwellazure/install-cromwellazure.sh");
+            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"/cromwellazure/install-cromwellazure.sh > /cromwellazure/install.log");
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod -aG docker {configuration.VmUsername}");
             WriteExecutionTime(line, startTime);
         }
