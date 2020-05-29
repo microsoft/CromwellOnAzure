@@ -14,9 +14,6 @@ sudo curl -L https://github.com/docker/compose/releases/download/1.24.1/docker-c
 sudo chmod +x /usr/local/bin/docker-compose
 sudo docker-compose --version
 
-# Add vmadmin user to Docker group (Allows running of docker and docker-compose commands without sudoer permissions)
-sudo usermod -aG docker vmadmin
-
 # Install Blobfuse
 sudo wget https://packages.microsoft.com/config/ubuntu/16.04/packages-microsoft-prod.deb
 sudo dpkg -i packages-microsoft-prod.deb
