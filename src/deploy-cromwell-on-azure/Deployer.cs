@@ -377,7 +377,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo)
         {
-            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, "sudo mkdir /cromwellazure && sudo chown vmadmin /cromwellazure && sudo chmod ug=rwx,o= /cromwellazure");
+            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo mkdir /cromwellazure && sudo chown {configuration.VmUsername} /cromwellazure && sudo chmod ug=rwx,o= /cromwellazure");
             await CopyInstallationFilesAsync(sshConnectionInfo);
             await Task.WhenAll(new[] { RunInstallationScriptAsync(sshConnectionInfo), CopyAnyCustomDockerImagesToTheVmAsync(sshConnectionInfo) });
             await LoadAnyCustomDockerImagesAndCopyDockerComposeFileAsync(sshConnectionInfo);
@@ -405,6 +405,7 @@ namespace CromwellOnAzureDeployer
             var startTime = DateTime.UtcNow;
             var line = RefreshableConsole.WriteLine("Running installation script on the VM...");
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"/cromwellazure/install-cromwellazure.sh");
+            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod -aG docker {configuration.VmUsername}");
             WriteExecutionTime(line, startTime);
         }
 
