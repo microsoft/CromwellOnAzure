@@ -18,7 +18,7 @@ sudo docker-compose --version
 sudo wget https://packages.microsoft.com/config/ubuntu/16.04/packages-microsoft-prod.deb
 sudo dpkg -i packages-microsoft-prod.deb
 sudo apt update
-sudo apt install -y blobfuse=1.2.1 fuse
+sudo apt install -y blobfuse=1.2.3 fuse
 
 # Mount data disk and set to mount on startup
 sudo fdisk /dev/sdc <<EOF
