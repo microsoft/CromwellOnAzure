@@ -102,9 +102,10 @@ namespace TesApi.Web
                 var tesTaskId = jobId.Split(new[] { '-' })[0];
                 logger.LogInformation($"TES task Id to delete: {tesTaskId}");
 
-                var repositoryItem = await repository.GetItemAsync(tesTaskId);
+                RepositoryItem<TesTask> repositoryItem = null;
+                var itemFound = await repository.TryGetItemAsync(tesTaskId, item => repositoryItem = item);
 
-                if (repositoryItem != null)
+                if (itemFound)
                 {
                     if (repositoryItem.Value.State == TesState.COMPLETEEnum ||
                         repositoryItem.Value.State == TesState.EXECUTORERROREnum ||

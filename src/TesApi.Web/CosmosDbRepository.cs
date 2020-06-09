@@ -9,10 +9,12 @@ namespace TesApi.Web
     using System.Linq;
     using System.Linq.Expressions;
     using System.Threading.Tasks;
+    using Microsoft.ApplicationInsights.Extensibility.Implementation;
     using Microsoft.Azure.Documents;
     using Microsoft.Azure.Documents.Client;
     using Microsoft.Azure.Documents.Linq;
     using Newtonsoft.Json;
+    using TesApi.Models;
 
     /// <summary>
     /// A repository for interacting with an Azure Cosmos DB instance
@@ -56,27 +58,56 @@ namespace TesApi.Web
         /// Reads a document from the database
         /// </summary>
         /// <param name="id">The document ID</param>
+        /// <param name="onSuccess"></param>
         /// <returns>An etag and object of type T as a RepositoryItem</returns>
-        public async Task<RepositoryItem<T>> GetItemAsync(string id)
+        public async Task<bool> TryGetItemAsync(string id, Action<RepositoryItem<T>> onSuccess)
         {
-            var requestOptions = new RequestOptions { PartitionKey = partitionKeyObjectForRequestOptions };
-
             try
             {
+                var requestOptions = new RequestOptions { PartitionKey = partitionKeyObjectForRequestOptions };
                 Document document = await client.ReadDocumentAsync(documentUriFactory(id), requestOptions);
-                return new RepositoryItem<T> { ETag = document.ETag, Value = (T)(dynamic)document };
+                var item = new RepositoryItem<T> { ETag = document.ETag, Value = (T)(dynamic)document };
+
+                if (item != null)
+                {
+                    onSuccess?.Invoke(item);
+                    return true;
+                }
             }
             catch (DocumentClientException e)
             {
                 if (e.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    return null;
+                    return false;
                 }
                 else
                 {
                     throw;
                 }
             }
+
+            return false;
+        }
+
+        public async Task<IEnumerable<RepositoryItem<T>>> GetItemsAsync(Expression<Func<T, bool>> predicate)
+        {
+            string continuationToken = null;
+            var listOfRepositoryItems = new List<RepositoryItem<T>>();
+
+            do
+            {
+                IEnumerable<RepositoryItem<T>> repositoryItems;
+
+                (continuationToken, repositoryItems) = await GetItemsAsync(
+                    predicate,
+                    pageSize: 256,
+                    continuationToken: continuationToken);
+
+                listOfRepositoryItems.AddRange(repositoryItems);
+            }
+            while (continuationToken != null);
+
+            return listOfRepositoryItems;
         }
 
         /// <summary>

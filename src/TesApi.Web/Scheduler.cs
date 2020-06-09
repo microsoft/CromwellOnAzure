@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -103,60 +102,50 @@ namespace TesApi.Web
         /// <returns></returns>
         private async Task OrchestrateTesTasksOnBatch()
         {
-            string continuationToken = null;
-
-            do
-            {
-                IEnumerable<RepositoryItem<TesTask>> tesTasks;
-
-                (continuationToken, tesTasks) = await repository.GetItemsAsync(
+            var tesTasks = await repository.GetItemsAsync(
                     predicate: t => t.State == TesState.QUEUEDEnum
                         || t.State == TesState.INITIALIZINGEnum
                         || t.State == TesState.RUNNINGEnum
-                        || (t.State == TesState.CANCELEDEnum && t.IsCancelRequested),
-                    pageSize: 256,
-                    continuationToken: continuationToken);
+                        || (t.State == TesState.CANCELEDEnum && t.IsCancelRequested));
 
-                foreach (var tesTask in tesTasks)
+            foreach (var tesTask in tesTasks)
+            {
+                try
                 {
-                    try
+                    var isModified = await batchScheduler.ProcessTesTaskAsync(tesTask.Value);
+
+                    if (isModified)
                     {
-                        var isModified = await batchScheduler.ProcessTesTaskAsync(tesTask.Value);
-
-                        if (isModified)
+                        //task has transitioned
+                        if (tesTask.Value.State == TesState.CANCELEDEnum
+                           || tesTask.Value.State == TesState.COMPLETEEnum
+                           || tesTask.Value.State == TesState.EXECUTORERROREnum
+                           || tesTask.Value.State == TesState.SYSTEMERROREnum)
                         {
-                            //task has transitioned
-                             if (tesTask.Value.State == TesState.CANCELEDEnum
-                                || tesTask.Value.State == TesState.COMPLETEEnum
-                                || tesTask.Value.State == TesState.EXECUTORERROREnum
-                                || tesTask.Value.State == TesState.SYSTEMERROREnum)
-                            {
-                                tesTask.Value.EndTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo);
-
-                                if (tesTask.Value.State == TesState.EXECUTORERROREnum || tesTask.Value.State == TesState.SYSTEMERROREnum)
-                                {
-                                    logger.LogDebug($"{tesTask.Value.Id} is in a terminal state: {tesTask.Value.State}");
-                                }
-                            }
-
-                            await repository.UpdateItemAsync(tesTask.Value.Id, new RepositoryItem<TesTask> { ETag = tesTask.ETag, Value = tesTask.Value });
-                        }
-                    }
-                    catch (Exception exc)
-                    {
-                        if (++tesTask.Value.ErrorCount > 3) // TODO: Should we increment this for exceptions here (current behaviour) or the attempted executions on the batch?
-                        {
-                            tesTask.Value.State = TesState.SYSTEMERROREnum;
                             tesTask.Value.EndTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo);
-                            tesTask.Value.WriteToSystemLog(exc.Message, exc.StackTrace);
+
+                            if (tesTask.Value.State == TesState.EXECUTORERROREnum || tesTask.Value.State == TesState.SYSTEMERROREnum)
+                            {
+                                logger.LogDebug($"{tesTask.Value.Id} is in a terminal state: {tesTask.Value.State}");
+                            }
                         }
 
-                        logger.LogError(exc, $"TES Task '{tesTask.Value.Id}' threw an exception.");
-                        await repository.UpdateItemAsync(tesTask.Value.Id, tesTask);
+                        await repository.UpdateItemAsync(tesTask.Value.Id, new RepositoryItem<TesTask> { ETag = tesTask.ETag, Value = tesTask.Value });
                     }
                 }
+                catch (Exception exc)
+                {
+                    if (++tesTask.Value.ErrorCount > 3) // TODO: Should we increment this for exceptions here (current behaviour) or the attempted executions on the batch?
+                    {
+                        tesTask.Value.State = TesState.SYSTEMERROREnum;
+                        tesTask.Value.EndTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo);
+                        tesTask.Value.WriteToSystemLog(exc.Message, exc.StackTrace);
+                    }
+
+                    logger.LogError(exc, $"TES Task '{tesTask.Value.Id}' threw an exception.");
+                    await repository.UpdateItemAsync(tesTask.Value.Id, tesTask);
+                }
             }
-            while (continuationToken != null);
         }
     }
 }

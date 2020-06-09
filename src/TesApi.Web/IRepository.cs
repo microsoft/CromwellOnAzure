@@ -31,8 +31,16 @@ namespace TesApi.Web
         /// Get an item by ID
         /// </summary>
         /// <param name="id">The ID of the item to retrieve</param>
+        /// <param name="onSuccess">The action to run when the item with the ID is found</param>
         /// <returns>The item instance</returns>
-        Task<RepositoryItem<T>> GetItemAsync(string id);
+        Task<bool> TryGetItemAsync(string id, Action<RepositoryItem<T>> onSuccess = null);
+
+        /// <summary>
+        /// Reads a collection of items from the repository
+        /// </summary>
+        /// <param name="predicate">The 'where' clause</param>
+        /// <returns>The collection of retrieved items</returns>
+        Task<IEnumerable<RepositoryItem<T>>> GetItemsAsync(Expression<Func<T, bool>> predicate);
 
         /// <summary>
         /// Reads a collection of items from the repository
