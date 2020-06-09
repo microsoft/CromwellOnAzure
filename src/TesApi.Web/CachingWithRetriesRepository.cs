@@ -34,25 +34,23 @@ namespace TesApi.Web
         }
 
         ///<inheritdoc/>
-        public Task<RepositoryItem<T>> CreateItemAsync(T item)
+        public async Task<RepositoryItem<T>> CreateItemAsync(T item)
         {
-            var task = retryPolicy.ExecuteAsync(() => repository.CreateItemAsync(item));
+            var repositoryItem = await retryPolicy.ExecuteAsync(() => repository.CreateItemAsync(item));
             ClearAllItemsPredicateCachedKeys();
-            return task;
+            return repositoryItem;
         }
 
         ///<inheritdoc/>
-        public Task DeleteItemAsync(string id)
+        public async Task DeleteItemAsync(string id)
         {
             if (cache.TryGetValue(id, out var cachedRepositoryItem))
             {
                 cache.Remove(id);
             }
 
-
-            var task = retryPolicy.ExecuteAsync(() => repository.DeleteItemAsync(id));
+            await retryPolicy.ExecuteAsync(() => repository.DeleteItemAsync(id));
             ClearAllItemsPredicateCachedKeys();
-            return task;
         }
 
         ///<inheritdoc/>
@@ -104,16 +102,16 @@ namespace TesApi.Web
         }
 
         ///<inheritdoc/>
-        public Task<RepositoryItem<T>> UpdateItemAsync(string id, RepositoryItem<T> item)
+        public async Task<RepositoryItem<T>> UpdateItemAsync(string id, RepositoryItem<T> item)
         {
             if (cache.TryGetValue(id, out var cachedRepositoryItem))
             {
                 cache.Remove(id);
             }
 
-            var task = retryPolicy.ExecuteAsync(() => repository.UpdateItemAsync(id, item));
+            var repositoryItem = await retryPolicy.ExecuteAsync(() => repository.UpdateItemAsync(id, item));
             ClearAllItemsPredicateCachedKeys();
-            return task;
+            return repositoryItem;
         }
 
         private void ClearAllItemsPredicateCachedKeys()
