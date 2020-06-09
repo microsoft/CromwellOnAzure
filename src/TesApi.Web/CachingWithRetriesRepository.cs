@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
 
@@ -17,7 +16,7 @@ namespace TesApi.Web
     public class CachingWithRetriesRepository<T> : IRepository<T> where T : class
     {
         private readonly IRepository<T> repository;
-
+        private readonly object cacheLock = new object();
         private readonly IMemoryCache cache = new MemoryCache(new MemoryCacheOptions());
         private readonly IList<object> itemsPredicateCachedKeys = new List<object>();
 
@@ -37,8 +36,9 @@ namespace TesApi.Web
         ///<inheritdoc/>
         public Task<RepositoryItem<T>> CreateItemAsync(T item)
         {
+            var task = retryPolicy.ExecuteAsync(() => repository.CreateItemAsync(item));
             ClearAllItemsPredicateCachedKeys();
-            return retryPolicy.ExecuteAsync(() => repository.CreateItemAsync(item));
+            return task;
         }
 
         ///<inheritdoc/>
@@ -49,8 +49,10 @@ namespace TesApi.Web
                 cache.Remove(id);
             }
 
+
+            var task = retryPolicy.ExecuteAsync(() => repository.DeleteItemAsync(id));
             ClearAllItemsPredicateCachedKeys();
-            return retryPolicy.ExecuteAsync(() => repository.DeleteItemAsync(id));
+            return task;
         }
 
         ///<inheritdoc/>
@@ -91,8 +93,14 @@ namespace TesApi.Web
             }
 
             repositoryItems = await retryPolicy.ExecuteAsync(() => repository.GetItemsAsync(predicate));
-            itemsPredicateCachedKeys.Add(key);
-            return cache.Set(key, repositoryItems, DateTimeOffset.MaxValue);
+
+            lock (cacheLock)
+            {
+                cache.Set(key, repositoryItems, DateTimeOffset.MaxValue);
+                itemsPredicateCachedKeys.Add(key);
+            }
+
+            return repositoryItems;
         }
 
         ///<inheritdoc/>
@@ -103,18 +111,22 @@ namespace TesApi.Web
                 cache.Remove(id);
             }
 
+            var task = retryPolicy.ExecuteAsync(() => repository.UpdateItemAsync(id, item));
             ClearAllItemsPredicateCachedKeys();
-            return retryPolicy.ExecuteAsync(() => repository.UpdateItemAsync(id, item));
+            return task;
         }
 
         private void ClearAllItemsPredicateCachedKeys()
         {
-            foreach (var key in itemsPredicateCachedKeys)
+            lock (cacheLock)
             {
-                cache.Remove(key);
-            }
+                foreach (var key in itemsPredicateCachedKeys)
+                {
+                    cache.Remove(key);
+                }
 
-            itemsPredicateCachedKeys.Clear();
+                itemsPredicateCachedKeys.Clear();
+            }
         }
     }
 }
