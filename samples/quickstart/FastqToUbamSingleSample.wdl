@@ -61,9 +61,6 @@ task FastqToUbam {
 
     runtime {
         docker: docker_image
-        memory: "32 GB"
-        cpu: "16"
-        disk: disk_size + " GB"
     }
 
     output {
