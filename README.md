@@ -162,7 +162,7 @@ Run Broad Institute of MIT and Harvard's Best Practices Pipelines on Cromwell on
 
 [Data pre-processing for variant discovery](https://github.com/microsoft/gatk4-data-processing-azure)<br/>
 
-[Germline short variant discovery (SNPs + Indels)](https://github.com/microsoft/five-dollar-genome-analysis-pipeline-azure)<br/>
+[Germline short variant discovery (SNPs + Indels)](https://github.com/microsoft/gatk4-genome-processing-pipeline-azure)<br/>
 
 [Somatic short variant discovery (SNVs + Indels)](https://github.com/microsoft/gatk4-somatic-snvs-indels-azure)<br/>
 
