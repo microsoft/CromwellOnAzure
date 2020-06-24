@@ -43,7 +43,7 @@ Cromwell on Azure configures all Azure resources needed to run workflows through
 
 ### Download the deployment executable
 
-Download the required executable from [Releases](https://github.com/microsoft/CromwellOnAzure/releases). Choose the runtime of your choice from `win-x64`, `linux-x64`, `osx-x64` <br/>
+Download the required executable from [Releases](https://github.com/microsoft/CromwellOnAzure/releases). Choose the runtime of your choice from `win-x64`, `linux-x64`, `osx-x64`. *On Windows machines, we recommend using the `win-x64` runtime (deployment using the `linux-x64` runtime via the Windows Subsystem for Linux is not supported).*<br/>
 
    *Optional: build the executable yourself.  Clone the [Cromwell on Azure repository](https://github.com/microsoft/CromwellOnAzure) and build the solution in Visual Studio 2019. Note that [VS 2019](https://visualstudio.microsoft.com/vs/) and [.NET Core SDK 3.0 and 2.2.x](https://dotnet.microsoft.com/download/dotnet-core) are required prerequisites. Build and [publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish?tabs=netcore21#synopsis) the `deploy-cromwell-on-azure` project [as a self-contained deployment with your target RID](https://docs.microsoft.com/en-us/dotnet/core/deploying/#self-contained-deployments-scd) to produce the executable*
 
