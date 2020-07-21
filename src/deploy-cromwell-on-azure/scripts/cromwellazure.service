@@ -1,8 +1,10 @@
 [Unit]
-Description=CromwellOnAzure - Start blobfuse and Docker Compose
+Description=CromwellOnAzure
+RequiresMountsFor=/data
 
 [Service]
-ExecStart=/bin/bash /cromwellazure/startup.sh
+ExecStart=/bin/bash /data/cromwellazure/startup.sh
+ExecStop=/bin/bash -c "cd /data/cromwellazure && docker-compose stop"
 
 [Install]
 WantedBy=multi-user.target

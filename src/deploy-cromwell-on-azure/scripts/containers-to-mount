@@ -22,11 +22,11 @@
 
 # Required containers, don't delete these lines:
 
-/STORAGEACCOUNTNAME/configuration
-/STORAGEACCOUNTNAME/cromwell-executions
-/STORAGEACCOUNTNAME/cromwell-workflow-logs
+/{DefaultStorageAccountName}/configuration
+/{DefaultStorageAccountName}/cromwell-executions
+/{DefaultStorageAccountName}/cromwell-workflow-logs
 
 # Optional containers, should list all containers where your input files are located:
 
 https://msgenpublicdata.blob.core.windows.net/inputs?sv=2015-04-05&sr=c&si=coa&sig=pENt%2FMMOj24uoNBZIPLa%2BNVVkvopcFK51rwADyYLEPE%3D
-/STORAGEACCOUNTNAME/inputs
+/{DefaultStorageAccountName}/inputs

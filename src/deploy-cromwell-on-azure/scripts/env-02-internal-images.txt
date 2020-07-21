@@ -1,0 +1,3 @@
+﻿TesImageName=mcr.microsoft.com/cromwellonazure/tes:${Build.BuildNumber}
+TriggerServiceImageName=mcr.microsoft.com/cromwellonazure/triggerservice:${Build.BuildNumber}
+CromwellOnAzureVersion=${Build.BuildNumber}

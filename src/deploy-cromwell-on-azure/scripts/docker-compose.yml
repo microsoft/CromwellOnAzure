@@ -4,29 +4,39 @@
 version: "3.6"
 services:
   tes:
-    image: "TESIMAGENAME"
+    image: "$TesImageName"
     environment:
-      - DefaultStorageAccountName=STORAGEACCOUNTNAME
-      - CosmosDbAccountName=COSMOSDBNAME
-      - BatchAccountName=VARBATCHACCOUNTNAME
-      - ApplicationInsightsAccountName=VARAPPLICATIONINSIGHTSACCOUNTNAME
-      - UsePreemptibleVmsOnly=false
-      - AzureOfferDurableId=MS-AZR-0003p
+      - DefaultStorageAccountName=$DefaultStorageAccountName
+      - CosmosDbAccountName=$CosmosDbAccountName
+      - BatchAccountName=$BatchAccountName
+      - ApplicationInsightsAccountName=$ApplicationInsightsAccountName
+      - UsePreemptibleVmsOnly=$UsePreemptibleVmsOnly
+      - AzureOfferDurableId=$AzureOfferDurableId
+      - CromwellOnAzureVersion=$CromwellOnAzureVersion
+      - CromwellImageName=$CromwellImageName
+      - MySqlImageName=$MySqlImageName
+      - TesImageName=$TesImageName
+      - TriggerServiceImageName=$TriggerServiceImageName
+      - CromwellImageSha=$CromwellImageSha
+      - MySqlImageSha=$MySqlImageSha
+      - TesImageSha=$TesImageSha
+      - TriggerServiceImageSha=$TriggerServiceImageSha
+      - DisableBatchScheduling=$DisableBatchScheduling
     expose:
       - "80"
     volumes:
       - type: bind
-        source: /cromwellazure/cromwell-tmp
+        source: /mnt/cromwell-tmp
         target: /cromwell-tmp
     restart: unless-stopped
   mysqldb:
-    image: "mysql:latest"
+    image: "$MySqlImageName"
     environment:
       - MYSQL_ROOT_PASSWORD=cromwell
       - MYSQL_DATABASE=cromwell_db
     volumes:
       - type: bind
-        source: /mysql
+        source: /data/mysql
         target: /var/lib/mysql
     entrypoint:
       - /bin/sh
@@ -36,13 +46,13 @@ services:
       - "3306"
     restart: unless-stopped
   cromwell:
-    image: "CROMWELLIMAGENAME"
+    image: "$CromwellImageName"
     volumes:
       - type: bind
-        source: /cromwellazure/wait-for-it
+        source: /data/cromwellazure/wait-for-it
         target: /wait-for-it
       - type: bind
-        source: /cromwellazure/cromwell-tmp
+        source: /mnt/cromwell-tmp
         target: /cromwell-tmp
     entrypoint:
       - /bin/sh
@@ -55,11 +65,10 @@ services:
       - "tes"
     restart: unless-stopped
   triggerservice:
-    image: "TRIGGERSERVICEIMAGENAME"
+    image: "$TriggerServiceImageName"
     environment:
-      - DefaultStorageAccountName=STORAGEACCOUNTNAME
-      - LAB_NAME=lab1
-      - ApplicationInsightsAccountName=VARAPPLICATIONINSIGHTSACCOUNTNAME
+      - DefaultStorageAccountName=$DefaultStorageAccountName
+      - ApplicationInsightsAccountName=$ApplicationInsightsAccountName
     depends_on:
       - "cromwell"
     restart: unless-stopped

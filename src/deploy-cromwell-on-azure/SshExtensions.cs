@@ -15,20 +15,20 @@ namespace CromwellOnAzureDeployer
     {
         private static readonly RetryPolicy retryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetry(5, retryAttempt => TimeSpan.FromSeconds(5));
+            .WaitAndRetry(10, retryAttempt => TimeSpan.FromSeconds(10));
 
         // TODO: cancellationToken
-        public static Task UploadFileAsync(this SftpClient sftpClient, Stream input, string path, bool canOverride = true, CancellationToken cancellationToken = default)
+        public static Task UploadFileAsync(this SftpClient sftpClient, Stream input, string path, bool canOverride = true)
         {
             return Task.Factory.FromAsync(sftpClient.BeginUploadFile(input, path, canOverride, null, null), sftpClient.EndUploadFile);
         }
 
-        public static async Task<(string output, string error, int exitStatus)> ExecuteCommandAsync(this SshClient sshClient, string commandText, bool throwOnNonZeroExitCode = false, CancellationToken cancellationToken = default)
+        public static async Task<(string output, string error, int exitStatus)> ExecuteCommandAsync(this SshClient sshClient, string commandText)
         {
             using var sshCommand = sshClient.CreateCommand(commandText);
             var output = await Task.Factory.FromAsync(sshCommand.BeginExecute(), sshCommand.EndExecute);
 
-            if (throwOnNonZeroExitCode && sshCommand.ExitStatus != 0)
+            if (sshCommand.ExitStatus != 0)
             {
                 throw new Exception($"ExecuteCommandAsync failed: ExitStatus = {sshCommand.ExitStatus}, Error = '{sshCommand.Error}'");
             }

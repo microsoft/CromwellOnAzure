@@ -2,7 +2,11 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-#!/bin/bash
+set -o errexit
+set -o nounset
+set -o errtrace
+
+trap 'echo "mount_containers failed with exit code $?"' ERR
 
 while getopts a: option
 do
@@ -13,7 +17,9 @@ done
 
 get_list_of_containers_to_mount () {
   local -n result=$1
+  echo "Getting access token for $default_storage_account"
   storage_token=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://$default_storage_account.blob.core.windows.net" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+  echo "Getting list of containers to mount from containers-to-mount file"
   containers=$(curl -s -X GET "https://$default_storage_account.blob.core.windows.net/configuration/containers-to-mount" -H "Authorization: Bearer $storage_token" -H "x-ms-version: 2018-03-28" -d '' )
   containers=$(tr -d "[:blank:]" <<< "$containers")    # remove all spaces
   containers=$(grep "^[^#]" <<< "$containers")    # remove all comment lines
@@ -23,20 +29,25 @@ get_list_of_containers_to_mount () {
 get_accessible_storage_containers () {
   local -n result=$1
 
+  echo "Getting management access token"
   mgmt_token=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+  echo "Getting storage access token"
   storage_token=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://storage.azure.com" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
-
+  echo "Getting list of accessible subscriptions"
   subscription_ids=$(curl -s -X GET "https://management.azure.com/subscriptions/?api-version=2019-08-01" -H "Authorization: Bearer $mgmt_token" | grep -Po '"id":"/subscriptions/\K([^"]*)' )
 
   for subscription_id in $subscription_ids; do
     resource_filter="resourceType%20eq%20'Microsoft.Storage/storageAccounts'"
 
+    echo "Getting list of storage accounts accessible by this VM in subscription $subscription_id"
     account_ids=$(curl -s -X GET "https://management.azure.com/subscriptions/$subscription_id/resources?%24filter=$resource_filter&api-version=2019-05-10" -H "Authorization: Bearer $mgmt_token" \
       | grep -Po "/subscriptions/[^\"]*/providers/Microsoft.Storage/storageAccounts/[^\"]*")
 
     for account_id in $account_ids; do
       account_name=$(grep -Po '/subscriptions/[^"]*/providers/Microsoft.Storage/storageAccounts/\K([^"]*)' <<< "$account_id")
+      echo "Getting access key for storage account $account_name"
       account_key=$(curl -s -X POST "https://management.azure.com/$account_id/listKeys?api-version=2016-12-01" -H "Authorization: Bearer $mgmt_token" -d '' | grep -Po '"key1","value":"\K([^"]*)' )
+      echo "Getting list of containers for storage account $account_name"
       container_names=$(curl -s -X GET "https://$account_name.blob.core.windows.net/?comp=list" -H "Authorization: Bearer $storage_token" -H "x-ms-version: 2018-03-28" -d '' | grep -Po '<Name>\K([^<]*)' )
 
       for container_name in $container_names; do
@@ -50,11 +61,12 @@ echo $default_storage_account
 declare -a container_patterns_to_mount
 declare -A accessible_containers
 declare -A include_patterns
+declare -a exclude_patterns
 
 get_list_of_containers_to_mount container_patterns_to_mount
 
 echo "Containers to mount:"
-for x in "${container_patterns_to_mount[@]}"; do echo "$x}"; done
+printf "%s\n" "${container_patterns_to_mount[@]-}" 
 
 container_patterns_to_mount=("${container_patterns_to_mount[@]/.blob.core.windows.net/}")
 container_patterns_to_mount=("${container_patterns_to_mount[@]/https:\/\//}")
@@ -63,7 +75,7 @@ container_patterns_to_mount=("${container_patterns_to_mount[@]/http:\/\//}")
 for pattern in "${container_patterns_to_mount[@]}"; do
   acct_and_cont=$(expr "$pattern" : '^[-/]*\([^?]*\)')    # remove leading "-" and "/", and the SAS token
   acct_and_cont=${acct_and_cont/%\//}    # remove trailing "/"
-  sas=$(expr "$pattern" : '[^?]*\(.*\)')
+  sas=$(expr "$pattern" : '[^?]*\(.*\)') || sas=""
   [[ $pattern != -* ]] && include_patterns[$acct_and_cont]=$sas || exclude_patterns+=($acct_and_cont)
 done
 
@@ -72,7 +84,7 @@ echo "account/container patterns to include:"
 for x in "${!include_patterns[@]}"; do echo "$x -> ${include_patterns[$x]}"; done
 echo ""
 echo "account/container patterns to exclude:"
-printf '%s\n' "${exclude_patterns[@]}"
+printf "%s\n" "${exclude_patterns[@]-}" 
 
 get_accessible_storage_containers accessible_containers
 
@@ -92,7 +104,7 @@ for x in "${!accessible_containers[@]}"; do
   account_key=${accessible_containers[$x]}
   include="false"
   for include_pattern in "${!include_patterns[@]}"; do [[ $x == $include_pattern ]] && include="true"; done
-  for exclude_pattern in "${exclude_patterns[@]}"; do [[ $x == $exclude_pattern ]] && include="false"; done
+  for exclude_pattern in "${exclude_patterns[@]-}"; do [[ $x == $exclude_pattern ]] && include="false"; done
 
   [[ $include == "true" ]] \
     && account_name=$(expr "$x" : '\(.*\)/.*') \
@@ -110,7 +122,7 @@ for x in "${!include_patterns[@]}"; do
   sas_token=${include_patterns[$x]}
   [[ $sas_token == "" ]] && continue
   include="true"
-  for exclude_pattern in "${exclude_patterns[@]}"; do [[ $x == $exclude_pattern ]] && include="false"; done
+  for exclude_pattern in "${exclude_patterns[@]-}"; do [[ $x == $exclude_pattern ]] && include="false"; done
 
   [[ $include == "true" ]] \
     && account_name=$(expr "$x" : '\(.*\)/.*') \
@@ -129,3 +141,5 @@ echo -e "$docker_compose_overrides" > "docker-compose.override.yml"
 
 # Execute fstab
 sudo mount -av -t fuse
+
+echo "mount_containers completed successfully"

@@ -2,7 +2,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-readonly log_file="/cromwellazure/mount.blobfuse.log"
+readonly log_file="/data/cromwellazure/mount.blobfuse.log"
 touch $log_file
 exec 1>>$log_file
 exec 2>&1
@@ -39,7 +39,7 @@ else
     write_log "Error mounting $1. Either the account key or the SAS token must be specified." && exit 1
 fi
 
-/usr/bin/blobfuse $1 --tmp-path=$tmp_dir -o nonempty -o attr_timeout=240 -o entry_timeout=240 -o negative_timeout=120 -o allow_other --container-name=$container_name
+/usr/bin/blobfuse $1 --tmp-path=$tmp_dir -o nonempty -o attr_timeout=240 -o entry_timeout=240 -o negative_timeout=120 -o allow_other --container-name=$container_name --log-level=LOG_CRIT
 exitcode=$?
 [ $exitcode -eq 0 ] && write_log "Successfully mounted $1" || write_log "Error mounting $1. Exit code: $exitcode" && exit $exitcode
 

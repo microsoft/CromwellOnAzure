@@ -34,16 +34,7 @@ namespace CromwellOnAzureDeployer
                 PrintWelcomeScreen();
             }
 
-            var isSuccessful = await new Deployer(configuration).DeployAsync();
-
-            if (isSuccessful)
-            {
-                Environment.Exit(0);
-            }
-            else
-            {
-                Environment.Exit(1);
-            }
+            Environment.Exit(await new Deployer(configuration).DeployAsync());
         }
 
         private static void PrintWelcomeScreen()
