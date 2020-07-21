@@ -18,7 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
+    <Compile Include="..\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
   </ItemGroup>
 
   <ItemGroup>
