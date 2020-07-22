@@ -44,6 +44,55 @@ kv["TesImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}
 kv["TriggerServiceImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TriggerServiceImageName"]})
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 
+
+write_log "Checking account access (this could take awhile due to role assignment propagation delay)..."
+
+subscription_id=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/compute/subscriptionId?api-version=2017-08-01&format=text")
+
+while :
+do
+    write_log "Getting management token..."
+
+    response=$(curl -s -H Metadata:true --write-out '~%{http_code}' "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com") \
+        && IFS='~' read content http_status <<< $response \
+        && [[ "$http_status" == "200" ]] \
+        && mgmt_token=$(grep -o '"access_token":"[^"]*' <<< $content | grep -o '[^"]*$') \
+        || write_log "Management token request failed with $http_status, $content"
+
+    [ "$http_status" == "200" ] && break || sleep 10
+done
+
+while :
+do
+    while :
+    do
+        write_log "Getting list of accessible resources..."
+
+        response=$(curl -s -X GET --write-out '~%{http_code}' "https://management.azure.com/subscriptions/$subscription_id/resources?api-version=2019-05-10" -H "Authorization: Bearer $mgmt_token" -d '') \
+            && IFS='~' read content http_status <<< $response \
+            && [[ "$http_status" == "200" ]] \
+            && resource_ids=$(grep -Po '"id":"\K([^"]*)' <<< $content) \
+            || write_log "Resource query failed with $http_status, $content"
+
+            [ "$http_status" == "200" ] && break || sleep 10
+    done
+
+    write_log "Verifying that all required accounts (4) are present in the list of accessible resources..."
+
+    if grep -q "${kv["DefaultStorageAccountName"]}" <<< "$resource_ids" \
+            && grep -q "${kv["CosmosDbAccountName"]}" <<< "$resource_ids" \
+            && grep -q "${kv["BatchAccountName"]}" <<< "$resource_ids" \
+            && grep -q "${kv["ApplicationInsightsAccountName"]}" <<< "$resource_ids"; then
+        break
+    else
+        write_log "Not all accounts are accessible, retrying..."
+        sleep 10
+    fi
+done
+
+write_log "Account access OK"
+write_log
+
 storage_account_name=${kv["DefaultStorageAccountName"]}
 
 write_log "Mounting containers (default storage account = $storage_account_name)"

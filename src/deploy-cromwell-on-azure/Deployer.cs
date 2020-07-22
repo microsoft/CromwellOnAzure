@@ -50,7 +50,6 @@ namespace CromwellOnAzureDeployer
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
 
-        private readonly TimeSpan azurePropagationDelay = TimeSpan.FromMinutes(5);
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
 
         private readonly List<string> requiredResourceProviders = new List<string>
@@ -306,8 +305,6 @@ namespace CromwellOnAzureDeployer
                     await AssignVmAsContributorToBatchAccountAsync(managedIdentity, batchAccount);
                     await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
                     await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
-
-                    await DelayAsync($"Waiting {azurePropagationDelay.TotalMinutes:n0} minute(s) for Azure to fully propagate role assignments...", azurePropagationDelay);
                 }
 
                 await RestartVmAsync(linuxVm);
@@ -999,8 +996,6 @@ namespace CromwellOnAzureDeployer
                     await Execute(
                         "Removing existing system-managed identity and assigning new user-managed identity to the VM...",
                         () => linuxVm.Update().WithoutSystemAssignedManagedServiceIdentity().WithExistingUserAssignedManagedServiceIdentity(userManagedIdentity).ApplyAsync());
-
-                    await DelayAsync($"Waiting {azurePropagationDelay.TotalMinutes:n0} minute(s) for Azure to fully propagate role assignments...", azurePropagationDelay);
 
                     return userManagedIdentity;
                 });
