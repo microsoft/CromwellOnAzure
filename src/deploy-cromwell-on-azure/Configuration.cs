@@ -5,8 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Microsoft.Azure.Management.Compute.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Extensions.Configuration;
 
 namespace CromwellOnAzureDeployer
@@ -36,7 +34,7 @@ namespace CromwellOnAzureDeployer
         public string CustomCromwellImagePath { get; set; }
         public string CustomTesImagePath { get; set; }
         public string CustomTriggerServiceImagePath { get; set; }
-        public bool? RunTestWorkflow { get; set; } = null;
+        public bool SkipTestWorkflow { get; set; } = false;
         public bool Update { get; set; } = false;
 
         public static Configuration BuildConfiguration(string[] args)

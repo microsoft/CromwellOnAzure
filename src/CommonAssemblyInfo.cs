@@ -1,8 +1,8 @@
 ﻿using System.Reflection;
 
-[assembly: AssemblyCompany("Microsoft")]
+[assembly: AssemblyCompany("Microsoft Corporation")]
 [assembly: AssemblyProduct("Cromwell on Azure")]
-[assembly: AssemblyCopyright("Copyright © Microsoft 2020")]
+[assembly: AssemblyCopyright("Copyright © Microsoft Corporation")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
