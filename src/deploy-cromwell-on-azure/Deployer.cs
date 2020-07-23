@@ -141,9 +141,15 @@ namespace CromwellOnAzureDeployer
 
                     configuration.VmName = linuxVm.Name;
 
-                    if (! (await azureClient.Identities.ListByResourceGroupAsync(configuration.ResourceGroupName)).Any())
+                    var existingUserManagedIdentityId = linuxVm.UserAssignedManagedServiceIdentityIds.FirstOrDefault();
+
+                    if (existingUserManagedIdentityId == null)
                     {
                         managedIdentity = await ReplaceSystemManagedIdentityWithUserManagedIdentityAsync(resourceGroup, linuxVm);
+                    }
+                    else
+                    {
+                        managedIdentity = await azureClient.Identities.GetByIdAsync(existingUserManagedIdentityId);
                     }
 
                     networkSecurityGroup = (await azureClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault();
