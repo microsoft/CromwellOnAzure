@@ -601,7 +601,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task<Version> GetInstalledCromwellOnAzureVersionAsync(ConnectionInfo sshConnectionInfo)
         {
-            var versionString = (await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, @"grep -sPo 'CromwellOnAzureVersion=\K(.*)$' /cromwellazure/env-02-internal-images.txt || :")).Output;
+            var versionString = (await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $@"grep -sPo 'CromwellOnAzureVersion=\K(.*)$' {CromwellAzureRootDir}/env-02-internal-images.txt || :")).Output;
 
             return !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
         }
