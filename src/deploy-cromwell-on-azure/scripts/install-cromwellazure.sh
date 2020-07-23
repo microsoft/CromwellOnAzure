@@ -37,7 +37,10 @@ ubuntuVersion=$(lsb_release -ar 2>/dev/null | grep -i release | cut -s -f2)
 sudo wget https://packages.microsoft.com/config/ubuntu/$ubuntuVersion/packages-microsoft-prod.deb
 sudo dpkg -i packages-microsoft-prod.deb
 sudo apt update
-sudo apt install -y --allow-downgrades blobfuse=1.2.1 fuse
+sudo apt install -y --allow-downgrades blobfuse=1.2.4 fuse
+
+write_log "Applying security patches"
+sudo unattended-upgrades -v
 
 if [ -d "/mysql" ]; then
     write_log "Previous /mysql exists, moving it to /data/mysql"
