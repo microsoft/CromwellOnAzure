@@ -18,7 +18,7 @@ done
 get_list_of_containers_to_mount () {
   local -n result=$1
   echo "Getting access token for $default_storage_account"
-  storage_token=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://$default_storage_account.blob.core.windows.net" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+  storage_token=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://$default_storage_account.blob.core.windows.net" | grep -Po '"access_token":"\K([^"]*)')
   echo "Getting list of containers to mount from containers-to-mount file"
   containers=$(curl -s -X GET "https://$default_storage_account.blob.core.windows.net/configuration/containers-to-mount" -H "Authorization: Bearer $storage_token" -H "x-ms-version: 2018-03-28" -d '' )
   containers=$(tr -d "[:blank:]" <<< "$containers")    # remove all spaces
@@ -30,9 +30,9 @@ get_accessible_storage_containers () {
   local -n result=$1
 
   echo "Getting management access token"
-  mgmt_token=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+  mgmt_token=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com" | grep -Po '"access_token":"\K([^"]*)')
   echo "Getting storage access token"
-  storage_token=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://storage.azure.com" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+  storage_token=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://storage.azure.com" | grep -Po '"access_token":"\K([^"]*)')
   echo "Getting list of accessible subscriptions"
   subscription_ids=$(curl -s -X GET "https://management.azure.com/subscriptions/?api-version=2019-08-01" -H "Authorization: Bearer $mgmt_token" | grep -Po '"id":"/subscriptions/\K([^"]*)' )
 

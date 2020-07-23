@@ -110,7 +110,7 @@ namespace CromwellOnAzureDeployer
 
                     if (string.IsNullOrWhiteSpace(configuration.VmPassword))
                     {
-                        throw new ValidationException($"VmPassword is required for update.");
+                        throw new ValidationException($"--VmPassword is required for update.");
                     }
 
                     var existingVms = await azureClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
@@ -122,7 +122,7 @@ namespace CromwellOnAzureDeployer
 
                     if (existingVms.Count() > 1 && string.IsNullOrWhiteSpace(configuration.VmName))
                     {
-                        throw new ValidationException($"Resource group {configuration.ResourceGroupName} conntains multiple virtual machines. VmName must be provided.");
+                        throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. --VmName must be provided.");
                     }
 
                     if (!string.IsNullOrWhiteSpace(configuration.VmName))
@@ -966,7 +966,7 @@ namespace CromwellOnAzureDeployer
         private Task<IIdentity> ReplaceSystemManagedIdentityWithUserManagedIdentityAsync(IResourceGroup resourceGroup, IVirtualMachine linuxVm)
         {
             return Execute(
-                "Replacing VM system-managed identity with user-managed identity...",
+                "Replacing VM system-managed identity with user-managed identity for easier VM upgrades in the future...",
                 async () =>
                 {
                     var userManagedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
