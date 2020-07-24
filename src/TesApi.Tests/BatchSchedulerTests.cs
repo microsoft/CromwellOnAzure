@@ -47,7 +47,7 @@ namespace TesApi.Tests
         public async Task TesTaskFailsWithSystemErrorWhenTotalBatchQuotaIsSetTooLow()
         {
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
-            azureProxyReturnValues.BatchQuotas = new AzureProxy.AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 1, LowPriorityCoreQuota = 10 };
+            azureProxyReturnValues.BatchQuotas = new AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 1, LowPriorityCoreQuota = 10 };
 
             Assert.AreEqual(TesState.SYSTEMERROREnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 2, RamGb = 1, Preemptible = false }, azureProxyReturnValues));
             Assert.AreEqual(TesState.SYSTEMERROREnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 11, RamGb = 1, Preemptible = true }, azureProxyReturnValues));
@@ -73,10 +73,10 @@ namespace TesApi.Tests
                 new VirtualMachineInfo { VmSize = "VmSize1", LowPriority = false, NumberOfCores = 2, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 1 },
                 new VirtualMachineInfo { VmSize = "VmSize1", LowPriority = true, NumberOfCores = 2, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 2 }};
 
-            azureProxyReturnValues.BatchQuotas = new AzureProxy.AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 9, LowPriorityCoreQuota = 17 };
+            azureProxyReturnValues.BatchQuotas = new AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 9, LowPriorityCoreQuota = 17 };
 
-            azureProxyReturnValues.ActiveNodeCountByVmSize = new List<AzureProxy.AzureBatchNodeCount> {
-                new AzureProxy.AzureBatchNodeCount { VirtualMachineSize = "VmSize1", DedicatedNodeCount = 4, LowPriorityNodeCount = 8 }  // 8 (4 * 2) dedicated and 16 ( 8 * 2) low pri cores are used
+            azureProxyReturnValues.ActiveNodeCountByVmSize = new List<AzureBatchNodeCount> {
+                new AzureBatchNodeCount { VirtualMachineSize = "VmSize1", DedicatedNodeCount = 4, LowPriorityNodeCount = 8 }  // 8 (4 * 2) dedicated and 16 ( 8 * 2) low pri cores are used
             };
 
             Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 2, RamGb = 1, Preemptible = false }, azureProxyReturnValues));
@@ -488,7 +488,7 @@ namespace TesApi.Tests
             azureProxy.Verify(i => i.UploadBlobFromFileAsync(It.Is<Uri>(uri => uri.AbsoluteUri.StartsWith("https://defaultstorageaccount.blob.core.windows.net/cromwell-executions/workflowpath/inputs/blob1?sv=")), "/cromwell-tmp/tmp12345/blob1"));
         }
 
-        private static async Task<string> ProcessTesTaskAndGetFirstLogMessageAsync(TesTask tesTask, AzureProxy.AzureBatchJobAndTaskState? azureBatchJobAndTaskState = null)
+        private static async Task<string> ProcessTesTaskAndGetFirstLogMessageAsync(TesTask tesTask, AzureBatchJobAndTaskState? azureBatchJobAndTaskState = null)
         {
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
             azureProxyReturnValues.BatchJobAndTaskState = azureBatchJobAndTaskState ?? azureProxyReturnValues.BatchJobAndTaskState;
@@ -520,7 +520,7 @@ namespace TesApi.Tests
             return (jobId, cloudTask, poolInformation);
         }
 
-        private static async Task<TesState> GetNewTesTaskStateAsync(TesState currentTesTaskState, AzureProxy.AzureBatchJobAndTaskState azureBatchJobAndTaskState)
+        private static async Task<TesState> GetNewTesTaskStateAsync(TesState currentTesTaskState, AzureBatchJobAndTaskState azureBatchJobAndTaskState)
         {
             var tesTask = new TesTask { Id = "test", State = currentTesTaskState };
 
@@ -598,18 +598,18 @@ namespace TesApi.Tests
 
         private struct BatchJobAndTaskStates
         {
-            public static AzureProxy.AzureBatchJobAndTaskState TaskActive => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = TaskState.Active };
-            public static AzureProxy.AzureBatchJobAndTaskState TaskPreparing => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = TaskState.Preparing };
-            public static AzureProxy.AzureBatchJobAndTaskState TaskRunning => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = TaskState.Running };
-            public static AzureProxy.AzureBatchJobAndTaskState TaskCompletedSuccessfully => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Completed, TaskState = TaskState.Completed, TaskExitCode = 0 };
-            public static AzureProxy.AzureBatchJobAndTaskState TaskFailed => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Completed, TaskState = TaskState.Completed, TaskExitCode = -1 };
-            public static AzureProxy.AzureBatchJobAndTaskState JobNotFound => new AzureProxy.AzureBatchJobAndTaskState { JobState = null };
-            public static AzureProxy.AzureBatchJobAndTaskState TaskNotFound => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = null };
-            public static AzureProxy.AzureBatchJobAndTaskState MoreThanOneJobFound => new AzureProxy.AzureBatchJobAndTaskState { MoreThanOneActiveJobFound = true };
-            public static AzureProxy.AzureBatchJobAndTaskState NodeAllocationFailed => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, NodeAllocationFailed = true };
-            public static AzureProxy.AzureBatchJobAndTaskState NodeDiskFull => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, NodeErrorCode = "DiskFull" };
-            public static AzureProxy.AzureBatchJobAndTaskState ActiveJobWithMissingAutoPool => new AzureProxy.AzureBatchJobAndTaskState { ActiveJobWithMissingAutoPool = true };
-            public static AzureProxy.AzureBatchJobAndTaskState ImageDownloadFailed => new AzureProxy.AzureBatchJobAndTaskState { JobState = JobState.Active, NodeErrorCode = "ContainerInvalidImage" };
+            public static AzureBatchJobAndTaskState TaskActive => new AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = TaskState.Active };
+            public static AzureBatchJobAndTaskState TaskPreparing => new AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = TaskState.Preparing };
+            public static AzureBatchJobAndTaskState TaskRunning => new AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = TaskState.Running };
+            public static AzureBatchJobAndTaskState TaskCompletedSuccessfully => new AzureBatchJobAndTaskState { JobState = JobState.Completed, TaskState = TaskState.Completed, TaskExitCode = 0 };
+            public static AzureBatchJobAndTaskState TaskFailed => new AzureBatchJobAndTaskState { JobState = JobState.Completed, TaskState = TaskState.Completed, TaskExitCode = -1 };
+            public static AzureBatchJobAndTaskState JobNotFound => new AzureBatchJobAndTaskState { JobState = null };
+            public static AzureBatchJobAndTaskState TaskNotFound => new AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = null };
+            public static AzureBatchJobAndTaskState MoreThanOneJobFound => new AzureBatchJobAndTaskState { MoreThanOneActiveJobFound = true };
+            public static AzureBatchJobAndTaskState NodeAllocationFailed => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeAllocationFailed = true };
+            public static AzureBatchJobAndTaskState NodeDiskFull => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeErrorCode = "DiskFull" };
+            public static AzureBatchJobAndTaskState ActiveJobWithMissingAutoPool => new AzureBatchJobAndTaskState { ActiveJobWithMissingAutoPool = true };
+            public static AzureBatchJobAndTaskState ImageDownloadFailed => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeErrorCode = "ContainerInvalidImage" };
         }
 
         private class AzureProxyReturnValues
@@ -617,11 +617,11 @@ namespace TesApi.Tests
             public Dictionary<string, StorageAccountInfo> StorageAccountInfos { get; set; }
             public ContainerRegistryInfo ContainerRegistryInfo { get; set; }
             public List<VirtualMachineInfo> VmSizesAndPrices { get; set; }
-            public AzureProxy.AzureBatchAccountQuotas BatchQuotas { get; set; }
-            public IEnumerable<AzureProxy.AzureBatchNodeCount> ActiveNodeCountByVmSize { get; set; }
+            public AzureBatchAccountQuotas BatchQuotas { get; set; }
+            public IEnumerable<AzureBatchNodeCount> ActiveNodeCountByVmSize { get; set; }
             public int ActiveJobCount { get; set; }
             public int ActivePoolCount { get; set; }
-            public AzureProxy.AzureBatchJobAndTaskState BatchJobAndTaskState { get; set; }
+            public AzureBatchJobAndTaskState BatchJobAndTaskState { get; set; }
             public string NextBatchJobId { get; set; }
             public string StorageAccountKey { get; set; }
             public string DownloadedBlobContent { get; set; }
@@ -640,8 +640,8 @@ namespace TesApi.Tests
                     new VirtualMachineInfo { VmSize = "VmSizeDedicated1", LowPriority = false, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 11 },
                     new VirtualMachineInfo { VmSize = "VmSizeDedicated2", LowPriority = false, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 22 }
                 },
-                BatchQuotas = new AzureProxy.AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 5, LowPriorityCoreQuota = 10 },
-                ActiveNodeCountByVmSize = new List<AzureProxy.AzureBatchNodeCount>(),
+                BatchQuotas = new AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 5, LowPriorityCoreQuota = 10 },
+                ActiveNodeCountByVmSize = new List<AzureBatchNodeCount>(),
                 ActiveJobCount = 0,
                 ActivePoolCount = 0,
                 BatchJobAndTaskState = BatchJobAndTaskStates.JobNotFound,

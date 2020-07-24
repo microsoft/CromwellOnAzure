@@ -24,7 +24,7 @@ namespace TesApi.Tests
         public async Task GetBatchAccountQuotasAsync_UsesCache()
         {
             var azureProxy = GetMockAzureProxy();
-            var batchQuotas = new AzureProxy.AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 5, LowPriorityCoreQuota = 10 };
+            var batchQuotas = new AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 5, LowPriorityCoreQuota = 10 };
             azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(batchQuotas));
             var cachingAzureProxy = new CachingAzureProxy(azureProxy.Object, cache, new Mock<ILogger<CachingAzureProxy>>().Object);
 

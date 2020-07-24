@@ -8,13 +8,14 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Auth;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
-using Microsoft.Azure.Management.Batch.Fluent;
+using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.Fluent;
@@ -37,12 +38,12 @@ namespace TesApi.Web
     {
         private const double MbToGbRatio = 0.001;
         private const char BatchJobAttemptSeparator = '-';
-        private const string defaultAzureBillingRegionName = "US West";
+        private const string DefaultAzureBillingRegionName = "US West";
 
         private static readonly HttpClient httpClient = new HttpClient();
 
         private readonly ILogger logger;
-        private readonly string batchAccountId;
+        private readonly Func<Task<BatchAccount>> getBatchAccountFunc;
         private readonly BatchClient batchClient;
         private readonly string subscriptionId;
         private readonly string location;
@@ -58,21 +59,24 @@ namespace TesApi.Web
         public AzureProxy(string batchAccountName, string azureOfferDurableId, ILogger logger)
         {
             this.logger = logger;
-            var batchAccount = FindBatchAccountAsync(batchAccountName).Result;
-            batchAccountId = batchAccount.Id;
-            batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{batchAccount.AccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
-            subscriptionId = batchAccount.Manager.SubscriptionId;
-            location = batchAccount.RegionName;
+
+            var findBatchAccountResult = FindBatchAccountAsync(batchAccountName).Result;
+
+            subscriptionId = findBatchAccountResult.SubscriptionId;
+            location = findBatchAccountResult.Location;
+            batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{findBatchAccountResult.BatchAccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
+
+            getBatchAccountFunc = async () => 
+                await new BatchManagementClient(new TokenCredentials(await GetAzureAccessTokenAsync())) { SubscriptionId = findBatchAccountResult.SubscriptionId }
+                    .BatchAccount
+                    .GetAsync(findBatchAccountResult.ResourceGroupName, batchAccountName);
+
             this.azureOfferDurableId = azureOfferDurableId;
 
-            if (AzureRegionUtils.TryGetBillingRegionName(location, out var azureBillingRegionName))
+            if (! AzureRegionUtils.TryGetBillingRegionName(location, out billingRegionName))
             {
-                billingRegionName = azureBillingRegionName;
-            }
-            else
-            {
-                logger.LogWarning($"Azure ARM location '{location}' does not have a corresponding Azure Billing Region.  Prices from the fallback billing region '{defaultAzureBillingRegionName}' will be used instead.");
-                billingRegionName = defaultAzureBillingRegionName;
+                logger.LogWarning($"Azure ARM location '{location}' does not have a corresponding Azure Billing Region.  Prices from the fallback billing region '{DefaultAzureBillingRegionName}' will be used instead.");
+                billingRegionName = DefaultAzureBillingRegionName;
             }
         }
 
@@ -209,28 +213,21 @@ namespace TesApi.Web
         /// <returns>Batch quotas</returns>
         public async Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
         {
-            // retry
-            var batchAccount = (await GetBatchAccountAsync(batchAccountId)).Inner;
-
-            return new AzureBatchAccountQuotas
-            {
-                ActiveJobAndJobScheduleQuota = batchAccount.ActiveJobAndJobScheduleQuota,
-                DedicatedCoreQuota = batchAccount.DedicatedCoreQuota,
-                LowPriorityCoreQuota = batchAccount.LowPriorityCoreQuota,
-                PoolQuota = batchAccount.PoolQuota
-            };
-        }
-
-        private async Task<IBatchAccount> GetBatchAccountAsync(string batchAccountId)
-        {
             try
             {
-                var azureClient = await GetAzureManagementClientAsync();
-                return await azureClient.WithSubscription(subscriptionId).BatchAccounts.GetByIdAsync(batchAccountId);
+                var batchAccount = await getBatchAccountFunc();
+
+                return new AzureBatchAccountQuotas
+                {
+                    ActiveJobAndJobScheduleQuota = batchAccount.ActiveJobAndJobScheduleQuota,
+                    DedicatedCoreQuota = batchAccount.DedicatedCoreQuota.Value,
+                    LowPriorityCoreQuota = batchAccount.LowPriorityCoreQuota.Value,
+                    PoolQuota = batchAccount.PoolQuota
+                };
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, $"An exception occurred when getting the batch account with id {batchAccountId}.");
+                logger.LogError(ex, $"An exception occurred when getting the batch account.");
                 throw;
             }
         }
@@ -738,21 +735,29 @@ namespace TesApi.Web
             return azureClient;
         }
 
-        private static async Task<IBatchAccount> FindBatchAccountAsync(string batchAccountName)
+        private static async Task<(string SubscriptionId, string ResourceGroupName, string Location, string BatchAccountEndpoint)> FindBatchAccountAsync(string batchAccountName)
         {
+            var resourceGroupRegex = new Regex("/*/resourceGroups/([^/]*)/*");
+
+            var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
             var azureClient = await GetAzureManagementClientAsync();
+
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
 
-            var account = (await Task.WhenAll(subscriptionIds.Select(async subId => await azureClient.WithSubscription(subId).BatchAccounts.ListAsync())))
-                .SelectMany(a => a)
-                .FirstOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase));
-
-            if (account == null)
+            foreach (var subId in subscriptionIds)
             {
-                throw new Exception($"Batch account '{batchAccountName}' does not exist or the TES app service does not have Contributor role on the account.");
+                var batchAccount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = subId }.BatchAccount.ListAsync())
+                    .FirstOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase));
+
+                if (batchAccount != null)
+                {
+                    var resourceGroupName = resourceGroupRegex.Match(batchAccount.Id).Groups[1].Value;
+
+                    return (subId, resourceGroupName, batchAccount.Location, batchAccount.AccountEndpoint);
+                }
             }
 
-            return account;
+            throw new Exception($"Batch account '{batchAccountName}' does not exist or the TES app service does not have Contributor role on the account.");
         }
 
         // TODO: Batch will provide an API for this in a future release of the client library
@@ -889,43 +894,6 @@ namespace TesApi.Web
         {
             return (await GetAccessibleStorageAccountsAsync())
                 .FirstOrDefault(storageAccount => storageAccount.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase));
-        }
-
-        public struct AzureBatchJobAndTaskState
-        {
-            public bool MoreThanOneActiveJobFound { get; set; }
-            public bool ActiveJobWithMissingAutoPool { get; set; }
-            public int AttemptNumber { get; set; }
-            public bool NodeAllocationFailed { get; set; }
-            public string NodeErrorCode { get; set; }
-            public IEnumerable<string> NodeErrorDetails { get; set; }
-            public JobState? JobState { get; set; }
-            public DateTime? JobStartTime { get; set; }
-            public DateTime? JobEndTime { get; set; }
-            public JobSchedulingError JobSchedulingError { get; set; }
-            public TaskState? TaskState { get; set; }
-            public int? TaskExitCode { get; set; }
-            public TaskExecutionResult? TaskExecutionResult { get; set; }
-            public DateTime? TaskStartTime { get; set; }
-            public DateTime? TaskEndTime { get; set; }
-            public TaskFailureInformation TaskFailureInformation { get; set; }
-            public string TaskContainerState { get; set; }
-            public string TaskContainerError { get; set; }
-        }
-
-        public struct AzureBatchNodeCount
-        {
-            public string VirtualMachineSize { get; set; }
-            public int DedicatedNodeCount { get; set; }
-            public int LowPriorityNodeCount { get; set; }
-        }
-
-        public struct AzureBatchAccountQuotas
-        {
-            public int ActiveJobAndJobScheduleQuota { get; set; }
-            public int DedicatedCoreQuota { get; set; }
-            public int LowPriorityCoreQuota { get; set; }
-            public int PoolQuota { get; set; }
         }
 
         private class VmPrice

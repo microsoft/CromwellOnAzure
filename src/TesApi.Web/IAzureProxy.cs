@@ -6,9 +6,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
-using Microsoft.Azure.Management.Batch.Models;
 using TesApi.Models;
-using static TesApi.Web.AzureProxy;
 
 namespace TesApi.Web
 {
@@ -91,7 +89,7 @@ namespace TesApi.Web
         int GetBatchActiveJobCount();
 
         /// <summary>
-        /// Gets the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>
+        /// Gets the price and resource summary of all available VMs in a region
         /// </summary>
         /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
         Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync();
