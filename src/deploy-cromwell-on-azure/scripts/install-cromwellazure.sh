@@ -2,7 +2,25 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-# Install Docker and Docker Compose
+set -o errexit
+set -o nounset
+set -o errtrace
+
+trap 'write_log "Install failed with exit code $?"' ERR
+
+readonly log_file="/data/cromwellazure/install.log"
+touch $log_file
+exec 1>>$log_file
+exec 2>&1
+
+function write_log() {
+    # Prepend the parameter value with the current datetime, if passed
+    echo ${1+$(date --iso-8601=seconds) $1}
+}
+
+write_log "Install starting"
+
+write_log "Installing docker and docker-compose"
 sudo apt update
 sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
@@ -10,31 +28,45 @@ sudo add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/u
 sudo apt update
 sudo apt-cache policy docker-ce
 sudo apt install -y docker-ce
-sudo curl -L https://github.com/docker/compose/releases/download/1.24.1/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+sudo curl -L "https://github.com/docker/compose/releases/download/1.26.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
 sudo docker-compose --version
 
-# Install Blobfuse
-sudo wget https://packages.microsoft.com/config/ubuntu/16.04/packages-microsoft-prod.deb
+write_log "Installing blobfuse"
+ubuntuVersion=$(lsb_release -ar 2>/dev/null | grep -i release | cut -s -f2)
+sudo wget https://packages.microsoft.com/config/ubuntu/$ubuntuVersion/packages-microsoft-prod.deb
 sudo dpkg -i packages-microsoft-prod.deb
 sudo apt update
-sudo apt install -y blobfuse=1.2.1 fuse
+sudo apt install -y --allow-downgrades blobfuse=1.2.4 fuse
 
-# Mount data disk and set to mount on startup
-sudo fdisk /dev/sdc <<EOF
-n
-p
-1
-2048
-67108863
-p
-w
-EOF
-sudo mkfs -t ext4 /dev/sdc1
-sudo mkdir /mysql
-sudo mount /dev/sdc1 /mysql
-DISKUUID=$(sudo -i blkid | awk '{ print $2 }' | awk '{ print $2 }' FS='=' | tail -n 1 | tr -d '"')
-sudo echo "UUID=$DISKUUID   /mysql   ext4   defaults,nofail   1   2" >> /etc/fstab
+write_log "Applying security patches"
+sudo unattended-upgrades -v
 
-# Run cromwellazure on startup
-sudo systemctl enable cromwellazure
+if [ -d "/mysql" ]; then
+    write_log "Previous /mysql exists, moving it to /data/mysql"
+    cd /data/cromwellazure
+    sudo docker-compose stop &>/dev/null
+    sudo mv /mysql /data
+fi
+
+sudo mkdir -p /data/mysql
+
+if [ -d "/cromwellazure" ] && [ ! -L "/cromwellazure" ]; then
+    write_log "Previous /cromwellazure exists, using it to create /data/cromwellazure/env-01-account-names.txt and env-04-settings.txt"
+    egrep -o 'DefaultStorageAccountName.*|CosmosDbAccountName.*|BatchAccountName.*|ApplicationInsightsAccountName.*' /cromwellazure/docker-compose.yml | sort -u > /data/cromwellazure/env-01-account-names.txt
+    egrep -o 'DisableBatchScheduling.*|AzureOfferDurableId.*' /cromwellazure/docker-compose.yml | sort -u > /data/cromwellazure/env-04-settings.txt
+    echo "UsePreemptibleVmsOnly=false" >> /data/cromwellazure/env-04-settings.txt
+    grep -q 'DisableBatchScheduling' /data/cromwellazure/env-04-settings.txt || echo "DisableBatchScheduling=false" >> /data/cromwellazure/env-04-settings.txt
+    write_log "Moving previous /cromwellazure to /cromwellazure-backup"
+    sudo mv /cromwellazure /cromwellazure-backup
+fi
+
+if [ ! -L "/cromwellazure" ]; then
+    write_log "Creating symlink /cromwellazure -> /data/cromwellazure"
+    sudo ln -s /data/cromwellazure /cromwellazure
+fi
+
+write_log "Enabling cromwellazure service"
+sudo systemctl enable cromwellazure.service
+
+write_log "Install complete"
