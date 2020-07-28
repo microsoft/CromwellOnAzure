@@ -69,6 +69,7 @@ namespace CromwellOnAzureDeployer
         private IResourceManager resourceManagerClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
         private bool SkipBillingReaderRoleAssignment { get; set; }
+        private bool isResourceGroupCreated { get; set; }
 
         public Deployer(Configuration configuration)
         {
@@ -262,6 +263,7 @@ namespace CromwellOnAzureDeployer
                     {
                         configuration.ResourceGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
                         resourceGroup = await CreateResourceGroupAsync();
+                        isResourceGroupCreated = true;
                     }
                     else
                     {
@@ -1229,7 +1231,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task DeleteResourceGroupIfUserConsentsAsync()
         {
-            if (configuration.Update)
+            if (!isResourceGroupCreated)
             {
                 return;
             }
