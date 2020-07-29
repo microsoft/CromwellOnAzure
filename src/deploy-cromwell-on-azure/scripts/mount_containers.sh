@@ -139,7 +139,9 @@ done
 docker_compose_overrides="version: \"3.6\"\nservices:\n  cromwell:\n    volumes:\n$cromwell_volumes  tes:\n    environment:\n      - ExternalStorageContainers=$tes_ext_storage_containers\n"
 echo -e "$docker_compose_overrides" > "docker-compose.override.yml"
 
-# Execute fstab
+# Unmount existing mounts and remount using the updated /etc/fstab
+sudo umount -a -f -t fuse
+sudo rm -f /data/cromwellazure/mount.blobfuse.log
 sudo mount -av -t fuse
 
 echo "mount_containers completed successfully"

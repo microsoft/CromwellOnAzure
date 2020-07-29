@@ -324,6 +324,11 @@ namespace CromwellOnAzureDeployer
                     return 1;
                 }
 
+                if(await MountWarningsExistAsync(sshConnectionInfo))
+                {
+                    RefreshableConsole.WriteLine($"Found warnings in {CromwellAzureRootDir}/mount.blobfuse.log. Some storage containers may have failed to mount on the VM. Check the file for details.", ConsoleColor.Yellow);
+                }
+
                 await WaitForDockerComposeAsync(sshConnectionInfo);
                 await WaitForCromwellAsync(sshConnectionInfo);
 
@@ -501,6 +506,12 @@ namespace CromwellOnAzureDeployer
                 });
         }
 
+        private async Task<bool> MountWarningsExistAsync(ConnectionInfo sshConnectionInfo)
+        {
+            var warningCount = int.Parse((await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"grep -c 'WARNING' {CromwellAzureRootDir}/mount.blobfuse.log || :")).Output);
+            return warningCount > 0;
+        }
+
         private IAzure GetAzureClient(AzureCredentials azureCredentials)
         {
             return Azure
@@ -589,6 +600,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo)
         {
+            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"echo '{configuration.VmPassword}' | sudo -S -p '' /bin/bash -c \"echo '{configuration.VmUsername} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/z_{configuration.VmUsername}\"");
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo mkdir -p {CromwellAzureRootDir} && sudo chown {configuration.VmUsername} {CromwellAzureRootDir} && sudo chmod ug=rwx,o= {CromwellAzureRootDir}");
             await WriteNonPersonalizedFilesToVmAsync(sshConnectionInfo);
