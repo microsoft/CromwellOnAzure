@@ -24,6 +24,7 @@ namespace TesApi.Web
     {
         private const string PartitionKeyFieldName = "_partitionKey";
         private readonly DocumentClient client;
+        private readonly Microsoft.Azure.Cosmos.CosmosClient cosmosClient;
         private readonly string databaseId;
         private readonly string collectionId;
         private readonly PartitionKey partitionKeyObjectForRequestOptions;
@@ -40,9 +41,11 @@ namespace TesApi.Web
         /// <param name="databaseId">Azure Cosmos DB database ID</param>
         /// <param name="collectionId">Azure Cosmos DB collection ID</param>
         /// <param name="partitionKeyValue">Partition key value. Only the items matching this value will be visible.</param>
-        public CosmosDbRepository(Uri endpoint, string key, string databaseId, string collectionId, string partitionKeyValue)
+        /// <param name="useAutoscaling">If true, CosmosDB database autoscaling will be enabled</param>
+        public CosmosDbRepository(Uri endpoint, string key, string databaseId, string collectionId, string partitionKeyValue, bool useAutoscaling, int cosmosDbAutoscalingMaxThroughput)
         {
             client = new DocumentClient(endpoint, key);
+            cosmosClient = new Microsoft.Azure.Cosmos.CosmosClient(endpoint.ToString(), key);
             this.databaseId = databaseId;
             this.collectionId = collectionId;
             databaseUri = UriFactory.CreateDatabaseUri(databaseId);
@@ -50,7 +53,7 @@ namespace TesApi.Web
             documentUriFactory = documentId => UriFactory.CreateDocumentUri(databaseId, this.collectionId, documentId);
             this.partitionKeyValue = partitionKeyValue;
             partitionKeyObjectForRequestOptions = new PartitionKey(this.partitionKeyValue);
-            CreateDatabaseIfNotExistsAsync().Wait();
+            CreateDatabaseIfNotExistsAsync(useAutoscaling, cosmosDbAutoscalingMaxThroughput).Wait();
             CreateCollectionIfNotExistsAsync().Wait();
         }
 
@@ -171,22 +174,18 @@ namespace TesApi.Web
             await client.DeleteDocumentAsync(documentUriFactory(id), requestOptions);
         }
 
-        private async Task CreateDatabaseIfNotExistsAsync()
+        private async Task CreateDatabaseIfNotExistsAsync(bool setCosmosDbAutoscalingOnStartup, int cosmosDbAutoscalingMaxThroughput)
         {
-            try
+            var throughputProperties = Microsoft.Azure.Cosmos.ThroughputProperties.CreateAutoscaleThroughput(cosmosDbAutoscalingMaxThroughput);
+            var response = await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseId, throughputProperties);
+
+            if (setCosmosDbAutoscalingOnStartup && response.StatusCode == System.Net.HttpStatusCode.Accepted)
             {
-                await client.ReadDatabaseAsync(databaseUri);
-            }
-            catch (DocumentClientException e)
-            {
-                if (e.StatusCode == System.Net.HttpStatusCode.NotFound)
-                {
-                    await client.CreateDatabaseAsync(new Database { Id = databaseId });
-                }
-                else
-                {
-                    throw;
-                }
+                // Database already exists
+
+                // 7/30/2020 - there is no programmatic way to check if autoscale is enabled
+                // as a result, enabling autoscaling AND setting max value is done here
+                await response.Database.ReplaceThroughputAsync(throughputProperties);
             }
         }
 

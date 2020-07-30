@@ -33,6 +33,8 @@ namespace TesApi.Web
         private readonly ILoggerFactory loggerFactory;
         private readonly IWebHostEnvironment hostingEnvironment;
         private readonly string azureOfferDurableId;
+        private readonly bool setCosmosDbAutoscalingOnStartup;
+        private readonly int cosmosDbAutoscalingMaxThroughput;
 
         /// <summary>
         /// Startup class for ASP.NET core
@@ -44,6 +46,8 @@ namespace TesApi.Web
             logger = loggerFactory.CreateLogger<Startup>();
             this.loggerFactory = loggerFactory;
             azureOfferDurableId = Configuration["AzureOfferDurableId"] ?? defaultAzureOfferDurableId;
+            bool.TryParse(configuration["SetCosmosDbAutoscalingOnStartup"], out setCosmosDbAutoscalingOnStartup);
+            int.TryParse(configuration["CosmosDbAutoscalingMaxThroughput"], out cosmosDbAutoscalingMaxThroughput);
         }
 
         /// <summary>
@@ -76,7 +80,7 @@ namespace TesApi.Web
 
             (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
 
-            var cosmosDbRepository = new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, CosmosDbDatabaseId, CosmosDbCollectionId, CosmosDbPartitionId);
+            var cosmosDbRepository = new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, CosmosDbDatabaseId, CosmosDbCollectionId, CosmosDbPartitionId, setCosmosDbAutoscalingOnStartup, cosmosDbAutoscalingMaxThroughput);
             var repository = new CachingWithRetriesRepository<TesTask>(cosmosDbRepository);
 
             services.AddSingleton<IRepository<TesTask>>(repository);

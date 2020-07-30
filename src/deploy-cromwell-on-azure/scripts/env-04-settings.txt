@@ -1,3 +1,5 @@
 ﻿UsePreemptibleVmsOnly=false
 DisableBatchScheduling=false
 AzureOfferDurableId=MS-AZR-0003p
+SetCosmosDbAutoscalingOnStartup=true
+CosmosDbAutoscalingMaxThroughput=4000
