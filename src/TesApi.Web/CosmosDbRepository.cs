@@ -25,6 +25,8 @@ namespace TesApi.Web
         private const string PartitionKeyFieldName = "_partitionKey";
         private readonly DocumentClient client;
         private readonly Microsoft.Azure.Cosmos.CosmosClient cosmosClient;
+        private readonly bool useAutoscaling;
+        private readonly Microsoft.Azure.Cosmos.ThroughputProperties throughputProperties;
         private readonly string databaseId;
         private readonly string collectionId;
         private readonly PartitionKey partitionKeyObjectForRequestOptions;
@@ -53,7 +55,9 @@ namespace TesApi.Web
             documentUriFactory = documentId => UriFactory.CreateDocumentUri(databaseId, this.collectionId, documentId);
             this.partitionKeyValue = partitionKeyValue;
             partitionKeyObjectForRequestOptions = new PartitionKey(this.partitionKeyValue);
-            CreateDatabaseIfNotExistsAsync(useAutoscaling, cosmosDbAutoscalingMaxThroughput).Wait();
+            this.useAutoscaling = useAutoscaling;
+            throughputProperties = Microsoft.Azure.Cosmos.ThroughputProperties.CreateAutoscaleThroughput(cosmosDbAutoscalingMaxThroughput);
+            CreateDatabaseIfNotExistsAsync().Wait();
             CreateCollectionIfNotExistsAsync().Wait();
         }
 
@@ -174,19 +178,9 @@ namespace TesApi.Web
             await client.DeleteDocumentAsync(documentUriFactory(id), requestOptions);
         }
 
-        private async Task CreateDatabaseIfNotExistsAsync(bool setCosmosDbAutoscalingOnStartup, int cosmosDbAutoscalingMaxThroughput)
+        private async Task CreateDatabaseIfNotExistsAsync()
         {
-            var throughputProperties = Microsoft.Azure.Cosmos.ThroughputProperties.CreateAutoscaleThroughput(cosmosDbAutoscalingMaxThroughput);
-            var response = await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseId, throughputProperties);
-
-            if (setCosmosDbAutoscalingOnStartup && response.StatusCode == System.Net.HttpStatusCode.Accepted)
-            {
-                // Database already exists
-
-                // 7/30/2020 - there is no programmatic way to check if autoscale is enabled
-                // as a result, enabling autoscaling AND setting max value is done here
-                await response.Database.ReplaceThroughputAsync(throughputProperties);
-            }
+            await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseId, throughputProperties);
         }
 
         /// <summary>
@@ -198,6 +192,17 @@ namespace TesApi.Web
             {
                 var documentCollection = await client.ReadDocumentCollectionAsync(documentCollectionUri);
 
+                if (useAutoscaling)
+                {
+                    var container = cosmosClient.GetContainer(databaseId, collectionId);
+                    var existingThroughput = await container.ReadThroughputAsync();
+
+                    if (existingThroughput.HasValue && existingThroughput != throughputProperties.AutoscaleMaxThroughput)
+                    {
+                        await container.ReplaceThroughputAsync(throughputProperties);
+                    }
+                }
+                
                 var existingPartitionKeyPath = documentCollection.Resource.PartitionKey.Paths.FirstOrDefault();
 
                 if (existingPartitionKeyPath == null)
