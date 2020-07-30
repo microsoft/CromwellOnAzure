@@ -9,12 +9,10 @@ namespace TesApi.Web
     using System.Linq;
     using System.Linq.Expressions;
     using System.Threading.Tasks;
-    using Microsoft.ApplicationInsights.Extensibility.Implementation;
     using Microsoft.Azure.Documents;
     using Microsoft.Azure.Documents.Client;
     using Microsoft.Azure.Documents.Linq;
     using Newtonsoft.Json;
-    using TesApi.Models;
 
     /// <summary>
     /// A repository for interacting with an Azure Cosmos DB instance
@@ -23,10 +21,9 @@ namespace TesApi.Web
     public class CosmosDbRepository<T> : IRepository<T> where T : class
     {
         private const string PartitionKeyFieldName = "_partitionKey";
+        private const int MaxAutoScaleThroughput = 4000;
         private readonly DocumentClient client;
         private readonly Microsoft.Azure.Cosmos.CosmosClient cosmosClient;
-        private readonly bool useAutoscaling;
-        private readonly Microsoft.Azure.Cosmos.ThroughputProperties throughputProperties;
         private readonly string databaseId;
         private readonly string collectionId;
         private readonly PartitionKey partitionKeyObjectForRequestOptions;
@@ -43,8 +40,7 @@ namespace TesApi.Web
         /// <param name="databaseId">Azure Cosmos DB database ID</param>
         /// <param name="collectionId">Azure Cosmos DB collection ID</param>
         /// <param name="partitionKeyValue">Partition key value. Only the items matching this value will be visible.</param>
-        /// <param name="useAutoscaling">If true, CosmosDB database autoscaling will be enabled</param>
-        public CosmosDbRepository(Uri endpoint, string key, string databaseId, string collectionId, string partitionKeyValue, bool useAutoscaling, int cosmosDbAutoscalingMaxThroughput)
+        public CosmosDbRepository(Uri endpoint, string key, string databaseId, string collectionId, string partitionKeyValue)
         {
             client = new DocumentClient(endpoint, key);
             cosmosClient = new Microsoft.Azure.Cosmos.CosmosClient(endpoint.ToString(), key);
@@ -55,8 +51,6 @@ namespace TesApi.Web
             documentUriFactory = documentId => UriFactory.CreateDocumentUri(databaseId, this.collectionId, documentId);
             this.partitionKeyValue = partitionKeyValue;
             partitionKeyObjectForRequestOptions = new PartitionKey(this.partitionKeyValue);
-            this.useAutoscaling = useAutoscaling;
-            throughputProperties = Microsoft.Azure.Cosmos.ThroughputProperties.CreateAutoscaleThroughput(cosmosDbAutoscalingMaxThroughput);
             CreateDatabaseIfNotExistsAsync().Wait();
             CreateCollectionIfNotExistsAsync().Wait();
         }
@@ -180,6 +174,7 @@ namespace TesApi.Web
 
         private async Task CreateDatabaseIfNotExistsAsync()
         {
+            var throughputProperties = Microsoft.Azure.Cosmos.ThroughputProperties.CreateAutoscaleThroughput(MaxAutoScaleThroughput);
             await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseId, throughputProperties);
         }
 
@@ -192,17 +187,6 @@ namespace TesApi.Web
             {
                 var documentCollection = await client.ReadDocumentCollectionAsync(documentCollectionUri);
 
-                if (useAutoscaling)
-                {
-                    var container = cosmosClient.GetContainer(databaseId, collectionId);
-                    var existingThroughput = await container.ReadThroughputAsync();
-
-                    if (existingThroughput.HasValue && existingThroughput != throughputProperties.AutoscaleMaxThroughput)
-                    {
-                        await container.ReplaceThroughputAsync(throughputProperties);
-                    }
-                }
-                
                 var existingPartitionKeyPath = documentCollection.Resource.PartitionKey.Paths.FirstOrDefault();
 
                 if (existingPartitionKeyPath == null)

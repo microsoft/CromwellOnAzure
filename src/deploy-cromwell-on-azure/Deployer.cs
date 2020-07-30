@@ -12,6 +12,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Common;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
@@ -45,10 +46,12 @@ namespace CromwellOnAzureDeployer
         private static readonly AsyncRetryPolicy roleAssignmentHashConflictRetryPolicy = Policy
             .Handle<Microsoft.Rest.Azure.CloudException>(cloudException => cloudException.Body.Code.Equals("HashConflictOnDifferentRoleAssignmentIds"))
             .RetryAsync();
+
         private const string WorkflowsContainerName = "workflows";
         private const string ConfigurationContainerName = "configuration";
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
+        private const int MaxAutoScaleThroughput = 4000;
 
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
 
@@ -203,12 +206,24 @@ namespace CromwellOnAzureDeployer
 
                     configuration.StorageAccountName = storageAccountName;
 
+                    if (!accountNames.TryGetValue("CosmosDbAccountName", out var cosmosDbAccountName))
+                    {
+                        throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
+                    }
+
+                    cosmosDb = (await azureClient.CosmosDBAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName))
+                        .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase))
+                            ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
+
+                    configuration.CosmosDbAccountName = cosmosDbAccountName;
+
                     await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
 
                     if(installedVersion == null)
                     {
                         // If upgrading from pre-2.0 version, patch the installed cromwell-application.conf (disable call caching and default to preemptible)
                         await PatchCromwellConfigurationFileAsync(storageAccount);
+                        await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
                     }
                 }
 
@@ -1042,6 +1057,20 @@ namespace CromwellOnAzureDeployer
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "cromwell-application.conf", cromwellConfigText);
                 });
+        }
+
+        private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
+        {
+            var key = (await cosmosDb.ListKeysAsync()).PrimaryMasterKey;
+            var cosmosClient = new CosmosClient(cosmosDb.DocumentEndpoint, key);
+            var container = cosmosClient.GetContainer("TES", "Tasks");
+
+            if ((await container.ReadThroughputAsync()).HasValue)
+            {
+                var x = await Execute(
+                    $"Replacing the throughput settings for CosmosDb container {container.Id} in database {container.Database.Id} with autoscale throughput with max of {MaxAutoScaleThroughput} units...",
+                    () => container.ReplaceThroughputAsync(ThroughputProperties.CreateAutoscaleThroughput(MaxAutoScaleThroughput)));
+            }
         }
 
         private static string GetPathFromAppRelativePath(params string[] paths)
