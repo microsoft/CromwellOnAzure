@@ -12,7 +12,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Common;
-using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
@@ -1062,14 +1061,17 @@ namespace CromwellOnAzureDeployer
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
             var key = (await cosmosDb.ListKeysAsync()).PrimaryMasterKey;
-            var cosmosClient = new CosmosClient(cosmosDb.DocumentEndpoint, key);
-            var container = cosmosClient.GetContainer("TES", "Tasks");
+            var cosmosClient = new CosmosRestClient(cosmosDb.DocumentEndpoint, key);
+            var requestThroughput = await cosmosClient.GetContainerRequestThroughputAsync("TES", "Tasks");
 
-            if ((await container.ReadThroughputAsync()).HasValue)
+            if (requestThroughput != null && requestThroughput.Throughput != null && requestThroughput.AutoscaleMaxThroughput == null)
             {
-                var x = await Execute(
-                    $"Replacing the throughput settings for CosmosDb container {container.Id} in database {container.Database.Id} with autoscale throughput with max of {MaxAutoScaleThroughput} units...",
-                    () => container.ReplaceThroughputAsync(ThroughputProperties.CreateAutoscaleThroughput(MaxAutoScaleThroughput)));
+                // If the container has request throughput setting configured, and it is currently manual, set it to auto
+                var effectiveMaxAutoScaleThroughput = Math.Max(requestThroughput.Throughput.Value, MaxAutoScaleThroughput);
+
+                await Execute(
+                    $"Replacing the throughput settings for CosmosDb container 'Tasks' in database 'TES' with autoscale throughput with max of {effectiveMaxAutoScaleThroughput} units...",
+                    () => cosmosClient.SetContainerAutoRequestThroughputAsync("TES", "Tasks", effectiveMaxAutoScaleThroughput));
             }
         }
 
