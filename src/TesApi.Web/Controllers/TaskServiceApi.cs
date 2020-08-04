@@ -119,10 +119,6 @@ namespace TesApi.Controllers
                 return BadRequest("Docker container image name is required.");
             }
 
-            // If the description starts with a GUID (Cromwell's job id), prefix the TES task id with first eight characters (of job id) to facilitate easier debugging
-            var tesTaskIdPrefix = tesTask.Description?.Length >= 36 && Guid.TryParse(tesTask.Description.Substring(0, 36), out _) ? $"{tesTask.Description.Substring(0, 8)}_" : "";
-
-            tesTask.Id = $"{tesTaskIdPrefix}{Guid.NewGuid().ToString("N")}";
             tesTask.State = TesState.QUEUEDEnum;
             tesTask.CreationTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo);
 
@@ -134,6 +130,10 @@ namespace TesApi.Controllers
                 ?.Split('/', StringSplitOptions.RemoveEmptyEntries)
                 ?.Skip(2)
                 ?.FirstOrDefault();
+
+            // Prefix the TES task id with first eight characters of root Cromwell job id to facilitate easier debugging
+            var tesTaskIdPrefix = tesTask.WorkflowId != null && Guid.TryParse(tesTask.WorkflowId, out _) ? $"{tesTask.WorkflowId.Substring(0, 8)}_" : "";
+            tesTask.Id = $"{tesTaskIdPrefix}{Guid.NewGuid().ToString("N")}";
 
             // For CWL workflows, if disk size is not specified in TES object (always), try to retrieve it from the corresponding workflow stored by Cromwell in /cromwell-tmp directory
             // Also allow for TES-style "memory" and "cpu" hints in CWL.

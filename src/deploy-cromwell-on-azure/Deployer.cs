@@ -394,7 +394,7 @@ namespace CromwellOnAzureDeployer
             catch (Microsoft.Rest.Azure.CloudException cloudException)
             {
                 RefreshableConsole.WriteLine();
-                RefreshableConsole.WriteLine(cloudException.Message, ConsoleColor.Red);
+                RefreshableConsole.WriteLine($"{cloudException.GetType().Name}: {cloudException.Message}", ConsoleColor.Red);
                 RefreshableConsole.WriteLine();
                 WriteGeneralRetryMessageToConsole();
                 Debugger.Break();
@@ -404,7 +404,7 @@ namespace CromwellOnAzureDeployer
             catch (Exception exc)
             {
                 RefreshableConsole.WriteLine();
-                RefreshableConsole.WriteLine(exc.Message, ConsoleColor.Red);
+                RefreshableConsole.WriteLine($"{exc.GetType().Name}: {exc.Message}", ConsoleColor.Red);
                 RefreshableConsole.WriteLine();
                 Debugger.Break();
                 WriteGeneralRetryMessageToConsole();
@@ -992,7 +992,8 @@ namespace CromwellOnAzureDeployer
 
         private Task<IIdentity> CreateUserManagedIdentityAsync(IResourceGroup resourceGroup)
         {
-            var managedIdentityName = $"{resourceGroup.Name}-identity";
+            // Resource group name supports periods and parenthesis but identity doesn't. Replacing them with hyphens.
+            var managedIdentityName = $"{resourceGroup.Name.Replace(".", "-").Replace("(", "-").Replace(")", "-")}-identity";
 
             return Execute(
                 $"Creating user-managed identity: {managedIdentityName}...",
@@ -1415,9 +1416,9 @@ namespace CromwellOnAzureDeployer
                     line.Write(" Cancelled", ConsoleColor.Red);
                     return await Task.FromCanceled<T>(cts.Token);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    line.Write($" Failed", ConsoleColor.Red);
+                    line.Write($" Failed. Exception: {ex.GetType().Name}", ConsoleColor.Red);
                     cts.Cancel();
                     throw;
                 }
