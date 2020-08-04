@@ -37,6 +37,7 @@ using Newtonsoft.Json;
 using Polly;
 using Polly.Retry;
 using Renci.SshNet;
+using Renci.SshNet.Common;
 
 namespace CromwellOnAzureDeployer
 {
@@ -144,6 +145,10 @@ namespace CromwellOnAzureDeployer
 
                     configuration.VmName = linuxVm.Name;
 
+                    sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+
+                    await WaitForSshConnectivityAsync(sshConnectionInfo);
+
                     var existingUserManagedIdentityId = linuxVm.UserAssignedManagedServiceIdentityIds.FirstOrDefault();
 
                     if (existingUserManagedIdentityId == null)
@@ -167,10 +172,6 @@ namespace CromwellOnAzureDeployer
                         networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
                         await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
                     }
-
-                    sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
-
-                    await WaitForSshConnectivityAsync(sshConnectionInfo);
 
                     var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
 
@@ -429,6 +430,10 @@ namespace CromwellOnAzureDeployer
                             using var sshClient = new SshClient(sshConnectionInfo);
                             sshClient.ConnectWithRetries();
                             sshClient.Disconnect();
+                        }
+                        catch(SshAuthenticationException ex) when (ex.Message.StartsWith("Permission"))
+                        {
+                            throw new ValidationException($"Could not connect to VM '{sshConnectionInfo.Host}'. Reason: {ex.Message}", false);
                         }
                         catch
                         {
@@ -1225,11 +1230,11 @@ namespace CromwellOnAzureDeployer
             return new CloudStorageAccount(storageCredentials, true).CreateCloudBlobClient();
         }
 
-        private static async Task ValidateTokenProviderAsync()
+        private async Task ValidateTokenProviderAsync()
         {
             try
             {
-                await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
+                await Execute("Retrieving Azure management token...", () => new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/"));
             }
             catch (AzureServiceTokenProviderException ex)
             {
