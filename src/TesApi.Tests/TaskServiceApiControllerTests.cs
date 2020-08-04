@@ -61,18 +61,25 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
-        public async Task CreateTaskAsync_CromwellJobIdIsUsedAsTaskIdPrefix()
+        public async Task CreateTaskAsync_CromwellWorkflowIdIsUsedAsTaskIdPrefix()
         {
-            var cromwellJobId = Guid.NewGuid().ToString();
-            var taskDescription = $"{cromwellJobId}:BackendJobDescriptorKey_CommandCallNode_wf_hello.hello:-1:1";
-            var tesTask = new TesTask() { Description = taskDescription, Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } } };
+            var cromwellWorkflowId = Guid.NewGuid().ToString();
+            var cromwellSubWorkflowId = Guid.NewGuid().ToString();
+            var taskDescription = $"{cromwellSubWorkflowId}:BackendJobDescriptorKey_CommandCallNode_wf_hello.hello:-1:1";
+
+            var tesTask = new TesTask()
+            {
+                Description = taskDescription,
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Inputs = new List<TesInput> { new TesInput { Path = $"/cromwell-executions/test/{cromwellWorkflowId}/call-hello/test-subworkflow/{cromwellSubWorkflowId}/call-subworkflow/shard-8/execution/script" } }
+            };
 
             var controller = this.GetTaskServiceApiController();
 
             await controller.CreateTaskAsync(tesTask);
 
             Assert.AreEqual(41, tesTask.Id.Length); // First eight characters of Cromwell's job id + underscore + GUID without dashes
-            Assert.IsTrue(tesTask.Id.StartsWith(cromwellJobId.Substring(0, 8) + "_"));
+            Assert.IsTrue(tesTask.Id.StartsWith(cromwellWorkflowId.Substring(0, 8) + "_"));
         }
 
         [TestMethod]
