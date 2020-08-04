@@ -8,13 +8,14 @@ using System.Threading.Tasks;
 using Polly;
 using Polly.Retry;
 using Renci.SshNet;
+using Renci.SshNet.Common;
 
 namespace CromwellOnAzureDeployer
 {
     public static class SshExtensions
     {
         private static readonly RetryPolicy retryPolicy = Policy
-            .Handle<Exception>()
+            .Handle<Exception>(ex => ! (ex is SshAuthenticationException && ex.Message.StartsWith("Permission")))
             .WaitAndRetry(10, retryAttempt => TimeSpan.FromSeconds(10));
 
         // TODO: cancellationToken

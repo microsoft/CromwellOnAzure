@@ -9,12 +9,10 @@ namespace TesApi.Web
     using System.Linq;
     using System.Linq.Expressions;
     using System.Threading.Tasks;
-    using Microsoft.ApplicationInsights.Extensibility.Implementation;
     using Microsoft.Azure.Documents;
     using Microsoft.Azure.Documents.Client;
     using Microsoft.Azure.Documents.Linq;
     using Newtonsoft.Json;
-    using TesApi.Models;
 
     /// <summary>
     /// A repository for interacting with an Azure Cosmos DB instance
@@ -23,7 +21,9 @@ namespace TesApi.Web
     public class CosmosDbRepository<T> : IRepository<T> where T : class
     {
         private const string PartitionKeyFieldName = "_partitionKey";
+        private const int MaxAutoScaleThroughput = 4000;
         private readonly DocumentClient client;
+        private readonly Microsoft.Azure.Cosmos.CosmosClient cosmosClient;
         private readonly string databaseId;
         private readonly string collectionId;
         private readonly PartitionKey partitionKeyObjectForRequestOptions;
@@ -43,6 +43,7 @@ namespace TesApi.Web
         public CosmosDbRepository(Uri endpoint, string key, string databaseId, string collectionId, string partitionKeyValue)
         {
             client = new DocumentClient(endpoint, key);
+            cosmosClient = new Microsoft.Azure.Cosmos.CosmosClient(endpoint.ToString(), key);
             this.databaseId = databaseId;
             this.collectionId = collectionId;
             databaseUri = UriFactory.CreateDatabaseUri(databaseId);
@@ -173,21 +174,8 @@ namespace TesApi.Web
 
         private async Task CreateDatabaseIfNotExistsAsync()
         {
-            try
-            {
-                await client.ReadDatabaseAsync(databaseUri);
-            }
-            catch (DocumentClientException e)
-            {
-                if (e.StatusCode == System.Net.HttpStatusCode.NotFound)
-                {
-                    await client.CreateDatabaseAsync(new Database { Id = databaseId });
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            var throughputProperties = Microsoft.Azure.Cosmos.ThroughputProperties.CreateAutoscaleThroughput(MaxAutoScaleThroughput);
+            await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseId, throughputProperties);
         }
 
         /// <summary>

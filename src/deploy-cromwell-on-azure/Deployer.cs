@@ -37,6 +37,7 @@ using Newtonsoft.Json;
 using Polly;
 using Polly.Retry;
 using Renci.SshNet;
+using Renci.SshNet.Common;
 
 namespace CromwellOnAzureDeployer
 {
@@ -45,10 +46,12 @@ namespace CromwellOnAzureDeployer
         private static readonly AsyncRetryPolicy roleAssignmentHashConflictRetryPolicy = Policy
             .Handle<Microsoft.Rest.Azure.CloudException>(cloudException => cloudException.Body.Code.Equals("HashConflictOnDifferentRoleAssignmentIds"))
             .RetryAsync();
+
         private const string WorkflowsContainerName = "workflows";
         private const string ConfigurationContainerName = "configuration";
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
+        private const int MaxAutoScaleThroughput = 4000;
 
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
 
@@ -142,6 +145,10 @@ namespace CromwellOnAzureDeployer
 
                     configuration.VmName = linuxVm.Name;
 
+                    sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+
+                    await WaitForSshConnectivityAsync(sshConnectionInfo);
+
                     var existingUserManagedIdentityId = linuxVm.UserAssignedManagedServiceIdentityIds.FirstOrDefault();
 
                     if (existingUserManagedIdentityId == null)
@@ -165,10 +172,6 @@ namespace CromwellOnAzureDeployer
                         networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
                         await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
                     }
-
-                    sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
-
-                    await WaitForSshConnectivityAsync(sshConnectionInfo);
 
                     var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
 
@@ -203,12 +206,24 @@ namespace CromwellOnAzureDeployer
 
                     configuration.StorageAccountName = storageAccountName;
 
+                    if (!accountNames.TryGetValue("CosmosDbAccountName", out var cosmosDbAccountName))
+                    {
+                        throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
+                    }
+
+                    cosmosDb = (await azureClient.CosmosDBAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName))
+                        .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase))
+                            ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
+
+                    configuration.CosmosDbAccountName = cosmosDbAccountName;
+
                     await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
 
                     if(installedVersion == null)
                     {
                         // If upgrading from pre-2.0 version, patch the installed cromwell-application.conf (disable call caching and default to preemptible)
                         await PatchCromwellConfigurationFileAsync(storageAccount);
+                        await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
                     }
                 }
 
@@ -420,6 +435,10 @@ namespace CromwellOnAzureDeployer
                             using var sshClient = new SshClient(sshConnectionInfo);
                             sshClient.ConnectWithRetries();
                             sshClient.Disconnect();
+                        }
+                        catch(SshAuthenticationException ex) when (ex.Message.StartsWith("Permission"))
+                        {
+                            throw new ValidationException($"Could not connect to VM '{sshConnectionInfo.Host}'. Reason: {ex.Message}", false);
                         }
                         catch
                         {
@@ -1056,6 +1075,23 @@ namespace CromwellOnAzureDeployer
                 });
         }
 
+        private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
+        {
+            var key = (await cosmosDb.ListKeysAsync()).PrimaryMasterKey;
+            var cosmosClient = new CosmosRestClient(cosmosDb.DocumentEndpoint, key);
+            var requestThroughput = await cosmosClient.GetContainerRequestThroughputAsync("TES", "Tasks");
+
+            if (requestThroughput != null && requestThroughput.Throughput != null && requestThroughput.AutoscaleMaxThroughput == null)
+            {
+                // If the container has request throughput setting configured, and it is currently manual, set it to auto
+                var effectiveMaxAutoScaleThroughput = Math.Max(requestThroughput.Throughput.Value, MaxAutoScaleThroughput);
+
+                await Execute(
+                    $"Replacing the throughput settings for CosmosDb container 'Tasks' in database 'TES' with autoscale throughput with max of {effectiveMaxAutoScaleThroughput} units...",
+                    () => cosmosClient.SetContainerAutoRequestThroughputAsync("TES", "Tasks", effectiveMaxAutoScaleThroughput));
+            }
+        }
+
         private static string GetPathFromAppRelativePath(params string[] paths)
         {
             return Path.Combine(paths.Prepend(AppContext.BaseDirectory).ToArray());
@@ -1206,11 +1242,11 @@ namespace CromwellOnAzureDeployer
             return new CloudStorageAccount(storageCredentials, true).CreateCloudBlobClient();
         }
 
-        private static async Task ValidateTokenProviderAsync()
+        private async Task ValidateTokenProviderAsync()
         {
             try
             {
-                await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
+                await Execute("Retrieving Azure management token...", () => new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/"));
             }
             catch (AzureServiceTokenProviderException ex)
             {
