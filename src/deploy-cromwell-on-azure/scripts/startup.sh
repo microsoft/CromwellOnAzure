@@ -44,6 +44,7 @@ kv["TesImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}
 kv["TriggerServiceImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TriggerServiceImageName"]})
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 
+storage_account_name=${kv["DefaultStorageAccountName"]}
 
 write_log "Checking account access (this could take awhile due to role assignment propagation delay)..."
 
@@ -66,10 +67,25 @@ do
             write_log "Verifying that all required accounts (4) are present in the list of accessible resources..."
 
             if grep -q "${kv["DefaultStorageAccountName"]}" <<< "$resource_ids" \
-                    && grep -q "${kv["CosmosDbAccountName"]}" <<< "$resource_ids" \
-                    && grep -q "${kv["BatchAccountName"]}" <<< "$resource_ids" \
-                    && grep -q "${kv["ApplicationInsightsAccountName"]}" <<< "$resource_ids"; then
-                break
+                && grep -q "${kv["CosmosDbAccountName"]}" <<< "$resource_ids" \
+                && grep -q "${kv["BatchAccountName"]}" <<< "$resource_ids" \
+                && grep -q "${kv["ApplicationInsightsAccountName"]}" <<< "$resource_ids"; then
+
+                write_log "Getting storage token..."
+                IFS='~' read content http_status <<< $(curl -s -H Metadata:true --write-out '~%{http_code}' "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://$storage_account_name.blob.core.windows.net")
+
+                if [ "$http_status" == "200" ]; then
+                    storage_token=$(grep -Po '"access_token":"\K([^"]*)' <<< $content)
+
+                    write_log "Checking access to containers-to-mount file..."
+                    http_status=$(curl -o /dev/null -I -L -s -w "%{http_code}" -H "Authorization: Bearer $storage_token" -H "x-ms-version: 2018-03-28" "https://$storage_account_name.blob.core.windows.net/configuration/containers-to-mount")
+
+                    if [ "$http_status" == "200" ]; then
+                        break
+                    else
+                        write_log "containers-to-mount file is not accessible (status $http_status), retrying..."
+                    fi
+                fi
             else
                 write_log "Not all accounts are accessible, retrying..."
             fi
@@ -85,8 +101,6 @@ done
 
 write_log "Account access OK"
 write_log
-
-storage_account_name=${kv["DefaultStorageAccountName"]}
 
 write_log "Mounting containers (default storage account = $storage_account_name)"
 ./mount_containers.sh -a $storage_account_name

@@ -205,7 +205,7 @@ namespace TesApi.Web
                 {
                     var documentCollection = new DocumentCollection { Id = collectionId };
                     documentCollection.PartitionKey.Paths.Add($"/{PartitionKeyFieldName}");
-                    await client.CreateDocumentCollectionAsync(databaseUri, documentCollection, new RequestOptions { OfferThroughput = 400 });
+                    await client.CreateDocumentCollectionAsync(databaseUri, documentCollection);
                 }
                 else
                 {
