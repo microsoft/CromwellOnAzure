@@ -14,7 +14,7 @@ This article answers FAQs, describes advanced features that allow customization 
    * My workflow failed at task X. Where should I look to determine why it failed?
      * [Which tasks failed?](#Find-which-tasks-failed-in-a-workflow)
      * Some tasks are stuck or my workflow is stuck in the "inprogress" directory in the "workflows" container. [Were there Azure infrastructure issues?](#Make-sure-there-are-no-Azure-infrastructure-errors)
-   * My jobs are taking a long time in the "Preparing" task state, even with "smaller" input files and VMs being used. [Why is that]?(#Check-Azure-Storage-Tier)
+   * My jobs are taking a long time in the "Preparing" task state, even with "smaller" input files and VMs being used. [Why is that](#Check-Azure-Storage-Tier)?
 
 3. Customizing your instance
    * How do I [use input data files for my workflows from a different Azure Storage account](#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using) that my lab or team is currently using?
