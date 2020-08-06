@@ -14,6 +14,7 @@ This article answers FAQs, describes advanced features that allow customization 
    * My workflow failed at task X. Where should I look to determine why it failed?
      * [Which tasks failed?](#Find-which-tasks-failed-in-a-workflow)
      * Some tasks are stuck or my workflow is stuck in the "inprogress" directory in the "workflows" container. [Were there Azure infrastructure issues?](#Make-sure-there-are-no-Azure-infrastructure-errors)
+   * My jobs are taking a long time in the "Preparing" task state, even with "smaller" input files and VMs being used. Why is that?(#Check-Azure-Storage-Tier)
 
 3. Customizing your instance
    * How do I [use input data files for my workflows from a different Azure Storage account](#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using) that my lab or team is currently using?
@@ -135,6 +136,8 @@ Navigate to your Application Insights instance on Azure Portal. Click on the "Lo
 
 You can explore exceptions or logs to find the reason for failure, and use time ranges or [Kusto Query Language](https://docs.microsoft.com/en-us/azure/kusto/query/) to narrow your search.<br/>
 
+### Check Azure Storage Tier
+Cromwell utilizes Blob storage containers and Blobfuse to allow your data to be accessed and processed. The [Blob Storage Access Tier](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-storage-tiers?tabs=azure-portal) can have a demonstrable effect on your analysis time, particularly on your initial VM preparation. If you experience this, we would recommend setting your access tier to "Hot" instead of "Cool". You can do this under the "Access Tier" settings in the "Configuration" menu on Azure Portal. NOTE: this only affects users utilizing Gen2 Storage Accounts. All Gen 1 "Standard" blobs are access tier "Hot" by default.
 
 ## Customizing your Cromwell on Azure instance
 ### Connect to the host VM that runs all the Docker containers
