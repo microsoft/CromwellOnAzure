@@ -1161,8 +1161,8 @@ namespace CromwellOnAzureDeployer
 
         private IAzure GetExistVNetAzureClient()
         {
-            IAzure existingVNetAzureClient = null;
-            if (configuration.SubscriptionId == configuration.ExistingVNetSubscriptionId)
+            IAzure existingVNetAzureClient;
+            if (String.IsNullOrEmpty(configuration.ExistingVNetSubscriptionId) || configuration.SubscriptionId == configuration.ExistingVNetSubscriptionId)
             {
                 existingVNetAzureClient = azureClient;
             }
@@ -1174,7 +1174,12 @@ namespace CromwellOnAzureDeployer
                 }
                 catch (Exception)
                 {
-                    throw new ValidationException($"unable to create an azure client for subscription ID {configuration.ExistingVNetSubscriptionId}");
+                    var errorMessage = $"unable to create an azure client for subscription ID {configuration.ExistingVNetSubscriptionId}";
+                    if (String.IsNullOrEmpty(configuration.ExistingVNetSubscriptionId))
+                    {
+                        errorMessage += "\nplease submit a value for \"--ExistingVNetSubscriptionId\"";
+                    }
+                    throw new ValidationException(errorMessage);
                 }
             }
 
