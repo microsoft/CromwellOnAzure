@@ -99,10 +99,6 @@ namespace CromwellOnAzureDeployer
                 azureClient = GetAzureClient(azureCredentials);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
 
-                var networks = azureClient.Networks;
-                var network = networks.GetByResourceGroup("benchmarkb-17858", "benchmarkb-17858-vnet");
-                var subnets = network.Subnets;
-
                 await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName, configuration.Update);
 
                 IResourceGroup resourceGroup = null;
@@ -540,11 +536,16 @@ namespace CromwellOnAzureDeployer
 
         private IAzure GetAzureClient(AzureCredentials azureCredentials)
         {
+            return GetAzureClient(azureCredentials, configuration.SubscriptionId);
+        }
+
+        private IAzure GetAzureClient(AzureCredentials azureCredentials, string subscriptionId)
+        {
             return Azure
                 .Configure()
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                 .Authenticate(azureCredentials)
-                .WithSubscription(configuration.SubscriptionId);
+                .WithSubscription(subscriptionId);
         }
 
         private IResourceManager GetResourceManagerClient(AzureCredentials azureCredentials)
@@ -1135,10 +1136,11 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException("ExistingVNet and ExistingVNetResourceGroup must both be defined at the same time");
             }
 
-            var networks = azureClient.Networks;
+            var existingVNetAzureClient = GetExistVNetAzureClient();
+            var networks = existingVNetAzureClient.Networks;
             if (networks == null)
             {
-                throw new ArgumentException("no networks in azureClient");
+                throw new ValidationException("no networks in azureClient");
             }
             existingPrimaryNetwork = networks.GetByResourceGroup(configuration.ExistingVNetResourceGroup, configuration.ExistingVNet);
             if (existingPrimaryNetwork == null)
@@ -1155,6 +1157,28 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException($"more than one subnets on the existing primary network for vnet {configuration.ExistingVNet} in resource group {configuration.ExistingVNetResourceGroup}");
             }
             existingPrimaryNetworkSubnet = subnets.First().Key;
+        }
+
+        private IAzure GetExistVNetAzureClient()
+        {
+            IAzure existingVNetAzureClient = null;
+            if (configuration.SubscriptionId == configuration.ExistingVNetSubscriptionId)
+            {
+                existingVNetAzureClient = azureClient;
+            }
+            else
+            {
+                try
+                {
+                    existingVNetAzureClient = GetAzureClient(azureCredentials, configuration.ExistingVNetSubscriptionId);
+                }
+                catch (Exception)
+                {
+                    throw new ValidationException($"unable to create an azure client for subscription ID {configuration.ExistingVNetSubscriptionId}");
+                }
+            }
+
+            return existingVNetAzureClient;
         }
 
         private static string ReadAllTextWithUnixLineEndings(string path)
