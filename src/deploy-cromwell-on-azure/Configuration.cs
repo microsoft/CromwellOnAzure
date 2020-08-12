@@ -12,7 +12,7 @@ namespace CromwellOnAzureDeployer
     public class Configuration
     {
         public string SubscriptionId { get; set; }
-        public string RegionName { get; set; } = "westus";
+        public string RegionName { get; set; } = "westus2";
         public string MainIdentifierPrefix { get; set; } = "coa";
         public string VmOsVersion { get; set; } = "18.04-LTS";
         public string VmSize { get; set; } = "Standard_D3_v2";
@@ -36,6 +36,8 @@ namespace CromwellOnAzureDeployer
         public string CustomTriggerServiceImagePath { get; set; }
         public bool SkipTestWorkflow { get; set; } = false;
         public bool Update { get; set; } = false;
+        public string ExistingVNet { get; set; }
+        public string ExistingVNetResourceGroup { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {

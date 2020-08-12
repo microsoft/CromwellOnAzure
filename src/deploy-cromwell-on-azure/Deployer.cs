@@ -16,6 +16,7 @@ using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
 using Microsoft.Azure.Management.Compute.Fluent.Models;
+using Microsoft.Azure.Management.Compute.Fluent.VirtualMachine.Definition;
 using Microsoft.Azure.Management.CosmosDB.Fluent;
 using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
@@ -73,6 +74,8 @@ namespace CromwellOnAzureDeployer
         private AzureCredentials azureCredentials { get; set; }
         private bool SkipBillingReaderRoleAssignment { get; set; }
         private bool isResourceGroupCreated { get; set; }
+        private INetwork existingPrimaryNetwork { get; set; }
+        private string existingPrimaryNetworkSubnet { get; set; }
 
         public Deployer(Configuration configuration)
         {
@@ -95,6 +98,10 @@ namespace CromwellOnAzureDeployer
                 azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
                 azureClient = GetAzureClient(azureCredentials);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
+
+                var networks = azureClient.Networks;
+                var network = networks.GetByResourceGroup("benchmarkb-17858", "benchmarkb-17858-vnet");
+                var subnets = network.Subnets;
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName, configuration.Update);
 
@@ -903,10 +910,9 @@ namespace CromwellOnAzureDeployer
 
             return Execute(
                 $"Creating Linux VM: {configuration.VmName}...",
-                () => azureClient.VirtualMachines.Define(configuration.VmName)
-                    .WithRegion(configuration.RegionName)
-                    .WithExistingResourceGroup(configuration.ResourceGroupName)
-                    .WithNewPrimaryNetwork(configuration.VnetAddressSpace)
+                () => (existingPrimaryNetwork != null ?
+                        GetWithNetwork().WithExistingPrimaryNetwork(existingPrimaryNetwork).WithSubnet(existingPrimaryNetworkSubnet) :
+                        GetWithNetwork().WithNewPrimaryNetwork(configuration.VnetAddressSpace))
                     .WithPrimaryPrivateIPAddressDynamic()
                     .WithNewPrimaryPublicIPAddress(configuration.VmName)
                     .WithLatestLinuxImage("Canonical", "UbuntuServer", configuration.VmOsVersion)
@@ -915,7 +921,15 @@ namespace CromwellOnAzureDeployer
                     .WithNewDataDisk(dataDiskSizeGiB, dataDiskLun, CachingTypes.None)
                     .WithSize(configuration.VmSize)
                     .WithExistingUserAssignedManagedServiceIdentity(managedIdentity)
-                    .CreateAsync(cts.Token));
+                    .CreateAsync(cts.Token)
+                );
+        }
+
+        private IWithNetwork GetWithNetwork()
+        {
+            return azureClient.VirtualMachines.Define(configuration.VmName)
+                .WithRegion(configuration.RegionName)
+                .WithExistingResourceGroup(configuration.ResourceGroupName);
         }
 
         private Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync(IResourceGroup resourceGroup, string networkSecurityGroupName)
@@ -1113,6 +1127,36 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private void ValidateExistingPrimaryNetwork()
+        {
+            if ((configuration.ExistingVNet != null && configuration.ExistingVNetResourceGroup == null) ||
+                (configuration.ExistingVNet == null && configuration.ExistingVNetResourceGroup != null))
+            {
+                throw new ValidationException("ExistingVNet and ExistingVNetResourceGroup must both be defined at the same time");
+            }
+
+            var networks = azureClient.Networks;
+            if (networks == null)
+            {
+                throw new ArgumentException("no networks in azureClient");
+            }
+            existingPrimaryNetwork = networks.GetByResourceGroup(configuration.ExistingVNetResourceGroup, configuration.ExistingVNet);
+            if (existingPrimaryNetwork == null)
+            {
+                throw new ValidationException($"cannot locate the existing primary network for vnet {configuration.ExistingVNet} in resource group {configuration.ExistingVNetResourceGroup}");
+            }
+            var subnets = existingPrimaryNetwork.Subnets;
+            if (subnets == null || subnets.Count() == 0)
+            {
+                throw new ValidationException($"cannot locate any subnets on the existing primary network for vnet {configuration.ExistingVNet} in resource group {configuration.ExistingVNetResourceGroup}");
+            }
+            if (subnets.Count() != 1)
+            {
+                throw new ValidationException($"more than one subnets on the existing primary network for vnet {configuration.ExistingVNet} in resource group {configuration.ExistingVNetResourceGroup}");
+            }
+            existingPrimaryNetworkSubnet = subnets.First().Key;
+        }
+
         private static string ReadAllTextWithUnixLineEndings(string path)
         {
             return File.ReadAllText(path).Replace("\r\n", "\n");
@@ -1263,6 +1307,7 @@ namespace CromwellOnAzureDeployer
             ValidateSubscriptionId(configuration.SubscriptionId);
             ValidateRegionName(configuration.RegionName);
             ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
+            ValidateExistingPrimaryNetwork();
         }
 
         private static void DisplayValidationExceptionAndExit(ValidationException validationException)
