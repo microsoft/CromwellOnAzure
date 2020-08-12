@@ -665,6 +665,8 @@ namespace CromwellOnAzureDeployer
                     await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "docker-compose.yml")), $"{CromwellAzureRootDir}/docker-compose.yml", false);
                     await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "cromwellazure.service")), "/lib/systemd/system/cromwellazure.service", false);
                     await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "mount.blobfuse")), "/usr/sbin/mount.blobfuse", true);
+                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "mysql-init", "init-user.sql")), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false);
+                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "mysql-init", "unlock-change-log.sql")), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false);
                 });
         }
 
