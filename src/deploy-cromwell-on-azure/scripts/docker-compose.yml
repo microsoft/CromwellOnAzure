@@ -38,10 +38,14 @@ services:
       - type: bind
         source: /data/mysql
         target: /var/lib/mysql
+      - type: bind
+        source: /data/cromwellazure/mysql-init
+        target: /mysql-init
     entrypoint:
       - /bin/sh
       - -c
-    command: ["echo \"CREATE USER 'cromwell'@'localhost' IDENTIFIED BY 'cromwell'; GRANT ALL PRIVILEGES ON cromwell_db.* TO 'cromwell'@'localhost' WITH GRANT OPTION; CREATE USER 'cromwell'@'%' IDENTIFIED BY 'cromwell'; GRANT ALL PRIVILEGES ON cromwell_db.* TO 'cromwell'@'%' WITH GRANT OPTION;\" > /docker-entrypoint-initdb.d/init_user.sql && docker-entrypoint.sh mysqld && echo \"Deleting change log lock table...\" && mysql -u cromwell -p cromwell -e \"DELETE FROM DATABASECHANGELOGLOCK;\""]
+    command: ["ln -sf /mysql-init/init-user.sql /docker-entrypoint-initdb.d/init_user.sql \
+      && docker-entrypoint.sh mysqld --init-file /mysql-init/unlock-change-log.sql"]
     expose:
       - "3306"
     restart: unless-stopped
