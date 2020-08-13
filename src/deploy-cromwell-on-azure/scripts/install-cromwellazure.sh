@@ -18,6 +18,25 @@ function write_log() {
     echo ${1+$(date --iso-8601=seconds) $1}
 }
 
+function wait_for_apt_locks() {
+    i=0
+
+    while fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+        if [ $i -gt 20 ]; then
+            write_log 'Timed out while waiting for release of apt locks'
+            exit 1
+        else
+            write_log 'Waiting for release of apt locks'
+            sleep 30
+        fi
+
+        let i=i+1
+    done
+}
+
+write_log "Verifying that no other package updates are in progress"
+wait_for_apt_locks
+
 write_log "Install starting"
 
 write_log "Installing docker and docker-compose"
