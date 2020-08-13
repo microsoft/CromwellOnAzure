@@ -413,11 +413,6 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private Task DelayAsync(string message, TimeSpan duration)
-        {
-            return Execute(message, () => Task.Delay(duration));
-        }
-
         private Task WaitForSshConnectivityAsync(ConnectionInfo sshConnectionInfo)
         {
             var timeout = TimeSpan.FromMinutes(10);
@@ -645,7 +640,7 @@ namespace CromwellOnAzureDeployer
                 $"Mounting data disk to the VM...",
                 async () =>
                 {
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "mount-data-disk.sh")), $"/tmp/mount-data-disk.sh", true);
+                    await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (GetFileContent("scripts", "mount-data-disk.sh"), $"/tmp/mount-data-disk.sh", true));
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"/tmp/mount-data-disk.sh");
                 });
         }
@@ -654,20 +649,21 @@ namespace CromwellOnAzureDeployer
         {
             return Execute(
                 $"Writing files to the VM...",
-                async () =>
-                {
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "startup.sh")), $"{CromwellAzureRootDir}/startup.sh", true);
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "wait-for-it.sh")), $"{CromwellAzureRootDir}/wait-for-it/wait-for-it.sh", true);
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "install-cromwellazure.sh")), $"{CromwellAzureRootDir}/install-cromwellazure.sh", true);
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "mount_containers.sh")), $"{CromwellAzureRootDir}/mount_containers.sh", true);
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "env-02-internal-images.txt")), $"{CromwellAzureRootDir}/env-02-internal-images.txt", false);
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "env-03-external-images.txt")), $"{CromwellAzureRootDir}/env-03-external-images.txt", false);
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "docker-compose.yml")), $"{CromwellAzureRootDir}/docker-compose.yml", false);
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "cromwellazure.service")), "/lib/systemd/system/cromwellazure.service", false);
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "mount.blobfuse")), "/usr/sbin/mount.blobfuse", true);
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "mysql-init", "init-user.sql")), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false);
-                    await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "mysql-init", "unlock-change-log.sql")), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false);
-                });
+                () => UploadFilesToVirtualMachineAsync(
+                    sshConnectionInfo, 
+                    new[] {
+                        (GetFileContent("scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true),
+                        (GetFileContent("scripts", "wait-for-it.sh"), $"{CromwellAzureRootDir}/wait-for-it/wait-for-it.sh", true),
+                        (GetFileContent("scripts", "install-cromwellazure.sh"), $"{CromwellAzureRootDir}/install-cromwellazure.sh", true),
+                        (GetFileContent("scripts", "mount_containers.sh"), $"{CromwellAzureRootDir}/mount_containers.sh", true),
+                        (GetFileContent("scripts", "env-02-internal-images.txt"), $"{CromwellAzureRootDir}/env-02-internal-images.txt", false),
+                        (GetFileContent("scripts", "env-03-external-images.txt"), $"{CromwellAzureRootDir}/env-03-external-images.txt", false),
+                        (GetFileContent("scripts", "docker-compose.yml"), $"{CromwellAzureRootDir}/docker-compose.yml", false),
+                        (GetFileContent("scripts", "cromwellazure.service"), "/lib/systemd/system/cromwellazure.service", false),
+                        (GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true),
+                        (GetFileContent("scripts", "mysql-init", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
+                        (GetFileContent("scripts", "mysql-init", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
+                    }));
         }
 
         private Task RunInstallationScriptAsync(ConnectionInfo sshConnectionInfo)
@@ -682,17 +678,18 @@ namespace CromwellOnAzureDeployer
 
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo)
         {
-            await UploadFileToVirtualMachineAsync(
-                sshConnectionInfo, 
-                ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "env-01-account-names.txt"))
-                    .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
-                    .Replace("{CosmosDbAccountName}", configuration.CosmosDbAccountName)
-                    .Replace("{BatchAccountName}", configuration.BatchAccountName)
-                    .Replace("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName), 
-                $"{CromwellAzureRootDir}/env-01-account-names.txt", 
-                false);
+            var accountsFileContent = GetFileContent("scripts", "env-01-account-names.txt")
+                .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
+                .Replace("{CosmosDbAccountName}", configuration.CosmosDbAccountName)
+                .Replace("{BatchAccountName}", configuration.BatchAccountName)
+                .Replace("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName);
 
-            await UploadFileToVirtualMachineAsync(sshConnectionInfo, ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "env-04-settings.txt")), $"{CromwellAzureRootDir}/env-04-settings.txt", false);
+            await UploadFilesToVirtualMachineAsync(
+                sshConnectionInfo, 
+                new[] {
+                    (accountsFileContent, $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
+                    (GetFileContent("scripts", "env-04-settings.txt"), $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                });
         }
 
         private async Task HandleCustomImagesAsync(ConnectionInfo sshConnectionInfo)
@@ -709,7 +706,7 @@ namespace CromwellOnAzureDeployer
                 var startTime = DateTime.UtcNow;
                 var line = RefreshableConsole.WriteLine($"Copying custom image from {customImagePath} to the VM...");
                 var remotePath = $"{CromwellAzureRootDir}/{Path.GetFileName(customImagePath)}";
-                await UploadFileToVirtualMachineAsync(sshConnectionInfo, File.OpenRead(customImagePath), remotePath, false);
+                await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (File.OpenRead(customImagePath), remotePath, false));
                 WriteExecutionTime(line, startTime);
             }
 
@@ -731,13 +728,13 @@ namespace CromwellOnAzureDeployer
             else if (!string.IsNullOrEmpty(imageNameOrTag))
             {
                 var actualImageName = imageNameFactory != null ? imageNameFactory(imageNameOrTag) : imageNameOrTag;
-                await UploadFileToVirtualMachineAsync(sshConnectionInfo, $"{envFileKey}={actualImageName}", $"{CromwellAzureRootDir}/{envFileName}", false);
+                await UploadFilesToVirtualMachineAsync(sshConnectionInfo, ($"{envFileKey}={actualImageName}", $"{CromwellAzureRootDir}/{envFileName}", false));
             }
             else if (!string.IsNullOrEmpty(customImagePath))
             {
                 await CopyCustomDockerImageAsync(customImagePath);
                 var loadedImageName = await LoadCustomDockerImageAsync(customImagePath);
-                await UploadFileToVirtualMachineAsync(sshConnectionInfo, $"{envFileKey}={loadedImageName}", $"{CromwellAzureRootDir}/{envFileName}", false);
+                await UploadFilesToVirtualMachineAsync(sshConnectionInfo, ($"{envFileKey}={loadedImageName}", $"{CromwellAzureRootDir}/{envFileName}", false));
             }
         }
 
@@ -821,14 +818,8 @@ namespace CromwellOnAzureDeployer
                 $"Writing containers-to-mount and cromwell-application.conf files to '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var containersToMountConfigPath = GetPathFromAppRelativePath("scripts", "containers-to-mount");
-                    var containersToMountConfigText = ReadAllTextWithUnixLineEndings(containersToMountConfigPath).Replace("{DefaultStorageAccountName}", configuration.StorageAccountName);
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, Path.GetFileName(containersToMountConfigPath), containersToMountConfigText);
-
-                    var cromwellAppConfigPath = GetPathFromAppRelativePath("scripts", "cromwell-application.conf");
-                    var cromwellAppConfigText = ReadAllTextWithUnixLineEndings(cromwellAppConfigPath);
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, Path.GetFileName(cromwellAppConfigPath), cromwellAppConfigText);
-
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "containers-to-mount", GetFileContent("scripts", "containers-to-mount").Replace("{DefaultStorageAccountName}", configuration.StorageAccountName));
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "cromwell-application.conf", GetFileContent("scripts", "cromwell-application.conf"));
                 });
         }
 
@@ -1061,7 +1052,7 @@ namespace CromwellOnAzureDeployer
 
                     if (cromwellConfigText == null)
                     {
-                        cromwellConfigText = ReadAllTextWithUnixLineEndings(GetPathFromAppRelativePath("scripts", "cromwell-application.conf"));
+                        cromwellConfigText = GetFileContent("scripts", "cromwell-application.conf");
                     }
                     else
                     {
@@ -1095,11 +1086,6 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private static string GetPathFromAppRelativePath(params string[] paths)
-        {
-            return Path.Combine(paths.Prepend(AppContext.BaseDirectory).ToArray());
-        }
-
         private static void ValidateMainIdentifierPrefix(string prefix)
         {
             const int maxLength = 12;
@@ -1115,9 +1101,11 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private static string ReadAllTextWithUnixLineEndings(string path)
+        private static string GetFileContent(params string[] pathComponentsRelativeToAppBase)
         {
-            return File.ReadAllText(path).Replace("\r\n", "\n");
+            var absoluteFilepath = Path.Combine(pathComponentsRelativeToAppBase.Prepend(AppContext.BaseDirectory).ToArray());
+
+            return File.ReadAllText(absoluteFilepath).Replace("\r\n", "\n");
         }
 
         private static void ValidateRegionName(string regionName)
@@ -1341,8 +1329,8 @@ namespace CromwellOnAzureDeployer
             const string testInputFilename = "test.json";
 
             var id = Guid.NewGuid();
-            var wdlText = await File.ReadAllTextAsync(GetPathFromAppRelativePath(testWdlFilename));
-            var triggerJson = await File.ReadAllTextAsync(GetPathFromAppRelativePath(testInputFilename));
+            var wdlText = GetFileContent(testWdlFilename);
+            var triggerJson = GetFileContent(testInputFilename);
 
             if (!usePreemptibleVm)
             {
@@ -1446,40 +1434,42 @@ namespace CromwellOnAzureDeployer
             return (output, error, exitStatus);
         }
 
-        private async Task UploadFileToVirtualMachineAsync(ConnectionInfo sshConnectionInfo, string fileContent, string remoteFilePath, bool makeExecutable)
+        private async Task UploadFilesToVirtualMachineAsync(ConnectionInfo sshConnectionInfo, params (string fileContent, string remoteFilePath, bool makeExecutable)[] files)
         {
-            using var input = new MemoryStream(Encoding.UTF8.GetBytes(fileContent));
-            await UploadFileToVirtualMachineAsync(sshConnectionInfo, input, remoteFilePath, makeExecutable);
+            await UploadFilesToVirtualMachineAsync(sshConnectionInfo, files.Select(f => ((Stream)new MemoryStream(Encoding.UTF8.GetBytes(f.fileContent)), f.remoteFilePath, f.makeExecutable)).ToArray());
         }
 
-        private async Task UploadFileToVirtualMachineAsync(ConnectionInfo sshConnectionInfo, Stream input, string remoteFilePath, bool makeExecutable)
+        private async Task UploadFilesToVirtualMachineAsync(ConnectionInfo sshConnectionInfo, params (Stream input, string remoteFilePath, bool makeExecutable)[] files)
         {
-            var dir = GetLinuxParentPath(remoteFilePath);
-
             using var sshClient = new SshClient(sshConnectionInfo);
             using var sftpClient = new SftpClient(sshConnectionInfo);
 
             sshClient.ConnectWithRetries();
-
-            // Create destination directory if needed and make it writable for the current user
-            var (output, _, _) = await sshClient.ExecuteCommandAsync($"sudo mkdir -p {dir} && owner=$(stat -c '%U' {dir}) && mask=$(stat -c '%a' {dir}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {dir} && echo 1 ))");
-            var dirWasMadeWritableToOthers = output == "1";
-
             sftpClient.Connect();
-            await sftpClient.UploadFileAsync(input, remoteFilePath, true);
-            sftpClient.Disconnect();
 
-            if (makeExecutable)
+            foreach (var (input, remoteFilePath, makeExecutable) in files)
             {
-                await sshClient.ExecuteCommandAsync($"sudo chmod +x {remoteFilePath}");
-            }
+                var dir = GetLinuxParentPath(remoteFilePath);
 
-            if (dirWasMadeWritableToOthers)
-            {
-                await sshClient.ExecuteCommandAsync($"sudo chmod o-w {dir}");
+                // Create destination directory if needed and make it writable for the current user
+                var (output, _, _) = await sshClient.ExecuteCommandAsync($"sudo mkdir -p {dir} && owner=$(stat -c '%U' {dir}) && mask=$(stat -c '%a' {dir}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {dir} && echo 1 ))");
+                var dirWasMadeWritableToOthers = output == "1";
+
+                await sftpClient.UploadFileAsync(input, remoteFilePath, true);
+
+                if (makeExecutable)
+                {
+                    await sshClient.ExecuteCommandAsync($"sudo chmod +x {remoteFilePath}");
+                }
+
+                if (dirWasMadeWritableToOthers)
+                {
+                    await sshClient.ExecuteCommandAsync($"sudo chmod o-w {dir}");
+                }
             }
 
             sshClient.Disconnect();
+            sftpClient.Disconnect();
         }
 
         private async Task DeleteFileFromVirtualMachineAsync(ConnectionInfo sshConnectionInfo, string filePath)
