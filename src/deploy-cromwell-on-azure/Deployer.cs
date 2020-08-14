@@ -537,16 +537,11 @@ namespace CromwellOnAzureDeployer
 
         private IAzure GetAzureClient(AzureCredentials azureCredentials)
         {
-            return GetAzureClient(azureCredentials, configuration.SubscriptionId);
-        }
-
-        private IAzure GetAzureClient(AzureCredentials azureCredentials, string subscriptionId)
-        {
             return Azure
                 .Configure()
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                 .Authenticate(azureCredentials)
-                .WithSubscription(subscriptionId);
+                .WithSubscription(configuration.SubscriptionId);
         }
 
         private IResourceManager GetResourceManagerClient(AzureCredentials azureCredentials)
@@ -923,8 +918,7 @@ namespace CromwellOnAzureDeployer
                     .WithNewDataDisk(dataDiskSizeGiB, dataDiskLun, CachingTypes.None)
                     .WithSize(configuration.VmSize)
                     .WithExistingUserAssignedManagedServiceIdentity(managedIdentity)
-                    .CreateAsync(cts.Token)
-                );
+                    .CreateAsync(cts.Token));
         }
 
         private IWithNetwork GetWithNetwork()
@@ -1157,12 +1151,9 @@ namespace CromwellOnAzureDeployer
             {
                 throw new ValidationException($"cannot locate any subnets on the existing primary network for vnet {configuration.ExistingVNet} in resource group {configuration.ExistingVNetResourceGroup}");
             }
-            if (subnets.Count() != 1)
-            {
-                throw new ValidationException($"more than one subnets on the existing primary network for vnet {configuration.ExistingVNet} in resource group {configuration.ExistingVNetResourceGroup}");
-            }
             existingPrimaryNetworkSubnet = subnets.First().Key;
         }
+
 
         private static string ReadAllTextWithUnixLineEndings(string path)
         {
