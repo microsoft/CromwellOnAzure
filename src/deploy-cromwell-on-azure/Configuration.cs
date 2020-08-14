@@ -38,7 +38,6 @@ namespace CromwellOnAzureDeployer
         public bool Update { get; set; } = false;
         public string ExistingVNet { get; set; }
         public string ExistingVNetResourceGroup { get; set; }
-        public string ExistingVNetSubscriptionId { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {
