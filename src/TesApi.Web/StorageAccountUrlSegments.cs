@@ -83,6 +83,19 @@ namespace TesApi.Web
         }
 
         /// <summary>
+        /// Parses the provided string. The following formats are supported:
+        /// - /accountName/containerName/blobName
+        /// - https://accountName.blob.core.windows.net/containerName/blobName?sasToken
+        /// Throws if string cannot be parsed.
+        /// </summary>
+        /// <param name="uriString">String representing an Azure Storage object location</param>
+        /// <returns><see cref="StorageAccountUrlSegments"/> representing the provided object location</returns>
+        public static StorageAccountUrlSegments Create(string uriString)
+        {
+            return TryCreate(uriString, out var result) ? result : throw new ArgumentException($"Invalid blob URI: {uriString}");
+        }
+
+        /// <summary>
         /// Returns the Blob URL string
         /// </summary>
         /// <returns>Blob URL</returns>
