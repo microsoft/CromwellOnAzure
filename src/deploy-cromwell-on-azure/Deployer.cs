@@ -51,7 +51,6 @@ namespace CromwellOnAzureDeployer
         private const string ConfigurationContainerName = "configuration";
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
-        private const int MaxAutoScaleThroughput = 4000;
 
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
 
