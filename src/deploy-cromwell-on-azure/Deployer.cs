@@ -294,9 +294,9 @@ namespace CromwellOnAzureDeployer
                         Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
 
                         Task.Run(() => CreateStorageAccountAsync()
-                            .ContinueWith(async t => 
-                                { 
-                                    storageAccount = t.Result; 
+                            .ContinueWith(async t =>
+                                {
+                                    storageAccount = t.Result;
                                     await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                                     await WritePersonalizedFilesToStorageAccountAsync(storageAccount);
                                 },
@@ -392,20 +392,14 @@ namespace CromwellOnAzureDeployer
                 DisplayValidationExceptionAndExit(validationException);
                 return 1;
             }
-            catch (Microsoft.Rest.Azure.CloudException cloudException)
-            {
-                RefreshableConsole.WriteLine();
-                RefreshableConsole.WriteLine($"{cloudException.GetType().Name}: {cloudException.Message}", ConsoleColor.Red);
-                RefreshableConsole.WriteLine();
-                WriteGeneralRetryMessageToConsole();
-                Debugger.Break();
-                await DeleteResourceGroupIfUserConsentsAsync();
-                return 1;
-            }
             catch (Exception exc)
             {
-                RefreshableConsole.WriteLine();
-                RefreshableConsole.WriteLine($"{exc.GetType().Name}: {exc.Message}", ConsoleColor.Red);
+                if (!(exc is OperationCanceledException && cts.Token.IsCancellationRequested))
+                {
+                    RefreshableConsole.WriteLine();
+                    RefreshableConsole.WriteLine($"{exc.GetType().Name}: {exc.Message}", ConsoleColor.Red);
+                }
+
                 RefreshableConsole.WriteLine();
                 Debugger.Break();
                 WriteGeneralRetryMessageToConsole();
@@ -1414,7 +1408,7 @@ namespace CromwellOnAzureDeployer
                 }
                 catch (Exception ex)
                 {
-                    line.Write($" Failed. Exception: {ex.GetType().Name}", ConsoleColor.Red);
+                    line.Write($" Failed. {ex.GetType().Name}: {ex.Message}", ConsoleColor.Red);
                     cts.Cancel();
                     throw;
                 }
