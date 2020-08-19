@@ -16,6 +16,7 @@ using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
 using Microsoft.Azure.Management.Compute.Fluent.Models;
+using Microsoft.Azure.Management.Compute.Fluent.VirtualMachine.Definition;
 using Microsoft.Azure.Management.CosmosDB.Fluent;
 using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
@@ -266,6 +267,7 @@ namespace CromwellOnAzureDeployer
                     await RegisterResourceProvidersAsync();
                     await ValidateVmAsync();
                     await ValidateBatchQuotaAsync();
+                    var vnetAndSubnet = await ValidateAndGetExistingVirtualNetworkAsync();
 
                     RefreshableConsole.WriteLine();
                     RefreshableConsole.WriteLine($"VM host: {configuration.VmName}.{configuration.RegionName}.cloudapp.azure.com");
@@ -286,6 +288,12 @@ namespace CromwellOnAzureDeployer
 
                     managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
 
+                    if (vnetAndSubnet == null)
+                    {
+                        configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                        vnetAndSubnet = await CreateVnetAsync(resourceGroup, configuration.VnetName, configuration.VnetAddressSpace);
+                    }
+
                     await Task.WhenAll(new Task[]
                     {
                         Task.Run(async () => batchAccount = await CreateBatchAccountAsync()),
@@ -302,7 +310,7 @@ namespace CromwellOnAzureDeployer
                                 TaskContinuationOptions.OnlyOnRanToCompletion)
                             .Unwrap()),
 
-                        Task.Run(() => CreateVirtualMachineAsync(managedIdentity)
+                        Task.Run(() => CreateVirtualMachineAsync(managedIdentity, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName)
                             .ContinueWith(async t =>
                                 {
                                     linuxVm = t.Result;
@@ -890,7 +898,7 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(cts.Token)));
         }
 
-        private Task<IVirtualMachine> CreateVirtualMachineAsync(IIdentity managedIdentity)
+        private Task<IVirtualMachine> CreateVirtualMachineAsync(IIdentity managedIdentity, INetwork vnet, string subnetName)
         {
             const int dataDiskSizeGiB = 32;
             const int dataDiskLun = 0;
@@ -900,7 +908,8 @@ namespace CromwellOnAzureDeployer
                 () => azureClient.VirtualMachines.Define(configuration.VmName)
                     .WithRegion(configuration.RegionName)
                     .WithExistingResourceGroup(configuration.ResourceGroupName)
-                    .WithNewPrimaryNetwork(configuration.VnetAddressSpace)
+                    .WithExistingPrimaryNetwork(vnet)
+                    .WithSubnet(subnetName)
                     .WithPrimaryPrivateIPAddressDynamic()
                     .WithNewPrimaryPublicIPAddress(configuration.VmName)
                     .WithLatestLinuxImage("Canonical", "UbuntuServer", configuration.VmOsVersion)
@@ -910,6 +919,24 @@ namespace CromwellOnAzureDeployer
                     .WithSize(configuration.VmSize)
                     .WithExistingUserAssignedManagedServiceIdentity(managedIdentity)
                     .CreateAsync(cts.Token));
+        }
+
+        private Task<(INetwork virtualNetwork, string subnetName)> CreateVnetAsync(IResourceGroup resourceGroup, string name, string addressSpace)
+        {
+            return Execute(
+                $"Creating virtual network: {name}...",
+                async () =>
+                {
+                    var vnet = await azureClient.Networks
+                        .Define(name)
+                        .WithRegion(resourceGroup.Region)
+                        .WithExistingResourceGroup(resourceGroup)
+                        .WithAddressSpace(addressSpace)
+                        .DefineSubnet("subnet1").WithAddressPrefix(addressSpace).Attach()
+                        .CreateAsync();
+
+                    return (vnet, "subnet1");
+                });
         }
 
         private Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync(IResourceGroup resourceGroup, string networkSecurityGroupName)
@@ -1194,6 +1221,46 @@ namespace CromwellOnAzureDeployer
                 RefreshableConsole.WriteLine("assign the Billing Reader role for the VM's managed identity to your Azure Subscription scope.", ConsoleColor.Yellow);
                 RefreshableConsole.WriteLine("More info: https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access", ConsoleColor.Yellow);
             }
+        }
+
+        private async Task<(INetwork virtualNetwork, string subnetName)?> ValidateAndGetExistingVirtualNetworkAsync()
+        {
+            if (string.IsNullOrWhiteSpace(configuration.VnetName) && string.IsNullOrWhiteSpace(configuration.VnetResourceGroupName))
+            {
+                return null;
+            }
+
+            if ((!string.IsNullOrWhiteSpace(configuration.VnetName) && string.IsNullOrWhiteSpace(configuration.VnetResourceGroupName)) ||
+                (string.IsNullOrWhiteSpace(configuration.VnetName) && !string.IsNullOrWhiteSpace(configuration.VnetResourceGroupName)))
+            {
+                throw new ValidationException("Both --VnetResourceGroup and --VnetName are required when using the existing virtual network.");
+            }
+
+            var vnet = await azureClient.Networks.GetByResourceGroupAsync(configuration.VnetResourceGroupName, configuration.VnetName);
+
+            if (vnet == null)
+            {
+                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not exist in resource group '{configuration.VnetResourceGroupName}'.");
+            }
+
+            if (!vnet.Subnets.Any())
+            {
+                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not have any subnets. At least one subnet is required.");
+            }
+
+            if (vnet.Subnets.Count() > 1 && string.IsNullOrWhiteSpace(configuration.SubnetName))
+            {
+                throw new ValidationException($"More than one subnet exists in virtual network  '{configuration.VnetName}'. --SubnetName is required.");
+            }
+
+            var subnet = vnet.Subnets.Keys.FirstOrDefault(k => string.IsNullOrWhiteSpace(configuration.SubnetName) || k.Equals(configuration.SubnetName, StringComparison.OrdinalIgnoreCase));
+
+            if (subnet == null)
+            {
+                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.SubnetName}'.");
+            }
+
+            return (vnet, subnet);
         }
 
         private async Task ValidateBatchQuotaAsync()
