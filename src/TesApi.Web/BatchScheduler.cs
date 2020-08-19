@@ -492,9 +492,10 @@ namespace TesApi.Web
             var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
             var filesToDownload = await Task.WhenAll(inputFiles.Union(additionalInputFiles).Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
 
+            // Using --include and not using --no-recursive as a workaround for https://github.com/Azure/blobxfer/issues/123
             var downloadFilesScriptContent = string.Join(" && ", filesToDownload.Select(f => 
                 f.Url.Contains(".blob.core.") 
-                    ? $"blobxfer download --storage-url '{f.Url}' --local-path '{f.Path}' --chunk-size-bytes 104857600 --rename --no-recursive"
+                    ? $"blobxfer download --storage-url '{f.Url}' --local-path '{f.Path}' --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
                     : $"mkdir -p {GetParentPath(f.Path)} && wget -O '{f.Path}' '{f.Url}'"));
 
             var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
