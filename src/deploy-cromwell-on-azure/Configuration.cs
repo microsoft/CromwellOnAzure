@@ -36,8 +36,9 @@ namespace CromwellOnAzureDeployer
         public string CustomTriggerServiceImagePath { get; set; }
         public bool SkipTestWorkflow { get; set; } = false;
         public bool Update { get; set; } = false;
-        public string ExistingVNet { get; set; }
-        public string ExistingVNetResourceGroup { get; set; }
+        public string VnetResourceGroupName { get; set; }
+        public string VnetName { get; set; }
+        public string SubnetName { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {
