@@ -1,3 +1,2 @@
 ﻿TesImageName=mcr.microsoft.com/cromwellonazure/tes:2.0.0
 TriggerServiceImageName=mcr.microsoft.com/cromwellonazure/triggerservice:2.0.0
-CromwellOnAzureVersion=2.0.0

@@ -52,7 +52,6 @@ namespace CromwellOnAzureDeployer
         private const string ConfigurationContainerName = "configuration";
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
-        private const int MaxAutoScaleThroughput = 4000;
 
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
 
@@ -174,8 +173,6 @@ namespace CromwellOnAzureDeployer
                         await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
                     }
 
-                    var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
-
                     await ConfigureVmAsync(sshConnectionInfo);
 
                     var accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
@@ -220,9 +217,11 @@ namespace CromwellOnAzureDeployer
 
                     await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
 
-                    if(installedVersion == null)
+                    var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
+
+                    if (installedVersion == null)
                     {
-                        // If upgrading from pre-2.0 version, patch the installed cromwell-application.conf (disable call caching and default to preemptible)
+                        // If upgrading from pre-2.1 version, patch the installed cromwell-application.conf (disable call caching and default to preemptible)
                         await PatchCromwellConfigurationFileAsync(storageAccount);
                         await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
                     }
@@ -302,9 +301,9 @@ namespace CromwellOnAzureDeployer
                         Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
 
                         Task.Run(() => CreateStorageAccountAsync()
-                            .ContinueWith(async t => 
-                                { 
-                                    storageAccount = t.Result; 
+                            .ContinueWith(async t =>
+                                {
+                                    storageAccount = t.Result;
                                     await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                                     await WritePersonalizedFilesToStorageAccountAsync(storageAccount);
                                 },
@@ -338,6 +337,7 @@ namespace CromwellOnAzureDeployer
                     await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
                 }
 
+                await WriteCoaVersionToVmAsync(sshConnectionInfo);
                 await RestartVmAsync(linuxVm);
                 await WaitForSshConnectivityAsync(sshConnectionInfo);
 
@@ -399,20 +399,14 @@ namespace CromwellOnAzureDeployer
                 DisplayValidationExceptionAndExit(validationException);
                 return 1;
             }
-            catch (Microsoft.Rest.Azure.CloudException cloudException)
-            {
-                RefreshableConsole.WriteLine();
-                RefreshableConsole.WriteLine($"{cloudException.GetType().Name}: {cloudException.Message}", ConsoleColor.Red);
-                RefreshableConsole.WriteLine();
-                WriteGeneralRetryMessageToConsole();
-                Debugger.Break();
-                await DeleteResourceGroupIfUserConsentsAsync();
-                return 1;
-            }
             catch (Exception exc)
             {
-                RefreshableConsole.WriteLine();
-                RefreshableConsole.WriteLine($"{exc.GetType().Name}: {exc.Message}", ConsoleColor.Red);
+                if (!(exc is OperationCanceledException && cts.Token.IsCancellationRequested))
+                {
+                    RefreshableConsole.WriteLine();
+                    RefreshableConsole.WriteLine($"{exc.GetType().Name}: {exc.Message}", ConsoleColor.Red);
+                }
+
                 RefreshableConsole.WriteLine();
                 Debugger.Break();
                 WriteGeneralRetryMessageToConsole();
@@ -637,7 +631,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task<Version> GetInstalledCromwellOnAzureVersionAsync(ConnectionInfo sshConnectionInfo)
         {
-            var versionString = (await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $@"grep -sPo 'CromwellOnAzureVersion=\K(.*)$' {CromwellAzureRootDir}/env-02-internal-images.txt || :")).Output;
+            var versionString = (await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $@"grep -sPo 'CromwellOnAzureVersion=\K(.*)$' {CromwellAzureRootDir}/env-00-coa-version.txt || :")).Output;
 
             return !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
         }
@@ -672,6 +666,13 @@ namespace CromwellOnAzureDeployer
                         (GetFileContent("scripts", "mysql-init", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
                         (GetFileContent("scripts", "mysql-init", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
                     }));
+        }
+
+        private Task WriteCoaVersionToVmAsync(ConnectionInfo sshConnectionInfo)
+        {
+            return Execute(
+                $"Writing CoA version file to the VM...",
+                () => UploadFilesToVirtualMachineAsync(sshConnectionInfo, (GetFileContent("scripts", "env-00-coa-version.txt"), $"{CromwellAzureRootDir}/env-00-coa-version.txt", false)));
         }
 
         private Task RunInstallationScriptAsync(ConnectionInfo sshConnectionInfo)
@@ -1105,11 +1106,9 @@ namespace CromwellOnAzureDeployer
             if (requestThroughput != null && requestThroughput.Throughput != null && requestThroughput.AutoscaleMaxThroughput == null)
             {
                 // If the container has request throughput setting configured, and it is currently manual, set it to auto
-                var effectiveMaxAutoScaleThroughput = Math.Max(requestThroughput.Throughput.Value, MaxAutoScaleThroughput);
-
                 await Execute(
-                    $"Replacing the throughput settings for CosmosDb container 'Tasks' in database 'TES' with autoscale throughput with max of {effectiveMaxAutoScaleThroughput} units...",
-                    () => cosmosClient.SetContainerAutoRequestThroughputAsync("TES", "Tasks", effectiveMaxAutoScaleThroughput));
+                    $"Switching the throughput setting for CosmosDb container 'Tasks' in database 'TES' from Manual to Autoscale...",
+                    () => cosmosClient.SwitchContainerRequestThroughputToAutoAsync("TES", "Tasks"));
             }
         }
 
@@ -1475,7 +1474,7 @@ namespace CromwellOnAzureDeployer
                 }
                 catch (Exception ex)
                 {
-                    line.Write($" Failed. Exception: {ex.GetType().Name}", ConsoleColor.Red);
+                    line.Write($" Failed. {ex.GetType().Name}: {ex.Message}", ConsoleColor.Red);
                     cts.Cancel();
                     throw;
                 }

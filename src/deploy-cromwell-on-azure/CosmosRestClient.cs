@@ -42,11 +42,10 @@ namespace CromwellOnAzureDeployer
             return JsonConvert.DeserializeObject<OfferQueryResponse>(offerQueryResponse).Offers.FirstOrDefault();
         }
 
-        public async Task SetContainerAutoRequestThroughputAsync(string databaseName, string containerName, int maxThroughput)
+        public async Task SwitchContainerRequestThroughputToAutoAsync(string databaseName, string containerName)
         {
             var offer = await GetContainerRequestThroughputAsync(databaseName, containerName);
-            offer.Content = new OfferContentProperties { OfferAutoscaleSettings = new OfferAutoscaleProperties { MaxThroughput = maxThroughput } };
-            await PutAsync(this.endpoint, offer.SelfLink, this.key, "offers", offer.OfferRID.ToLower(), JsonConvert.SerializeObject(offer));
+            await PutAsync(this.endpoint, offer.SelfLink, this.key, "offers", offer.OfferRID.ToLower(), JsonConvert.SerializeObject(offer), ("x-ms-cosmos-migrate-offer-to-autopilot", "true"));
         }
 
         async Task<string> GetAsync(string baseUrl, string relativeUrl, string key, string resourceType, string resourceId)
@@ -82,7 +81,7 @@ namespace CromwellOnAzureDeployer
             return await result.Content.ReadAsStringAsync();
         }
 
-        async Task<string> PutAsync(string baseUrl, string relativeUrl, string key, string resourceType, string resourceId, string body)
+        async Task<string> PutAsync(string baseUrl, string relativeUrl, string key, string resourceType, string resourceId, string body, params (string name, string value)[] additionalHeaders)
         {
             var dateString = DateTime.UtcNow.ToString("R");
             var authHeader = GenerateAuthToken("PUT", resourceType, resourceId, dateString, key, "master", "1.0");
@@ -92,6 +91,11 @@ namespace CromwellOnAzureDeployer
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             client.DefaultRequestHeaders.Add("x-ms-version", "2018-12-31");
             client.DefaultRequestHeaders.Add("x-ms-date", dateString);
+
+            foreach (var (name, value) in additionalHeaders)
+            {
+                client.DefaultRequestHeaders.Add(name, value);
+            }
 
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             var result = await client.PutAsync($"{baseUrl}/{relativeUrl}", content);
