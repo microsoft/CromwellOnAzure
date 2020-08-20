@@ -534,11 +534,11 @@ namespace TesApi.Web
             var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) == null;
 
             var taskCommand = $@"
-                docker pull --quiet {BlobxferImageName} && 
-                {(executorImageIsPublic ? $"docker pull --quiet {executor.Image} && " : "")}
-                docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {downloadFilesScriptPath} && 
-                chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && 
-                docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c '{ string.Join(" && ", executor.Command.Skip(1))}' && 
+                docker pull --quiet {BlobxferImageName} && \
+                {(executorImageIsPublic ? $"docker pull --quiet {executor.Image} && \\" : "")}
+                docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {downloadFilesScriptPath} && \
+                chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \
+                docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c '{ string.Join(" && ", executor.Command.Skip(1))}' && \
                 docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath}
             ";
 

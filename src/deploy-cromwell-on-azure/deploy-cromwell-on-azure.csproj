@@ -100,7 +100,7 @@
     <None Update="scripts\mysql-init\unlock-change-log.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="test.json">
+    <None Update="testInputs.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="test.wdl">
