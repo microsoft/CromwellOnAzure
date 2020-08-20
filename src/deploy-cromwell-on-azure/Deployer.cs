@@ -1391,27 +1391,29 @@ namespace CromwellOnAzureDeployer
         private async Task<bool> TestWorkflowAsync(IStorageAccount storageAccount, bool usePreemptibleVm = true)
         {
             const string testDirectoryName = "test";
-            const string testWdlFilename = "test.wdl";
-            const string testInputFilename = "test.json";
+            const string wdlFileName = "test.wdl";
+            const string workflowInputsFileName = "testInputs.json";
+            const string inputFileName = "inputFile.txt";
+            const string inputFileContent = "Hello from inputFile.txt!";
 
             var id = Guid.NewGuid();
-            var wdlText = GetFileContent(testWdlFilename);
-            var triggerJson = GetFileContent(testInputFilename);
+            var wdlFileContent = GetFileContent(wdlFileName);
+            var workflowInputsFileContent = GetFileContent(workflowInputsFileName).Replace("{InputFilePath}", $"/{storageAccount.Name}/{InputsContainerName}/{testDirectoryName}/{inputFileName}");
 
             if (!usePreemptibleVm)
             {
-                wdlText = wdlText.Replace("preemptible: true", "preemptible: false", StringComparison.OrdinalIgnoreCase);
+                wdlFileContent = wdlFileContent.Replace("preemptible: true", "preemptible: false", StringComparison.OrdinalIgnoreCase);
             }
-
-            await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, $"{testDirectoryName}/{testWdlFilename}", wdlText);
-            await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, $"{testDirectoryName}/{testInputFilename}", triggerJson);
 
             var workflowTrigger = new Workflow
             {
-                WorkflowUrl = $"/{storageAccount.Name}/{InputsContainerName}/{testDirectoryName}/{testWdlFilename}",
-                WorkflowInputsUrl = $"/{storageAccount.Name}/{InputsContainerName}/{testDirectoryName}/{testInputFilename}"
+                WorkflowUrl = $"/{storageAccount.Name}/{InputsContainerName}/{testDirectoryName}/{wdlFileName}",
+                WorkflowInputsUrl = $"/{storageAccount.Name}/{InputsContainerName}/{testDirectoryName}/{workflowInputsFileName}"
             };
 
+            await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, $"{testDirectoryName}/{wdlFileName}", wdlFileContent);
+            await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, $"{testDirectoryName}/{workflowInputsFileName}", workflowInputsFileContent);
+            await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, $"{testDirectoryName}/{inputFileName}", inputFileContent);
             await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, $"new/{id}.json", JsonConvert.SerializeObject(workflowTrigger, Formatting.Indented));
 
             return await IsWorkflowSuccessfulAfterLongPollingAsync(storageAccount, WorkflowsContainerName, id);

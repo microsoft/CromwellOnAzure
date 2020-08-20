@@ -493,10 +493,15 @@ namespace TesApi.Web
             var filesToDownload = await Task.WhenAll(inputFiles.Union(additionalInputFiles).Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
 
             // Using --include and not using --no-recursive as a workaround for https://github.com/Azure/blobxfer/issues/123
-            var downloadFilesScriptContent = string.Join(" && ", filesToDownload.Select(f => 
-                f.Url.Contains(".blob.core.") 
+            var downloadFilesScriptContent = string.Join(" && ", filesToDownload.Select(f => {
+                var downloadSingleFile = f.Url.Contains(".blob.core.")
                     ? $"blobxfer download --storage-url '{f.Url}' --local-path '{f.Path}' --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
-                    : $"mkdir -p {GetParentPath(f.Path)} && wget -O '{f.Path}' '{f.Url}'"));
+                    : $"mkdir -p {GetParentPath(f.Path)} && wget -O '{f.Path}' '{f.Url}'";
+
+                var exitIfDownloadedFileIsNotFound = $"{{ [ -f '{f.Path}' ] && : || {{ echo 'Failed to download file {f.Url}' 1>&2 && exit 1; }} }}";
+
+                return $"{downloadSingleFile} && {exitIfDownloadedFileIsNotFound}";
+            }));
 
             var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
             var writableDownloadFilesScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(downloadFilesScriptPath, getContainerSas: true));
@@ -510,10 +515,11 @@ namespace TesApi.Web
             var uploadFilesScriptContent = string.Join(" && ", filesToUpload.Select(f =>
             {
                 // Ignore missing stdout/stderr files. CWL workflows have an issue where if the stdout/stderr are redirected, they are still listed in the TES outputs
-                // Syntax is: If file doesn't exist, run a noop (":") operator , otherwise run the upload command
-                var fileExistsCheck = f.Path.EndsWith("/stdout") || f.Path.EndsWith("/stderr") ? $"[ ! -f '{f.Path}' ] && : || " : "";
+                // Ignore any other missing files and directories. WDL tasks can have optional output files.
+                // Syntax is: If file or directory doesn't exist, run a noop (":") operator, otherwise run the upload command:
+                // { if not exists do nothing else upload; } && { ... }
 
-                return $"{fileExistsCheck}blobxfer upload --storage-url '{f.Url}' --local-path '{f.Path}' --one-shot-bytes 104857600 {(f.Type == TesFileType.FILEEnum ? "--rename --no-recursive" : "")}";
+                return $"{{ [ ! -e '{f.Path}' ] && : || blobxfer upload --storage-url '{f.Url}' --local-path '{f.Path}' --one-shot-bytes 104857600 {(f.Type == TesFileType.FILEEnum ? "--rename --no-recursive" : "")}; }}";
             }));
 
             var uploadFilesScriptPath = $"{batchExecutionDirectoryPath}/{UploadFilesScriptFileName}";
@@ -529,7 +535,7 @@ namespace TesApi.Web
 
             var taskCommand = $@"
                 docker pull --quiet {BlobxferImageName} && \
-                {(executorImageIsPublic ? $"docker pull --quiet {executor.Image} &&" : "")} \
+                {(executorImageIsPublic ? $"docker pull --quiet {executor.Image} && \\" : "")}
                 docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {downloadFilesScriptPath} && \
                 chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \
                 docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c '{ string.Join(" && ", executor.Command.Skip(1))}' && \
