@@ -498,7 +498,7 @@ namespace TesApi.Web
                     ? $"blobxfer download --storage-url '{f.Url}' --local-path '{f.Path}' --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
                     : $"mkdir -p {GetParentPath(f.Path)} && wget -O '{f.Path}' '{f.Url}'";
 
-                var exitIfDownloadedFileIsNotFound = $"[ ! -f '{f.Path}' ] && echo 'Failed to download file {f.Url}' 1>&2 && exit 1";
+                var exitIfDownloadedFileIsNotFound = $"{{ [ -f '{f.Path}' ] && : || {{ echo 'Failed to download file {f.Url}' 1>&2 && exit 1; }} }}";
 
                 return $"{downloadSingleFile} && {exitIfDownloadedFileIsNotFound}";
             }));
