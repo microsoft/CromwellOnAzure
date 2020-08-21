@@ -15,6 +15,8 @@ namespace TesApi.Web
     /// </summary>
     public interface IAzureProxy
     {
+        bool ContainsUnusableNode(string jobId);
+
         /// <summary>
         /// Gets CosmosDB endpoint and key
         /// </summary>

@@ -80,6 +80,73 @@ namespace TesApi.Web
             }
         }
 
+        /// <summary>
+        /// check that the current batch job contains a node in an Unusable state
+        /// </summary>
+        /// <param name="jobId">batch job ID</param>
+        /// <returns>true if node in Unusable state found; false if not</returns>
+        public bool ContainsUnusableNode(string jobId)
+        {
+            CloudJob job = null;
+            try
+            {
+                job = batchClient.JobOperations.GetJob(jobId + "-1");
+            }
+            catch (Exception exception)
+            {
+                logger.LogInformation(exception.GetType().ToString());
+                logger.LogInformation(exception.Message);
+                return false;
+            }
+
+            var tasks = job.ListTasks().ToList();
+            if (tasks.Count == 0)
+            {
+                logger.LogInformation($"no tasks in job {jobId}");
+                return false;
+            }
+
+            var task = tasks.Single();
+
+            var computeNodeInformation = task.ComputeNodeInformation;
+            if (computeNodeInformation == null)
+            {
+                logger.LogInformation("computeNodeInformation is null");
+                return false;
+            }
+
+            var poolId = computeNodeInformation.PoolId;
+
+            if (poolId == null)
+            {
+                logger.LogInformation("pool ID is null");
+                return false;
+            }
+
+            List<ComputeNode> computeNodes;
+            try
+            {
+                computeNodes = batchClient.PoolOperations.ListComputeNodes(poolId).ToList();
+            }
+            catch (Exception exception)
+            {
+                logger.LogInformation(exception.GetType().ToString());
+                logger.LogInformation(exception.Message);
+                return false;
+            }
+
+            try
+            {
+                return computeNodes.Any(computeNode => computeNode.State == ComputeNodeState.Unusable);
+            }
+            catch (Exception exception)
+            {
+                logger.LogInformation(exception.GetType().ToString());
+                logger.LogInformation(exception.Message);
+                return false;
+            }
+        }
+
         // TODO: Static method because the instrumentation key is needed in both Program.cs and Startup.cs and we wanted to avoid intializing the batch client twice.
         // Can we skip initializing app insights with a instrumentation key in Program.cs? If yes, change this to an instance method.
         /// <summary>
