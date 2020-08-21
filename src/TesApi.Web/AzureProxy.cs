@@ -83,14 +83,14 @@ namespace TesApi.Web
         /// <summary>
         /// check that the current batch job contains a node in an Unusable state
         /// </summary>
-        /// <param name="jobId">batch job ID</param>
+        /// <param name="batchJobId">batch job ID</param>
         /// <returns>true if node in Unusable state found; false if not</returns>
-        public bool ContainsUnusableNode(string jobId)
+        public bool ContainsUnusableNode(string batchJobId)
         {
             CloudJob job = null;
             try
             {
-                job = batchClient.JobOperations.GetJob(jobId + "-1");
+                job = batchClient.JobOperations.GetJob(batchJobId + "-1");
             }
             catch (Exception exception)
             {
@@ -102,49 +102,54 @@ namespace TesApi.Web
             var tasks = job.ListTasks().ToList();
             if (tasks.Count == 0)
             {
-                logger.LogInformation($"no tasks in job {jobId}");
+                logger.LogInformation($"no tasks in job {batchJobId}");
                 return false;
             }
 
-            var task = tasks.Single();
+            foreach (var task in tasks)
+            {
+                var computeNodeInformation = task.ComputeNodeInformation;
+                if (computeNodeInformation == null)
+                {
+                    logger.LogInformation("computeNodeInformation is null");
+                    continue;
+                }
 
-            var computeNodeInformation = task.ComputeNodeInformation;
-            if (computeNodeInformation == null)
-            {
-                logger.LogInformation("computeNodeInformation is null");
-                return false;
+                var poolId = computeNodeInformation.PoolId;
+                if (poolId == null)
+                {
+                    logger.LogInformation("pool ID is null");
+                    continue;
+                }
+
+                List<ComputeNode> computeNodes;
+                try
+                {
+                    computeNodes = batchClient.PoolOperations.ListComputeNodes(poolId).ToList();
+                }
+                catch (Exception exception)
+                {
+                    logger.LogInformation(exception.GetType().ToString());
+                    logger.LogInformation(exception.Message);
+                    continue;
+                }
+
+                try
+                {
+                    if (computeNodes.Any(computeNode => computeNode.State == ComputeNodeState.Unusable))
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    logger.LogInformation(exception.GetType().ToString());
+                    logger.LogInformation(exception.Message);
+                    continue;
+                }
             }
 
-            var poolId = computeNodeInformation.PoolId;
-
-            if (poolId == null)
-            {
-                logger.LogInformation("pool ID is null");
-                return false;
-            }
-
-            List<ComputeNode> computeNodes;
-            try
-            {
-                computeNodes = batchClient.PoolOperations.ListComputeNodes(poolId).ToList();
-            }
-            catch (Exception exception)
-            {
-                logger.LogInformation(exception.GetType().ToString());
-                logger.LogInformation(exception.Message);
-                return false;
-            }
-
-            try
-            {
-                return computeNodes.Any(computeNode => computeNode.State == ComputeNodeState.Unusable);
-            }
-            catch (Exception exception)
-            {
-                logger.LogInformation(exception.GetType().ToString());
-                logger.LogInformation(exception.Message);
-                return false;
-            }
+            return false;
         }
 
         // TODO: Static method because the instrumentation key is needed in both Program.cs and Startup.cs and we wanted to avoid intializing the batch client twice.

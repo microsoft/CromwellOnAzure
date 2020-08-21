@@ -15,7 +15,12 @@ namespace TesApi.Web
     /// </summary>
     public interface IAzureProxy
     {
-        bool ContainsUnusableNode(string jobId);
+        /// <summary>
+        /// check that the current batch job contains a node in an Unusable state
+        /// </summary>
+        /// <param name="batchJobId">batch job ID</param>
+        /// <returns>true if node in Unusable state found; false if not</returns>
+        bool ContainsUnusableNode(string batchJobId);
 
         /// <summary>
         /// Gets CosmosDB endpoint and key
