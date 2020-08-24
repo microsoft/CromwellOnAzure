@@ -61,7 +61,7 @@ namespace TesApi.Web
             services.AddSingleton<IAppCache>(cache);
 
             var azureProxy = new AzureProxy(Configuration["BatchAccountName"], azureOfferDurableId, loggerFactory.CreateLogger<AzureProxy>());
-            IAzureProxy cachingAzureProxy = new CachingAzureProxy(azureProxy, cache, loggerFactory.CreateLogger<CachingAzureProxy>());
+            IAzureProxy cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy, cache);
 
             services.AddSingleton(cachingAzureProxy);
             services.AddSingleton(azureProxy);

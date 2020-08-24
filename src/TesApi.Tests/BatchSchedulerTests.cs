@@ -506,8 +506,7 @@ namespace TesApi.Tests
         private static async Task<(string JobId, CloudTask CloudTask, PoolInformation PoolInformation)> ProcessTesTaskAndGetBatchJobArgumentsAsync(TesTask tesTask, IConfiguration configuration, Mock<IAzureProxy> azureProxy)
         {
             var batchScheduler = new BatchScheduler(new Mock<ILogger>().Object, configuration, 
-                new CachingAzureProxy(azureProxy.Object, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()))), 
-                new Mock<ILogger<CachingAzureProxy>>().Object));
+                new CachingWithRetriesAzureProxy(azureProxy.Object, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions())))));
 
             await batchScheduler.ProcessTesTaskAsync(tesTask);
 
