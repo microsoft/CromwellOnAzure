@@ -1,32 +1,45 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using LazyCache;
-using LazyCache.Mocks;
 using LazyCache.Providers;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using Polly.Utilities;
 using TesApi.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests
 {
     [TestClass]
-    public class CachingAzureProxyTests
+    public class CachingWithRetriesAzureProxyTests
     {
         private readonly IAppCache cache = new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions())));
-        
+
+        [TestMethod]
+        public async Task GetBatchAccountQuotasAsync_ThrowsException_DoesNotSetCache()
+        {
+            SystemClock.SleepAsync = (_, __) => Task.FromResult(true);
+            SystemClock.Sleep = (_, __) => { };
+            var azureProxy = GetMockAzureProxy();
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
+            azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Throws<Exception>();
+
+            await Assert.ThrowsExceptionAsync<Exception>(async () => await cachingAzureProxy.GetBatchAccountQuotasAsync());
+            azureProxy.Verify(mock => mock.GetBatchAccountQuotasAsync(), Times.Exactly(4));
+        }
+
         [TestMethod]
         public async Task GetBatchAccountQuotasAsync_UsesCache()
         {
             var azureProxy = GetMockAzureProxy();
             var batchQuotas = new AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 5, LowPriorityCoreQuota = 10 };
             azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(batchQuotas));
-            var cachingAzureProxy = new CachingAzureProxy(azureProxy.Object, cache, new Mock<ILogger<CachingAzureProxy>>().Object);
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
 
             var quotas1 = await cachingAzureProxy.GetBatchAccountQuotasAsync();
             var quotas2 = await cachingAzureProxy.GetBatchAccountQuotasAsync();
@@ -43,7 +56,7 @@ namespace TesApi.Tests
             var storageAccountInfo = new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount/", SubscriptionId = "SubId" };
             var storageAccountKey = "key";
             azureProxy.Setup(a => a.GetStorageAccountKeyAsync(It.IsAny<StorageAccountInfo>())).Returns(Task.FromResult(storageAccountKey));
-            var cachingAzureProxy = new CachingAzureProxy(azureProxy.Object, cache, new Mock<ILogger<CachingAzureProxy>>().Object);
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
 
             var key1 = await cachingAzureProxy.GetStorageAccountKeyAsync(storageAccountInfo);
             var key2 = await cachingAzureProxy.GetStorageAccountKeyAsync(storageAccountInfo);
@@ -57,7 +70,7 @@ namespace TesApi.Tests
         public async Task GetVMSizesAndPricesAsync_UsesCache()
         {
             var azureProxy = GetMockAzureProxy();
-            var cachingAzureProxy = new CachingAzureProxy(azureProxy.Object, cache, new Mock<ILogger<CachingAzureProxy>>().Object);
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
 
             var vmSizesAndPrices1 = await cachingAzureProxy.GetVmSizesAndPricesAsync();
             var vmSizesAndPrices2 = await cachingAzureProxy.GetVmSizesAndPricesAsync();
@@ -74,7 +87,7 @@ namespace TesApi.Tests
             var storageAccountInfo = new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount/", SubscriptionId = "SubId" };
 
             azureProxy.Setup(a => a.GetStorageAccountInfoAsync(It.IsAny<string>())).Returns(Task.FromResult(storageAccountInfo));
-            var cachingAzureProxy = new CachingAzureProxy(azureProxy.Object, cache, new Mock<ILogger<CachingAzureProxy>>().Object);
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
 
             var info1 = await cachingAzureProxy.GetStorageAccountInfoAsync("defaultstorageaccount");
             var info2 = await cachingAzureProxy.GetStorageAccountInfoAsync("defaultstorageaccount");
@@ -90,7 +103,7 @@ namespace TesApi.Tests
             var azureProxy = GetMockAzureProxy();
 
             azureProxy.Setup(a => a.GetStorageAccountInfoAsync(It.IsAny<string>())).Returns(Task.FromResult((StorageAccountInfo)null));
-            var cachingAzureProxy = new CachingAzureProxy(azureProxy.Object, cache, new Mock<ILogger<CachingAzureProxy>>().Object);
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
             var info1 = await cachingAzureProxy.GetStorageAccountInfoAsync("defaultstorageaccount");
 
             var storageAccountInfo = new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount/", SubscriptionId = "SubId" };
@@ -109,7 +122,7 @@ namespace TesApi.Tests
             var containerRegistryInfo = new ContainerRegistryInfo { RegistryServer = "registryServer1", Username = "default", Password = "placeholder" };
 
             azureProxy.Setup(a => a.GetContainerRegistryInfoAsync(It.IsAny<string>())).Returns(Task.FromResult(containerRegistryInfo));
-            var cachingAzureProxy = new CachingAzureProxy(azureProxy.Object, cache, new Mock<ILogger<CachingAzureProxy>>().Object);
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
 
             var info1 = await cachingAzureProxy.GetContainerRegistryInfoAsync("registryServer1/imageName1:tag1");
             var info2 = await cachingAzureProxy.GetContainerRegistryInfoAsync("registryServer1/imageName1:tag1");
@@ -125,7 +138,7 @@ namespace TesApi.Tests
             var azureProxy = GetMockAzureProxy();
 
             azureProxy.Setup(a => a.GetContainerRegistryInfoAsync(It.IsAny<string>())).Returns(Task.FromResult((ContainerRegistryInfo)null));
-            var cachingAzureProxy = new CachingAzureProxy(azureProxy.Object, cache, new Mock<ILogger<CachingAzureProxy>>().Object);
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
             var info1 = await cachingAzureProxy.GetContainerRegistryInfoAsync("registryServer1/imageName1:tag1");
 
             var containerRegistryInfo = new ContainerRegistryInfo { RegistryServer = "registryServer1", Username = "default", Password = "placeholder" };
@@ -135,6 +148,45 @@ namespace TesApi.Tests
             azureProxy.Verify(mock => mock.GetContainerRegistryInfoAsync("registryServer1/imageName1:tag1"), Times.Exactly(2));
             Assert.IsNull(info1);
             Assert.AreEqual(containerRegistryInfo, info2);
+        }
+
+        [TestMethod]
+        public async Task GetContainerRegistryInfoAsync_ThrowsException_DoesNotSetCache()
+        {
+            SystemClock.SleepAsync = (_, __) => Task.FromResult(true);
+            SystemClock.Sleep = (_, __) => { };
+            var azureProxy = GetMockAzureProxy();
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
+            azureProxy.Setup(a => a.GetContainerRegistryInfoAsync("throw/exception:tag1")).Throws<Exception>();
+
+            await Assert.ThrowsExceptionAsync<Exception>(async () => await cachingAzureProxy.GetContainerRegistryInfoAsync("throw/exception:tag1"));
+            azureProxy.Verify(mock => mock.GetContainerRegistryInfoAsync("throw/exception:tag1"), Times.Exactly(4));
+        }
+
+        [TestMethod]
+        public void GetBatchActivePoolCount_ThrowsException_RetriesThreeTimes()
+        {
+            SystemClock.SleepAsync = (_, __) => Task.FromResult(true);
+            SystemClock.Sleep = (_, __) => { };
+            var azureProxy = GetMockAzureProxy();
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
+            azureProxy.Setup(a => a.GetBatchActivePoolCount()).Throws<Exception>();
+
+            Assert.ThrowsException<Exception>(() => cachingAzureProxy.GetBatchActivePoolCount());
+            azureProxy.Verify(mock => mock.GetBatchActivePoolCount(), Times.Exactly(4));
+        }
+
+        [TestMethod]
+        public void GetBatchActiveJobCount_ThrowsException_RetriesThreeTimes()
+        {
+            SystemClock.SleepAsync = (_, __) => Task.FromResult(true);
+            SystemClock.Sleep = (_, __) => { };
+            var azureProxy = GetMockAzureProxy();
+            var cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy.Object, cache);
+            azureProxy.Setup(a => a.GetBatchActiveJobCount()).Throws<Exception>();
+
+            Assert.ThrowsException<Exception>(() => cachingAzureProxy.GetBatchActiveJobCount());
+            azureProxy.Verify(mock => mock.GetBatchActiveJobCount(), Times.Exactly(4));
         }
 
         private Mock<IAzureProxy> GetMockAzureProxy()
