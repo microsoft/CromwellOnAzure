@@ -80,78 +80,6 @@ namespace TesApi.Web
             }
         }
 
-        /// <summary>
-        /// check that the current batch job contains a node in an Unusable state
-        /// </summary>
-        /// <param name="batchJobId">batch job ID</param>
-        /// <returns>true if node in Unusable state found; false if not</returns>
-        public bool ContainsUnusableNode(string batchJobId)
-        {
-            CloudJob job = null;
-            try
-            {
-                job = batchClient.JobOperations.GetJob(batchJobId + "-1");
-            }
-            catch (Exception exception)
-            {
-                logger.LogInformation(exception.GetType().ToString());
-                logger.LogInformation(exception.Message);
-                return false;
-            }
-
-            var tasks = job.ListTasks().ToList();
-            if (tasks.Count == 0)
-            {
-                logger.LogInformation($"no tasks in job {batchJobId}");
-                return false;
-            }
-
-            foreach (var task in tasks)
-            {
-                var computeNodeInformation = task.ComputeNodeInformation;
-                if (computeNodeInformation == null)
-                {
-                    logger.LogInformation("computeNodeInformation is null");
-                    continue;
-                }
-
-                var poolId = computeNodeInformation.PoolId;
-                if (poolId == null)
-                {
-                    logger.LogInformation("pool ID is null");
-                    continue;
-                }
-
-                List<ComputeNode> computeNodes;
-                try
-                {
-                    computeNodes = batchClient.PoolOperations.ListComputeNodes(poolId).ToList();
-                }
-                catch (Exception exception)
-                {
-                    logger.LogInformation(exception.GetType().ToString());
-                    logger.LogInformation(exception.Message);
-                    continue;
-                }
-
-                try
-                {
-                    if (computeNodes.Any(computeNode => computeNode.State == ComputeNodeState.Unusable))
-                    {
-                        return true;
-                    }
-                }
-                catch (Exception exception)
-                {
-                    logger.LogInformation(exception.GetType().ToString());
-                    logger.LogInformation(exception.Message);
-                    continue;
-                }
-            }
-
-            return false;
-        }
-
         // TODO: Static method because the instrumentation key is needed in both Program.cs and Startup.cs and we wanted to avoid intializing the batch client twice.
         // Can we skip initializing app insights with a instrumentation key in Program.cs? If yes, change this to an instance method.
         /// <summary>
@@ -348,6 +276,7 @@ namespace TesApi.Web
                 string nodeErrorCode = null;
                 IEnumerable<string> nodeErrorDetails = null;
                 var activeJobWithMissingAutoPool = false;
+                ComputeNodeState? nodeState = null;
                 TaskState? taskState = null;
                 TaskExecutionInformation taskExecutionInformation = null;
 
@@ -393,6 +322,7 @@ namespace TesApi.Web
 
                         if (node != null)
                         {
+                            nodeState = (ComputeNodeState?)node.State;
                             var nodeError = node.Errors?.FirstOrDefault();
 
                             if (nodeError != null && nodeError.Code != null)
@@ -430,6 +360,7 @@ namespace TesApi.Web
                     NodeAllocationFailed = nodeAllocationFailed,
                     NodeErrorCode = nodeErrorCode,
                     NodeErrorDetails = nodeErrorDetails,
+                    NodeState = nodeState,
                     JobState = job.State,
                     JobStartTime = job.ExecutionInformation?.StartTime,
                     JobEndTime = job.ExecutionInformation?.EndTime,

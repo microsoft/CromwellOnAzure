@@ -20,6 +20,7 @@ namespace TesApi.Web
         public DateTime? JobStartTime { get; set; }
         public DateTime? JobEndTime { get; set; }
         public JobSchedulingError JobSchedulingError { get; set; }
+        public ComputeNodeState? NodeState { get; set; }
         public TaskState? TaskState { get; set; }
         public int? TaskExitCode { get; set; }
         public TaskExecutionResult? TaskExecutionResult { get; set; }

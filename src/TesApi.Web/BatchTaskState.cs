@@ -62,6 +62,11 @@ namespace TesApi.Web
         NodePreempted,
 
         /// <summary>
+        /// node in an Unusable state detected
+        /// </summary>
+        NodeUnusable,
+
+        /// <summary>
         /// Batch job exists but task is missing. This can happen if scheduler goes down after creating the job but before creating the task.
         /// </summary>
         MissingBatchTask,

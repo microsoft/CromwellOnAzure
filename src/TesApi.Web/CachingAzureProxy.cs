@@ -36,7 +36,6 @@ namespace TesApi.Web
             this.logger = logger;
         }
 
-        public bool ContainsUnusableNode(string jobId) => azureProxy.ContainsUnusableNode(jobId);
         public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
         public Task DeleteBatchJobAsync(string taskId) => azureProxy.DeleteBatchJobAsync(taskId);
         public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken) => azureProxy.DeleteBatchPoolAsync(poolId, cancellationToken);
