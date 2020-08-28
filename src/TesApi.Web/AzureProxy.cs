@@ -322,7 +322,7 @@ namespace TesApi.Web
 
                         if (node != null)
                         {
-                            nodeState = (ComputeNodeState?)node.State;
+                            nodeState = node.State;
                             var nodeError = node.Errors?.FirstOrDefault();
 
                             if (nodeError != null && nodeError.Code != null)
