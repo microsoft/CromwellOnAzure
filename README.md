@@ -166,3 +166,7 @@ Run Broad Institute of MIT and Harvard's Best Practices Pipelines on Cromwell on
 [Somatic short variant discovery (SNVs + Indels)](https://github.com/microsoft/gatk4-somatic-snvs-indels-azure)<br/>
 
 [Variant-filtering with Convolutional Neural Networks](https://github.com/microsoft/gatk4-cnn-variant-filter-azure)<br/>
+
+## Related Projects
+
+[Genomics Data Analysis with Jupyter Notebooks on Azure](https://github.com/microsoft/genomicsnotebook)<br/>
