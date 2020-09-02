@@ -1,4 +1,8 @@
 # Welcome to Cromwell on Azure
+### Latest release
+ * [Release 2.0](https://github.com/microsoft/CromwellOnAzure/releases/tag/2.0.0)<br/>
+
+ Check the [release notes](docs/release-notes/2.0.0.md) to learn how to update an existing Cromwell on Azure deployment to version 2.0 and above. You can customize some parameters when updating. Please [see these customization instructions](docs/troubleshooting-guide.md/#Customize-your-Cromwell-on-Azure-deployment), specifically the "Used by update" and "Comment" columns in the table.<br/>
 
 #### Getting started
  * What is [Cromwell on Azure?](#Cromwell-on-Azure) <br/>
@@ -10,6 +14,7 @@
  * Here is an example workflow to [convert FASTQ files to uBAM files](docs/example-fastq-to-ubam.md/#Example-workflow-to-convert-FASTQ-files-to-uBAM-files)<br/>
  * Have an existing WDL file that you want to run on Azure? [Modify your existing WDL with these adaptations for Azure](docs/change-existing-WDL-for-Azure.md/#How-to-modify-an-existing-WDL-file-to-run-on-Cromwell-on-Azure)<br/>
  * Want to run commonly used workflows? [Find links to ready-to-use workflows here](#Run-Common-Workflows)<br/>
+ * Are there any examples of tertiary analysis or other genomics analysis? [Find links to related project here](#Related-Projects)<br/>
 
 #### Questions?
  * See our [Troubleshooting Guide](docs/troubleshooting-guide.md/#FAQs,-advanced-troubleshooting-and-known-issues-for-Cromwell-on-Azure) for more information.<br/>
@@ -33,8 +38,7 @@ Cromwell on Azure configures all Azure resources needed to run workflows through
 2. You must have the proper [Azure role assignments](https://docs.microsoft.com/en-us/azure/role-based-access-control/overview) to deploy Cromwell on Azure.  To check your current role assignments, please follow [these instructions](https://docs.microsoft.com/en-us/azure/role-based-access-control/check-access).  You must have one of the following combinations of [role assignments](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles):
    1. `Owner` of the subscription<br/>
    2. `Contributor` and `User Access Administrator` of the subscription
-   3. `Owner` of the resource group.
-      . *Note: this level of access will result in a warning during deployment, and will not use the latest VM pricing data.</i>  [Learn more](/docs/troubleshooting-guide.md/#How-are-Batch-VMs-selected-to-run-tasks-in-a-workflow?).  Also, you must specify the resource group name during deployment with this level of access (see below).*
+   3. `Owner` of the resource group. *Note: this level of access will result in a warning during deployment, and will not use the latest VM pricing data.</i>  [Learn more](/docs/troubleshooting-guide.md/#How-are-Batch-VMs-selected-to-run-tasks-in-a-workflow?).  Also, you must specify the resource group name during deployment with this level of access (see below).*
    4.  Note: if you only have `Service Administrator` as a role assignment, please assign yourself as `Owner` of the subscription.
 3. Install the [Azure Command Line Interface (az cli)](https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest), a command line experience for managing Azure resources.
 4. Run `az login` to authenticate with Azure.
@@ -44,7 +48,42 @@ Cromwell on Azure configures all Azure resources needed to run workflows through
 
 Download the required executable from [Releases](https://github.com/microsoft/CromwellOnAzure/releases). Choose the runtime of your choice from `win-x64`, `linux-x64`, `osx-x64`. *On Windows machines, we recommend using the `win-x64` runtime (deployment using the `linux-x64` runtime via the Windows Subsystem for Linux is not supported).*<br/>
 
-   *Optional: build the executable yourself.  Clone the [Cromwell on Azure repository](https://github.com/microsoft/CromwellOnAzure) and build the solution in Visual Studio 2019. Note that [VS 2019](https://visualstudio.microsoft.com/vs/) and [.NET Core SDK 3.0 and 2.2.x](https://dotnet.microsoft.com/download/dotnet-core) are required prerequisites. Build and [publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish?tabs=netcore21#synopsis) the `deploy-cromwell-on-azure` project [as a self-contained deployment with your target RID](https://docs.microsoft.com/en-us/dotnet/core/deploying/#self-contained-deployments-scd) to produce the executable*
+### Optional: build the executable yourself
+Note: Build instructions only provided for the latest release.
+
+#### Linux
+*Preqrequisites*:<br/>
+.NET Core 3.1 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
+
+For example, instructions for *Ubuntu 18.04* are available [here](https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu#1804-) and below for convenience:
+
+```
+wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+sudo apt-get update && \
+sudo apt-get install -y apt-transport-https && \
+sudo apt-get update && \
+sudo apt-get install -y dotnet-sdk-3.1
+```
+
+#### Windows
+*Preqrequisites*:<br/>
+.NET Core 3.1 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
+
+*Recommended*:<br/>
+VS 2019
+
+#### Build steps
+1. Clone the [Cromwell on Azure repository](https://github.com/microsoft/CromwellOnAzure)
+2. Build the solution using `dotnet build` on bash or Powershell. For Windows, you can choose to build and test using VS 2019
+3. Run tests using `dotnet test` on bash or Powershell
+4. [Publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish#synopsis) the `deploy-cromwell-on-azure` project [as a self-contained deployment with your target runtime identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/deploying/#self-contained-deployments-scd) to produce the executable
+
+Example<br/> 
+Linux: `dotnet publish -r linux-x64`:<br/>
+Windows: `dotnet publish -r win-x64`:<br/>
+
+Learn more about `dotnet` commands [here](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet#dotnet-commands)
 
 ### Run the deployment executable
 
@@ -70,7 +109,9 @@ Run the following at the command line or terminal after navigating to where your
 .\deploy-cromwell-on-azure.exe --SubscriptionId 00000000-0000-0000-0000-000000000000 --RegionName westus2 --MainIdentifierPrefix coa 
 ```
 
-Deployment can take up to 25 minutes to complete. **At installation, a user is created to allow managing the host VM with username "vmadmin". The password is randomly generated and shown during installation. You may want to save the username, password and resource group name to allow for advanced debugging later.**
+A [test workflow](#Hello-World-WDL-test) is run to ensure successful deployment. If your [Batch account does not have enough resource quotas](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas), you will see the error while deploying. You can request more quotas by following [these instructions](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#increase-a-quota).
+
+Deployment, including a small test workflow can take up to 25 minutes to complete. **At installation, a user is created to allow managing the host VM with username "vmadmin". The password is randomly generated and shown during installation. You may want to save the username, password and resource group name to allow for advanced debugging later.**
 
 Prepare, start or abort a workflow using instructions [here](docs/managing-your-workflow.md).
 
@@ -78,9 +119,9 @@ Prepare, start or abort a workflow using instructions [here](docs/managing-your-
 
 Once deployed, Cromwell on Azure configures the following Azure resources:
 
-* [Host VM](https://azure.microsoft.com/en-us/services/virtual-machines/) - runs [Ubuntu 16.04 LTS](https://github.com/microsoft/CromwellOnAzure/blob/421ccd163bfd53807413ed696c0dab31fb2478aa/src/deploy-cromwell-on-azure/Configuration.cs#L16) and [Docker Compose with four containers](https://github.com/microsoft/CromwellOnAzure/blob/master/src/deploy-cromwell-on-azure/scripts/docker-compose.yml) (Cromwell, MySQL, TES, TriggerService).  [Blobfuse](https://github.com/Azure/azure-storage-fuse) is used to mount the default storage account as a local file system available to the four containers.  Also created are an OS and data disk, network interface, public IP address, virtual network, and network security group. [Learn more](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/)
+* [Host VM](https://azure.microsoft.com/en-us/services/virtual-machines/) - runs [Ubuntu 18.04 LTS](https://github.com/microsoft/CromwellOnAzure/blob/421ccd163bfd53807413ed696c0dab31fb2478aa/src/deploy-cromwell-on-azure/Configuration.cs#L16) and [Docker Compose with four containers](https://github.com/microsoft/CromwellOnAzure/blob/master/src/deploy-cromwell-on-azure/scripts/docker-compose.yml) (Cromwell, MySQL, TES, TriggerService).  [Blobfuse](https://github.com/Azure/azure-storage-fuse) is used to mount the default storage account as a local file system available to the four containers.  Also created are an OS and data disk, network interface, public IP address, virtual network, and network security group. [Learn more](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/)
 * [Batch account](https://docs.microsoft.com/en-us/azure/batch/) - The Azure Batch account is used by TES to spin up the virtual machines that run each task in a workflow.  After deployment, create an Azure support request to increase your core quotas if you plan on running large workflows.  [Learn more](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas)
-* [Storage account](https://docs.microsoft.com/en-us/azure/storage/) - The Azure Storage account is mounted to the host VM using [blobfuse](https://github.com/Azure/azure-storage-fuse), which enables [Azure Block Blobs](https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs) to be mounted as a local file system available to the four containers running in Docker. By default, it includes the following Blob containers - `cromwell-executions`, `cromwell-workflow-logs`, `inputs`, `outputs`, and `workflows`.
+* [Storage account](https://docs.microsoft.com/en-us/azure/storage/) - The Azure Storage account is mounted to the host VM using [blobfuse](https://github.com/Azure/azure-storage-fuse), which enables [Azure Block Blobs](https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs) to be mounted as a local file system available to the four containers running in Docker. By default, it includes the following Blob containers - `configuration`, `cromwell-executions`, `cromwell-workflow-logs`, `inputs`, `outputs`, and `workflows`.
 * [Application Insights](https://docs.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview) - This contains logs from TES and the Trigger Service to enable debugging.
 * [Cosmos DB](https://docs.microsoft.com/en-us/azure/cosmos-db/introduction) - This database is used by TES, and includes information and metadata about each TES task that is run as part of a workflow.
 
@@ -92,9 +133,19 @@ You can [follow these steps](/docs/troubleshooting-guide.md/#Use-input-data-file
 
 ### Connect to existing Azure resources I own that are not part of the Cromwell on Azure instance by default
 
-Cromwell on Azure uses [managed identities](https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview) to allow the host VM to connect to Azure resources in a simple and secure manner.  At the time of installation, a managed identity is created and associated with the host VM. You can find the identity via the Azure Portal by searching for the VM name in Azure Active Directory, under "All Applications". Or you may use Azure CLI `show` command as described [here](https://docs.microsoft.com/en-us/cli/azure/vm/identity?view=azure-cli-latest#az-vm-identity-show).
+Cromwell on Azure uses [managed identities](https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview) to allow the host VM to connect to Azure resources in a simple and secure manner.  
 
-To allow the host VM to connect to **custom** Azure resources like Storage Account, Batch Account etc. you can use the [Azure Portal](https://docs.microsoft.com/en-us/azure/role-based-access-control/role-assignments-portal) or [Azure CLI](https://docs.microsoft.com/en-us/azure/role-based-access-control/role-assignments-cli) to find the managed identity of the host VM and add it as a Contributor to the required Azure resource.<br/>
+At the time of installation, a managed identity is created and associated with the host VM. 
+
+**Cromwell on Azure version 2.x**
+
+Since version 2.0, a user managed identity is created with the name `{resource-group-name}-identity` in the deployment resource group.
+
+**Cromwell on Azure version 1.x**
+
+For version 1.x and below, a system managed identity is created. You can find the identity via the Azure Portal by searching for the VM name in Azure Active Directory, under "All Applications". Or you may use Azure CLI `show` command as described [here](https://docs.microsoft.com/en-us/cli/azure/vm/identity?view=azure-cli-latest#az-vm-identity-show).
+
+To allow the host VM to connect to **custom** Azure resources like Storage Account, Batch Account etc. you can use the [Azure Portal](https://docs.microsoft.com/en-us/azure/role-based-access-control/role-assignments-portal) or [Azure CLI](https://docs.microsoft.com/en-us/azure/role-based-access-control/role-assignments-cli) to find the managed identity of the host VM (if using Cromwell on Azure version 1.x) or the user-managed identity (if using Cromwell on Azure version 2.x and above) and add it as a Contributor to the required Azure resource.<br/>
 
 ![Add Role](/docs/screenshots/add-role.png)
 
@@ -154,6 +205,8 @@ Hello World trigger JSON file as seen in your storage account's `workflows` cont
   "WorkflowDependenciesUrl": null
 }
 ```
+
+If your "Hello-World" test workflow or other workflows consistently fail, make sure to [check your Azure Batch account quotas](docs/troubleshooting-guide.md/#Check-Azure-Batch-account-quotas).
 
 ## Run Common Workflows
 
