@@ -14,10 +14,10 @@
  * Here is an example workflow to [convert FASTQ files to uBAM files](docs/example-fastq-to-ubam.md/#Example-workflow-to-convert-FASTQ-files-to-uBAM-files)<br/>
  * Have an existing WDL file that you want to run on Azure? [Modify your existing WDL with these adaptations for Azure](docs/change-existing-WDL-for-Azure.md/#How-to-modify-an-existing-WDL-file-to-run-on-Cromwell-on-Azure)<br/>
  * Want to run commonly used workflows? [Find links to ready-to-use workflows here](#Run-Common-Workflows)<br/>
- * Are there any examples of tertiary analysis or other genomics analysis? [Find links to related project here](#Related-Projects)<br/>
+ * Want to see some examples of tertiary analysis or other genomics analysis? [Find links to related project here](#Related-Projects)<br/>
 
 #### Questions?
- * See our [Troubleshooting Guide](docs/troubleshooting-guide.md/#FAQs,-advanced-troubleshooting-and-known-issues-for-Cromwell-on-Azure) for more information.<br/>
+ * See our [Troubleshooting Guide](docs/troubleshooting-guide.md/#FAQs,-advanced-troubleshooting-and-known-issues-for-Cromwell-on-Azure) for more information<br/>
  * Known issues and work-arounds are [documented here](docs/troubleshooting-guide.md/#Known-Issues-And-Mitigation)<br/>
 
 If you are running into an issue and cannot find any information in the troubleshooting guide, please open a GitHub issue!<br/>

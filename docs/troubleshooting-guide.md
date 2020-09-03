@@ -186,30 +186,25 @@ Here is the summary of all configuration parameters:
 
 Configuration   parameter | Has default | Validated | Used by update | Comment
 -- | -- | -- | -- | --
-string   SubscriptionId | N | Y | Y | Always required
-string   RegionName = "westus"; | Y | Y | N | Required for new   install
-string   MainIdentifierPrefix = "coa"; | Y | Y | N |  
-string   VmOsVersion = "18.04-LTS"; | Y | N | N |  
-string   VmSize   = "Standard_D3_v2"; | Y | N | N |  
-string   VnetAddressSpace = "10.0.0.0/24"; | Y | N | N |  
-string   VmUsername = "vmadmin"; | Y | N | Y |  
+string   SubscriptionId | N | Y | Y | Azure Subscription Id - Always required
+string   RegionName = "westus"; | Y | Y | N | Azure region name to deploy to - Required for new install
+string   MainIdentifierPrefix = "coa"; | Y | Y | N |  Prefix for all resources to be deployed - Required to deploy but defaults to "coa"
+string   VmOsVersion = "18.04-LTS"; | Y | N | N |  OS Version of the Linux Ubuntu VM to use as the host - Not required and defaults to Ubuntu 18.04 LTS
+string   VmSize   = "Standard_D3_v2"; | Y | N | N |  VM size of the Linux Ubuntu VM to use as the host - Not required and defaults to [Standard_D3_v2](https://docs.microsoft.com/en-us/azure/cloud-services/cloud-services-sizes-specs#dv2-series)
+string   VmUsername = "vmadmin"; | Y | N | Y |  Username created on Cromwell on Azure Linux host - Not required and defaults to "vmadmin"
 string   VmPassword | Y | N | Y | Required for update
-string   ResourceGroupName | Y | Y | Y | Required for update.   If provided for new install, it must already exist.
-string   BatchAccountName | Y | N | N |  
-string   StorageAccountName | Y | N | N |  
-string   NetworkSecurityGroupName | Y | N | N |  
-string   CosmosDbAccountName | Y | N | N |  
-string   ApplicationInsightsAccountName | Y | N | N |  
-string   VmName | Y | N | Y | Required for update   if multiple VMs exist in the resource group
-bool     Silent | Y | Y | Y | Integration testing
-bool     DeleteResourceGroupOnFailure | Y | Y | N | Integration testing
-string   CromwellVersion | Y | N | Y |  
-string   TesImageName | Y | N | Y | Integration testing
-string   TriggerServiceImageName | Y | N | Y | Integration testing
-string   CustomCromwellImagePath | N | N | Y | Development
-string   CustomTesImagePath | N | N | Y | Development
-string   CustomTriggerServiceImagePath | N | N | Y | Development
-bool     SkipTestWorkflow = false; | Y | Y | Y |  
+string   VnetResourceGroupName | Y | Y | N | Available starting version 2.1. The resource group name of the specified virtual network to use - Not required, generated automatically if not provided. If specified, VnetName and SubnetName must be provided.
+string   VnetName | Y | Y | N | Available starting version 2.1. The name of the specified virtual network to use - Not required, generated automatically if not provided. If specified, VnetResourceGroupName and SubnetName must be provided.
+string   SubnetName | Y | Y | N | Available starting version 2.1. The subnet name of the specified virtual network to use - Not required, generated automatically if not provided. If specified, VnetResourceGroupName and VnetName must be provided.
+string   ResourceGroupName | Y | Y | Y | Required for update.   If provided for new Cromwell on Azure deployment, it must already exist.
+string   BatchAccountName | Y | N | N | The name of the Azure Batch Account to use ; must be in the SubscriptionId provided - Not required, generated automatically if not provided
+string   StorageAccountName | Y | N | N | The name of the Azure Storage Account to use ; must be in the SubscriptionId provided - Not required, generated automatically if not provided
+string   NetworkSecurityGroupName | Y | N | N |  The name of the Network Security Group to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
+string   CosmosDbAccountName | Y | N | N | The name of the Cosmos Db Account to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
+string   ApplicationInsightsAccountName | Y | N | N |  The name of the Application Insights Account to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
+string   VmName | Y | N | Y | Name of the VM host that is part of the Cromwell on Azure deployment to update - Required for update if multiple VMs exist in the resource group
+string   CromwellVersion | Y | N | Y |  Cromwell docker image version to use
+bool     SkipTestWorkflow = false; | Y | Y | Y |  Set to true to skip running the default [test workflow](../README.md/#Hello-World-WDL-test)
 bool     Update =   false; | Y | Y | Y | Required for update
 
 
