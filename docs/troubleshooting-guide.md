@@ -205,7 +205,7 @@ string   ApplicationInsightsAccountName | Y | N | N |  The name of the Applicat
 string   VmName | Y | N | Y | Name of the VM host that is part of the Cromwell on Azure deployment to update - Required for update if multiple VMs exist in the resource group
 string   CromwellVersion | Y | N | Y |  Cromwell docker image version to use
 bool     SkipTestWorkflow = false; | Y | Y | Y |  Set to true to skip running the default [test workflow](../README.md/#Hello-World-WDL-test)
-bool     Update =   false; | Y | Y | Y | Required for update
+bool     Update =   false; | Y | Y | Y | Set to true if you want to [update your existing Cromwell on Azure deployment](/release-notes/2.0.0.md/#Update-instructions) to the latest version. Required for update
 
 
 ### Use a specific Cromwell version
