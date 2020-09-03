@@ -80,8 +80,8 @@ VS 2019
 4. [Publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish#synopsis) the `deploy-cromwell-on-azure` project [as a self-contained deployment with your target runtime identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/deploying/#self-contained-deployments-scd) to produce the executable
 
 Example<br/> 
-Linux: `dotnet publish -r linux-x64`:<br/>
-Windows: `dotnet publish -r win-x64`:<br/>
+Linux: `dotnet publish -r linux-x64`<br/>
+Windows: `dotnet publish -r win-x64`<br/>
 
 Learn more about `dotnet` commands [here](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet#dotnet-commands)
 
