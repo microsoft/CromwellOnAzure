@@ -199,12 +199,12 @@ string   SubnetName | Y | Y | N | Available starting version 2.1. The subnet nam
 string   ResourceGroupName | Y | Y | Y | Required for update.   If provided for new Cromwell on Azure deployment, it must already exist.
 string   BatchAccountName | Y | N | N | The name of the Azure Batch Account to use ; must be in the SubscriptionId provided - Not required, generated automatically if not provided
 string   StorageAccountName | Y | N | N | The name of the Azure Storage Account to use ; must be in the SubscriptionId provided - Not required, generated automatically if not provided
-string   NetworkSecurityGroupName | Y | N | N | The name of the Network Security Group to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
+string   NetworkSecurityGroupName | Y | N | N | The name of the Network Security Group to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
 string   CosmosDbAccountName | Y | N | N | The name of the Cosmos Db Account to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
 string   ApplicationInsightsAccountName | Y | N | N | The name of the Application Insights Account to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
 string   VmName | Y | N | Y | Name of the VM host that is part of the Cromwell on Azure deployment to update - Required for update if multiple VMs exist in the resource group
 string   CromwellVersion | Y | N | Y | Cromwell docker image version to use
-bool     SkipTestWorkflow = false; | Y | Y | Y | Set to true to skip running the default [test workflow](../README.md/#Hello-World-WDL-test)
+bool     SkipTestWorkflow = false; | Y | Y | Y | Set to true to skip running the default [test workflow](../README.md/#Hello-World-WDL-test)
 bool     Update =   false; | Y | Y | Y | Set to true if you want to [update your existing Cromwell on Azure deployment](/release-notes/2.0.0.md/#Update-instructions) to the latest version. Required for update
 
 
