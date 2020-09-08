@@ -192,12 +192,12 @@ namespace TriggerService
                 }
                 catch (CromwellApiException cromwellException) when (cromwellException?.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    logger.LogError(cromwellException, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger}.  Id: {id}  Cromwell reported workflow as NotFound (404).  Mutating state to Failed.");
+                    logger.LogError(cromwellException, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.StorageUri.PrimaryUri.AbsoluteUri}.  Id: {id}  Cromwell reported workflow as NotFound (404).  Mutating state to Failed.");
                     await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Failed);
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger}.  Id: {id}");
+                    logger.LogError(exception, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.StorageUri.PrimaryUri.AbsoluteUri}.  Id: {id}");
                 }
             }
         }
