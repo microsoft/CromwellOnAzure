@@ -66,15 +66,23 @@ Your trigger file should be configured as follows:
 }
 ```
 
-When using WDL and inputs JSON file hosted on your private Azure Storage account's blob containers, the specific URL can be found by clicking on the file to view the blob's properties from the Azure portal. The URL path to "WorkflowUrl" for a test WDL file will look like:
+#### Ensure WDL and inputs JSON files are accessible by Cromwell
+
+When using WDL "WorkflowUrl" and inputs JSON "WorkflowInputsUrl" file hosted on your private Azure Storage account's blob containers, the specific URL can be found by clicking on the file to view the blob's properties from the Azure portal. The URL path to "WorkflowUrl" for a test WDL file will look like:
 ```
 https://<storageaccountname>.blob.core.windows.net/inputs/test/test.wdl
 ```
 
-You can also use the `/<storageaccountname>/<containername>/<blobName>` format for any storage account that is mounted to your Cromwell on Azure instance. By default, Cromwell on Azure mounts a storage account to your instance, which is found in your resource group after a successful deployment. You can [follow these steps](/docs/troubleshooting-guide.md/#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using) to mount a different storage account that you manage or own, to your Cromwell on Azure instance.
+You can also use the `/<storageaccountname>/<containername>/<blobname>` format for any storage account that is mounted to your Cromwell on Azure instance. By default, Cromwell on Azure mounts a storage account to your instance, which is found in your resource group after a successful deployment. You can [follow these steps](/docs/troubleshooting-guide.md/#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using) to mount a different storage account that you manage or own, to your Cromwell on Azure instance.
 
 Alternatively, you can use any http or https path to a TES compliant WDL and inputs.json [using shared access signatures (SAS)](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for files in a private Azure Storage account container or refer to any public file location like raw GitHub URLs.
 
+#### Ensure your dependencies are accessible by Cromwell
+
+Any additional scripts or subworkflows must be accessible to TES. They can be provided in 3 ways using the "WorkflowDependenciesUrl" property:  
+  * Via a ZIP file in a storage container accessible by Cromwell
+  * Via http or https URLs (if not public, use [SAS tokens](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview))
+  * Via storage accounts accessible to TES using either the `/storageaccountname/containername/blobname notation` OR the `https://<storageaccountname>.blob.core.windows.net/<containername>/<blobname>` format
 
 ## Start your workflow
 
