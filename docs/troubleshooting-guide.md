@@ -392,7 +392,7 @@ To ensure that no data is corrupted for MySQL backed storage for Cromwell, Cromw
 ### Running CWL Workflows on Cromwell on Azure
 Running workflows written in the Common Workflow Language(CWL) format is possible with a few modifications to your workflow submission.
 
-**Ensure your runtime resource requests are specified with the same names as WDL files** CWL files sometimes contain differing runtime parameter names than what's acceptable by TES. Please refer to our [guide](/managing-your-workflow.md/#how-to-prepare-a-workflow-description-language-wdl-file-that-runs-a-workflow-on-cromwell-on-azure) for proper guidance.<br/>
+**Ensure your runtime resource requests are specified with the same names as WDL files** CWL files sometimes contain differing runtime parameter names than what's acceptable by TES. Please refer to our [guide](/managing-your-workflow.md/#how-to-prepare-a-workflow-description-language-(wdl)-file-that-runs-a-workflow-on-cromwell-on-azure) for proper guidance.<br/>
 
    **Update for Cromwell on Azure version 2.0 and above**
       For CWL workflows, all CWL resource keywords are supported, plus `preemptible` (not in CWL spec). `preemptible` defaults to true (set in Cromwell configuration file), so use `preemptible` only if setting it to false (run on dedicated machine). TES keywords are also supported in CWL workflows, but we advise users to use the CWL ones.<br/>
