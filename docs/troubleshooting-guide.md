@@ -394,21 +394,22 @@ Running workflows written in the Common Workflow Language(CWL) format is possibl
 
 **Ensure your runtime resource requests are specified with the same names as WDL files** CWL files sometimes contain differing runtime parameter names than what's acceptable by TES. Please refer to our [guide](managing-your-workflow.md/#how-to-prepare-a-workflow-description-language-(wdl)-file-that-runs-a-workflow-on-cromwell-on-azure) for proper guidance.<br/>
 
-   **Update for Cromwell on Azure version 2.0 and above**
-      For CWL workflows, all CWL resource keywords are supported, plus `preemptible` (not in CWL spec). `preemptible` defaults to true (set in Cromwell configuration file), so use `preemptible` only if setting it to false (run on dedicated machine). TES keywords are also supported in CWL workflows, but we advise users to use the CWL ones.<br/>
+**Update for Cromwell on Azure version 2.0 and above**
 
-      *CWL keywords: (CWL workflows only)* <br/>
-      coresMin: number <br/>
-      ramMin: size in MB <br/>
-      tmpdirMin: size in MB <br/>
-      outdirMin: size in MB <br/>
-      (the final disk size is the sum of tmpDir and outDir values) <br/>
+For CWL workflows, all CWL resource keywords are supported, plus `preemptible` (not in CWL spec). `preemptible` defaults to true (set in Cromwell configuration file), so use `preemptible` only if setting it to false (run on dedicated machine). TES keywords are also supported in CWL workflows, but we advise users to use the CWL ones.<br/>
 
-      *TES keywords: (both CWL and WDL workflows)* <br/>
-      cpu: number <br/>
-      memory: size unit <br/>
-      disk: size unit <br/>
-      preemptible: true|false <br/>
+   *CWL keywords: (CWL workflows only)* <br/>
+    coresMin: number <br/>
+    ramMin: size in MB <br/>
+    tmpdirMin: size in MB <br/>
+    outdirMin: size in MB <br/>
+    (the final disk size is the sum of tmpDir and outDir values) <br/>
+
+   *TES keywords: (both CWL and WDL workflows)* <br/>
+    cpu: number <br/>
+    memory: size unit <br/>
+    disk: size unit <br/>
+    preemptible: true|false <br/>
 
 **Known issue for CWL files: Cannot request specific HDD size** Unfortunately, this is actually a [bug in how Cromwell](https://broadworkbench.atlassian.net/jira/software/c/projects/BA/issues/BA-4507) currently parses the CWL files and thus must be addressed in the Cromwell source code directly.
 The current workaround for this is to increase the number of `vCPUs` or `memory` requested for a task, which will indirectly increase the amount of working disk space available. However, because this may cause inconsistent performance, we advise that if you are running a task that might consume a large amount of local scratch space, consider converting your workflow to the WDL format instead.
