@@ -29,33 +29,22 @@ Ensure that the attributes `memory` and `disk` (note: use the singular form for 
 > GB - "GB", "G", "GiB", "Gi"<br/>
 > TB - "TB", "T", "TiB", "Ti"<br/>
 
-The `preemptible` attribute is a boolean (not an integer). You can specify `preemptible` as `true` or `false` for each task. When set to `true` Cromwell on Azure will use a [low-priority batch VM](https://docs.microsoft.com/en-us/azure/batch/batch-low-pri-vms#use-cases-for-low-priority-vms) to run the task.<br/>
+The `preemptible` attribute is a boolean (not an integer). You can specify `preemptible` as `true` or `false` for each task. When set to `true` Cromwell on Azure will use a [low-priority batch VM](https://docs.microsoft.com/en-us/azure/batch/batch-low-pri-vms#use-cases-for-low-priority-vms) to run the task. If set to `false` Cromwell on Azure will use a [dedicated VM](https://docs.microsoft.com/en-us/azure/batch/nodes-and-pools#node-type-and-target) to run the task.<br/>
 
 `bootDiskSizeGb` and `zones` attributes are not supported by the TES backend.<br/>
 Each of these runtime attributes are specific to your workflow and tasks within those workflows. The default values for resource requirements are as set above.<br/>
 Learn more about Cromwell's runtime attributes [here](https://cromwell.readthedocs.io/en/develop/RuntimeAttributes).
 
-### How to prepare an inputs JSON file to use in your workflow
+### Configure your Cromwell on Azure workflow files
 
-For specifying inputs to any workflow, you may want to use a JSON file that allows you to customize inputs to any workflow WDL file.<br/>
-
-For files hosted on an Azure Storage account that is connected to your Cromwell on Azure instance, the input path consists of 3 parts - the storage account name, the blob container name, file path with extension, following this format:
-```
-/<storageaccountname>/<containername>/<blobName>
-```
-
-Example file path for an "inputs" container in a storage account "msgenpublicdata" will look like
-`"/msgenpublicdata/inputs/chr21.read1.fq.gz"`
-
-### Configure your Cromwell on Azure trigger JSON file
-
-To run a workflow using Cromwell on Azure, you will need to specify the location of your WDL file and inputs JSON file in an Cromwell on Azure-specific trigger JSON file which also includes any workflow options and dependencies. Submitting this trigger file initiates the Cromwell workflow.
+#### Trigger JSON file
+To run a workflow using Cromwell on Azure, you will need to specify the location of your WDL or CWL file and inputs JSON file in an Cromwell on Azure-specific trigger JSON file which also includes any workflow options and dependencies. Submitting this trigger file initiates the Cromwell workflow.
 
 All trigger JSON files include the following information:
-- The "WorkflowUrl" is the url for your WDL file.
-- The "WorkflowInputsUrl" is the url for your input JSON file.
-- The "WorkflowOptionsUrl" is only used with some WDL files. If you are not using it set this to `null`.
-- The "WorkflowDependenciesUrl" is only used with some WDL files. If you are not using it set this to `null`.
+- The "WorkflowUrl" is the url for your WDL or CWL file.
+- The "WorkflowInputsUrl" is the url for your input JSON file. You can use this file to customize inputs to any workflow file.
+- The "WorkflowOptionsUrl" is only used with some workflow files. If you are not using it set this to `null`.
+- The "WorkflowDependenciesUrl" is only used with some workflow files. If you are not using it set this to `null`.
 
 Your trigger file should be configured as follows:
 ```
@@ -67,23 +56,30 @@ Your trigger file should be configured as follows:
 }
 ```
 
-#### Ensure WDL and inputs JSON files are accessible by Cromwell
+By default, Cromwell on Azure mounts a storage account to your instance, which is found in your resource group after a successful deployment. You can [follow these steps](/docs/troubleshooting-guide.md/#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using) to mount a different storage account that you manage or own, to your Cromwell on Azure instance.<br/>
 
-When using WDL "WorkflowUrl" and inputs JSON "WorkflowInputsUrl" file hosted on your private Azure Storage account's blob containers, the specific URL can be found by clicking on the file to view the blob's properties from the Azure portal. The URL path to "WorkflowUrl" for a test WDL file will look like:
+#### Specify file locations
+There are four main ways to specify the location of all the files in your trigger JSON - WorkflowUrl, WorkflowInputsUrl, WorkflowsOptionsUrl, WorkflowDependenciesUrl.<br/>
+
+If using the default storage account or using a storage account connected to your Cromwell on Azure instance:
+1. For files hosted on an Azure Storage account that is connected to your Cromwell on Azure instance, the input path consists of 3 parts - the storage account name, the blob container name, file path with extension, following this format:
+```
+/<storageaccountname>/<containername>/<blobName>
+```
+Example file path for an "inputs" container in a storage account "msgenpublicdata" will look like
+`"/msgenpublicdata/inputs/chr21.read1.fq.gz"`
+
+2. You can also use the https URLs which can be found by clicking on the file to view the blob's properties from the Azure portal. The URL path to "WorkflowUrl" for a test WDL file will look like:
 ```
 https://<storageaccountname>.blob.core.windows.net/inputs/test/test.wdl
 ```
 
-You can also use the `/<storageaccountname>/<containername>/<blobname>` format for any storage account that is mounted to your Cromwell on Azure instance. By default, Cromwell on Azure mounts a storage account to your instance, which is found in your resource group after a successful deployment. You can [follow these steps](/docs/troubleshooting-guide.md/#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using) to mount a different storage account that you manage or own, to your Cromwell on Azure instance.
-
-Alternatively, you can use any http or https path to a TES compliant WDL and inputs.json [using shared access signatures (SAS)](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for files in a private Azure Storage account container or refer to any public file location like raw GitHub URLs.
+If using files in locations that are not connected to your Cromwell on Azure instance:
+3. Via [SAS URLs](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for Azure Storage account blobs that are not connected to your Cromwell on Azure instance
+4. Via public http or https URLs like GitHub raw URLs
 
 #### Ensure your dependencies are accessible by Cromwell
-
-Any additional scripts or subworkflows must be accessible to TES. They can be provided in 3 ways using the "WorkflowDependenciesUrl" property:  
-  * Via a ZIP file in a storage container accessible by Cromwell
-  * Via http or https URLs (if not public, use [SAS tokens](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview))
-  * Via storage accounts accessible to TES using either the `/storageaccountname/containername/blobname notation` OR the `https://<storageaccountname>.blob.core.windows.net/<containername>/<blobname>` format
+Any additional scripts or subworkflows must be accessible to TES. Apart from the [above methods](#Specify-file-locations), the "WorkflowDependenciesUrl" property can also be defined via a ZIP file in a storage container accessible by Cromwell.
 
 ## Start your workflow
 
