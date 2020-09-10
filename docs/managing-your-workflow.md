@@ -19,6 +19,7 @@ runtime {
     disk: 10 GB
     docker:
     maxRetries: 0
+    preemptible: true
 }
 ```
 Ensure that the attributes `memory` and `disk` (note: use the singular form for `disk` NOT `disks`) have units. Supported units from Cromwell:
