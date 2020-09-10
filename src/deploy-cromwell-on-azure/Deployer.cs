@@ -16,7 +16,6 @@ using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
 using Microsoft.Azure.Management.Compute.Fluent.Models;
-using Microsoft.Azure.Management.Compute.Fluent.VirtualMachine.Definition;
 using Microsoft.Azure.Management.CosmosDB.Fluent;
 using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
@@ -50,6 +49,8 @@ namespace CromwellOnAzureDeployer
 
         private const string WorkflowsContainerName = "workflows";
         private const string ConfigurationContainerName = "configuration";
+        private const string CromwellConfigurationFileName = "cromwell-application.conf";
+        private const string ContainersToMountFileName = "containers-to-mount";
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
 
@@ -111,6 +112,10 @@ namespace CromwellOnAzureDeployer
                 if (configuration.Update)
                 {
                     resourceGroup = await azureClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
+
+                    var targetVersion = DelimitedTextToDictionary(GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
+
+                    RefreshableConsole.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
                     if (string.IsNullOrWhiteSpace(configuration.VmPassword))
                     {
@@ -221,9 +226,14 @@ namespace CromwellOnAzureDeployer
 
                     if (installedVersion == null)
                     {
-                        // If upgrading from pre-2.1 version, patch the installed cromwell-application.conf (disable call caching and default to preemptible)
-                        await PatchCromwellConfigurationFileAsync(storageAccount);
+                        // If upgrading from pre-2.1 version, patch the installed Cromwell configuration file (disable call caching and default to preemptible)
+                        await PatchCromwellConfigurationFileV200Async(storageAccount);
                         await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
+                    }
+
+                    if (installedVersion == null || installedVersion < new Version(2, 1))
+                    {
+                        await PatchContainersToMountFileV210Async(storageAccount, managedIdentity.Name);
                     }
                 }
 
@@ -305,7 +315,7 @@ namespace CromwellOnAzureDeployer
                                 {
                                     storageAccount = t.Result;
                                     await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
-                                    await WritePersonalizedFilesToStorageAccountAsync(storageAccount);
+                                    await WritePersonalizedFilesToStorageAccountAsync(storageAccount, managedIdentity.Name);
                                 },
                                 TaskContinuationOptions.OnlyOnRanToCompletion)
                             .Unwrap()),
@@ -821,14 +831,18 @@ namespace CromwellOnAzureDeployer
                 });
         }
 
-        private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount)
+        private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
         {
             return Execute(
-                $"Writing containers-to-mount and cromwell-application.conf files to '{ConfigurationContainerName}' storage container...",
+                $"Writing {ContainersToMountFileName} and {CromwellConfigurationFileName} files to '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "containers-to-mount", GetFileContent("scripts", "containers-to-mount").Replace("{DefaultStorageAccountName}", configuration.StorageAccountName));
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "cromwell-application.conf", GetFileContent("scripts", "cromwell-application.conf"));
+                    var containersToMountFileContent = GetFileContent("scripts", ContainersToMountFileName)
+                        .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
+                        .Replace("{ManagedIdentityName}", managedIdentityName);
+
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountFileContent);
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, GetFileContent("scripts", CromwellConfigurationFileName));
                 });
         }
 
@@ -1070,17 +1084,17 @@ namespace CromwellOnAzureDeployer
             WriteExecutionTime(line, startTime);
         }
 
-        private Task PatchCromwellConfigurationFileAsync(IStorageAccount storageAccount)
+        private Task PatchCromwellConfigurationFileV200Async(IStorageAccount storageAccount)
         {
             return Execute(
-                "Patching cromwell-application.conf in 'configuration' storage container...",
+                $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, "cromwell-application.conf");
+                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName);
 
                     if (cromwellConfigText == null)
                     {
-                        cromwellConfigText = GetFileContent("scripts", "cromwell-application.conf");
+                        cromwellConfigText = GetFileContent("scripts", CromwellConfigurationFileName);
                     }
                     else
                     {
@@ -1093,7 +1107,34 @@ namespace CromwellOnAzureDeployer
                         cromwellConfigText = preemptibleRegex.Replace(cromwellConfigText, match => $"{match.Groups[1].Value}{match.Groups[2].Value}\n          preemptible: true{match.Groups[3].Value}");
                     }
 
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "cromwell-application.conf", cromwellConfigText);
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
+                });
+        }
+
+        private Task PatchContainersToMountFileV210Async(IStorageAccount storageAccount, string managedIdentityName)
+        {
+            return Execute(
+                $"Adding public datasettestinputs/dataset container to '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName);
+
+                    if (containersToMountText != null)
+                    {
+                        // Add datasettestinputs container if not already present
+                        if (! containersToMountText.Contains("datasettestinputs.blob.core.windows.net/dataset"))
+                        {
+                            var dataSetUrl = "https://datasettestinputs.blob.core.windows.net/dataset?sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D";
+                            containersToMountText = $"{containersToMountText.TrimEnd()}\n{dataSetUrl}";
+                        }
+
+                        containersToMountText = containersToMountText
+                            .Replace("where the VM has Contributor role", $"where the identity '{managedIdentityName}' has 'Contributor' and 'Storage Blob Data Reader' roles")
+                            .Replace("where VM's identity", "where CoA VM")
+                            .Replace("that the VM's identity has Contributor role", $"that the identity '{managedIdentityName}' has 'Contributor' and 'Storage Blob Data Reader' roles");
+
+                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountText);
+                    }
                 });
         }
 
