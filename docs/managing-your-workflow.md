@@ -59,23 +59,25 @@ Your trigger file should be configured as follows:
 By default, Cromwell on Azure mounts a storage account to your instance, which is found in your resource group after a successful deployment. You can [follow these steps](/docs/troubleshooting-guide.md/#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using) to mount a different storage account that you manage or own, to your Cromwell on Azure instance.<br/>
 
 #### Specify file locations
-There are four main ways to specify the location of all the files in your trigger JSON - WorkflowUrl, WorkflowInputsUrl, WorkflowsOptionsUrl, WorkflowDependenciesUrl.<br/>
+There are four main ways to specify the blob paths within your trigger JSON, "WorkflowUrl" WDL or CWL file, "WorkflowInputsUrl" JSON file, and "WorkflowDependenciesUrl" file. The "WorkflowOptionsUrl" file only supports the first format.<br/>
 
 If using the default storage account or using a storage account connected to your Cromwell on Azure instance:
-1. For files hosted on an Azure Storage account that is connected to your Cromwell on Azure instance, the input path consists of 3 parts - the storage account name, the blob container name, file path with extension, following this format:
+1. For blobs/files hosted on an Azure Storage account that is connected to your Cromwell on Azure instance, the input path consists of 3 parts - the storage account name, the blob container name, blob/file path with extension, following this format:
 ```
 /<storageaccountname>/<containername>/<blobName>
 ```
 Example file path for an "inputs" container in a storage account "msgenpublicdata" will look like
 `"/msgenpublicdata/inputs/chr21.read1.fq.gz"`
 
-2. You can also use the https URLs which can be found by clicking on the file to view the blob's properties from the Azure portal. The URL path to "WorkflowUrl" for a test WDL file will look like:
+This is the **only supported format for blob paths within the "WorkflowOptionsUrl" file**.
+
+2. You can also use the https URLs which can be found by clicking on the blob to view the properties from the Azure portal. The URL path to "WorkflowUrl" for a test WDL file in a container called "inputs" will look like:
 ```
 https://<storageaccountname>.blob.core.windows.net/inputs/test/test.wdl
 ```
 
-If using files in locations that are not connected to your Cromwell on Azure instance:
-3. Via [SAS URLs](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for Azure Storage account blobs that are not connected to your Cromwell on Azure instance
+If using files in locations that are not connected to your Cromwell on Azure instance:<br/>
+3. Via [SAS URLs](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) for Azure Storage account blobs/files that are not connected to your Cromwell on Azure instance<br/>
 4. Via public http or https URLs like GitHub raw URLs
 
 #### Ensure your dependencies are accessible by Cromwell
