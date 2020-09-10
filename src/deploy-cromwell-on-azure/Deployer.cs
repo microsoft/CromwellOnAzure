@@ -1124,6 +1124,7 @@ namespace CromwellOnAzureDeployer
                         // Add datasettestinputs container if not already present
                         if (! containersToMountText.Contains("datasettestinputs.blob.core.windows.net/dataset"))
                         {
+                            // [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="SAS token for public use")]
                             var dataSetUrl = "https://datasettestinputs.blob.core.windows.net/dataset?sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D";
                             containersToMountText = $"{containersToMountText.TrimEnd()}\n{dataSetUrl}";
                         }
