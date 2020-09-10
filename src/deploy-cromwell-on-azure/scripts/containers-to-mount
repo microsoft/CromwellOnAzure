@@ -3,7 +3,7 @@
 # Accepted formats are:
 # 1. Blob container URL with SAS, for cases where CoA VM does not have access to the storage account (containers from other Azure tenants).
 #    https://<storage account name>.blob.core.windows.net/<container name>?<SAS token>
-# 2. /<storage account name>/<container name>, where the identity '{ManagedIdentityName}' has 'Contributor' and 'Storage Blob Data Reader' roles on the storage account.
+# 2. /<storage account name>/<container name>, where the identity '{ManagedIdentityName}' has 'Contributor' role on the storage account.
 
 # In both cases, the containers are mounted as /<storage account name>/<container name> on the Cromwell host.
 # Similarly, when specifying file paths in inputs.json files, use the same approach to refer to Azure blobs: /<storage account name>/<container name>/<blob name>
@@ -12,7 +12,7 @@
 # Wildcards are supported. For example:
 # - to include all containers in an account, enter /mystorageaccount/*
 # - to include all containers in all accounts, enter *
-# Only those accounts that the identity '{ManagedIdentityName}' has 'Contributor' and 'Storage Blob Data Reader' roles on will actually be considered.
+# Only those accounts that the identity '{ManagedIdentityName}' has 'Contributor' role on will actually be considered.
 
 # Exclusions are supported and processed after inclusions:
 # - to exclude specific account or container, prefix the line with "-", for example -/mystorageaccount/private

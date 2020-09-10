@@ -1129,9 +1129,9 @@ namespace CromwellOnAzureDeployer
                         }
 
                         containersToMountText = containersToMountText
-                            .Replace("where the VM has Contributor role", $"where the identity '{managedIdentityName}' has 'Contributor' and 'Storage Blob Data Reader' roles")
+                            .Replace("where the VM has Contributor role", $"where the identity '{managedIdentityName}' has 'Contributor' role")
                             .Replace("where VM's identity", "where CoA VM")
-                            .Replace("that the VM's identity has Contributor role", $"that the identity '{managedIdentityName}' has 'Contributor' and 'Storage Blob Data Reader' roles");
+                            .Replace("that the VM's identity has Contributor role", $"that the identity '{managedIdentityName}' has 'Contributor' role");
 
                         await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountText);
                     }
