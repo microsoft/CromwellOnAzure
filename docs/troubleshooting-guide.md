@@ -35,6 +35,7 @@ This article answers FAQs, describes advanced features that allow customization 
 5. Miscellaneous
    * I cannot find my issue in this document and [want more information](#Get-container-logs-to-debug-issues) from Cromwell, MySQL, or TES Docker container logs.
    * I am running a large amount of workflows and [MySQL storage disk is full](#I-am-running-a-large-amount-of-workflows-and-MySQL-storage-disk-is-full)
+   * How can I run [CWL](#Running-CWL-Workflows-on-Cromwell-on-Azure) files on Cromwell on Azure?
 
 
 ## Known Issues And Mitigation
@@ -57,7 +58,6 @@ After the change, **sr=c&si=inputs-key** should be the order in your SAS URL. <b
 Update all the SAS URLs similarly and retry your workflow.
 
 ### All TES tasks for my workflow are done running, but the trigger JSON file is still in the "inprogress" directory in the workflows container
-
 1. The root cause is most likely memory pressure on the host Linux VM because [blobfuse](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-how-to-mount-container-linux#overview) processes grow to consume all physical memory. 
 
 You may see the following Cromwell container logs as a symptom:
@@ -85,7 +85,31 @@ sudo docker exec -it cromwellazure_mysqldb_1 bash -c 'mysql -ucromwell -Dcromwel
 
 ## Setup
 ### Setup Cromwell on Azure for multiple users in the same Azure subscription
-This section is COMING SOON.
+Cromwell on Azure is designed to be flexible for single and multiple user scenarios. Here we have envisioned 4 general scenarios and demonstrated how they relate to your Azure account, Azure Batch service, Subscription ID, and Resource Groups, each depicted below.
+
+![Multiple Users FAQ](/docs/screenshots/multiple-users-configs.png)
+
+1) **The Individual User**: This is the current standard deployment configuration for Cromwell on Azure. No extra steps beyond the [deployment guide](../README.md/#deploy-your-instance-of-cromwell-on-azure) are necessary.
+
+2) **The Lab**: This scenario is envisioned for small lab groups and teams sharing a common Azure resource (ie. a common bioinformatician(s), data scientist(s), or computational biologist(s) collaborating on projects from the same lab). Functionally, this setup does not differ from the "Individual User" configuration. We recommend a single "Cromwell Administrator" perform the initial Cromwell on Azure  setup for the group. Ensure that this user has the appropriate role(s) on the Subscription ID as outlined [here](../README.md/#Prerequisites). Once deployed, this "Cromwell Administrator" can [grant "Contributor" access to the created Cromwell storage account via the Azure Portal](https://docs.microsoft.com/en-us/azure/storage/common/storage-auth-aad-rbac-portal#assign-an-azure-built-in-role). This would allow granted users the ability to submit analysis jobs and retrieve results. It would also allow them the ability to view *any analysis* that has been run by the lab. As Cromwell submits all jobs to Azure Batch as one user, the billing for Cromwell on Azure usage would be collective for the entire lab, not broken down by individual users who submitted the jobs. 
+
+3) **The Research Group**: This scenario is envisioned for larger research groups where a common Azure subscription is shared, but users want/require their own instance of Cromwell on Azure. The initial Cromwell on Azure deployment is done as described in the [deployment guide](../README.md/#deploy-your-instance-of-cromwell-on-azure). After the first deployment of Cromwell on Azure is done on the Subscription, subsequent users will need to specify a *separate Resource Group* **AND** *preexisting Azure Batch account name* that is currently being utilized by the pre-existing deployment(s) of Cromwell on Azure. The Azure Batch account must exist in the same region as defined in the "--RegionName" configuration of the new Cromwell on Azure deployment. You can check all the [configuration options here](#Customize-your-Cromwell-on-Azure-deployment). See the invocation of the Linux deployment script for an example: 
+
+```
+.\deploy-cromwell-on-azure-linux --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> --ResourceGroupName <Your resource group> --BatchAccountName <Your Batch account name>
+```
+
+   In this scenario, please note the lack of separation at the Azure Batch account level. While you will be able track resource usage independently due to the separate Cromwell users submitting analyses to Azure Batch (for your own tracking/internal billing purposes), anyone who has access to Azure Batch as a Contributor or Owner will be able to see ***everyone's*** Batch pools, and thus what they are running. For this scenario, we would recommend the Cromwell Administrator(s) be trusted personnel, such as your IT team.
+
+4) **The Institution**: This is an enterprise level deployment scenario for a large organization with multiple Subscriptions and independent user groups within an internal hierarchy. In this scenario, due to the independent nature of the work being done and the desire/need to track specific resource usage (for your own internal billing purposes) you will have ***completely independent*** deployments of Cromwell on Azure.  
+
+   To deploy, you'll need to verify whether an existing Azure Batch account already exists on your Subscription (to run Cromwell on Azure on the Subscription level), or within your Resource Group as described in the [deployment guide](../README.md/#deploy-your-instance-of-cromwell-on-azure), with appropriate [roles](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles) set. If Azure Batch account is not deployed on your Subscription (or if you have available quota to create a new Batch account - the default for most accounts is 1 Batch account/region), then simply follow the [deployment guide](../README.md/#deploy-your-instance-of-cromwell-on-azure). If there is an existing Azure Batch account you're connecting to within your Subscription, simply follow the deployment recommendations outlined in [3], adding the appropriate flags for the deployment script. See the invocation of the Linux deployment script for an example: 
+
+```
+.\deploy-cromwell-on-azure-linux --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> --ResourceGroupName <Your resource group> --BatchAccountName <Your Batch account name>
+```
+
+Please note you can also mix scenarios 1, 2, and 3 within the Azure Enterprise Account in scenario 4. 
 
 ### Debug my Cromwell on Azure installation that ran into an error
 When the Cromwell on Azure installer is run, if there are errors, the logs are printed in the terminal. Most errors are related to insufficient permissions to create resources in Azure on your behalf, or intermittent Azure failures. In case of an error, we terminate the installation process and begin deleting all the resources in the Resource Group if already created. <br/>
@@ -95,11 +119,11 @@ Deleting all the resources in the Resource Group may take a while but as soon as
 If you see an issue that is unrelated to your permissions, and re-trying the installer does not fix it, please file a bug on our GitHub issues.
 
 ### Upgrade my Cromwell on Azure instance
-Starting in version 1.x, for convenience, some configuration files are hosted on your Cromwell on Azure storage account, in the "configuration" container - `containers-to-mount`, and `cromwell-application.conf`. You can modify and save these file using Azure Portal UI "Edit Blob" option or simply upload a new file to replace the existing one. Please create the "configuration" container in your storage account if it isn't there already; and then [follow these steps](https://github.com/microsoft/CromwellOnAzure/releases/tag/1.3.0) to upgrade your Cromwell on Azure instance.
+Starting in version 1.x, for convenience, some configuration files are hosted on your Cromwell on Azure storage account, in the "configuration" container - `containers-to-mount`, and `cromwell-application.conf`. You can modify and save these file using Azure Portal UI "Edit Blob" option or simply upload a new file to replace the existing one. [Follow these steps](https://github.com/microsoft/CromwellOnAzure/releases/tag/2.0.0) to upgrade your Cromwell on Azure instance to 2.x.
 
 ## Analysis
 ### Job failed immediately
-If a workflow you start has a task that failed immediately and lead to workflow failure be sure to check your input JSON files. Follow the instructions [here](managing-your-workflow.md/#How-to-prepare-an-inputs-JSON-file-to-use-in-your-workflow) and check out an example WDL and inputs JSON file [here](example-fastq-to-ubam.md/#Configure-your-Cromwell-on-Azure-trigger-JSON,-inputs-JSON-and-WDL-files) to ensure there are no errors in defining your input files.
+If a workflow you start has a task that failed immediately and lead to workflow failure be sure to check your input JSON files. Follow the instructions [here](managing-your-workflow.md/#Configure-your-Cromwell-on-Azure-workflow-files) and check out an example WDL and inputs JSON file [here](example-fastq-to-ubam.md/#Configure-your-Cromwell-on-Azure-trigger-JSON,-inputs-JSON-and-WDL-files) to ensure there are no errors in defining your input files.
 
 > For files hosted on an Azure Storage account that is connected to your Cromwell on Azure instance, the input path consists of 3 parts - the storage account name, the blob container name, file path with extension, following this format:
 ```
@@ -114,7 +138,6 @@ Another possibility is that you are trying to use a storage account that hasn't 
 Check out these [known issues and mitigation](#Known-Issues-And-Mitigation) for more commonly seen issues caused by bugs we are actively tracking.
 
 ### Check Azure Batch account quotas
-
 If you are running a task in a workflow with a large cpu cores requirement, check if your [Batch account has enough resource quotas](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas). You can request more quotas by following [these instructions](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#increase-a-quota).
 
 For other resource quotas, like active jobs or pools, if there are not enough resources available, Cromwell on Azure keeps the tasks in queue until resources become available.
@@ -162,7 +185,6 @@ Cromwell utilizes Blob storage containers and Blobfuse to allow your data to be 
 
 ## Customizing your Cromwell on Azure instance
 ### Connect to the host VM that runs all the Docker containers
-
 To get logs from all the Docker containers or to use the Cromwell REST API endpoints, you may want to connect to the Linux host VM. At installation, a user is created to allow managing the host VM with username "vmadmin". The password is randomly generated and shown during installation. If you need to reset your VM password, you can do this using the Azure Portal or by following these [instructions](https://docs.microsoft.com/en-us/azure/virtual-machines/troubleshooting/reset-password). 
 
 ![Reset password](/docs/screenshots/resetpassword.PNG)
@@ -197,47 +219,45 @@ string   VnetResourceGroupName | Y | Y | N | Available starting version 2.1. The
 string   VnetName | Y | Y | N | Available starting version 2.1. The name of the specified virtual network to use - Not required, generated automatically if not provided. If specified, VnetResourceGroupName and SubnetName must be provided.
 string   SubnetName | Y | Y | N | Available starting version 2.1. The subnet name of the specified virtual network to use - Not required, generated automatically if not provided. If specified, VnetResourceGroupName and VnetName must be provided.
 string   ResourceGroupName | Y | Y | Y | Required for update.   If provided for new Cromwell on Azure deployment, it must already exist.
-string   BatchAccountName | Y | N | N | The name of the Azure Batch Account to use ; must be in the SubscriptionId provided - Not required, generated automatically if not provided
+string   BatchAccountName | Y | N | N | The name of the Azure Batch Account to use ; must be in the SubscriptionId and RegionName provided - Not required, generated automatically if not provided
 string   StorageAccountName | Y | N | N | The name of the Azure Storage Account to use ; must be in the SubscriptionId provided - Not required, generated automatically if not provided
 string   NetworkSecurityGroupName | Y | N | N | The name of the Network Security Group to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
 string   CosmosDbAccountName | Y | N | N | The name of the Cosmos Db Account to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
 string   ApplicationInsightsAccountName | Y | N | N | The name of the Application Insights Account to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
 string   VmName | Y | N | Y | Name of the VM host that is part of the Cromwell on Azure deployment to update - Required for update if multiple VMs exist in the resource group
-string   CromwellVersion | Y | N | Y | Cromwell docker image version to use
+string   CromwellVersion | Y | N | Y | Cromwell version to use
 bool     SkipTestWorkflow = false; | Y | Y | Y | Set to true to skip running the default [test workflow](../README.md/#Hello-World-WDL-test)
 bool     Update =   false; | Y | Y | Y | Set to true if you want to [update your existing Cromwell on Azure deployment](/release-notes/2.0.0.md/#Update-instructions) to the latest version. Required for update
 
 
 ### Use a specific Cromwell version
-
 #### Before deploying Cromwell on Azure
-
 To choose a specific Cromwell version, you can specify the version as a configuration parameter before deploying Cromwell on Azure. Here is an example:
 
 ```
 .\deploy-cromwell-on-azure.exe --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> --CromwellVersion 53
 ```
 
-#### After Cromwell on Azure has been deployed
+This version will persist through future updates until you set it again or revert to the default behavior by specifying `--CromwellVersion ""`. See note below.
 
+#### After Cromwell on Azure has been deployed
 After deployment, you can still change the Cromwell docker image version being used.
-[Log on to the host VM](#Connect-to-the-host-VM-that-runs-all-the-docker-containers) using the ssh connection string as described in the instructions. 
 
 **Cromwell on Azure version 2.x**
 
-Starting with version 2.0, the Cromwell docker image version is pinned to "broadinstitute/cromwell:50".
-
-Replace `CromwellImageName` variable in the `env-03-external-images.txt` file with the name and tag of the docker image of your choice save your changes.<br/>
-
+Run the deployer in update mode and specify the new Cromwell version.
 ```
-cd /data/cromwellazure/
-sudo nano env-03-external-images.txt
-# Modify the CromwellImageName to your Batch Account name and save the file
+.\deploy-cromwell-on-azure.exe --Update true --SubscriptionId <Your subscription ID> --ResourceGroupName <Your RG> --VmPassword <Your VM password> --CromwellVersion 54
 ```
+
+The new version will persist through future updates until you set it again. 
+To revert to the default Cromwell version that is shipped with each deployer version, specify `--CromwellVersion ""`. 
+Be aware of compatibility issues if downgrading the version. 
+The default version is listed [here](../src/deploy-cromwell-on-azure/scripts/env-03-external-images.txt).
 
 **Cromwell on Azure version 1.x**
 
-Replace image name with the tag of your choice for the "cromwell" service in the `docker-compose.yml` file.<br/>
+[Log on to the host VM](#Connect-to-the-host-VM-that-runs-all-the-docker-containers) using the ssh connection string as described in the instructions. Replace image name with the tag of your choice for the "cromwell" service in the `docker-compose.yml` file.<br/>
 
 ```
 cd /data/cromwellazure/
@@ -247,23 +267,29 @@ sudo nano docker-compose.yml
 
 For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`. or run `sudo reboot`. You can also restart the docker containers.
 
-### Use input data files from an existing storage account that my lab or team is currently using
-Navigate to the "configuration" container in the Cromwell on Azure Storage account. Replace YOURSTORAGEACCOUNTNAME with your storage account name and YOURCONTAINERNAME with your container name in the `containers-to-mount` file below:
-```
-/YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/
-```
-Add this to the end of file and save your changes.<br/>
+### Use input data files from an existing Azure storage account that my lab or team is currently using
 
-To allow the host VM to write to a storage account, [add the VM identity as a Contributor](/README.md/#Connect-to-existing-Azure-resources-I-own-that-are-not-part-of-the-Cromwell-on-Azure-instance-by-default) to the Storage Account via Azure Portal or Azure CLI.<br/>
+##### If the VM can be granted 'Contributor' access to the storage account:
 
-Alternatively, you can choose to add a [SAS url for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file. This is also applicable if your VM cannot be granted Contributor access to the storage account because the two resources are in different Azure tenants
-```
-https://<yourstorageaccountname>.blob.core.windows.net:443/<yourcontainername>?<sastoken>
-```
+1. [Add the VM identity as a Contributor](/README.md/#Connect-to-existing-Azure-resources-I-own-that-are-not-part-of-the-Cromwell-on-Azure-instance-by-default) to the Storage Account via Azure Portal or Azure CLI.<br/>
 
-When using the newly mounted storage account in your inputs JSON file, use the path `"/container-mountpath/blobName"`, where `container-mountpath` is `/YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/`.
+2. Navigate to the "configuration" container in the default storage account. Replace the values below with your Storage Account and Container names and add the line to the end of the `containers-to-mount` file:
+    ```
+    /yourstorageaccountname/yourcontainername
+    ```
+3. Save the changes and restart the VM
 
-For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI.
+##### If the VM cannot be granted Contributor access to the storage account:
+This is applicable if the VM and storage account are in different Azure tenants, or if you want to use SAS token anyway for security reasons
+
+1. Add a [SAS url for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file. The SAS token can be at the account or container level and may be read-only or read-write depending on the usage.
+    ```
+    https://<yourstorageaccountname>.blob.core.windows.net:443/<yourcontainername>?<sastoken>
+    ```
+
+2. Save the changes and restart the VM
+
+In both cases, the specified containers will be mounted as `/yourstorageaccountname/yourcontainername/` on the Cromwell server. You can then use `/yourstorageaccountname/yourcontainername/path` in the trigger, WDL, CWL, inputs and workflow options files.
 
 ### Use a batch account for which I have already requested or received increased cores quota from Azure Support
 [Log on to the host VM](#Connect-to-the-host-VM-that-runs-all-the-docker-containers) using the ssh connection string as described in the instructions. 
@@ -298,23 +324,19 @@ Cromwell on Azure supports private Docker images for your WDL tasks hosted on [A
 To allow the host VM to use an ACR, [add the VM identity as a Contributor](../README.md/#Connect-to-existing-Azure-resources-I-own-that-are-not-part-of-the-Cromwell-on-Azure-instance-by-default) to the Container Registry via Azure Portal or Azure CLI.<br/>
 
 ### Configure my Cromwell on Azure instance to always use dedicated batch VMs to avoid getting preempted
-By default, we are using an environment variable `UsePreemptibleVmsOnly` set to true, to always use low priority Azure batch nodes.<br/>
+By default, your workflows will run on low priority Azure batch nodes.<br/>
 
-If you prefer to use dedicated Azure Batch nodes for all tasks, [log on to the host VM](#Connect-to-the-host-VM-that-runs-all-the-docker-containers) using the ssh connection string as described in the instructions. 
+If you prefer to use dedicated Azure Batch nodes for all tasks, do the following:
 
 **Cromwell on Azure version 2.x**
 
-Change the `UsePreemptibleVmsOnly` variable in the `env-04-settings.txt` file and save your changes.<br/>
+In file `cromwell-application.conf`, in the `configuration` container in the default storage account, in backend section, change `preemptible: true` to `preemptible: false`. Save your changes and restart the VM.<br/>
 
-```
-cd /data/cromwellazure/
-sudo nano env-04-settings.txt
-# Modify UsePreemptibleVmsOnly to false and save the file
-```
+Note that you can override this setting for each task individually by setting the `preemptible` boolean flag to `true` or `false` in the "runtime" attributes section of your task.
 
 **Cromwell on Azure version 1.x**
 
-Change the `UsePreemptibleVmsOnly` environment variable for the "tes" service to "false" in the `docker-compose.yml` file and save your changes.<br/>
+[Log on to the host VM](#Connect-to-the-host-VM-that-runs-all-the-docker-containers) using the ssh connection string as described in the instructions.  Change the `UsePreemptibleVmsOnly` environment variable for the "tes" service to "false" in the `docker-compose.yml` file and save your changes.<br/>
 
 ```
 cd /data/cromwellazure/
@@ -322,7 +344,6 @@ sudo nano docker-compose.yml
 # Modify UsePreemptibleVmsOnly to false and save the file
 ```
 
-Note that, you can set this for each task individually by using the `preemptible` boolean flag set to `true` or `false` in the "runtime" attributes section of your task. The `preemptible` runtime attribute will overwrite the `UsePreemptibleVmsOnly` environment variable setting for a particular task.<br/>
 For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`.
 
 ### Access the Cromwell REST API directly from Linux host VM
@@ -367,10 +388,25 @@ This command will list the names of all the Docker containers currently running.
 sudo docker logs 'containerName'
 ```
 
-
 ### I am running a large amount of workflows and MySQL storage disk is full
 To ensure that no data is corrupted for MySQL backed storage for Cromwell, Cromwell on Azure mounts MySQL files on to an Azure Managed Data Disk of size 32G. In case there is a need to increase the size of this data disk, follow instructions [here](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/expand-disks#expand-an-azure-managed-disk).
 
+### Running CWL Workflows on Cromwell on Azure
+Running workflows written in the Common Workflow Language(CWL) format is possible with a few modifications to your workflow submission.
+For CWL workflows, all CWL resource keywords are supported, plus `preemptible` (not in CWL spec). `preemptible` defaults to true (set in Cromwell configuration file), so use `preemptible` only if setting it to false (run on dedicated machine). TES keywords are also supported in CWL workflows, but we advise users to use the CWL ones.<br/>
+
+   *CWL keywords: (CWL workflows only)* <br/>
+    coresMin: number <br/>
+    ramMin: size in MB <br/>
+    tmpdirMin: size in MB - Cromwell on Azure version 2.0 and above only<br/>
+    outdirMin: size in MB - Cromwell on Azure version 2.0 and above only<br/>
+    (the final disk size is the sum of tmpDir and outDir values) <br/>
+
+   *TES keywords: (both CWL and WDL workflows)* <br/>
+    preemptible: true|false <br/>
+
+**Cromwell on Azure version 1.x known issue for CWL files: Cannot request specific HDD size** Unfortunately, this is actually a [bug in how Cromwell](https://broadworkbench.atlassian.net/jira/software/c/projects/BA/issues/BA-4507) currently parses the CWL files and thus must be addressed in the Cromwell source code directly.
+The current workaround for this is to increase the number of `vCPUs` or `memory` requested for a task, which will indirectly increase the amount of working disk space available. However, because this may cause inconsistent performance, we advise that if you are running a task that might consume a large amount of local scratch space, consider converting your workflow to the WDL format instead.
 
 
 
