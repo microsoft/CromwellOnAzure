@@ -225,7 +225,7 @@ string   NetworkSecurityGroupName | Y | N | N | The name of the Network Security
 string   CosmosDbAccountName | Y | N | N | The name of the Cosmos Db Account to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
 string   ApplicationInsightsAccountName | Y | N | N | The name of the Application Insights Account to use; must be in the SubscriptionId provided - Not required, generated automatically if not provided
 string   VmName | Y | N | Y | Name of the VM host that is part of the Cromwell on Azure deployment to update - Required for update if multiple VMs exist in the resource group
-string   CromwellVersion | Y | N | Y | Cromwell docker image version to use
+string   CromwellVersion | Y | N | Y | Cromwell version to use
 bool     SkipTestWorkflow = false; | Y | Y | Y | Set to true to skip running the default [test workflow](../README.md/#Hello-World-WDL-test)
 bool     Update =   false; | Y | Y | Y | Set to true if you want to [update your existing Cromwell on Azure deployment](/release-notes/2.0.0.md/#Update-instructions) to the latest version. Required for update
 
@@ -238,25 +238,26 @@ To choose a specific Cromwell version, you can specify the version as a configur
 .\deploy-cromwell-on-azure.exe --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> --CromwellVersion 53
 ```
 
+This version will persist through future updates until you set it again or revert to the default behavior by specifying `--CromwellVersion ""`. See note below.
+
 #### After Cromwell on Azure has been deployed
 After deployment, you can still change the Cromwell docker image version being used.
-[Log on to the host VM](#Connect-to-the-host-VM-that-runs-all-the-docker-containers) using the ssh connection string as described in the instructions. 
 
 **Cromwell on Azure version 2.x**
 
-Starting with version 2.0, the Cromwell docker image version is pinned to "broadinstitute/cromwell:50".
-
-Replace `CromwellImageName` variable in the `env-03-external-images.txt` file with the name and tag of the docker image of your choice save your changes.<br/>
-
+Run the deployer in update mode and specify the new Cromwell version.
 ```
-cd /data/cromwellazure/
-sudo nano env-03-external-images.txt
-# Modify the CromwellImageName to your Batch Account name and save the file
+.\deploy-cromwell-on-azure.exe --Update true --SubscriptionId <Your subscription ID> --ResourceGroupName <Your RG> --VmPassword <Your VM password> --CromwellVersion 54
 ```
+
+The new version will persist through future updates until you set it again. 
+To revert to the default Cromwell version that is shipped with each deployer version, specify `--CromwellVersion ""`. 
+Be aware of compatibility issues if downgrading the version. 
+The default version is listed [here](../src/deploy-cromwell-on-azure/scripts/env-03-external-images.txt).
 
 **Cromwell on Azure version 1.x**
 
-Replace image name with the tag of your choice for the "cromwell" service in the `docker-compose.yml` file.<br/>
+[Log on to the host VM](#Connect-to-the-host-VM-that-runs-all-the-docker-containers) using the ssh connection string as described in the instructions. Replace image name with the tag of your choice for the "cromwell" service in the `docker-compose.yml` file.<br/>
 
 ```
 cd /data/cromwellazure/
@@ -266,23 +267,29 @@ sudo nano docker-compose.yml
 
 For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`. or run `sudo reboot`. You can also restart the docker containers.
 
-### Use input data files from an existing storage account that my lab or team is currently using
-Navigate to the "configuration" container in the Cromwell on Azure Storage account. Replace YOURSTORAGEACCOUNTNAME with your storage account name and YOURCONTAINERNAME with your container name in the `containers-to-mount` file below:
-```
-/YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/
-```
-Add this to the end of file and save your changes.<br/>
+### Use input data files from an existing Azure storage account that my lab or team is currently using
 
-To allow the host VM to write to a storage account, [add the VM identity as a Contributor](/README.md/#Connect-to-existing-Azure-resources-I-own-that-are-not-part-of-the-Cromwell-on-Azure-instance-by-default) to the Storage Account via Azure Portal or Azure CLI.<br/>
+##### If the VM can be granted 'Contributor' access to the storage account:
 
-Alternatively, you can choose to add a [SAS url for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file. This is also applicable if your VM cannot be granted Contributor access to the storage account because the two resources are in different Azure tenants
-```
-https://<yourstorageaccountname>.blob.core.windows.net:443/<yourcontainername>?<sastoken>
-```
+1. [Add the VM identity as a Contributor](/README.md/#Connect-to-existing-Azure-resources-I-own-that-are-not-part-of-the-Cromwell-on-Azure-instance-by-default) to the Storage Account via Azure Portal or Azure CLI.<br/>
 
-When using the newly mounted storage account in your inputs JSON file, use the path `"/container-mountpath/blobName"`, where `container-mountpath` is `/YOURSTORAGEACCOUNTNAME/YOURCONTAINERNAME/`.
+2. Navigate to the "configuration" container in the default storage account. Replace the values below with your Storage Account and Container names and add the line to the end of the `containers-to-mount` file:
+    ```
+    /yourstorageaccountname/yourcontainername
+    ```
+3. Save the changes and restart the VM
 
-For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI.
+##### If the VM cannot be granted Contributor access to the storage account:
+This is applicable if the VM and storage account are in different Azure tenants, or if you want to use SAS token anyway for security reasons
+
+1. Add a [SAS url for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file. The SAS token can be at the account or container level and may be read-only or read-write depending on the usage.
+    ```
+    https://<yourstorageaccountname>.blob.core.windows.net:443/<yourcontainername>?<sastoken>
+    ```
+
+2. Save the changes and restart the VM
+
+In both cases, the specified containers will be mounted as `/yourstorageaccountname/yourcontainername/` on the Cromwell server. You can then use `/yourstorageaccountname/yourcontainername/path` in the trigger, WDL, CWL, inputs and workflow options files.
 
 ### Use a batch account for which I have already requested or received increased cores quota from Azure Support
 [Log on to the host VM](#Connect-to-the-host-VM-that-runs-all-the-docker-containers) using the ssh connection string as described in the instructions. 
@@ -317,23 +324,19 @@ Cromwell on Azure supports private Docker images for your WDL tasks hosted on [A
 To allow the host VM to use an ACR, [add the VM identity as a Contributor](../README.md/#Connect-to-existing-Azure-resources-I-own-that-are-not-part-of-the-Cromwell-on-Azure-instance-by-default) to the Container Registry via Azure Portal or Azure CLI.<br/>
 
 ### Configure my Cromwell on Azure instance to always use dedicated batch VMs to avoid getting preempted
-By default, we are using an environment variable `UsePreemptibleVmsOnly` set to true, to always use low priority Azure batch nodes.<br/>
+By default, your workflows will run on low priority Azure batch nodes.<br/>
 
-If you prefer to use dedicated Azure Batch nodes for all tasks, [log on to the host VM](#Connect-to-the-host-VM-that-runs-all-the-docker-containers) using the ssh connection string as described in the instructions. 
+If you prefer to use dedicated Azure Batch nodes for all tasks, do the following:
 
 **Cromwell on Azure version 2.x**
 
-Change the `UsePreemptibleVmsOnly` variable in the `env-04-settings.txt` file and save your changes.<br/>
+In file `cromwell-application.conf`, in the `configuration` container in the default storage account, in backend section, change `preemptible: true` to `preemptible: false`. Save your changes and restart the VM.<br/>
 
-```
-cd /data/cromwellazure/
-sudo nano env-04-settings.txt
-# Modify UsePreemptibleVmsOnly to false and save the file
-```
+Note that you can override this setting for each task individually by setting the `preemptible` boolean flag to `true` or `false` in the "runtime" attributes section of your task.
 
 **Cromwell on Azure version 1.x**
 
-Change the `UsePreemptibleVmsOnly` environment variable for the "tes" service to "false" in the `docker-compose.yml` file and save your changes.<br/>
+[Log on to the host VM](#Connect-to-the-host-VM-that-runs-all-the-docker-containers) using the ssh connection string as described in the instructions.  Change the `UsePreemptibleVmsOnly` environment variable for the "tes" service to "false" in the `docker-compose.yml` file and save your changes.<br/>
 
 ```
 cd /data/cromwellazure/
@@ -341,7 +344,6 @@ sudo nano docker-compose.yml
 # Modify UsePreemptibleVmsOnly to false and save the file
 ```
 
-Note that, you can set this for each task individually by using the `preemptible` boolean flag set to `true` or `false` in the "runtime" attributes section of your task. The `preemptible` runtime attribute will overwrite the `UsePreemptibleVmsOnly` environment variable setting for a particular task.<br/>
 For these changes to take effect, be sure to restart your Cromwell on Azure VM through the Azure Portal UI or run `sudo reboot`.
 
 ### Access the Cromwell REST API directly from Linux host VM
