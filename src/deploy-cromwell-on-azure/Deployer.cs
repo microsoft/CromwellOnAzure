@@ -167,7 +167,7 @@ namespace CromwellOnAzureDeployer
 
                     networkSecurityGroup = (await azureClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault();
 
-                    if(networkSecurityGroup == null)
+                    if (networkSecurityGroup == null)
                     {
                         if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
                         {
@@ -182,7 +182,7 @@ namespace CromwellOnAzureDeployer
 
                     var accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
 
-                    if(!accountNames.Any())
+                    if (!accountNames.Any())
                     {
                         throw new ValidationException($"Could not retrieve account names from virtual machine {configuration.VmName}.");
                     }
@@ -193,7 +193,7 @@ namespace CromwellOnAzureDeployer
                     }
 
                     batchAccount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListByResourceGroupAsync(configuration.ResourceGroupName))
-                        .FirstOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase)) 
+                        .FirstOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase))
                             ?? throw new ValidationException($"Batch account {batchAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
 
                     configuration.BatchAccountName = batchAccountName;
@@ -357,7 +357,7 @@ namespace CromwellOnAzureDeployer
                     return 1;
                 }
 
-                if(await MountWarningsExistAsync(sshConnectionInfo))
+                if (await MountWarningsExistAsync(sshConnectionInfo))
                 {
                     RefreshableConsole.WriteLine($"Found warnings in {CromwellAzureRootDir}/mount.blobfuse.log. Some storage containers may have failed to mount on the VM. Check the file for details.", ConsoleColor.Yellow);
                 }
@@ -389,7 +389,7 @@ namespace CromwellOnAzureDeployer
                 }
                 else
                 {
-                    if(!configuration.SkipTestWorkflow)
+                    if (!configuration.SkipTestWorkflow)
                     {
                         RefreshableConsole.WriteLine($"Could not run the test workflow.", ConsoleColor.Yellow);
                     }
@@ -443,7 +443,7 @@ namespace CromwellOnAzureDeployer
                             sshClient.ConnectWithRetries();
                             sshClient.Disconnect();
                         }
-                        catch(SshAuthenticationException ex) when (ex.Message.StartsWith("Permission"))
+                        catch (SshAuthenticationException ex) when (ex.Message.StartsWith("Permission"))
                         {
                             throw new ValidationException($"Could not connect to VM '{sshConnectionInfo.Host}'. Reason: {ex.Message}", false);
                         }
@@ -626,6 +626,11 @@ namespace CromwellOnAzureDeployer
 
         private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo)
         {
+            if (configuration.Update)
+            {
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cd {CromwellAzureRootDir} && sudo docker-compose down");
+            }
+
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"echo '{configuration.VmPassword}' | sudo -S -p '' /bin/bash -c \"echo '{configuration.VmUsername} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/z_{configuration.VmUsername}\"");
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo mkdir -p {CromwellAzureRootDir} && sudo chown {configuration.VmUsername} {CromwellAzureRootDir} && sudo chmod ug=rwx,o= {CromwellAzureRootDir}");
@@ -662,7 +667,7 @@ namespace CromwellOnAzureDeployer
             return Execute(
                 $"Writing files to the VM...",
                 () => UploadFilesToVirtualMachineAsync(
-                    sshConnectionInfo, 
+                    sshConnectionInfo,
                     new[] {
                         (GetFileContent("scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true),
                         (GetFileContent("scripts", "wait-for-it.sh"), $"{CromwellAzureRootDir}/wait-for-it/wait-for-it.sh", true),
@@ -689,7 +694,8 @@ namespace CromwellOnAzureDeployer
         {
             return Execute(
                 $"Running installation script on the VM...",
-                async () => { 
+                async () =>
+                {
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"{CromwellAzureRootDir}/install-cromwellazure.sh");
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod -aG docker {configuration.VmUsername}");
                 });
@@ -704,7 +710,7 @@ namespace CromwellOnAzureDeployer
                 .Replace("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName);
 
             await UploadFilesToVirtualMachineAsync(
-                sshConnectionInfo, 
+                sshConnectionInfo,
                 new[] {
                     (accountsFileContent, $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
                     (GetFileContent("scripts", "env-04-settings.txt"), $"{CromwellAzureRootDir}/env-04-settings.txt", false)
@@ -1122,7 +1128,7 @@ namespace CromwellOnAzureDeployer
                     if (containersToMountText != null)
                     {
                         // Add datasettestinputs container if not already present
-                        if (! containersToMountText.Contains("datasettestinputs.blob.core.windows.net/dataset"))
+                        if (!containersToMountText.Contains("datasettestinputs.blob.core.windows.net/dataset"))
                         {
                             // [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="SAS token for public use")]
                             var dataSetUrl = "https://datasettestinputs.blob.core.windows.net/dataset?sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D";
