@@ -2,7 +2,8 @@
 ### Latest release
  * [Release 2.1](https://github.com/microsoft/CromwellOnAzure/releases/tag/2.1.0)<br/>
  [Release notes for version 2.1](docs/release-notes/2.1.0.md)
- 
+
+### Previous release
  * [Release 2.0](https://github.com/microsoft/CromwellOnAzure/releases/tag/2.0.0)<br/>
  [Release notes for version 2.0](docs/release-notes/2.0.0.md)
  
