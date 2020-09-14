@@ -220,6 +220,8 @@ Run Broad Institute of MIT and Harvard's Best Practices Pipelines on Cromwell on
 
 [Variant-filtering with Convolutional Neural Networks](https://github.com/microsoft/gatk4-cnn-variant-filter-azure)<br/>
 
+[Sequence data format conversion](https://github.com/microsoft/seq-format-conversion-azure)<br/>
+
 ## Related Projects
 
 [Genomics Data Analysis with Jupyter Notebooks on Azure](https://github.com/microsoft/genomicsnotebook)<br/>
