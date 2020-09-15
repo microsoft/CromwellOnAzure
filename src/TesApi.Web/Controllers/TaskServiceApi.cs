@@ -70,22 +70,22 @@ namespace TesApi.Controllers
         [SwaggerResponse(statusCode: 200, type: typeof(object), description: "")]
         public virtual async Task<IActionResult> CancelTask([FromRoute][Required]string id)
         {
-            RepositoryItem<TesTask> tesTask = null;
+            TesTask tesTask = null;
 
             if (await repository.TryGetItemAsync(id, item => tesTask = item))
             {
-                if (tesTask.Value.State == TesState.COMPLETEEnum || 
-                    tesTask.Value.State == TesState.EXECUTORERROREnum || 
-                    tesTask.Value.State == TesState.SYSTEMERROREnum)
+                if (tesTask.State == TesState.COMPLETEEnum || 
+                    tesTask.State == TesState.EXECUTORERROREnum || 
+                    tesTask.State == TesState.SYSTEMERROREnum)
                 {
-                    logger.LogInformation($"Task {id} cannot be canceled because it is in {tesTask.Value.State} state.");
+                    logger.LogInformation($"Task {id} cannot be canceled because it is in {tesTask.State} state.");
                 }
-                else if (tesTask.Value.State != TesState.CANCELEDEnum)
+                else if (tesTask.State != TesState.CANCELEDEnum)
                 {
                     logger.LogInformation("Canceling task");
-                    tesTask.Value.IsCancelRequested = true;
-                    tesTask.Value.State = TesState.CANCELEDEnum;
-                    await repository.UpdateItemAsync(id, tesTask);
+                    tesTask.IsCancelRequested = true;
+                    tesTask.State = TesState.CANCELEDEnum;
+                    await repository.UpdateItemAsync(tesTask);
                 }
             }
             else
@@ -120,7 +120,7 @@ namespace TesApi.Controllers
             }
 
             tesTask.State = TesState.QUEUEDEnum;
-            tesTask.CreationTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo);
+            tesTask.CreationTime = DateTimeOffset.UtcNow;
 
             // example: /cromwell-executions/test/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script
             tesTask.WorkflowId = tesTask
@@ -187,10 +187,10 @@ namespace TesApi.Controllers
         [SwaggerResponse(statusCode: 200, type: typeof(TesTask), description: "")]
         public virtual async Task<IActionResult> GetTaskAsync([FromRoute][Required]string id, [FromQuery]string view)
         {
-            RepositoryItem<TesTask> repositoryItem = null;
-            var itemFound = (await repository.TryGetItemAsync(id, item => repositoryItem = item));
+            TesTask tesTask = null;
+            var itemFound = await repository.TryGetItemAsync(id, item => tesTask = item);
 
-            return itemFound ? TesJsonResult(repositoryItem.Value, view) : NotFound($"The task with id {id} does not exist.");
+            return itemFound ? TesJsonResult(tesTask, view) : NotFound($"The task with id {id} does not exist.");
         }
 
         /// <summary>
@@ -208,7 +208,6 @@ namespace TesApi.Controllers
         [SwaggerResponse(statusCode: 200, type: typeof(TesListTasksResponse), description: "")]
         public virtual async Task<IActionResult> ListTasks([FromQuery]string namePrefix, [FromQuery]long? pageSize, [FromQuery]string pageToken, [FromQuery]string view)
         {
-
             var decodedPageToken =
                 pageToken != null ? Encoding.UTF8.GetString(Base64UrlTextEncoder.Decode(pageToken)) : null;
 
@@ -224,7 +223,7 @@ namespace TesApi.Controllers
                 decodedPageToken);
 
             var encodedNextPageToken = nextPageToken != null ? Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(nextPageToken)) : null;
-            var response = new TesListTasksResponse { Tasks = tasks.Select(t => t.Value).ToList(), NextPageToken = encodedNextPageToken };
+            var response = new TesListTasksResponse { Tasks = tasks.ToList(), NextPageToken = encodedNextPageToken };
 
             return TesJsonResult(response, view);
         }

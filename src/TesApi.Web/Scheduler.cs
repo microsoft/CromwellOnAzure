@@ -3,6 +3,7 @@
 
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -38,7 +39,7 @@ namespace TesApi.Web
             this.repository = repository;
             this.batchScheduler = batchScheduler;
             this.logger = logger;
-            isStopped = bool.TryParse(configuration["DisableBatchScheduling"], out var disableBatchScheduling) ? disableBatchScheduling : false;
+            isStopped = configuration.GetValue("DisableBatchScheduling", false);
         }
 
         /// <summary>
@@ -102,50 +103,61 @@ namespace TesApi.Web
         /// <returns></returns>
         private async Task OrchestrateTesTasksOnBatch()
         {
-            var tesTasks = await repository.GetItemsAsync(
+            var tesTasks = (await repository.GetItemsAsync(
                     predicate: t => t.State == TesState.QUEUEDEnum
                         || t.State == TesState.INITIALIZINGEnum
                         || t.State == TesState.RUNNINGEnum
-                        || (t.State == TesState.CANCELEDEnum && t.IsCancelRequested));
+                        || (t.State == TesState.CANCELEDEnum && t.IsCancelRequested)))
+                .ToList();
+
+            if (!tesTasks.Any())
+            {
+                return;
+            }
+
+            var startTime = DateTime.UtcNow;
 
             foreach (var tesTask in tesTasks)
             {
                 try
                 {
-                    var isModified = await batchScheduler.ProcessTesTaskAsync(tesTask.Value);
+                    var isModified = await batchScheduler.ProcessTesTaskAsync(tesTask);
 
                     if (isModified)
                     {
                         //task has transitioned
-                        if (tesTask.Value.State == TesState.CANCELEDEnum
-                           || tesTask.Value.State == TesState.COMPLETEEnum
-                           || tesTask.Value.State == TesState.EXECUTORERROREnum
-                           || tesTask.Value.State == TesState.SYSTEMERROREnum)
+                        if (tesTask.State == TesState.CANCELEDEnum
+                           || tesTask.State == TesState.COMPLETEEnum
+                           || tesTask.State == TesState.EXECUTORERROREnum
+                           || tesTask.State == TesState.SYSTEMERROREnum)
                         {
-                            tesTask.Value.EndTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo);
+                            tesTask.EndTime = DateTimeOffset.UtcNow;
 
-                            if (tesTask.Value.State == TesState.EXECUTORERROREnum || tesTask.Value.State == TesState.SYSTEMERROREnum)
+                            if (tesTask.State == TesState.EXECUTORERROREnum || tesTask.State == TesState.SYSTEMERROREnum)
                             {
-                                logger.LogDebug($"{tesTask.Value.Id} is in a terminal state: {tesTask.Value.State}");
+                                logger.LogDebug($"{tesTask.Id} failed, state: {tesTask.State}, reason: {tesTask.FailureReason}");
                             }
                         }
 
-                        await repository.UpdateItemAsync(tesTask.Value.Id, new RepositoryItem<TesTask> { ETag = tesTask.ETag, Value = tesTask.Value });
+                        await repository.UpdateItemAsync(tesTask);
                     }
                 }
                 catch (Exception exc)
                 {
-                    if (++tesTask.Value.ErrorCount > 3) // TODO: Should we increment this for exceptions here (current behaviour) or the attempted executions on the batch?
+                    if (++tesTask.ErrorCount > 3) // TODO: Should we increment this for exceptions here (current behaviour) or the attempted executions on the batch?
                     {
-                        tesTask.Value.State = TesState.SYSTEMERROREnum;
-                        tesTask.Value.EndTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo);
-                        tesTask.Value.WriteToSystemLog(exc.Message, exc.StackTrace);
+                        tesTask.State = TesState.SYSTEMERROREnum;
+                        tesTask.EndTime = DateTimeOffset.UtcNow;
+                        tesTask.GetOrAddTesTaskLog().FailureReason = "UnknownError";
+                        tesTask.AddToSystemLog(new[] { "UnknownError", exc.Message, exc.StackTrace });
                     }
 
-                    logger.LogError(exc, $"TES Task '{tesTask.Value.Id}' threw an exception.");
-                    await repository.UpdateItemAsync(tesTask.Value.Id, tesTask);
+                    logger.LogError(exc, $"TES Task '{tesTask.Id}' threw an exception.");
+                    await repository.UpdateItemAsync(tesTask);
                 }
             }
+
+            logger.LogDebug($"OrchestrateTesTasksOnBatch for {tesTasks.Count()} tasks completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
         }
     }
 }

@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -104,7 +104,7 @@ namespace TesApi.Models
         /// </summary>
         /// <value>Date + time the task was created, in RFC 3339 format. This is set by the system, not the client.</value>
         [DataMember(Name = "creation_time")]
-        public string CreationTime { get; set; }
+        public DateTimeOffset? CreationTime { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object

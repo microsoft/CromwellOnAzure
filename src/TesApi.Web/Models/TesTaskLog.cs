@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -45,14 +45,14 @@ namespace TesApi.Models
         /// </summary>
         /// <value>When the task started, in RFC 3339 format.</value>
         [DataMember(Name = "start_time")]
-        public string StartTime { get; set; }
+        public DateTimeOffset? StartTime { get; set; }
 
         /// <summary>
         /// When the task ended, in RFC 3339 format.
         /// </summary>
         /// <value>When the task ended, in RFC 3339 format.</value>
         [DataMember(Name = "end_time")]
-        public string EndTime { get; set; }
+        public DateTimeOffset? EndTime { get; set; }
 
         /// <summary>
         /// Information about all output files. Directory outputs are flattened into separate items.

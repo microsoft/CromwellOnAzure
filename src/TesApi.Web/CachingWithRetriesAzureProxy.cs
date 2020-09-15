@@ -13,7 +13,6 @@ using TesApi.Models;
 
 namespace TesApi.Web
 {
-    ///<inheritdoc/>
     /// <summary>
     /// Implements caching and retries for <see cref="IAzureProxy"/>.
     /// </summary>
@@ -41,25 +40,41 @@ namespace TesApi.Web
             this.cache = cache;
         }
 
+        /// <inheritdoc/>
         public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
+
+        /// <inheritdoc/>
         public Task DeleteBatchJobAsync(string taskId) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchJobAsync(taskId));
+
+        /// <inheritdoc/>
         public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchPoolAsync(poolId, cancellationToken));
+
+        /// <inheritdoc/>
         public Task<string> DownloadBlobAsync(Uri blobAbsoluteUri) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DownloadBlobAsync(blobAbsoluteUri));
+
+        /// <inheritdoc/>
         public Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetActivePoolIdsAsync(prefix, minAge, cancellationToken));
 
-        ///<inheritdoc/>
+        /// <inheritdoc/>
         public Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
         {
             return cache.GetOrAddAsync("batchAccountQuotas", () =>
                 asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetBatchAccountQuotasAsync()), DateTimeOffset.Now.AddHours(1));
         }
 
+        /// <inheritdoc/>
         public int GetBatchActiveJobCount() => retryPolicy.Execute(() => azureProxy.GetBatchActiveJobCount());
+
+        /// <inheritdoc/>
         public IEnumerable<AzureBatchNodeCount> GetBatchActiveNodeCountByVmSize() => retryPolicy.Execute(() => azureProxy.GetBatchActiveNodeCountByVmSize());
+
+        /// <inheritdoc/>
         public int GetBatchActivePoolCount() => retryPolicy.Execute(() => azureProxy.GetBatchActivePoolCount());
+
+        /// <inheritdoc/>
         public Task<AzureBatchJobAndTaskState> GetBatchJobAndTaskStateAsync(string tesTaskId) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetBatchJobAndTaskStateAsync(tesTaskId));
 
-        ///<inheritdoc/>
+        /// <inheritdoc/>
         public async Task<ContainerRegistryInfo> GetContainerRegistryInfoAsync(string imageName)
         {
             var containerRegistryInfo = cache.Get<ContainerRegistryInfo>(imageName);
@@ -77,17 +92,20 @@ namespace TesApi.Web
             return containerRegistryInfo;
         }
 
+        /// <inheritdoc/>
         public Task<string> GetNextBatchJobIdAsync(string tesTaskId) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetNextBatchJobIdAsync(tesTaskId));
+
+        /// <inheritdoc/>
         public Task<IEnumerable<string>> GetPoolIdsReferencedByJobsAsync(CancellationToken cancellationToken) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetPoolIdsReferencedByJobsAsync(cancellationToken));
 
-        ///<inheritdoc/>
+        /// <inheritdoc/>
         public Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
         {
             return cache.GetOrAddAsync(storageAccountInfo.Id, () =>
                 asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetStorageAccountKeyAsync(storageAccountInfo)), DateTimeOffset.Now.AddHours(1));
         }
 
-        ///<inheritdoc/>
+        /// <inheritdoc/>
         public async Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName)
         {
             var storageAccountInfo = cache.Get<StorageAccountInfo>(storageAccountName);
@@ -105,18 +123,31 @@ namespace TesApi.Web
             return storageAccountInfo;
         }
 
-        ///<inheritdoc/>
+        /// <inheritdoc/>
         public Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
         {
             return cache.GetOrAddAsync("vmSizesAndPrices", () => azureProxy.GetVmSizesAndPricesAsync(), DateTimeOffset.MaxValue);
         }
 
+        /// <inheritdoc/>
         public Task<IEnumerable<string>> ListBlobsAsync(Uri directoryUri) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListBlobsAsync(directoryUri));
+
+        /// <inheritdoc/>
         public Task<IEnumerable<string>> ListOldJobsToDeleteAsync(TimeSpan oldestJobAge) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListOldJobsToDeleteAsync(oldestJobAge));
+
+        /// <inheritdoc/>
         public Task UploadBlobAsync(Uri blobAbsoluteUri, string content) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.UploadBlobAsync(blobAbsoluteUri, content));
-        public Task<(Uri, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName) =>  azureProxy.GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
+
+        /// <inheritdoc/>
+        public Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName) =>  azureProxy.GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
+
+        /// <inheritdoc/>
         public Task UploadBlobFromFileAsync(Uri blobAbsoluteUri, string filePath) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.UploadBlobFromFileAsync(blobAbsoluteUri, filePath));
+
+        /// <inheritdoc/>
         public bool LocalFileExists(string path) => azureProxy.LocalFileExists(path);
+
+        /// <inheritdoc/>
         public bool TryReadCwlFile(string workflowId, out string content) => azureProxy.TryReadCwlFile(workflowId, out content);
     }
 }

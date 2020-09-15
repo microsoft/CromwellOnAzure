@@ -20,10 +20,7 @@ namespace TesApi.Web
         // Task.ExecutorLog.stderr
         // Input.content
         // TaskLog.system_logs
-        // Task.IsCancelRequested
-        // Task.ErrorCount
-        // Task.EndTime
-        // TesResources.VmInfo
+        // plus additional custom fields added to support running TES with Cromwell on Azure
         private static readonly List<Tuple<Type, string>> PropertiesToSkip = new List<Tuple<Type, string>>
             {
                 Tuple.Create(typeof(TesExecutorLog), nameof(TesExecutorLog.Stdout)),
@@ -34,7 +31,8 @@ namespace TesApi.Web
                 Tuple.Create(typeof(TesTask), nameof(TesTask.ErrorCount)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.EndTime)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.WorkflowId)),
-                Tuple.Create(typeof(TesResources), nameof(TesResources.VmInfo))
+                Tuple.Create(typeof(RepositoryItem<TesTask>), nameof(RepositoryItem<TesTask>.ETag)),
+                Tuple.Create(typeof(RepositoryItem<TesTask>), nameof(RepositoryItem<TesTask>.PartitionKey))
             };
 
         /// <summary>

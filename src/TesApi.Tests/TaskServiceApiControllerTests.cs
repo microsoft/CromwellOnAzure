@@ -88,8 +88,8 @@ namespace TesApi.Tests
             var tesTaskId = "IdDoesNotExist";
 
             var mockRepo = new Mock<IRepository<TesTask>>();
-            mockRepo.Setup(repo => repo.TryGetItemAsync(tesTaskId, It.IsAny<Action<RepositoryItem<TesTask>>>()))
-                .Callback<string, Action<RepositoryItem<TesTask>>>((id, action) =>
+            mockRepo.Setup(repo => repo.TryGetItemAsync(tesTaskId, It.IsAny<Action<TesTask>>()))
+                .Callback<string, Action<TesTask>>((id, action) =>
                 {
                     action(null);
                 })
@@ -107,13 +107,12 @@ namespace TesApi.Tests
         public async Task CancelTaskAsync_ReturnsEmptyObject()
         {
             var tesTask = new TesTask() { Id = "testTaskId", State = TesState.QUEUEDEnum };
-            var repositoryItem = new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = tesTask };
             var mockRepo = new Mock<IRepository<TesTask>>();
 
-            mockRepo.Setup(repo => repo.TryGetItemAsync(tesTask.Id, It.IsAny<Action<RepositoryItem<TesTask>>>()))
-                .Callback<string, Action<RepositoryItem<TesTask>>>((id, action) =>
+            mockRepo.Setup(repo => repo.TryGetItemAsync(tesTask.Id, It.IsAny<Action<TesTask>>()))
+                .Callback<string, Action<TesTask>>((id, action) =>
                 {
-                    action(repositoryItem);
+                    action(tesTask);
                 })
                 .ReturnsAsync(true);
 
@@ -123,8 +122,8 @@ namespace TesApi.Tests
 
             Assert.IsNotNull(result);
             Assert.AreEqual(200, result.StatusCode);
-            Assert.AreEqual(TesState.CANCELEDEnum, repositoryItem.Value.State);
-            mockRepo.Verify(x => x.UpdateItemAsync(tesTask.Id, repositoryItem));
+            Assert.AreEqual(TesState.CANCELEDEnum, tesTask.State);
+            mockRepo.Verify(x => x.UpdateItemAsync(tesTask));
         }
 
         [TestMethod]
@@ -144,7 +143,8 @@ namespace TesApi.Tests
             var tesTaskId = "IdDoesNotExist";
 
             var mockRepo = new Mock<IRepository<TesTask>>();
-            mockRepo.Setup(repo => repo.TryGetItemAsync(tesTaskId, It.IsAny<Action<RepositoryItem<TesTask>>>()))
+
+            mockRepo.Setup(repo => repo.TryGetItemAsync(tesTaskId, It.IsAny<Action<TesTask>>()))
                 .ReturnsAsync(false);
 
             var controller = this.GetTaskServiceApiController(mockRepo.Object);
@@ -161,11 +161,11 @@ namespace TesApi.Tests
             var tesTask = new TesTask();
 
             var mockRepo = new Mock<IRepository<TesTask>>();
-            var repositoryItem = new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = tesTask };
-            mockRepo.Setup(repo => repo.TryGetItemAsync(tesTask.Id, It.IsAny<Action<RepositoryItem<TesTask>>>()))
-                .Callback<string, Action<RepositoryItem<TesTask>>>((id, action) =>
+
+            mockRepo.Setup(repo => repo.TryGetItemAsync(tesTask.Id, It.IsAny<Action<TesTask>>()))
+                .Callback<string, Action<TesTask>>((id, action) =>
                 {
-                    action(repositoryItem);
+                    action(tesTask);
                 })
                 .ReturnsAsync(true);
 
@@ -186,11 +186,11 @@ namespace TesApi.Tests
             };
 
             var mockRepo = new Mock<IRepository<TesTask>>();
-            var repositoryItem = new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = tesTask };
-            mockRepo.Setup(repo => repo.TryGetItemAsync(tesTask.Id, It.IsAny<Action<RepositoryItem<TesTask>>>()))
-                .Callback<string, Action<RepositoryItem<TesTask>>>((id, action) =>
+
+            mockRepo.Setup(repo => repo.TryGetItemAsync(tesTask.Id, It.IsAny<Action<TesTask>>()))
+                .Callback<string, Action<TesTask>>((id, action) =>
                 {
-                    action(repositoryItem);
+                    action(tesTask);
                 })
                 .ReturnsAsync(true);
 
@@ -199,7 +199,7 @@ namespace TesApi.Tests
             var result = await controller.GetTaskAsync(tesTask.Id, "MINIMAL") as JsonResult;
 
             Assert.IsNotNull(result);
-            mockRepo.Verify(x => x.TryGetItemAsync(tesTask.Id, It.IsAny<Action<RepositoryItem<TesTask>>>()));
+            mockRepo.Verify(x => x.TryGetItemAsync(tesTask.Id, It.IsAny<Action<TesTask>>()));
             Assert.AreEqual(TesState.RUNNINGEnum, tesTask.State);
             Assert.AreEqual(200, result.StatusCode);
         }
@@ -218,22 +218,19 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ListTasks_ReturnsJsonResult()
         {
-            var firstTesTask = new TesTask { Id = "tesTaskId1", State = TesState.COMPLETEEnum, Name = "tesTask" };
-            var secondTesTask = new TesTask { Id = "tesTaskId2", State = TesState.EXECUTORERROREnum, Name = "tesTask2" };
-            var thirdTesTask = new TesTask { Id = "tesTaskId3", State = TesState.EXECUTORERROREnum, Name = "someOtherTask2" };
+            var firstTesTask = new TesTask { Id = "tesTaskId1", State = TesState.COMPLETEEnum, Name = "tesTask", ETag = Guid.NewGuid().ToString() };
+            var secondTesTask = new TesTask { Id = "tesTaskId2", State = TesState.EXECUTORERROREnum, Name = "tesTask2", ETag = Guid.NewGuid().ToString() };
+            var thirdTesTask = new TesTask { Id = "tesTaskId3", State = TesState.EXECUTORERROREnum, Name = "someOtherTask2", ETag = Guid.NewGuid().ToString() };
             var namePrefix = "tesTask";
 
-            var repositoryItem1 = new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = firstTesTask };
-            var repositoryItem2 = new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = secondTesTask };
-            var repositoryItem3 = new RepositoryItem<TesTask> { ETag = Guid.NewGuid().ToString(), Value = thirdTesTask };
-            var repositoryItems = new[] { repositoryItem1, repositoryItem2, repositoryItem3 };
+            var tesTasks = new[] { firstTesTask, secondTesTask, thirdTesTask };
 
             var mockRepo = new Mock<IRepository<TesTask>>();
 
             mockRepo.Setup(repo => repo
                 .GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>(), It.IsAny<int>(), It.IsAny<string>()))
                 .ReturnsAsync((Expression<Func<TesTask, bool>> predicate, int pageSize, string continuationToken) =>
-                    ("", repositoryItems.Where(i => predicate.Compile().Invoke(i.Value)).Take(pageSize)));
+                    ("", tesTasks.Where(i => predicate.Compile().Invoke(i)).Take(pageSize)));
 
             var controller = this.GetTaskServiceApiController(mockRepo.Object);
 

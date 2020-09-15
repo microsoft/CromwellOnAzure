@@ -8,12 +8,11 @@ using Polly.Retry;
 
 namespace TesApi.Web
 {
-    ///<inheritdoc/>
     /// <summary>
     /// Implements caching and retries for <see cref="IRepository{T}"/>
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public class CachingWithRetriesRepository<T> : IRepository<T> where T : class
+    public class CachingWithRetriesRepository<T> : IRepository<T> where T : RepositoryItem<T>
     {
         private readonly IRepository<T> repository;
         private readonly object cacheLock = new object();
@@ -33,15 +32,15 @@ namespace TesApi.Web
             this.repository = repository;
         }
 
-        ///<inheritdoc/>
-        public async Task<RepositoryItem<T>> CreateItemAsync(T item)
+        /// <inheritdoc/>
+        public async Task<T> CreateItemAsync(T item)
         {
             var repositoryItem = await retryPolicy.ExecuteAsync(() => repository.CreateItemAsync(item));
             ClearAllItemsPredicateCachedKeys();
             return repositoryItem;
         }
 
-        ///<inheritdoc/>
+        /// <inheritdoc/>
         public async Task DeleteItemAsync(string id)
         {
             if (cache.TryGetValue(id, out var cachedRepositoryItem))
@@ -53,10 +52,10 @@ namespace TesApi.Web
             ClearAllItemsPredicateCachedKeys();
         }
 
-        ///<inheritdoc/>
-        public async Task<bool> TryGetItemAsync(string id, Action<RepositoryItem<T>> onSuccess)
+        /// <inheritdoc/>
+        public async Task<bool> TryGetItemAsync(string id, Action<T> onSuccess)
         {
-            RepositoryItem<T> repositoryItem = null;
+            T repositoryItem = null;
 
             if (cache.TryGetValue(id, out repositoryItem))
             {
@@ -75,15 +74,15 @@ namespace TesApi.Web
             return repositoryItemFound;
         }
 
-        ///<inheritdoc/>
-        public Task<(string, IEnumerable<RepositoryItem<T>>)> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, string continuationToken)
+        /// <inheritdoc/>
+        public Task<(string, IEnumerable<T>)> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, string continuationToken)
             => retryPolicy.ExecuteAsync(() => repository.GetItemsAsync(predicate, pageSize, continuationToken));
 
-        ///<inheritdoc/>
-        public async Task<IEnumerable<RepositoryItem<T>>> GetItemsAsync(Expression<Func<T, bool>> predicate)
+        /// <inheritdoc/>
+        public async Task<IEnumerable<T>> GetItemsAsync(Expression<Func<T, bool>> predicate)
         {
             var key = predicate.ToString().GetHashCode();
-            IEnumerable<RepositoryItem<T>> repositoryItems = new List<RepositoryItem<T>>();
+            IEnumerable<T> repositoryItems = new List<T>();
 
             if (cache.TryGetValue(key, out repositoryItems))
             {
@@ -101,15 +100,17 @@ namespace TesApi.Web
             return repositoryItems;
         }
 
-        ///<inheritdoc/>
-        public async Task<RepositoryItem<T>> UpdateItemAsync(string id, RepositoryItem<T> item)
+        /// <inheritdoc/>
+        public async Task<T> UpdateItemAsync(T item)
         {
+            var id = item.GetId();
+
             if (cache.TryGetValue(id, out var cachedRepositoryItem))
             {
                 cache.Remove(id);
             }
 
-            var repositoryItem = await retryPolicy.ExecuteAsync(() => repository.UpdateItemAsync(id, item));
+            var repositoryItem = await retryPolicy.ExecuteAsync(() => repository.UpdateItemAsync(item));
             ClearAllItemsPredicateCachedKeys();
             return repositoryItem;
         }

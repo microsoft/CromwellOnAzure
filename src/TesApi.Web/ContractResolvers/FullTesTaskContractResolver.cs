@@ -15,18 +15,15 @@ namespace TesApi.Web
     /// </summary>
     public class FullTesTaskContractResolver : DefaultContractResolver
     {
-        // In FULL view, task message will include all fields EXCEPT:   
-        // Task.IsCancelRequested
-        // Task.ErrorCount
-        // Task.EndTime
-        // TesResources.VmInfo
+        // In FULL view, task message will include all fields EXCEPT custom fields added to support running TES with Cromwell on Azure
         private static readonly List<Tuple<Type, string>> PropertiesToSkip = new List<Tuple<Type, string>>
             {
                 Tuple.Create(typeof(TesTask), nameof(TesTask.IsCancelRequested)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.ErrorCount)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.EndTime)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.WorkflowId)),
-                Tuple.Create(typeof(TesResources), nameof(TesResources.VmInfo)),
+                Tuple.Create(typeof(RepositoryItem<TesTask>), nameof(RepositoryItem<TesTask>.ETag)),
+                Tuple.Create(typeof(RepositoryItem<TesTask>), nameof(RepositoryItem<TesTask>.PartitionKey))
             };
 
         /// <summary>

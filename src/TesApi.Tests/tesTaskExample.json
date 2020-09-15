@@ -39,8 +39,8 @@
       "vm_number_of_cores": 64,
       "vm_resource_disk_size_in_gb": 1024,
       "vm_max_data_disk_count": 1
-      }
-    },
+    }
+  },
   "executors": [
     {
       "image": "string",
@@ -70,8 +70,8 @@
     {
       "logs": [
         {
-          "start_time": "string",
-          "end_time": "string",
+          "start_time": "2020-09-16T19:10:24.078014+00:00",
+          "end_time": "2020-09-16T19:10:24.078014+00:00",
           "stdout": "string",
           "stderr": "string",
           "exit_code": 0
@@ -82,8 +82,8 @@
         "additionalProp2": "string",
         "additionalProp3": "string"
       },
-      "start_time": "string",
-      "end_time": "string",
+      "start_time": "2020-09-16T19:10:24.078014+00:00",
+      "end_time": "2020-09-16T19:10:24.078014+00:00",
       "outputs": [
         {
           "url": "string",
@@ -96,9 +96,9 @@
       ]
     }
   ],
-  "creation_time": "string",
+  "creation_time": "2020-09-16T19:10:24.078014+00:00",
   "error_count": 0,
   "is_cancel_requested": false,
-  "end_time": "string",
+  "end_time": "2020-09-16T19:10:24.078014+00:00",
   "workflow_id": "string"
 }

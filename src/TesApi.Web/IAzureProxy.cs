@@ -20,7 +20,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="cosmosDbAccountName"></param>
         /// <returns>The CosmosDB endpoint and key of the specified account</returns>
-        Task<(Uri, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName);
+        Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName);
 
         /// <summary>
         /// Gets a new Azure Batch job id to schedule another task

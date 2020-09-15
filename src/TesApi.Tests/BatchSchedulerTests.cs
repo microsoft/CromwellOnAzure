@@ -58,10 +58,12 @@ namespace TesApi.Tests
         {
             var tesTask = GetTesTask();
 
-            var errorMessage = await ProcessTesTaskAndGetFirstLogMessageAsync(tesTask, BatchJobAndTaskStates.NodeDiskFull);
+            (var failureReason, var systemLog) = await ProcessTesTaskAndGetFailureReasonAndSystemLogAsync(tesTask, BatchJobAndTaskStates.NodeDiskFull);
 
             Assert.AreEqual(TesState.EXECUTORERROREnum, tesTask.State);
-            Assert.IsTrue(errorMessage.StartsWith("DiskFull"));
+            Assert.AreEqual("DiskFull", failureReason);
+            Assert.AreEqual("DiskFull", systemLog[0]);
+            Assert.AreEqual("DiskFull", tesTask.FailureReason);
         }
 
         [TestMethod]
@@ -201,6 +203,91 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
+        public async Task TaskIsRequeuedUpToThreeTimesForTransientErrors()
+        {
+            var tesTask = GetTesTask();
+
+            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(tesTask, BatchJobAndTaskStates.NodeAllocationFailed));
+            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(tesTask, BatchJobAndTaskStates.NodeAllocationFailed));
+            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(tesTask, BatchJobAndTaskStates.NodeAllocationFailed));
+            Assert.AreEqual(TesState.EXECUTORERROREnum, await GetNewTesTaskStateAsync(tesTask, BatchJobAndTaskStates.NodeAllocationFailed));
+        }
+
+        [TestMethod]
+        public async Task TaskGetsCancelled()
+        {
+            var tesTask = new TesTask { Id = "test", State = TesState.CANCELEDEnum, IsCancelRequested = true };
+
+            var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
+            azureProxyReturnValues.BatchJobAndTaskState = BatchJobAndTaskStates.TaskActive;
+            var azureProxy = GetMockAzureProxy(azureProxyReturnValues);
+
+            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureProxy);
+
+            Assert.AreEqual(TesState.CANCELEDEnum, tesTask.State);
+            Assert.IsFalse(tesTask.IsCancelRequested);
+            azureProxy.Verify(i => i.DeleteBatchJobAsync(tesTask.Id));
+        }
+
+        [TestMethod]
+        public async Task SuccessfullyCompletedTaskContainsBatchNodeMetrics()
+        {
+            var tesTask = GetTesTask();
+
+            var timingsFileContent = @"
+                BlobXferPullStart=2020-10-08T02:30:39+00:00
+                BlobXferPullEnd=2020-10-08T02:31:39+00:00
+                ExecutorPullStart=2020-10-08T02:32:39+00:00
+                ExecutorPullEnd=2020-10-08T02:34:39+00:00
+                DownloadStart=2020-10-08T02:35:39+00:00
+                DownloadEnd=2020-10-08T02:38:39+00:00
+                ExecutorStart=2020-10-08T02:39:39+00:00
+                ExecutorEnd=2020-10-08T02:43:39+00:00
+                UploadStart=2020-10-08T02:44:39+00:00
+                UploadEnd=2020-10-08T02:49:39+00:00".Replace(" ", "");
+
+            var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
+            azureProxyReturnValues.BatchJobAndTaskState = BatchJobAndTaskStates.TaskCompletedSuccessfully;
+            azureProxyReturnValues.DownloadedBlobContent = timingsFileContent;
+            var azureProxy = GetMockAzureProxy(azureProxyReturnValues);
+
+            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureProxy);
+
+            Assert.AreEqual(TesState.COMPLETEEnum, tesTask.State);
+
+            var batchNodeMetrics = tesTask.GetOrAddTesTaskLog().BatchNodeMetrics;
+            Assert.IsNotNull(batchNodeMetrics);
+            Assert.AreEqual(60, batchNodeMetrics.BlobXferImagePullDurationInSeconds);
+            Assert.AreEqual(120, batchNodeMetrics.ExecutorImagePullDurationInSeconds);
+            Assert.AreEqual(180, batchNodeMetrics.FileDownloadDurationInSeconds);
+            Assert.AreEqual(240, batchNodeMetrics.ExecutorDurationInSeconds);
+            Assert.AreEqual(300, batchNodeMetrics.FileUploadDurationInSeconds);
+
+            var executorLog = tesTask.GetOrAddTesTaskLog().GetOrAddExecutorLog();
+            Assert.IsNotNull(executorLog);
+            Assert.AreEqual(0, executorLog.ExitCode);
+            Assert.AreEqual(DateTimeOffset.Parse("2020-10-08T02:30:39+00:00"), executorLog.StartTime);
+            Assert.AreEqual(DateTimeOffset.Parse("2020-10-08T02:49:39+00:00"), executorLog.EndTime);
+        }
+
+        [TestMethod]
+        public async Task SuccessfullyCompletedTaskContainsCromwellResultCode()
+        {
+            var tesTask = GetTesTask();
+
+            var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
+            azureProxyReturnValues.BatchJobAndTaskState = BatchJobAndTaskStates.TaskCompletedSuccessfully;
+            azureProxyReturnValues.DownloadedBlobContent = "2";
+            var azureProxy = GetMockAzureProxy(azureProxyReturnValues);
+
+            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureProxy);
+
+            Assert.AreEqual(TesState.COMPLETEEnum, tesTask.State);
+            Assert.AreEqual(2, tesTask.GetOrAddTesTaskLog().CromwellResultCode);
+            Assert.AreEqual(2, tesTask.CromwellResultCode);
+        }
+
+        [TestMethod]
         public async Task TesInputFilePathMustStartWithCromwellExecutions()
         {
             var tesTask = GetTesTask();
@@ -210,10 +297,12 @@ namespace TesApi.Tests
                 Path = "xyz/path"
             });
 
-            var errorMessage = await ProcessTesTaskAndGetFirstLogMessageAsync(tesTask);
+            (var failureReason, var systemLog) = await ProcessTesTaskAndGetFailureReasonAndSystemLogAsync(tesTask);
 
             Assert.AreEqual(TesState.SYSTEMERROREnum, tesTask.State);
-            Assert.AreEqual($"Unsupported input path 'xyz/path' for task Id {tesTask.Id}. Must start with '/cromwell-executions/'.", errorMessage);
+            Assert.AreEqual($"InvalidInputFilePath", failureReason);
+            Assert.AreEqual($"InvalidInputFilePath", systemLog[0]);
+            Assert.AreEqual($"Unsupported input path 'xyz/path' for task Id {tesTask.Id}. Must start with '/cromwell-executions/'.", systemLog[1]);
         }
 
         [TestMethod]
@@ -227,10 +316,12 @@ namespace TesApi.Tests
                 Content = null
             });
 
-            var errorMessage = await ProcessTesTaskAndGetFirstLogMessageAsync(tesTask);
+            (var failureReason, var systemLog) = await ProcessTesTaskAndGetFailureReasonAndSystemLogAsync(tesTask);
 
             Assert.AreEqual(TesState.SYSTEMERROREnum, tesTask.State);
-            Assert.AreEqual($"One of Input Url or Content must be set", errorMessage);
+            Assert.AreEqual($"InvalidInputFilePath", failureReason);
+            Assert.AreEqual($"InvalidInputFilePath", systemLog[0]);
+            Assert.AreEqual($"One of Input Url or Content must be set", systemLog[1]);
         }
 
         [TestMethod]
@@ -244,10 +335,12 @@ namespace TesApi.Tests
                 Content = "test content"
             });
 
-            var errorMessage = await ProcessTesTaskAndGetFirstLogMessageAsync(tesTask);
+            (var failureReason, var systemLog) = await ProcessTesTaskAndGetFailureReasonAndSystemLogAsync(tesTask);
 
             Assert.AreEqual(TesState.SYSTEMERROREnum, tesTask.State);
-            Assert.AreEqual($"Input Url and Content cannot be both set", errorMessage);
+            Assert.AreEqual($"InvalidInputFilePath", failureReason);
+            Assert.AreEqual($"InvalidInputFilePath", systemLog[0]);
+            Assert.AreEqual($"Input Url and Content cannot be both set", systemLog[1]);
         }
 
         [TestMethod]
@@ -261,10 +354,12 @@ namespace TesApi.Tests
                 Type = TesFileType.DIRECTORYEnum
             });
 
-            var errorMessage = await ProcessTesTaskAndGetFirstLogMessageAsync(tesTask);
+            (var failureReason, var systemLog) = await ProcessTesTaskAndGetFailureReasonAndSystemLogAsync(tesTask);
 
             Assert.AreEqual(TesState.SYSTEMERROREnum, tesTask.State);
-            Assert.AreEqual($"Directory input is not supported.", errorMessage);
+            Assert.AreEqual($"InvalidInputFilePath", failureReason);
+            Assert.AreEqual($"InvalidInputFilePath", systemLog[0]);
+            Assert.AreEqual($"Directory input is not supported.", systemLog[1]);
         }
 
         [TestMethod]
@@ -488,14 +583,15 @@ namespace TesApi.Tests
             azureProxy.Verify(i => i.UploadBlobFromFileAsync(It.Is<Uri>(uri => uri.AbsoluteUri.StartsWith("https://defaultstorageaccount.blob.core.windows.net/cromwell-executions/workflowpath/inputs/blob1?sv=")), "/cromwell-tmp/tmp12345/blob1"));
         }
 
-        private static async Task<string> ProcessTesTaskAndGetFirstLogMessageAsync(TesTask tesTask, AzureBatchJobAndTaskState? azureBatchJobAndTaskState = null)
+        private static async Task<(string FailureReason, string[] SystemLog)> ProcessTesTaskAndGetFailureReasonAndSystemLogAsync(TesTask tesTask, AzureBatchJobAndTaskState? azureBatchJobAndTaskState = null)
         {
+            // TODO TONY: Test FailureReason
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
             azureProxyReturnValues.BatchJobAndTaskState = azureBatchJobAndTaskState ?? azureProxyReturnValues.BatchJobAndTaskState;
 
             await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(azureProxyReturnValues));
 
-            return tesTask.Logs?.FirstOrDefault()?.SystemLogs?.FirstOrDefault();
+            return (tesTask.Logs?.LastOrDefault()?.FailureReason, tesTask.Logs?.LastOrDefault()?.SystemLogs?.ToArray());
         }
 
         private static Task<(string JobId, CloudTask CloudTask, PoolInformation PoolInformation)> ProcessTesTaskAndGetBatchJobArgumentsAsync()
@@ -519,10 +615,14 @@ namespace TesApi.Tests
             return (jobId, cloudTask, poolInformation);
         }
 
-        private static async Task<TesState> GetNewTesTaskStateAsync(TesState currentTesTaskState, AzureBatchJobAndTaskState azureBatchJobAndTaskState)
+        private static Task<TesState> GetNewTesTaskStateAsync(TesState currentTesTaskState, AzureBatchJobAndTaskState azureBatchJobAndTaskState)
         {
             var tesTask = new TesTask { Id = "test", State = currentTesTaskState };
+            return GetNewTesTaskStateAsync(tesTask, azureBatchJobAndTaskState);
+        }
 
+        private static async Task<TesState> GetNewTesTaskStateAsync(TesTask tesTask, AzureBatchJobAndTaskState azureBatchJobAndTaskState)
+        {
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
             azureProxyReturnValues.BatchJobAndTaskState = azureBatchJobAndTaskState;
 

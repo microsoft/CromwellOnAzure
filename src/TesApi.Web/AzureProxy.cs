@@ -119,7 +119,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="cosmosDbAccountName"></param>
         /// <returns>The CosmosDB endpoint and key of the specified account</returns>
-        public async Task<(Uri, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName)
+        public async Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName)
         {
             var azureClient = await GetAzureManagementClientAsync();
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
@@ -135,7 +135,7 @@ namespace TesApi.Web
 
             var key = (await azureClient.WithSubscription(account.Manager.SubscriptionId).CosmosDBAccounts.ListKeysAsync(account.ResourceGroupName, account.Name)).PrimaryMasterKey;
 
-            return (new Uri(account.DocumentEndpoint), key);
+            return (account.DocumentEndpoint, key);
         }
 
         /// <summary>
@@ -625,7 +625,7 @@ namespace TesApi.Web
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, $"Error looking up or retrieving contents of file '{fileName}'");
+                logger.LogError(ex, $"Error looking up or retrieving contents of CWL file '{fileName}'");
             }
 
             content = null;
@@ -885,14 +885,14 @@ namespace TesApi.Web
             };
         }
 
-        ///<inheritdoc/>
+        /// <inheritdoc/>
         public async Task<ContainerRegistryInfo> GetContainerRegistryInfoAsync(string imageName)
         {
             return (await GetAccessibleContainerRegistriesAsync())
                 .FirstOrDefault(reg => reg.RegistryServer.Equals(imageName.Split('/').FirstOrDefault(), StringComparison.OrdinalIgnoreCase));
         }
 
-        ///<inheritdoc/>
+        /// <inheritdoc/>
         public async Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName)
         {
             return (await GetAccessibleStorageAccountsAsync())
