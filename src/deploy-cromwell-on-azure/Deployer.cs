@@ -153,7 +153,7 @@ namespace CromwellOnAzureDeployer
                         sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryNetworkInterface().PrimaryPrivateIP, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
                     else
                         sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
-                
+
                     await WaitForSshConnectivityAsync(sshConnectionInfo);
 
                     var existingUserManagedIdentityId = linuxVm.UserAssignedManagedServiceIdentityIds.FirstOrDefault();
@@ -169,7 +169,7 @@ namespace CromwellOnAzureDeployer
 
                     networkSecurityGroup = (await azureClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault();
 
-                    if (networkSecurityGroup == null)
+                    if (networkSecurityGroup == null && !configuration.useInternalIP)
                     {
                         if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
                         {
@@ -327,13 +327,16 @@ namespace CromwellOnAzureDeployer
                             .ContinueWith(async t =>
                                 {
                                     linuxVm = t.Result;
-                                    networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
-                                    await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
 
                                     if (configuration.useInternalIP)
                                         sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryNetworkInterface().PrimaryPrivateIP, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
                                     else
+                                    {
+                                        networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
+                                        await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
                                         sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+
+                                    }
                                     await WaitForSshConnectivityAsync(sshConnectionInfo);
                                     await ConfigureVmAsync(sshConnectionInfo);
                                 },
@@ -930,8 +933,8 @@ namespace CromwellOnAzureDeployer
         {
             const int dataDiskSizeGiB = 32;
             const int dataDiskLun = 0;
-
-            return Execute(
+            if (configuration.useInternalIP)
+                return Execute(
                 $"Creating Linux VM: {configuration.VmName}...",
                 () => azureClient.VirtualMachines.Define(configuration.VmName)
                     .WithRegion(configuration.RegionName)
@@ -939,7 +942,7 @@ namespace CromwellOnAzureDeployer
                     .WithExistingPrimaryNetwork(vnet)
                     .WithSubnet(subnetName)
                     .WithPrimaryPrivateIPAddressDynamic()
-                    .WithNewPrimaryPublicIPAddress(configuration.VmName)
+                    .WithoutPrimaryPublicIPAddress()
                     .WithLatestLinuxImage("Canonical", "UbuntuServer", configuration.VmOsVersion)
                     .WithRootUsername(configuration.VmUsername)
                     .WithRootPassword(configuration.VmPassword)
@@ -947,6 +950,23 @@ namespace CromwellOnAzureDeployer
                     .WithSize(configuration.VmSize)
                     .WithExistingUserAssignedManagedServiceIdentity(managedIdentity)
                     .CreateAsync(cts.Token));
+            else
+                return Execute(
+                    $"Creating Linux VM: {configuration.VmName}...",
+                    () => azureClient.VirtualMachines.Define(configuration.VmName)
+                        .WithRegion(configuration.RegionName)
+                        .WithExistingResourceGroup(configuration.ResourceGroupName)
+                        .WithExistingPrimaryNetwork(vnet)
+                        .WithSubnet(subnetName)
+                        .WithPrimaryPrivateIPAddressDynamic()
+                        .WithNewPrimaryPublicIPAddress(configuration.VmName)
+                        .WithLatestLinuxImage("Canonical", "UbuntuServer", configuration.VmOsVersion)
+                        .WithRootUsername(configuration.VmUsername)
+                        .WithRootPassword(configuration.VmPassword)
+                        .WithNewDataDisk(dataDiskSizeGiB, dataDiskLun, CachingTypes.None)
+                        .WithSize(configuration.VmSize)
+                        .WithExistingUserAssignedManagedServiceIdentity(managedIdentity)
+                        .CreateAsync(cts.Token));
         }
 
         private Task<(INetwork virtualNetwork, string subnetName)> CreateVnetAsync(IResourceGroup resourceGroup, string name, string addressSpace)
