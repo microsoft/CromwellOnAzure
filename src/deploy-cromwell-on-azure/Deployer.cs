@@ -149,9 +149,11 @@ namespace CromwellOnAzureDeployer
                     }
 
                     configuration.VmName = linuxVm.Name;
-
-                    sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
-
+                    if (configuration.useInternalIP)
+                        sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryNetworkInterface().PrimaryPrivateIP, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+                    else
+                        sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+                
                     await WaitForSshConnectivityAsync(sshConnectionInfo);
 
                     var existingUserManagedIdentityId = linuxVm.UserAssignedManagedServiceIdentityIds.FirstOrDefault();
@@ -283,6 +285,7 @@ namespace CromwellOnAzureDeployer
                     RefreshableConsole.WriteLine($"VM host: {configuration.VmName}.{configuration.RegionName}.cloudapp.azure.com");
                     RefreshableConsole.WriteLine($"VM username: {configuration.VmUsername}");
                     RefreshableConsole.WriteLine($"VM password: {configuration.VmPassword}");
+
                     RefreshableConsole.WriteLine();
 
                     if (string.IsNullOrWhiteSpace(configuration.ResourceGroupName))
@@ -327,7 +330,10 @@ namespace CromwellOnAzureDeployer
                                     networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
                                     await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
 
-                                    sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+                                    if (configuration.useInternalIP)
+                                        sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryNetworkInterface().PrimaryPrivateIP, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+                                    else
+                                        sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
                                     await WaitForSshConnectivityAsync(sshConnectionInfo);
                                     await ConfigureVmAsync(sshConnectionInfo);
                                 },
@@ -429,8 +435,10 @@ namespace CromwellOnAzureDeployer
         {
             var timeout = TimeSpan.FromMinutes(10);
 
+            String connectString;
+
             return Execute(
-                "Waiting for VM to accept SSH connections...",
+                $"Waiting for VM to accept SSH connections on {sshConnectionInfo.Host}...",
                 async () =>
                 {
                     var startTime = DateTime.UtcNow;

@@ -39,6 +39,7 @@ namespace CromwellOnAzureDeployer
         public string VnetResourceGroupName { get; set; }
         public string VnetName { get; set; }
         public string SubnetName { get; set; }
+        public bool useInternalIP { get; set; } = false;
 
         public static Configuration BuildConfiguration(string[] args)
         {
