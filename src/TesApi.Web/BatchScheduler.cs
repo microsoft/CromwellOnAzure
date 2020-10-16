@@ -284,7 +284,6 @@ namespace TesApi.Web
             }
             catch (Exception exc)
             {
-                // TODO TONY: Fill Failure reason and log if BatchSchedulerException
                 tesTask.State = TesState.SYSTEMERROREnum;
                 tesTask.GetOrAddTesTaskLog().FailureReason = "UnknownError";
                 tesTask.AddToSystemLog(new[] { "UnknownError", exc.Message, exc.StackTrace });
@@ -640,6 +639,7 @@ namespace TesApi.Web
 
             var taskCommand = $@"
                 write_ts() {{ echo ""$1=$(date -Iseconds)"" >> {timingsPath}; }} && \
+                mkdir -p {batchExecutionDirectoryPath} && \
                 write_ts BlobXferPullStart && \
                 docker pull --quiet {BlobxferImageName} && \
                 write_ts BlobXferPullEnd && \
@@ -695,7 +695,6 @@ namespace TesApi.Web
         /// <returns>List of modified <see cref="TesInput"/> files</returns>
         private async Task<TesInput> GetTesInputFileUrl(TesInput inputFile, string taskId, List<string> queryStringsToRemoveFromLocalFilePaths)
         {
-            // TODO TONY: Fill FailureReason, maybe throw BatchSchedulerException with FailureReason, Log entries, then fill it elsewhere
             if (inputFile.Path != null && !inputFile.Path.StartsWith(CromwellPathPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 throw new TesException("InvalidInputFilePath", $"Unsupported input path '{inputFile.Path}' for task Id {taskId}. Must start with '{CromwellPathPrefix}'.");
