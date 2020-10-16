@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using TesApi.Web;
 
 namespace TesApi.Models
 {
@@ -27,6 +28,29 @@ namespace TesApi.Models
         }
 
         /// <summary>
+        /// Sets the failure reason for <see cref="TesTask"/> and optionally adds additional system log items
+        /// </summary>
+        /// <param name="tesTask"><see cref="TesTask"/></param>
+        /// <param name="failureReason">Failure reason code</param>
+        /// <param name="additionalSystemLogItems">Additional system log entries</param>
+        public static void SetFailureReason(this TesTask tesTask, string failureReason, params string[] additionalSystemLogItems)
+        {
+            tesTask.GetOrAddTesTaskLog().FailureReason = failureReason;
+            tesTask.AddToSystemLog(new[] { failureReason });
+            tesTask.AddToSystemLog(additionalSystemLogItems.Where(i => !string.IsNullOrEmpty(i)));
+        }
+
+        /// <summary>
+        /// Sets the failure reason for <see cref="TesTask"/> using values from <see cref="TesException"/>
+        /// </summary>
+        /// <param name="tesTask"><see cref="TesTask"/></param>
+        /// <param name="tesException"><see cref="TesException"/></param>
+        public static void SetFailureReason(this TesTask tesTask, TesException tesException)
+        {
+            tesTask.SetFailureReason(tesException.FailureReason, tesException.Message, tesException.StackTrace);
+        }
+
+        /// <summary>
         /// Returns the last <see cref="TesTaskLog"/>. Adds it if none exist.
         /// </summary>
         /// <param name="tesTask"><see cref="TesTask"/></param>
@@ -48,14 +72,8 @@ namespace TesApi.Models
         /// <returns>Last <see cref="TesTaskLog"/></returns>
         public static TesTaskLog AddTesTaskLog(this TesTask tesTask)
         {
-            if (tesTask.Logs == null)
-            {
-                tesTask.Logs = new List<TesTaskLog>();
-            }
-            else
-            {
-                tesTask.Logs.Add(new TesTaskLog());
-            }
+            tesTask.Logs ??= new List<TesTaskLog>();
+            tesTask.Logs.Add(new TesTaskLog());
 
             return tesTask.Logs.Last();
         }

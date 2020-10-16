@@ -92,16 +92,12 @@ namespace TesApi.Web
 
                 tesTaskLog.BatchNodeMetrics = batchInfo.BatchNodeMetrics;
                 tesTaskLog.CromwellResultCode = batchInfo.CromwellRcCode;
-                tesTaskLog.FailureReason = batchInfo.FailureReason;
                 tesTaskLog.EndTime = DateTime.UtcNow;
                 tesTaskExecutorLog.StartTime = batchInfo.BatchTaskStartTime;
                 tesTaskExecutorLog.EndTime = batchInfo.BatchTaskEndTime;
                 tesTaskExecutorLog.ExitCode = batchInfo.BatchTaskExitCode;
 
-                if (batchInfo.FailureReason != null)
-                {
-                    tesTask.AddToSystemLog(new[] { batchInfo.FailureReason });
-                }
+                tesTask.SetFailureReason(batchInfo.FailureReason);
 
                 if (batchInfo.SystemLogItems != null)
                 {
@@ -255,6 +251,7 @@ namespace TesApi.Web
             {
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask.Resources);
+                var tesTaskLog = tesTask.AddTesTaskLog();
 
                 await CheckBatchAccountQuotas((int)tesTask.Resources.CpuCores.GetValueOrDefault(DefaultCoreCount), virtualMachineInfo.LowPriority ?? false);
 
@@ -262,12 +259,12 @@ namespace TesApi.Web
                 var dockerImage = tesTask.Executors.First().Image;
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask);
                 var poolInformation = await CreatePoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority ?? false);
-                tesTask.GetOrAddTesTaskLog().VirtualMachineInfo = virtualMachineInfo;
+                tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
 
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
                 await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
-                tesTask.AddTesTaskLog().StartTime = DateTimeOffset.UtcNow;
+                tesTaskLog.StartTime = DateTimeOffset.UtcNow;
 
                 tesTask.State = TesState.INITIALIZINGEnum;
             }
@@ -278,15 +275,13 @@ namespace TesApi.Web
             catch (TesException exc)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
-                tesTask.GetOrAddTesTaskLog().FailureReason = exc.FailureReason;
-                tesTask.AddToSystemLog(new[] { exc.FailureReason, exc.Message });
+                tesTask.SetFailureReason(exc);
                 logger.LogError(exc, exc.Message);
             }
             catch (Exception exc)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
-                tesTask.GetOrAddTesTaskLog().FailureReason = "UnknownError";
-                tesTask.AddToSystemLog(new[] { "UnknownError", exc.Message, exc.StackTrace });
+                tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
                 logger.LogError(exc, exc.Message);
             }
         }
@@ -638,8 +633,8 @@ namespace TesApi.Web
             var timingsUrl = new Uri(await MapLocalPathToSasUrlAsync(timingsPath, getContainerSas: true));
 
             var taskCommand = $@"
-                write_ts() {{ echo ""$1=$(date -Iseconds)"" >> {timingsPath}; }} && \
-                mkdir -p {batchExecutionDirectoryPath} && \
+                write_ts() {{ echo ""$1=$(date -Iseconds)"" >> /mnt{timingsPath}; }} && \
+                mkdir -p /mnt{batchExecutionDirectoryPath} && \
                 write_ts BlobXferPullStart && \
                 docker pull --quiet {BlobxferImageName} && \
                 write_ts BlobXferPullEnd && \

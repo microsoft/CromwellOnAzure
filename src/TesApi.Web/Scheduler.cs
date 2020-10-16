@@ -148,8 +148,7 @@ namespace TesApi.Web
                     {
                         tesTask.State = TesState.SYSTEMERROREnum;
                         tesTask.EndTime = DateTimeOffset.UtcNow;
-                        tesTask.GetOrAddTesTaskLog().FailureReason = "UnknownError";
-                        tesTask.AddToSystemLog(new[] { "UnknownError", exc.Message, exc.StackTrace });
+                        tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
                     }
 
                     logger.LogError(exc, $"TES Task '{tesTask.Id}' threw an exception.");
