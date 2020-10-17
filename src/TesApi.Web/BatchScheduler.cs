@@ -80,7 +80,6 @@ namespace TesApi.Web
             static bool tesTaskIsInitializingOrRunning(TesTask tesTask) => tesTask.State == TesState.INITIALIZINGEnum || tesTask.State == TesState.RUNNINGEnum;
             static bool tesTaskIsQueuedOrInitializing(TesTask tesTask) => tesTask.State == TesState.QUEUEDEnum || tesTask.State == TesState.INITIALIZINGEnum;
             static bool tesTaskIsQueued(TesTask tesTask) => tesTask.State == TesState.QUEUEDEnum;
-            static bool tesTaskIsInitializing(TesTask tesTask) => tesTask.State == TesState.INITIALIZINGEnum;
             static bool tesTaskCancellationRequested(TesTask tesTask) => tesTask.State == TesState.CANCELEDEnum && tesTask.IsCancelRequested;
 
             static void SetTaskStateAndLog(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
@@ -629,11 +628,11 @@ namespace TesApi.Web
 
             var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) == null;
 
-            var timingsPath = $"{batchExecutionDirectoryPath}/timings.txt";
-            var timingsUrl = new Uri(await MapLocalPathToSasUrlAsync(timingsPath, getContainerSas: true));
+            var metricsPath = $"{batchExecutionDirectoryPath}/metrics.txt";
+            var metricsUrl = new Uri(await MapLocalPathToSasUrlAsync(metricsPath, getContainerSas: true));
 
             var taskCommand = $@"
-                write_ts() {{ echo ""$1=$(date -Iseconds)"" >> /mnt{timingsPath}; }} && \
+                write_ts() {{ echo ""$1=$(date -Iseconds)"" >> /mnt{metricsPath}; }} && \
                 mkdir -p /mnt{batchExecutionDirectoryPath} && \
                 write_ts BlobXferPullStart && \
                 docker pull --quiet {BlobxferImageName} && \
@@ -649,7 +648,8 @@ namespace TesApi.Web
                 write_ts UploadStart && \
                 docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \
                 write_ts UploadEnd && \
-                docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url ""{timingsUrl}"" --local-path ""{timingsPath}"" --rename --no-recursive
+                /bin/bash -c 'df -k /mnt > disk.txt && read -a diskusage <<< $(tail -n 1 disk.txt) && echo DiskSizeInKB=${{diskusage[1]}} >> /mnt{metricsPath} && echo DiskUsageInKB=${{diskusage[2]}} >> /mnt{metricsPath}'
+                docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url ""{metricsUrl}"" --local-path ""{metricsPath}"" --rename --no-recursive
             ";
 
             var batchExecutionDirectoryUrl = await MapLocalPathToSasUrlAsync($"{batchExecutionDirectoryPath}", getContainerSas: true);
@@ -923,11 +923,23 @@ namespace TesApi.Web
 
         private async Task<(BatchNodeMetrics BatchNodeMetrics, DateTimeOffset? TaskStartTime, DateTimeOffset? TaskEndTime, int? CromwellRcCode)> GetBatchNodeMetricsAndCromwellResultCodeAsync(TesTask tesTask)
         {
-            static double? GetDurationInSeconds(Dictionary<string, DateTimeOffset?> dict, string startKey, string endKey)
+            static double? GetDurationInSeconds(Dictionary<string, string> dict, string startKey, string endKey)
             {
-                return dict.TryGetValue(startKey, out var startTime) && startTime.HasValue && dict.TryGetValue(endKey, out var endTime) && endTime.HasValue
-                    ? endTime.Value.Subtract(startTime.Value).TotalSeconds
+                return TryGetValueAsDateTimeOffset(dict, startKey, out var startTime) && TryGetValueAsDateTimeOffset(dict, endKey, out var endTime)
+                    ? endTime.Subtract(startTime).TotalSeconds
                     : (double?)null;
+            }
+
+            static bool TryGetValueAsDateTimeOffset(Dictionary<string, string> dict, string key, out DateTimeOffset result)
+            {
+                result = default;
+                return dict.TryGetValue(key, out var valueAsString) && DateTimeOffset.TryParse(valueAsString, out result);
+            }
+
+            static bool TryGetValueAsDouble(Dictionary<string, string> dict, string key, out double result)
+            {
+                result = default;
+                return dict.TryGetValue(key, out var valueAsString) && double.TryParse(valueAsString, out result);
             }
 
             BatchNodeMetrics batchNodeMetrics = null;
@@ -944,29 +956,34 @@ namespace TesApi.Web
                     cromwellRcCode = temp;
                 }
 
-                var timingsContent = await GetFileContentAsync($"{GetBatchExecutionDirectoryPath(tesTask)}/timings.txt");
+                var metricsContent = await GetFileContentAsync($"{GetBatchExecutionDirectoryPath(tesTask)}/metrics.txt");
 
-                if (timingsContent != null)
+                if (metricsContent != null)
                 {
                     try
-                    { 
-                        var timings = DelimitedTextToDictionary(timingsContent.Trim()).ToDictionary(kv => kv.Key, kv => DateTimeOffset.TryParse(kv.Value, out var result) ? (DateTimeOffset?)result : null);
+                    {
+                        var metrics = DelimitedTextToDictionary(metricsContent.Trim());
+
+                        var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKB", out var diskSizeKB)  ? diskSizeKB / 1024 / 1024 : (double?)null;
+                        var diskUsageInGB = TryGetValueAsDouble(metrics, "DiskUsageInKB", out var diskUsageKB) ? diskUsageKB / 1024 / 1024 : (double?)null;
 
                         batchNodeMetrics = new BatchNodeMetrics
                         {
-                            BlobXferImagePullDurationInSeconds = GetDurationInSeconds(timings, "BlobXferPullStart", "BlobXferPullEnd"),
-                            ExecutorImagePullDurationInSeconds = GetDurationInSeconds(timings, "ExecutorPullStart", "ExecutorPullEnd"),
-                            FileDownloadDurationInSeconds = GetDurationInSeconds(timings, "DownloadStart", "DownloadEnd"),
-                            ExecutorDurationInSeconds = GetDurationInSeconds(timings, "ExecutorStart", "ExecutorEnd"),
-                            FileUploadDurationInSeconds = GetDurationInSeconds(timings, "UploadStart", "UploadEnd")
+                            BlobXferImagePullDurationInSeconds = GetDurationInSeconds(metrics, "BlobXferPullStart", "BlobXferPullEnd"),
+                            ExecutorImagePullDurationInSeconds = GetDurationInSeconds(metrics, "ExecutorPullStart", "ExecutorPullEnd"),
+                            FileDownloadDurationInSeconds = GetDurationInSeconds(metrics, "DownloadStart", "DownloadEnd"),
+                            ExecutorDurationInSeconds = GetDurationInSeconds(metrics, "ExecutorStart", "ExecutorEnd"),
+                            FileUploadDurationInSeconds = GetDurationInSeconds(metrics, "UploadStart", "UploadEnd"),
+                            MaxDiskUsageInGB = diskUsageInGB,
+                            MaxDiskUsagePercent = diskUsageInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsageInGB / diskSizeInGB) : null
                         };
 
-                        taskStartTime = timings.GetValueOrDefault("BlobXferPullStart");
-                        taskEndTime = timings.GetValueOrDefault("UploadEnd");
+                        taskStartTime = TryGetValueAsDateTimeOffset(metrics, "BlobXferPullStart", out var startTime) ? (DateTimeOffset?)startTime : null;
+                        taskEndTime = TryGetValueAsDateTimeOffset(metrics, "UploadEnd", out var endTime) ? (DateTimeOffset?)endTime: null;
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError($"Failed to parse timings for task {tesTask.Id}. Error: {ex.Message}");
+                        logger.LogError($"Failed to parse metrics for task {tesTask.Id}. Error: {ex.Message}");
                     }
                 }
             }

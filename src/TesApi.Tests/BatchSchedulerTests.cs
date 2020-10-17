@@ -234,7 +234,7 @@ namespace TesApi.Tests
         {
             var tesTask = GetTesTask();
 
-            var timingsFileContent = @"
+            var metricsFileContent = @"
                 BlobXferPullStart=2020-10-08T02:30:39+00:00
                 BlobXferPullEnd=2020-10-08T02:31:39+00:00
                 ExecutorPullStart=2020-10-08T02:32:39+00:00
@@ -244,11 +244,13 @@ namespace TesApi.Tests
                 ExecutorStart=2020-10-08T02:39:39+00:00
                 ExecutorEnd=2020-10-08T02:43:39+00:00
                 UploadStart=2020-10-08T02:44:39+00:00
-                UploadEnd=2020-10-08T02:49:39+00:00".Replace(" ", "");
+                UploadEnd=2020-10-08T02:49:39+00:00
+                DiskSizeInKB=2097152
+                DiskUsageInKB=262144".Replace(" ", "");
 
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
             azureProxyReturnValues.BatchJobAndTaskState = BatchJobAndTaskStates.TaskCompletedSuccessfully;
-            azureProxyReturnValues.DownloadedBlobContent = timingsFileContent;
+            azureProxyReturnValues.DownloadedBlobContent = metricsFileContent;
             var azureProxy = GetMockAzureProxy(azureProxyReturnValues);
 
             await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureProxy);
@@ -262,6 +264,9 @@ namespace TesApi.Tests
             Assert.AreEqual(180, batchNodeMetrics.FileDownloadDurationInSeconds);
             Assert.AreEqual(240, batchNodeMetrics.ExecutorDurationInSeconds);
             Assert.AreEqual(300, batchNodeMetrics.FileUploadDurationInSeconds);
+            Assert.AreEqual(300, batchNodeMetrics.FileUploadDurationInSeconds);
+            Assert.AreEqual(0.25, batchNodeMetrics.MaxDiskUsageInGB);
+            Assert.AreEqual(0.125f, batchNodeMetrics.MaxDiskUsagePercent);
 
             var executorLog = tesTask.GetOrAddTesTaskLog().GetOrAddExecutorLog();
             Assert.IsNotNull(executorLog);
