@@ -634,6 +634,7 @@ namespace TesApi.Web
             var taskCommand = $@"
                 write_ts() {{ echo ""$1=$(date -Iseconds)"" >> /mnt{metricsPath}; }} && \
                 mkdir -p /mnt{batchExecutionDirectoryPath} && \
+                (grep -q alpine /etc/os-release && apk add bash || :) && \
                 write_ts BlobXferPullStart && \
                 docker pull --quiet {BlobxferImageName} && \
                 write_ts BlobXferPullEnd && \
@@ -648,7 +649,7 @@ namespace TesApi.Web
                 write_ts UploadStart && \
                 docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \
                 write_ts UploadEnd && \
-                /bin/bash -c 'df -k /mnt > disk.txt && read -a diskusage <<< $(tail -n 1 disk.txt) && echo DiskSizeInKB=${{diskusage[1]}} >> /mnt{metricsPath} && echo DiskUsageInKB=${{diskusage[2]}} >> /mnt{metricsPath}'
+                /bin/bash -c 'df -k /mnt > disk.txt && read -a diskusage <<< $(tail -n 1 disk.txt) && echo DiskSizeInKB=${{diskusage[1]}} >> /mnt{metricsPath} && echo DiskUsageInKB=${{diskusage[2]}} >> /mnt{metricsPath}' && \
                 docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url ""{metricsUrl}"" --local-path ""{metricsPath}"" --rename --no-recursive
             ";
 
