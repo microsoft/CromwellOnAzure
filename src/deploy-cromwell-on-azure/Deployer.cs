@@ -204,8 +204,13 @@ namespace CromwellOnAzureDeployer
                     }
 
                     storageAccount = (await azureClient.StorageAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName))
-                        .FirstOrDefault(a => a.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase))
-                            ?? throw new ValidationException($"Storage account {storageAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
+                        .FirstOrDefault(a => a.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase));
+
+                    if (storageAccount == null)
+                    {
+                        storageAccount = (await TryGetExistingStorageAccountAsync(storageAccountName))
+                                ?? throw new ValidationException($"Storage account {storageAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
+                    }
 
                     configuration.StorageAccountName = storageAccountName;
 
@@ -809,21 +814,52 @@ namespace CromwellOnAzureDeployer
                 $"Creating Storage Account: {configuration.StorageAccountName}...",
                 async () =>
                 {
-                    var storageAccount = await azureClient.StorageAccounts
-                        .Define(configuration.StorageAccountName)
-                        .WithRegion(configuration.RegionName)
-                        .WithExistingResourceGroup(configuration.ResourceGroupName)
-                        .CreateAsync(cts.Token);
+                    var storageAccount = await TryGetExistingStorageAccountAsync();
+                    if (storageAccount == null) // no storage account exists under the specified name
+                    {
+                        storageAccount = await CreateNewStorageAccountAsync();
+                    }
 
                     cts.Token.ThrowIfCancellationRequested();
-
                     var blobClient = await GetBlobClientAsync(storageAccount);
-                    var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
 
+                    var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
                     await Task.WhenAll(defaultContainers.Select(c => blobClient.GetContainerReference(c).CreateIfNotExistsAsync(cts.Token)));
 
                     return storageAccount;
                 });
+        }
+
+        private async Task<IStorageAccount> CreateNewStorageAccountAsync()
+        {
+            return await azureClient.StorageAccounts
+                                        .Define(configuration.StorageAccountName)
+                                        .WithRegion(configuration.RegionName)
+                                        .WithExistingResourceGroup(configuration.ResourceGroupName)
+                                        .CreateAsync(cts.Token);
+        }
+
+        private async Task<IStorageAccount> TryGetExistingStorageAccountAsync()
+        {
+            var storageAccountName = configuration.StorageAccountName;
+
+            return await TryGetExistingStorageAccountAsync(storageAccountName);
+        }
+
+        private async Task<IStorageAccount> TryGetExistingStorageAccountAsync(string storageAccountName)
+        {
+            IStorageAccount storageAccount = null;
+            var resourceGroupNames = (await azureClient.ResourceGroups.ListAsync()).Select(a => a.Name);
+            foreach (var resourceGroupName in resourceGroupNames)
+            {
+                storageAccount = await azureClient.StorageAccounts.GetByResourceGroupAsync(resourceGroupName, storageAccountName);
+                if (storageAccount != null)
+                {
+                    break;
+                }
+            }
+
+            return storageAccount;
         }
 
         private Task WriteNonPersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount)
