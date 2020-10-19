@@ -32,6 +32,7 @@ namespace TesApi.Web
         private const string CromwellPathPrefix = "/cromwell-executions/";
         private const string CromwellScriptFileName = "script";
         private const string BatchExecutionDirectoryName = "__batch";
+        private const string BatchScriptFileName = "batch_script";
         private const string UploadFilesScriptFileName = "upload_files_script";
         private const string DownloadFilesScriptFileName = "download_files_script";
         private const string DockerInDockerImageName = "docker";
@@ -396,7 +397,7 @@ namespace TesApi.Web
         /// <summary>
         /// Gets the current state of the Azure Batch task
         /// </summary>
-        /// <param name="tesTaskId">The unique ID of the <see cref="TesTask"/></param>
+        /// <param name="tesTask"><see cref="TesTask"/></param>
         /// <returns>A higher-level abstraction of the current state of the Azure Batch task</returns>
         private async Task<CombinedBatchTaskInfo> GetBatchTaskStateAsync(TesTask tesTask)
         {
@@ -631,7 +632,7 @@ namespace TesApi.Web
             var metricsPath = $"{batchExecutionDirectoryPath}/metrics.txt";
             var metricsUrl = new Uri(await MapLocalPathToSasUrlAsync(metricsPath, getContainerSas: true));
 
-            var taskCommand = $@"
+            var batchScript = $@"
                 write_ts() {{ echo ""$1=$(date -Iseconds)"" >> /mnt{metricsPath}; }} && \
                 mkdir -p /mnt{batchExecutionDirectoryPath} && \
                 (grep -q alpine /etc/os-release && apk add bash || :) && \
@@ -649,16 +650,21 @@ namespace TesApi.Web
                 write_ts UploadStart && \
                 docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \
                 write_ts UploadEnd && \
-                /bin/bash -c 'df -k /mnt > disk.txt && read -a diskusage <<< $(tail -n 1 disk.txt) && echo DiskSizeInKB=${{diskusage[1]}} >> /mnt{metricsPath} && echo DiskUsageInKB=${{diskusage[2]}} >> /mnt{metricsPath}' && \
+                /bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsageInKB=${{disk[2]}} >> /mnt{metricsPath}'
                 docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url ""{metricsUrl}"" --local-path ""{metricsPath}"" --rename --no-recursive
-            ";
+            ".Replace("    ", "");
+
+            var batchScriptPath = $"{batchExecutionDirectoryPath}/{BatchScriptFileName}";
+            var writableBatchScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(batchScriptPath, getContainerSas: true));
+            var batchScriptUrl = await MapLocalPathToSasUrlAsync(batchScriptPath);
+            await azureProxy.UploadBlobAsync(writableBatchScriptUrl, batchScript);
 
             var batchExecutionDirectoryUrl = await MapLocalPathToSasUrlAsync($"{batchExecutionDirectoryPath}", getContainerSas: true);
 
-            var cloudTask = new CloudTask(taskId, $"/bin/sh -c '{taskCommand.Trim()}'")
+            var cloudTask = new CloudTask(taskId, $"/bin/sh /mnt{batchScriptPath}")
             {
                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-                ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptUrl, $"/mnt{uploadFilesScriptPath}") },
+                ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(batchScriptUrl, $"/mnt{batchScriptPath}"), ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptUrl, $"/mnt{uploadFilesScriptPath}") },
                 OutputFiles = new List<OutputFile> {
                     new OutputFile(
                         "../std*.txt",

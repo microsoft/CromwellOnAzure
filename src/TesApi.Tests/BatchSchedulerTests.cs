@@ -91,7 +91,8 @@ namespace TesApi.Tests
         {
             (_, var cloudTask, _) = await ProcessTesTaskAndGetBatchJobArgumentsAsync();
 
-            Assert.AreEqual(2, cloudTask.ResourceFiles.Count());
+            Assert.AreEqual(3, cloudTask.ResourceFiles.Count());
+            Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/batch_script")));
             Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/upload_files_script")));
             Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/download_files_script")));
         }
@@ -517,13 +518,15 @@ namespace TesApi.Tests
         public async Task PrivateImagesArePulledUsingPoolConfiguration()
         {
             var tesTask = GetTesTask();
+            var azureProxy = GetMockAzureProxy(AzureProxyReturnValues.Defaults);
 
-            (_, var cloudTask, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+            (_, var cloudTask, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureProxy);
+            var batchScript = (string)azureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.UploadBlobAsync) && i.Arguments[0].ToString().Contains("/batch_script"))?.Arguments[1];
 
             Assert.IsNotNull(poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration);
             Assert.AreEqual("registryServer1", poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.FirstOrDefault()?.RegistryServer);
-            Assert.AreEqual(1, Regex.Matches(cloudTask.CommandLine, tesTask.Executors.First().Image, RegexOptions.IgnoreCase).Count);
-            Assert.IsFalse(cloudTask.CommandLine.Contains($"docker pull --quiet {tesTask.Executors.First().Image}"));
+            Assert.AreEqual(1, Regex.Matches(batchScript, tesTask.Executors.First().Image, RegexOptions.IgnoreCase).Count);
+            Assert.IsFalse(batchScript.Contains($"docker pull --quiet {tesTask.Executors.First().Image}"));
         }
 
         [TestMethod]
@@ -531,12 +534,14 @@ namespace TesApi.Tests
         {
             var tesTask = GetTesTask();
             tesTask.Executors.First().Image = "ubuntu";
+            var azureProxy = GetMockAzureProxy(AzureProxyReturnValues.Defaults);
 
-            (_, var cloudTask, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+            (_, var cloudTask, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), azureProxy);
+            var batchScript = (string)azureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.UploadBlobAsync) && i.Arguments[0].ToString().Contains("/batch_script"))?.Arguments[1];
 
             Assert.IsNull(poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration);
-            Assert.AreEqual(2, Regex.Matches(cloudTask.CommandLine, tesTask.Executors.First().Image, RegexOptions.IgnoreCase).Count);
-            Assert.IsTrue(cloudTask.CommandLine.Contains("docker pull --quiet ubuntu"));
+            Assert.AreEqual(2, Regex.Matches(batchScript, tesTask.Executors.First().Image, RegexOptions.IgnoreCase).Count);
+            Assert.IsTrue(batchScript.Contains("docker pull --quiet ubuntu"));
         }
 
         [TestMethod]
