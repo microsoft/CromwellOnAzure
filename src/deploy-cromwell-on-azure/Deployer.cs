@@ -97,7 +97,7 @@ namespace CromwellOnAzureDeployer
                 azureClient = GetAzureClient(azureCredentials);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
 
-                await ValidateSubscriptionAndResourceGroupAsync(configuration.SubscriptionId, configuration.ResourceGroupName, configuration.Update);
+                await ValidateSubscriptionResourceGroupAndStorageAccountAsync(configuration.SubscriptionId, configuration.ResourceGroupName, configuration.StorageAccountName, configuration.Update);
 
                 IResourceGroup resourceGroup = null;
                 BatchAccount batchAccount = null;
@@ -1242,7 +1242,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task ValidateSubscriptionAndResourceGroupAsync(string subscriptionId, string resourceGroupName, bool isUpdate)
+        private async Task ValidateSubscriptionResourceGroupAndStorageAccountAsync(string subscriptionId, string resourceGroupName, string storageAccountName, bool isUpdate)
         {
             const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
@@ -1270,6 +1270,19 @@ namespace CromwellOnAzureDeployer
             if (!string.IsNullOrEmpty(resourceGroupName) && !rgExists)
             {
                 throw new ValidationException($"If ResourceGroupName is provided, the resource group must already exist.", displayExample: false);
+            }
+
+            if (storageAccountName != null)
+            {
+                var isAvailable = (await azureClient.StorageAccounts.CheckNameAvailabilityAsync(storageAccountName)).IsAvailable;
+                if (isAvailable == null)
+                {
+                    throw new ValidationException($"Unable to verify if the StorageAccountName is an account that already exists", displayExample: false);
+                }
+                else if ((bool)isAvailable) // if the storage account is available, then fail because we expect the storage account to exist already and not be available
+                {
+                    throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist.", displayExample: false);
+                }
             }
 
             var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
