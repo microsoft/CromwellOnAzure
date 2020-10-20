@@ -324,12 +324,8 @@ namespace TesApi.Web
                         {
                             nodeState = node.State;
                             var nodeError = node.Errors?.FirstOrDefault();
-
-                            if (nodeError != null && nodeError.Code != null)
-                            {
-                                nodeErrorCode = nodeError.Code;
-                                nodeErrorDetails = nodeError.ErrorDetails?.Select(e => e.Value);
-                            }
+                            nodeErrorCode = nodeError?.Code;
+                            nodeErrorDetails = nodeError?.ErrorDetails?.Select(e => e.Value);
                         }
                     }
                     else

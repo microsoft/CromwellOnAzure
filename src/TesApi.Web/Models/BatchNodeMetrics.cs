@@ -57,27 +57,27 @@ namespace TesApi.Models
         public double? FileUploadSizeInGB { get; set; }
 
         /// <summary>
-        /// Max disk usage in GB
+        /// Disk space used in GB
         /// </summary>
-        [TesTaskLogMetadataKey("max_disk_usage_gb")]
-        public double? MaxDiskUsageInGB { get; set; }
+        [TesTaskLogMetadataKey("disk_used_gb")]
+        public double? DiskUsedInGB { get; set; }
 
         /// <summary>
-        /// Max resident memory usage in GB
+        /// Max resident memory used in GB
         /// </summary>
-        [TesTaskLogMetadataKey("max_res_mem_usage_gb")]
-        public double? MaxResidentMemoryUsageInGB { get; set; }
+        [TesTaskLogMetadataKey("max_res_mem_used_gb")]
+        public double? MaxResidentMemoryUsedInGB { get; set; }
 
         /// <summary>
-        /// Max disk usage as percent of total
+        /// Disk space used as percent of total
         /// </summary>
-        [TesTaskLogMetadataKey("max_disk_usage_pct")]
-        public float? MaxDiskUsagePercent { get; set; }
+        [TesTaskLogMetadataKey("disk_used_pct")]
+        public float? DiskUsedPercent { get; set; }
 
         /// <summary>
-        /// Max resident memory usage as percent of total
+        /// Max resident memory used as percent of total
         /// </summary>
-        [TesTaskLogMetadataKey("max_res_mem_usage_pct")]
-        public float? MaxResidentMemoryUsagePercent { get; set; }
+        [TesTaskLogMetadataKey("max_res_mem_used_pct")]
+        public float? MaxResidentMemoryUsedPercent { get; set; }
     }
 }

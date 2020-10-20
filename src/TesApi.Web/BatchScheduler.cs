@@ -121,9 +121,6 @@ namespace TesApi.Web
 
             tesTaskStateTransitions = new List<TesTaskStateTransition>()
             {
-                // TODO TONY: Recognized error: FailureReason, one line to SystemLog
-                // Unknown error: FailureReason=UnknownPoolError/UnknownNodeError etc., one line to System log with Node error code if it exists or other code-like message we can get from pool or node, plus dump of AzureBatchJobAndTaskState - just non null values serialized
-
                 new TesTaskStateTransition(tesTaskCancellationRequested, batchTaskState: null, CancelTaskAsync),
                 new TesTaskStateTransition(tesTaskIsQueued, BatchTaskState.JobNotFound, (tesTask, _) => AddBatchJobAsync(tesTask)),
                 new TesTaskStateTransition(tesTaskIsQueued, BatchTaskState.MissingBatchTask, DeleteBatchJobAndRequeueTaskAsync),
@@ -403,6 +400,23 @@ namespace TesApi.Web
         {
             var azureBatchJobAndTaskState = await azureProxy.GetBatchJobAndTaskStateAsync(tesTask.Id);
 
+            static IEnumerable<string> ConvertNodeErrorsToSystemLogItems(AzureBatchJobAndTaskState azureBatchJobAndTaskState)
+            {
+                var systemLogItems = new List<string>();
+
+                if (azureBatchJobAndTaskState.NodeErrorCode != null)
+                {
+                    systemLogItems.Add(azureBatchJobAndTaskState.NodeErrorCode);
+                }
+
+                if (azureBatchJobAndTaskState.NodeErrorDetails != null)
+                {
+                    systemLogItems.AddRange(azureBatchJobAndTaskState.NodeErrorDetails);
+                }
+
+                return systemLogItems;
+            }
+
             if (azureBatchJobAndTaskState.ActiveJobWithMissingAutoPool)
             {
                 var batchJobInfo = JsonConvert.SerializeObject(azureBatchJobAndTaskState);
@@ -419,33 +433,29 @@ namespace TesApi.Web
             {
                 case null:
                 case JobState.Deleting:
-                    // TODO TONY JobNotFound is both good and bad, depending on the task state, but that decision needs to be made outside
                     return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.JobNotFound, FailureReason = BatchTaskState.JobNotFound.ToString() };
-                    // return (BatchTaskState.JobNotFound, null, null); // Treating the deleting job as if it doesn't exist, // TODO TONY: Is there an error code here? SHoud transition interpret BatchTaskState and then pull error code if needed? As oppoised to handle doing it?
                 case JobState.Active:
                     {
                         if (azureBatchJobAndTaskState.NodeAllocationFailed)
                         {
-                            return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeAllocationFailed, FailureReason = BatchTaskState.NodeAllocationFailed.ToString() }; // TODO TONY Need to get additional error code here
+                            return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeAllocationFailed, FailureReason = BatchTaskState.NodeAllocationFailed.ToString(), SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState) };
+                        }
+
+                        if (azureBatchJobAndTaskState.NodeState == ComputeNodeState.Unusable)
+                        {
+                            return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeUnusable, FailureReason = BatchTaskState.NodeUnusable.ToString(), SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState) };
                         }
 
                         if (azureBatchJobAndTaskState.NodeErrorCode != null)
                         {
-                            if(azureBatchJobAndTaskState.NodeErrorCode == "DiskFull")
+                            if (azureBatchJobAndTaskState.NodeErrorCode == "DiskFull")
                             {
                                 return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeFailedDuringStartupOrExecution, FailureReason = azureBatchJobAndTaskState.NodeErrorCode };
                             }
                             else
                             {
-                                return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeFailedDuringStartupOrExecution, FailureReason = BatchTaskState.NodeFailedDuringStartupOrExecution.ToString(), SystemLogItems = new [] { azureBatchJobAndTaskState.NodeErrorCode } };
+                                return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeFailedDuringStartupOrExecution, FailureReason = BatchTaskState.NodeFailedDuringStartupOrExecution.ToString(), SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState) };
                             }
-                            // TODO TONY handle elsewhere: var message = $"{azureBatchJobAndTaskState.NodeErrorCode}: {(azureBatchJobAndTaskState.NodeErrorDetails != null ? string.Join(", ", azureBatchJobAndTaskState.NodeErrorDetails) : null)}";
-                              //return (BatchTaskState.NodeFailedDuringStartupOrExecution, azureBatchJobAndTaskState.NodeErrorCode, azureBatchJobAndTaskState); // Do we extract relevant part of azureBatchJobAndTaskState into a string? Or string[]
-                        }
-
-                        if (azureBatchJobAndTaskState.NodeState == ComputeNodeState.Unusable) // TODO TONY Need to get additional error code here
-                        {
-                            return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeUnusable, FailureReason = BatchTaskState.NodeUnusable.ToString() };
                         }
 
                         break;
@@ -579,6 +589,8 @@ namespace TesApi.Web
             }
 
             var batchExecutionDirectoryPath = GetBatchExecutionDirectoryPath(task);
+            var metricsPath = $"{batchExecutionDirectoryPath}/metrics.txt";
+            var metricsUrl = new Uri(await MapLocalPathToSasUrlAsync(metricsPath, getContainerSas: true));
 
             // TODO: Cromwell bug: Cromwell command write_tsv() generates a file in the execution directory, for example execution/write_tsv_3922310b441805fc43d52f293623efbc.tmp. These are not passed on to TES inputs.
             // WORKAROUND: Get the list of files in the execution directory and add them to task inputs.
@@ -587,17 +599,20 @@ namespace TesApi.Web
             var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
             var filesToDownload = await Task.WhenAll(inputFiles.Union(additionalInputFiles).Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
 
+            const string exitIfDownloadedFileIsNotFound = "{ [ -f \"$path\" ] && : || { echo \"Failed to download file $url\" 1>&2 && exit 1; } }";
+            const string incrementTotalBytesTransferred = "total_bytes=$(( $total_bytes + `stat -c %s \"$path\"` ))";
+
             // Using --include and not using --no-recursive as a workaround for https://github.com/Azure/blobxfer/issues/123
-            var downloadFilesScriptContent = string.Join(" && ", filesToDownload.Select(f =>
-            {
-                var downloadSingleFile = f.Url.Contains(".blob.core.")
-                    ? $"blobxfer download --storage-url '{f.Url}' --local-path '{f.Path}' --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
-                    : $"mkdir -p {GetParentPath(f.Path)} && wget -O '{f.Path}' '{f.Url}'";
+            var downloadFilesScriptContent = "total_bytes=0 && " 
+                + string.Join(" && ", filesToDownload.Select(f => {
+                    var setVariables = $"path='{f.Path}' && url='{f.Url}'";
 
-                var exitIfDownloadedFileIsNotFound = $"{{ [ -f '{f.Path}' ] && : || {{ echo 'Failed to download file {f.Url}' 1>&2 && exit 1; }} }}";
+                    var downloadSingleFile = f.Url.Contains(".blob.core.")
+                        ? $"blobxfer download --storage-url \"$url\" --local-path \"$path\" --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
+                        : "mkdir -p $(dirname \"$path\") && wget -O \"$path\" \"$url\"";
 
-                return $"{downloadSingleFile} && {exitIfDownloadedFileIsNotFound}";
-            }));
+                    return $"{setVariables} && {downloadSingleFile} && {exitIfDownloadedFileIsNotFound} && {incrementTotalBytesTransferred}"; })) 
+                + $" && echo FileDownloadSizeInBytes=$total_bytes >> {metricsPath}";
 
             var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
             var writableDownloadFilesScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(downloadFilesScriptPath, getContainerSas: true));
@@ -608,15 +623,18 @@ namespace TesApi.Web
                 task.Outputs.Select(async f =>
                     new TesOutput { Path = f.Path, Url = await MapLocalPathToSasUrlAsync(f.Path, getContainerSas: true), Name = f.Name, Type = f.Type }));
 
-            var uploadFilesScriptContent = string.Join(" && ", filesToUpload.Select(f =>
-            {
-                // Ignore missing stdout/stderr files. CWL workflows have an issue where if the stdout/stderr are redirected, they are still listed in the TES outputs
-                // Ignore any other missing files and directories. WDL tasks can have optional output files.
-                // Syntax is: If file or directory doesn't exist, run a noop (":") operator, otherwise run the upload command:
-                // { if not exists do nothing else upload; } && { ... }
+            // Ignore missing stdout/stderr files. CWL workflows have an issue where if the stdout/stderr are redirected, they are still listed in the TES outputs
+            // Ignore any other missing files and directories. WDL tasks can have optional output files.
+            // Syntax is: If file or directory doesn't exist, run a noop (":") operator, otherwise run the upload command:
+            // { if not exists do nothing else upload; } && { ... }
+            var uploadFilesScriptContent = "total_bytes=0 && "
+                + string.Join(" && ", filesToUpload.Select(f => {
+                    var setVariables = $"path='{f.Path}' && url='{f.Url}'";
+                    var blobxferCommand = $"blobxfer upload --storage-url \"$url\" --local-path \"$path\" --one-shot-bytes 104857600 {(f.Type == TesFileType.FILEEnum ? "--rename --no-recursive" : "")}";
 
-                return $"{{ [ ! -e '{f.Path}' ] && : || blobxfer upload --storage-url '{f.Url}' --local-path '{f.Path}' --one-shot-bytes 104857600 {(f.Type == TesFileType.FILEEnum ? "--rename --no-recursive" : "")}; }}";
-            }));
+                    return $"{{ {setVariables} && [ ! -e \"$path\" ] && : || {{ {blobxferCommand} && {incrementTotalBytesTransferred}; }} }}";
+                }))
+                + $" && echo FileUploadSizeInBytes=$total_bytes >> {metricsPath}";
 
             var uploadFilesScriptPath = $"{batchExecutionDirectoryPath}/{UploadFilesScriptFileName}";
             var writableUploadFilesScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(uploadFilesScriptPath, getContainerSas: true));
@@ -629,17 +647,16 @@ namespace TesApi.Web
 
             var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) == null;
 
-            var metricsPath = $"{batchExecutionDirectoryPath}/metrics.txt";
-            var metricsUrl = new Uri(await MapLocalPathToSasUrlAsync(metricsPath, getContainerSas: true));
-
             var batchScript = $@"
-                write_ts() {{ echo ""$1=$(date -Iseconds)"" >> /mnt{metricsPath}; }} && \
+                write_kv() {{ echo ""$1=$2"" >> /mnt{metricsPath}; }} && \
+                write_ts() {{ write_kv $1 $(date -Iseconds); }} && \
                 mkdir -p /mnt{batchExecutionDirectoryPath} && \
                 (grep -q alpine /etc/os-release && apk add bash || :) && \
                 write_ts BlobXferPullStart && \
                 docker pull --quiet {BlobxferImageName} && \
                 write_ts BlobXferPullEnd && \
                 {(executorImageIsPublic ? $"write_ts ExecutorPullStart && docker pull --quiet {executor.Image} && write_ts ExecutorPullEnd && \\" : "")}
+                write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \""Size\"" | grep -Po '(?i)\""Size\"":\K([^,]*)') && \
                 write_ts DownloadStart && \
                 docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {downloadFilesScriptPath} && \
                 write_ts DownloadEnd && \
@@ -650,7 +667,7 @@ namespace TesApi.Web
                 write_ts UploadStart && \
                 docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \
                 write_ts UploadEnd && \
-                /bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsageInKB=${{disk[2]}} >> /mnt{metricsPath}'
+                /bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKB=${{disk[2]}} >> /mnt{metricsPath}'
                 docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url ""{metricsUrl}"" --local-path ""{metricsPath}"" --rename --no-recursive
             ".Replace("    ", "");
 
@@ -679,7 +696,7 @@ namespace TesApi.Web
                 // This also requires that the main task runs inside a container. So we run the "docker" container that in turn runs other containers.
                 // If the executor image is public, there is no need for pool ContainerConfiguration and task can run normally, without being wrapped in a docker container.
                 // Volume mapping for docker.sock below allows the docker client in the container to access host's docker daemon.
-                var containerRunOptions = $"--rm -v /var/run/docker.sock:/var/run/docker.sock -v /mnt{cromwellPathPrefixWithoutEndSlash}:/mnt{cromwellPathPrefixWithoutEndSlash} ";
+                var containerRunOptions = $"--rm -v /var/run/docker.sock:/var/run/docker.sock -v /mnt:/mnt ";
                 cloudTask.ContainerSettings = new TaskContainerSettings(DockerInDockerImageName, containerRunOptions);
             }
 
@@ -930,6 +947,9 @@ namespace TesApi.Web
 
         private async Task<(BatchNodeMetrics BatchNodeMetrics, DateTimeOffset? TaskStartTime, DateTimeOffset? TaskEndTime, int? CromwellRcCode)> GetBatchNodeMetricsAndCromwellResultCodeAsync(TesTask tesTask)
         {
+            const double BytesInGB = 1024 * 1024 * 1024;
+            const double kBInGB = 1024 * 1024;
+
             static double? GetDurationInSeconds(Dictionary<string, string> dict, string startKey, string endKey)
             {
                 return TryGetValueAsDateTimeOffset(dict, startKey, out var startTime) && TryGetValueAsDateTimeOffset(dict, endKey, out var endTime)
@@ -970,19 +990,22 @@ namespace TesApi.Web
                     try
                     {
                         var metrics = DelimitedTextToDictionary(metricsContent.Trim());
-
-                        var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKB", out var diskSizeKB)  ? diskSizeKB / 1024 / 1024 : (double?)null;
-                        var diskUsageInGB = TryGetValueAsDouble(metrics, "DiskUsageInKB", out var diskUsageKB) ? diskUsageKB / 1024 / 1024 : (double?)null;
+                         
+                        var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKB", out var diskSizeKB)  ? diskSizeKB / kBInGB : (double?)null;
+                        var diskUsedInGB = TryGetValueAsDouble(metrics, "DiskUsedInKB", out var diskUsedKB) ? diskUsedKB / kBInGB : (double?)null;
 
                         batchNodeMetrics = new BatchNodeMetrics
                         {
                             BlobXferImagePullDurationInSeconds = GetDurationInSeconds(metrics, "BlobXferPullStart", "BlobXferPullEnd"),
                             ExecutorImagePullDurationInSeconds = GetDurationInSeconds(metrics, "ExecutorPullStart", "ExecutorPullEnd"),
+                            ExecutorImageSizeInGB = TryGetValueAsDouble(metrics, "ExecutorImageSizeInBytes", out var executorImageSizeInBytes) ? executorImageSizeInBytes / BytesInGB : (double?)null,
                             FileDownloadDurationInSeconds = GetDurationInSeconds(metrics, "DownloadStart", "DownloadEnd"),
+                            FileDownloadSizeInGB = TryGetValueAsDouble(metrics, "FileDownloadSizeInBytes", out var fileDownloadSizeInBytes) ? fileDownloadSizeInBytes / BytesInGB : (double?)null,
                             ExecutorDurationInSeconds = GetDurationInSeconds(metrics, "ExecutorStart", "ExecutorEnd"),
                             FileUploadDurationInSeconds = GetDurationInSeconds(metrics, "UploadStart", "UploadEnd"),
-                            MaxDiskUsageInGB = diskUsageInGB,
-                            MaxDiskUsagePercent = diskUsageInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsageInGB / diskSizeInGB) : null
+                            FileUploadSizeInGB = TryGetValueAsDouble(metrics, "FileUploadSizeInBytes", out var fileUploadSizeInBytes) ? fileUploadSizeInBytes / BytesInGB : (double?)null,
+                            DiskUsedInGB = diskUsedInGB,
+                            DiskUsedPercent = diskUsedInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsedInGB / diskSizeInGB) : null
                         };
 
                         taskStartTime = TryGetValueAsDateTimeOffset(metrics, "BlobXferPullStart", out var startTime) ? (DateTimeOffset?)startTime : null;
@@ -1000,77 +1023,6 @@ namespace TesApi.Web
             }
 
             return (batchNodeMetrics, taskStartTime, taskEndTime, cromwellRcCode);
-
-
-            // TODO TONY:
-            //batchNodeMetrics.ExecutorImageSizeInGB = null;
-            //batchNodeMetrics.FileDownloadSizeInGB = null;
-            //batchNodeMetrics.FileUploadSizeInGB = null;
-            //batchNodeMetrics.MaxDiskUsageInGB = null;
-            //batchNodeMetrics.MaxDiskUsagePercent = null;
-            //batchNodeMetrics.MaxResidentMemoryUsageInGB = null;
-            //batchNodeMetrics.MaxResidentMemoryUsagePercent = null;
-            // TODO:
-            //executorLog.ExitCode = null; // Batch task exit code
-
-            // Interating time points:
-            // Trigger file created - creation time of the blob => needs to be picked up by Trigger service and written back to the trigger file
-            // Trigger file sent to Cromwell => needs to be written by trigger service
-            // Task added to TES by Cromwell = tesTask.CreatedTime - OK
-            // Task sent to batch for execution = tesTask.TesTaskLog.BatchNodeMetrics.TimeScheduledForExecution - could be tesTask.Logs[].StartTime
-            // Task actually started running on the node (before downloads started) = tesTask.TesTaskLog.BatchNodeMetrics.TimeExecutionStartedOnNode, could be tesTask.Logs[].Logs[].StartTime
-            // Downloads size and duration (images and files) = tesTask.TesTaskLog.BatchNodeMetrics.FileDownloadSizeInGB / FileDownloadDurationInSeconds
-            // Executor script started running on the node (after all downloads)
-            // Executor script finished running on the node (or just capture duration) = tesTask.TesTaskLog.BatchNodeMetrics.ExecutorDurationInSeconds
-            // Uploads size and duration = tesTask.TesTaskLog.BatchNodeMetricsFileUploadSizeInGB / FileUploadDurationInSeconds
-            // Task ended running on the node = tesTask.TesTaskLog.BatchNodeMetrics.TimeExecutionEndedOnNode, could be tesTask.Logs[].Logs[].EndTime
-            // Batch/TES realized the task is done and set the task state to completed = tesTask.EndTime - OK, although the value could be obtained from the tesTask.Logs[].EndTime of the last log (usually one)
-
-            // Interesting resource usage:
-            // Max resident memory consumed on the node = MaxResidentMemoryUsageInGB
-            // Max resident memory consumed on the node as percentage of total = MaxResidentMemoryUsagePercent
-            // Max disk consumed on the node = MaxDiskUsageInGB
-            // Max disk consumed on the node as percentage of total = MaxDiskUsagePercent
-
-            // Start/end time provided by the original TES:
-            // tesTask.StartTime - Date + time the task was created
-            // tesTask.Logs[].StartTime - When the task started (there is a Logs item for each execution attempt - There might be multiple? When do we add a new one? ). Could be sent to batch.
-            // tesTask.Logs[].EndTime - When the task ended (there is a Logs item for each execution attempt - same q as above). Could be TES realized batch is done.
-            // tesTask.Logs[].Logs[].StartTime - Time the executor started (there is a Logs item for each executor - there is only one). Could be actual code started running on the node.
-            // tesTask.Logs[].Logs[].EndTime - Time the executor ended (there is a Logs item for each executor - there is only one). Could be actual code ended running on the node.
-            // Added by us:
-            // tesTask.EndTime = date time when task went to final state. Could be equal to tesTask.Logs[].EndTime of the last Log item (usually one).
-
-            // Other:
-            // tesTask.Logs[].Logs[].ExitCode - exit code of the executor - as reported by batch, not Cromwell RC
-            // tesTask.Logs[].SystemLogs[]: We could use this to record final_error_code, instead of or in addition to tesTask.Logs[].FinalErrorCode
-            //   - System logs are any logs the system decides are relevant, which are not tied directly to an Executor process. 
-            //   - Content is implementation specific: format, size, etc.  System logs may be collected here to provide convenient access.  
-            //   - For example, the system may include the name of the host where the task is executing, an error message that caused a SYSTEM_ERROR state (e.g. disk is full), etc.  
-            //   - System logs are only included in the FULL task view.
-
-
-            // TesTask log was conventient place to add new properties as it has the Metadata dictionary intended for this purpose.
-            // When the task is done, it should be easy to get the following:
-            // Overall state = tesTask.State
-            // For failed tasks, the reason for failure = tesTask.Logs[LAST].FailureReason - may want to bring this to tesTask.FailureReason, but not serialize it. May want to also write to tesTask.Logs[].SystemLogs[] array as item 0, so it is exposed via TES APIs
-            // For completed tasks, Cromwell RC code = tesTask.Logs[LAST].CromwellResultCode - may want to bring this to tesTask.CromwellResultCode, but not serialize it.
-
-            // Trigger service needs to write to Trigger file:
-            // 1. Why did my workflow end up in failed folder?
-            // 2. How can I reduce the cost and duration of the workflow? Which steps need more/less computing resources?
-            // Count of: total number of tasks, running, completed successfully, failed. overall duration, total vm time, total est cost
-            // List of failed tasks (state is EXECUTOR_ERROR/SYSTEM_ERROR or have CromwellRC != 0), along with FailureReason for each task.
-            // FailedTasks: TaskNameWithShard, FailureReason, CromwellRC
-            // Should FailureReason be set to "NonZeroCromwellResultCode" when task is COMPLETED but has non-zero Cromwell RC, or should it be left empty in CosmosDb, since it didn't actually fail in TES/Batch? Should it be set it in the report only?
-            // Should we consider missing RC code (but that should fail the task)?
-            // Should we include the tail of the stderr from the execution if RC != 0 and tail from __batch stderr if executor/system error? These could go to TaskLog.SystemLog or TaskLog.ExecutorLog, and include this in trigger file just for the first failed task?
-            // Approximate cost of the execution, summarized by task name (excluding the shard number), plus total VM time, total elapsed time and cost
-            // Memory and disk usage percentage for each task in the workflow, Or grouped by (task name w/o shard + VM mem/disk requested and allocated) (with max GB and % for mem/disk, average/min/max duration of execution on the node incl. up/down)
-            // TaskName, DiskRequestd, MemoryRequested, DiskAllocated, MemoryAllocated, MaxDiskGB, MaxDiskPct, MaxMemGB, MaxMemPct, AvgDurationSec, MaxDurationSec, MinDurationSec, InstanceCount, TotalVmTime, TotalVmCost, only consider reporting successful tasks here.
-
-
-            // May want to separate TES model from TesApi.Web, so it can be referenced by Trigger service
         }
 
         private async Task<string> GetFileContentAsync(string path)

@@ -29,17 +29,7 @@
     "disk_gb": 0,
     "zones": [
       "string"
-    ],
-    "vm_info": {
-      "vm_size": "string",
-      "vm_series": "string",
-      "vm_low_priority": true,
-      "vm_price_per_hour": 1.00,
-      "vm_memory_in_gb": 256,
-      "vm_number_of_cores": 64,
-      "vm_resource_disk_size_in_gb": 1024,
-      "vm_max_data_disk_count": 1
-    }
+    ]
   },
   "executors": [
     {

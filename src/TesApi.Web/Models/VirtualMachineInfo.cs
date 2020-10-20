@@ -29,7 +29,7 @@ namespace TesApi.Models
         /// <summary>
         /// VM price per hour
         /// </summary>
-        [TesTaskLogMetadataKey("vm_price_per_hour")]
+        [TesTaskLogMetadataKey("vm_price_per_hour_usd")]
         public decimal? PricePerHour { get; set; }
 
         /// <summary>
