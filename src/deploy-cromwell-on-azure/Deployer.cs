@@ -97,7 +97,8 @@ namespace CromwellOnAzureDeployer
                 azureClient = GetAzureClient(azureCredentials);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
 
-                await ValidateSubscriptionResourceGroupAndStorageAccountAsync(configuration.SubscriptionId, configuration.ResourceGroupName, configuration.StorageAccountName, configuration.Update);
+                await ValidateSubscriptionResourceGroupStorageAndBatchAccountsAsync(configuration.SubscriptionId, configuration.ResourceGroupName, 
+                    configuration.StorageAccountName, configuration.BatchAccountName, configuration.Update);
 
                 IResourceGroup resourceGroup = null;
                 BatchAccount batchAccount = null;
@@ -852,8 +853,7 @@ namespace CromwellOnAzureDeployer
         private async Task<IStorageAccount> TryGetExistingStorageAccountAsync(string storageAccountName)
         {
             IStorageAccount storageAccount = null;
-            var resourceGroupNames = (await azureClient.ResourceGroups.ListAsync()).Select(a => a.Name);
-            foreach (var resourceGroupName in resourceGroupNames)
+            foreach (var resourceGroupName in await GetResourceGroupNamesInSubscriptionAndRegionAsync())
             {
                 storageAccount = await azureClient.StorageAccounts.GetByResourceGroupAsync(resourceGroupName, storageAccountName);
                 if (storageAccount != null)
@@ -865,6 +865,11 @@ namespace CromwellOnAzureDeployer
             return storageAccount;
         }
 
+        private async Task<IEnumerable<string>> GetResourceGroupNamesInSubscriptionAndRegionAsync()
+        {
+            return (await azureClient.ResourceGroups.ListAsync()).Where(a => a.RegionName == configuration.RegionName).Select(a => a.Name);
+        }
+
         private async Task<BatchAccount> TryGetExistingBatchAccountAsync()
         {
             return await TryGetExistingBatchAccountAsync(configuration.BatchAccountName);
@@ -873,8 +878,7 @@ namespace CromwellOnAzureDeployer
         private async Task<BatchAccount> TryGetExistingBatchAccountAsync(string batchAccountName)
         {
             BatchAccount batchAccount = null;
-            var resourceGroupNames = (await azureClient.ResourceGroups.ListAsync()).Where(a => a.RegionName == configuration.RegionName).Select(a => a.Name);
-            foreach (var resourceGroupName in resourceGroupNames)
+            foreach (var resourceGroupName in await GetResourceGroupNamesInSubscriptionAndRegionAsync())
             {
                 batchAccount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount
                     .ListByResourceGroupAsync(resourceGroupName))
@@ -1274,8 +1278,8 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task ValidateSubscriptionResourceGroupAndStorageAccountAsync(string subscriptionId, string resourceGroupName, 
-            string storageAccountName, bool isUpdate)
+        private async Task ValidateSubscriptionResourceGroupStorageAndBatchAccountsAsync(string subscriptionId, string resourceGroupName, 
+            string storageAccountName, string batchAccountName, bool isUpdate)
         {
             const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
@@ -1315,6 +1319,15 @@ namespace CromwellOnAzureDeployer
                 else if ((bool)isAvailable) // if the storage account is available, then fail because we expect the storage account to exist already and not be available
                 {
                     throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist.", displayExample: false);
+                }
+            }
+
+            if (batchAccountName != null)
+            {
+                var batchAccountExists = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).Any(a => a.Name == batchAccountName);
+                if (!batchAccountExists) 
+                {
+                    throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist.", displayExample: false);
                 }
             }
 
