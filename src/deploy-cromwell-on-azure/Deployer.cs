@@ -193,8 +193,13 @@ namespace CromwellOnAzureDeployer
                     }
 
                     batchAccount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListByResourceGroupAsync(configuration.ResourceGroupName))
-                        .FirstOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase))
-                            ?? throw new ValidationException($"Batch account {batchAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
+                        .FirstOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase));
+
+                    if (batchAccount == null)
+                    {
+                        batchAccount = (await TryGetExistingBatchAccountAsync(batchAccountName))
+                                ?? throw new ValidationException($"Batch account {batchAccountName} does not exist in subscription {configuration.SubscriptionId}.");
+                    }
 
                     configuration.BatchAccountName = batchAccountName;
 
@@ -209,7 +214,7 @@ namespace CromwellOnAzureDeployer
                     if (storageAccount == null)
                     {
                         storageAccount = (await TryGetExistingStorageAccountAsync(storageAccountName))
-                                ?? throw new ValidationException($"Storage account {storageAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
+                                ?? throw new ValidationException($"Storage account {storageAccountName} does not exist in subscription {configuration.SubscriptionId}.");
                     }
 
                     configuration.StorageAccountName = storageAccountName;
@@ -841,9 +846,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task<IStorageAccount> TryGetExistingStorageAccountAsync()
         {
-            var storageAccountName = configuration.StorageAccountName;
-
-            return await TryGetExistingStorageAccountAsync(storageAccountName);
+            return await TryGetExistingStorageAccountAsync(configuration.StorageAccountName);
         }
 
         private async Task<IStorageAccount> TryGetExistingStorageAccountAsync(string storageAccountName)
@@ -860,6 +863,29 @@ namespace CromwellOnAzureDeployer
             }
 
             return storageAccount;
+        }
+
+        private async Task<BatchAccount> TryGetExistingBatchAccountAsync()
+        {
+            return await TryGetExistingBatchAccountAsync(configuration.BatchAccountName);
+        }
+
+        private async Task<BatchAccount> TryGetExistingBatchAccountAsync(string batchAccountName)
+        {
+            BatchAccount batchAccount = null;
+            var resourceGroupNames = (await azureClient.ResourceGroups.ListAsync()).Where(a => a.RegionName == configuration.RegionName).Select(a => a.Name);
+            foreach (var resourceGroupName in resourceGroupNames)
+            {
+                batchAccount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount
+                    .ListByResourceGroupAsync(resourceGroupName))
+                    .FirstOrDefault(a => a.Name == batchAccountName);
+                if (batchAccount != null)
+                {
+                    break;
+                }
+            }
+
+            return batchAccount;
         }
 
         private Task WriteNonPersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount)
@@ -1051,10 +1077,16 @@ namespace CromwellOnAzureDeployer
         {
             return Execute(
                 $"Creating Batch Account: {configuration.BatchAccountName}...",
-                () => new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
-                    .BatchAccount
-                    .CreateAsync(configuration.ResourceGroupName, configuration.BatchAccountName, new BatchAccountCreateParameters { Location = configuration.RegionName }, cts.Token)
+                async () =>
+                    await TryGetExistingBatchAccountAsync() ?? await CreateNewBatchAccount()
                 );
+        }
+
+        private Task<BatchAccount> CreateNewBatchAccount()
+        {
+            return new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
+                                        .BatchAccount
+                                        .CreateAsync(configuration.ResourceGroupName, configuration.BatchAccountName, new BatchAccountCreateParameters { Location = configuration.RegionName }, cts.Token);
         }
 
         private Task<IResourceGroup> CreateResourceGroupAsync()
@@ -1242,7 +1274,8 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task ValidateSubscriptionResourceGroupAndStorageAccountAsync(string subscriptionId, string resourceGroupName, string storageAccountName, bool isUpdate)
+        private async Task ValidateSubscriptionResourceGroupAndStorageAccountAsync(string subscriptionId, string resourceGroupName, 
+            string storageAccountName, bool isUpdate)
         {
             const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
