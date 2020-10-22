@@ -248,14 +248,16 @@ namespace TesApi.Web
             {
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask.Resources);
-                var tesTaskLog = tesTask.AddTesTaskLog();
 
                 await CheckBatchAccountQuotas((int)tesTask.Resources.CpuCores.GetValueOrDefault(DefaultCoreCount), virtualMachineInfo.LowPriority ?? false);
+
+                var tesTaskLog = tesTask.AddTesTaskLog();
 
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var dockerImage = tesTask.Executors.First().Image;
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask);
                 var poolInformation = await CreatePoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority ?? false);
+
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
 
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
@@ -667,7 +669,7 @@ namespace TesApi.Web
                 write_ts UploadStart && \
                 docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \
                 write_ts UploadEnd && \
-                /bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKB=${{disk[2]}} >> /mnt{metricsPath}'
+                /bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKB=${{disk[2]}} >> /mnt{metricsPath}' && \
                 docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url ""{metricsUrl}"" --local-path ""{metricsPath}"" --rename --no-recursive
             ".Replace("    ", "");
 
