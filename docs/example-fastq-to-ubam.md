@@ -11,7 +11,10 @@ In this example, we will run a workflow written in WDL that converts pair of FAS
 
 You can find publicly available paired end reads for the sample hosted here:
 
+FASTQ 1<br/>
 [https://datasettestinputs.blob.core.windows.net/dataset/seq-format-conversion/NA12878_20k/H06HDADXX130110.1.ATCACGAT.20k_reads_1.fastq](https://datasettestinputs.blob.core.windows.net/dataset/seq-format-conversion/NA12878_20k/H06HDADXX130110.1.ATCACGAT.20k_reads_1.fastq)
+
+FASTQ 2<br/>
 [https://datasettestinputs.blob.core.windows.net/dataset/seq-format-conversion/NA12878_20k/H06HDADXX130110.1.ATCACGAT.20k_reads_2.fastq](https://datasettestinputs.blob.core.windows.net/dataset/seq-format-conversion/NA12878_20k/H06HDADXX130110.1.ATCACGAT.20k_reads_2.fastq)
 
 You can use these input file URLs directly as they are publicly available.<br/>
