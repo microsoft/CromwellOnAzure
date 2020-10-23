@@ -804,7 +804,7 @@ namespace CromwellOnAzureDeployer
         private Task<IStorageAccount> CreateStorageAccountAsync()
         {
             return Execute(
-                $"Creating Storage Account: {configuration.StorageAccountName}...",
+                $"Finding Existing Storage Account or Creating New Storage Account: {configuration.StorageAccountName}...",
                 async () =>
                 {
                     var storageAccount = await TryGetExistingStorageAccountAsync() ?? await CreateNewStorageAccountAsync();
@@ -1039,7 +1039,7 @@ namespace CromwellOnAzureDeployer
         private Task<BatchAccount> CreateBatchAccountAsync()
         {
             return Execute(
-                $"Creating Batch Account: {configuration.BatchAccountName}...",
+                $"Finding Existing Batch Account or Creating New Batch Account: {configuration.BatchAccountName}...",
                 async () => await TryGetExistingBatchAccountAsync() ?? await CreateNewBatchAccount()
                 );
         }
