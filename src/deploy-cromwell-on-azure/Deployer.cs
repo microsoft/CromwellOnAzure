@@ -192,14 +192,8 @@ namespace CromwellOnAzureDeployer
                         throw new ValidationException($"Could not retrieve the Batch account name from virtual machine {configuration.VmName}.");
                     }
 
-                    batchAccount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListByResourceGroupAsync(configuration.ResourceGroupName))
-                        .FirstOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase));
-
-                    if (batchAccount == null)
-                    {
-                        batchAccount = (await TryGetExistingBatchAccountAsync(batchAccountName))
-                                ?? throw new ValidationException($"Batch account {batchAccountName} does not exist in subscription {configuration.SubscriptionId}.");
-                    }
+                    batchAccount = await TryGetExistingBatchAccountAsync(batchAccountName)
+                            ?? throw new ValidationException($"Batch account {batchAccountName} does not exist in subscription {configuration.SubscriptionId}.");
 
                     configuration.BatchAccountName = batchAccountName;
 
@@ -208,14 +202,8 @@ namespace CromwellOnAzureDeployer
                         throw new ValidationException($"Could not retrieve the default storage account name from virtual machine {configuration.VmName}.");
                     }
 
-                    storageAccount = (await azureClient.StorageAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName))
-                        .FirstOrDefault(a => a.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase));
-
-                    if (storageAccount == null)
-                    {
-                        storageAccount = await TryGetExistingStorageAccountAsync(storageAccountName)
-                                ?? throw new ValidationException($"Storage account {storageAccountName} does not exist in subscription {configuration.SubscriptionId}.");
-                    }
+                    storageAccount = await TryGetExistingStorageAccountAsync(storageAccountName)
+                            ?? throw new ValidationException($"Storage account {storageAccountName} does not exist in subscription {configuration.SubscriptionId}.");
 
                     configuration.StorageAccountName = storageAccountName;
 
@@ -1052,8 +1040,7 @@ namespace CromwellOnAzureDeployer
         {
             return Execute(
                 $"Creating Batch Account: {configuration.BatchAccountName}...",
-                async () =>
-                    await TryGetExistingBatchAccountAsync() ?? await CreateNewBatchAccount()
+                async () => await TryGetExistingBatchAccountAsync() ?? await CreateNewBatchAccount()
                 );
         }
 
