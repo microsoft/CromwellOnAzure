@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.WebSockets;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
@@ -649,29 +649,36 @@ namespace TesApi.Web
 
             var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) == null;
 
-            var batchScript = $@"
-                write_kv() {{ echo ""$1=$2"" >> /mnt{metricsPath}; }} && \
-                write_ts() {{ write_kv $1 $(date -Iseconds); }} && \
-                mkdir -p /mnt{batchExecutionDirectoryPath} && \
-                (grep -q alpine /etc/os-release && apk add bash || :) && \
-                write_ts BlobXferPullStart && \
-                docker pull --quiet {BlobxferImageName} && \
-                write_ts BlobXferPullEnd && \
-                {(executorImageIsPublic ? $"write_ts ExecutorPullStart && docker pull --quiet {executor.Image} && write_ts ExecutorPullEnd && \\" : "")}
-                write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \""Size\"" | grep -Po '(?i)\""Size\"":\K([^,]*)') && \
-                write_ts DownloadStart && \
-                docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {downloadFilesScriptPath} && \
-                write_ts DownloadEnd && \
-                chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \
-                write_ts ExecutorStart && \
-                docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c ""{ string.Join(" && ", executor.Command.Skip(1))}"" && \
-                write_ts ExecutorEnd && \
-                write_ts UploadStart && \
-                docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \
-                write_ts UploadEnd && \
-                /bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKB=${{disk[2]}} >> /mnt{metricsPath}' && \
-                docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url ""{metricsUrl}"" --local-path ""{metricsPath}"" --rename --no-recursive
-            ".Replace("    ", "");
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"write_kv() {{ echo \"$1=$2\" >> /mnt{metricsPath}; }} && \\");
+            sb.AppendLine($"write_ts() {{ write_kv $1 $(date -Iseconds); }} && \\");
+            sb.AppendLine($"mkdir -p /mnt{batchExecutionDirectoryPath} && \\");
+            sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");
+            sb.AppendLine($"write_ts BlobXferPullStart && \\");
+            sb.AppendLine($"docker pull --quiet {BlobxferImageName} && \\");
+            sb.AppendLine($"write_ts BlobXferPullEnd && \\");
+
+            if(executorImageIsPublic)
+            {
+                sb.AppendLine($"write_ts ExecutorPullStart && docker pull--quiet {executor.Image} && write_ts ExecutorPullEnd && \\");
+            }
+            
+            sb.AppendLine($"write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \\\"Size\\\" | grep - Po '(?i)\\\"Size\\\":\\K([^,]*)') && \\");
+            sb.AppendLine($"write_ts DownloadStart && \\");
+            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {downloadFilesScriptPath} && \\");
+            sb.AppendLine($"write_ts DownloadEnd && \\");
+            sb.AppendLine($"chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \\");
+            sb.AppendLine($"write_ts ExecutorStart && \\");
+            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{ string.Join(" && ", executor.Command.Skip(1))}\" && \\");
+            sb.AppendLine($"write_ts ExecutorEnd && \\");
+            sb.AppendLine($"write_ts UploadStart && \\");
+            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \\");
+            sb.AppendLine($"write_ts UploadEnd && \\");
+            sb.AppendLine($"/bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKB=${{disk[2]}} >> /mnt{metricsPath}' && \\");
+            sb.AppendLine($"docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url \"{metricsUrl}\" --local-path \"{metricsPath}\" --rename --no-recursive");
+
+            var batchScript = sb.ToString();
 
             var batchScriptPath = $"{batchExecutionDirectoryPath}/{BatchScriptFileName}";
             var writableBatchScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(batchScriptPath, getContainerSas: true));
