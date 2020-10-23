@@ -97,8 +97,7 @@ namespace CromwellOnAzureDeployer
                 azureClient = GetAzureClient(azureCredentials);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
 
-                await ValidateSubscriptionResourceGroupStorageAndBatchAccountsAsync(configuration.SubscriptionId, configuration.ResourceGroupName, 
-                    configuration.StorageAccountName, configuration.BatchAccountName, configuration.Update);
+                await ValidateSubscriptionResourceGroupStorageAndBatchAccountsAsync(configuration);
 
                 IResourceGroup resourceGroup = null;
                 BatchAccount batchAccount = null;
@@ -214,7 +213,7 @@ namespace CromwellOnAzureDeployer
 
                     if (storageAccount == null)
                     {
-                        storageAccount = (await TryGetExistingStorageAccountAsync(storageAccountName))
+                        storageAccount = await TryGetExistingStorageAccountAsync(storageAccountName)
                                 ?? throw new ValidationException($"Storage account {storageAccountName} does not exist in subscription {configuration.SubscriptionId}.");
                     }
 
@@ -820,11 +819,7 @@ namespace CromwellOnAzureDeployer
                 $"Creating Storage Account: {configuration.StorageAccountName}...",
                 async () =>
                 {
-                    var storageAccount = await TryGetExistingStorageAccountAsync();
-                    if (storageAccount == null) // no storage account exists under the specified name
-                    {
-                        storageAccount = await CreateNewStorageAccountAsync();
-                    }
+                    var storageAccount = await TryGetExistingStorageAccountAsync() ?? await CreateNewStorageAccountAsync();
 
                     cts.Token.ThrowIfCancellationRequested();
                     var blobClient = await GetBlobClientAsync(storageAccount);
@@ -842,6 +837,7 @@ namespace CromwellOnAzureDeployer
                                         .Define(configuration.StorageAccountName)
                                         .WithRegion(configuration.RegionName)
                                         .WithExistingResourceGroup(configuration.ResourceGroupName)
+                                        .WithOnlyHttpsTraffic()
                                         .CreateAsync(cts.Token);
         }
 
@@ -852,22 +848,8 @@ namespace CromwellOnAzureDeployer
 
         private async Task<IStorageAccount> TryGetExistingStorageAccountAsync(string storageAccountName)
         {
-            IStorageAccount storageAccount = null;
-            foreach (var resourceGroupName in await GetResourceGroupNamesInSubscriptionAndRegionAsync())
-            {
-                storageAccount = await azureClient.StorageAccounts.GetByResourceGroupAsync(resourceGroupName, storageAccountName);
-                if (storageAccount != null)
-                {
-                    break;
-                }
-            }
-
-            return storageAccount;
-        }
-
-        private async Task<IEnumerable<string>> GetResourceGroupNamesInSubscriptionAndRegionAsync()
-        {
-            return (await azureClient.ResourceGroups.ListAsync()).Where(a => a.RegionName == configuration.RegionName).Select(a => a.Name);
+            return (await azureClient.StorageAccounts.ListAsync())
+                .SingleOrDefault(a => a.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase) && a.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
         }
 
         private async Task<BatchAccount> TryGetExistingBatchAccountAsync()
@@ -877,19 +859,8 @@ namespace CromwellOnAzureDeployer
 
         private async Task<BatchAccount> TryGetExistingBatchAccountAsync(string batchAccountName)
         {
-            BatchAccount batchAccount = null;
-            foreach (var resourceGroupName in await GetResourceGroupNamesInSubscriptionAndRegionAsync())
-            {
-                batchAccount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount
-                    .ListByResourceGroupAsync(resourceGroupName))
-                    .FirstOrDefault(a => a.Name == batchAccountName);
-                if (batchAccount != null)
-                {
-                    break;
-                }
-            }
-
-            return batchAccount;
+            return (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync())
+                .SingleOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase));
         }
 
         private Task WriteNonPersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount)
@@ -1278,8 +1249,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task ValidateSubscriptionResourceGroupStorageAndBatchAccountsAsync(string subscriptionId, string resourceGroupName, 
-            string storageAccountName, string batchAccountName, bool isUpdate)
+        private async Task ValidateSubscriptionResourceGroupStorageAndBatchAccountsAsync(Configuration configuration)
         {
             const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
@@ -1290,51 +1260,52 @@ namespace CromwellOnAzureDeployer
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                 .Authenticate(azureCredentials);
 
-            var subscriptionExists = (await azure.Subscriptions.ListAsync()).Any(sub => sub.SubscriptionId.Equals(subscriptionId, StringComparison.OrdinalIgnoreCase));
+            var subscriptionExists = (await azure.Subscriptions.ListAsync()).Any(sub => sub.SubscriptionId.Equals(configuration.SubscriptionId, StringComparison.OrdinalIgnoreCase));
 
             if (!subscriptionExists)
             {
-                throw new ValidationException($"Invalid or inaccessible subcription id '{subscriptionId}'. Make sure that subscription exists and that you are either an Owner or have Contributor and User Access Administrator roles on the subscription.", displayExample: false);
+                throw new ValidationException($"Invalid or inaccessible subcription id '{configuration.SubscriptionId}'. Make sure that subscription exists and that you are either an Owner or have Contributor and User Access Administrator roles on the subscription.", displayExample: false);
             }
 
-            if (isUpdate && string.IsNullOrEmpty(resourceGroupName))
+            if (configuration.Update && string.IsNullOrEmpty(configuration.ResourceGroupName))
             {
                 throw new ValidationException($"ResourceGroupName is required for the update.", displayExample: false);
             }
 
-            var rgExists = !string.IsNullOrEmpty(resourceGroupName) && await azureClient.ResourceGroups.ContainAsync(resourceGroupName);
+            var rgExists = !string.IsNullOrEmpty(configuration.ResourceGroupName) && await azureClient.ResourceGroups.ContainAsync(configuration.ResourceGroupName);
 
-            if (!string.IsNullOrEmpty(resourceGroupName) && !rgExists)
+            if (!string.IsNullOrEmpty(configuration.ResourceGroupName) && !rgExists)
             {
                 throw new ValidationException($"If ResourceGroupName is provided, the resource group must already exist.", displayExample: false);
             }
 
-            if (storageAccountName != null)
+            if (configuration.StorageAccountName != null)
             {
-                var isAvailable = (await azureClient.StorageAccounts.CheckNameAvailabilityAsync(storageAccountName)).IsAvailable;
-                if (isAvailable == null)
+                var isAvailable = (await azureClient.StorageAccounts.CheckNameAvailabilityAsync(configuration.StorageAccountName)).IsAvailable;
+         
+                if (!isAvailable.HasValue)
                 {
                     throw new ValidationException($"Unable to verify if the StorageAccountName is an account that already exists", displayExample: false);
                 }
-                else if ((bool)isAvailable) // if the storage account is available, then fail because we expect the storage account to exist already and not be available
+                else if (isAvailable.Value) // if the storage account is available, then fail because we expect the storage account to exist already and not be available
                 {
-                    throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist.", displayExample: false);
+                    throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist and be accessible to the user.", displayExample: false);
                 }
             }
 
-            if (batchAccountName != null)
+            if (configuration.BatchAccountName != null)
             {
-                var batchAccountExists = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).Any(a => a.Name == batchAccountName);
+                var batchAccountExists = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).Any(a => a.Name.Equals(configuration.BatchAccountName, StringComparison.OrdinalIgnoreCase));
                 if (!batchAccountExists) 
                 {
-                    throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist.", displayExample: false);
+                    throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist and be accessible to the user.", displayExample: false);
                 }
             }
 
             var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
             var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
 
-            var currentPrincipalSubscriptionRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{subscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
+            var currentPrincipalSubscriptionRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
                 .Body
                 .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
@@ -1345,7 +1316,7 @@ namespace CromwellOnAzureDeployer
                     throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
                 }
 
-                var currentPrincipalRgRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
+                var currentPrincipalRgRoleIds = (await azureClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}/resourceGroups/{configuration.ResourceGroupName}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
                     .Body
                     .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
