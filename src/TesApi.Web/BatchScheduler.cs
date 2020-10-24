@@ -661,7 +661,7 @@ namespace TesApi.Web
 
             if(executorImageIsPublic)
             {
-                sb.AppendLine($"write_ts ExecutorPullStart && docker pull--quiet {executor.Image} && write_ts ExecutorPullEnd && \\");
+                sb.AppendLine($"write_ts ExecutorPullStart && docker pull --quiet {executor.Image} && write_ts ExecutorPullEnd && \\");
             }
             
             sb.AppendLine($"write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \\\"Size\\\" | grep - Po '(?i)\\\"Size\\\":\\K([^,]*)') && \\");
