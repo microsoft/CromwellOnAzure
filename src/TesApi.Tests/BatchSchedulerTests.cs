@@ -270,7 +270,7 @@ namespace TesApi.Tests
             Assert.AreEqual(240, batchNodeMetrics.ExecutorDurationInSeconds);
             Assert.AreEqual(300, batchNodeMetrics.FileUploadDurationInSeconds);
             Assert.AreEqual(0.25, batchNodeMetrics.DiskUsedInGB);
-            Assert.AreEqual(0.125f, batchNodeMetrics.DiskUsedPercent);
+            Assert.AreEqual(12.5f, batchNodeMetrics.DiskUsedPercent);
             Assert.AreEqual(2, batchNodeMetrics.FileDownloadSizeInGB);
             Assert.AreEqual(4, batchNodeMetrics.FileUploadSizeInGB);
 
