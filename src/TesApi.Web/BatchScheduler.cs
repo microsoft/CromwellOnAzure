@@ -651,19 +651,21 @@ namespace TesApi.Web
 
             var sb = new StringBuilder();
 
-            sb.AppendLine($"write_kv() {{ echo \"$1=$2\" >> /mnt{metricsPath}; }} && \\");
-            sb.AppendLine($"write_ts() {{ write_kv $1 $(date -Iseconds); }} && \\");
+            sb.AppendLine($"write_kv() {{ echo \"$1=$2\" >> /mnt{metricsPath}; }} && \\");  // Function that appends key=value pair to metrics.txt file
+            sb.AppendLine($"write_ts() {{ write_kv $1 $(date -Iseconds); }} && \\");    // Function that appends key=<current datetime> to metrics.txt file
             sb.AppendLine($"mkdir -p /mnt{batchExecutionDirectoryPath} && \\");
-            sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");
+            sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");  // Install bash if running on alpine (will be the case if running inside "docker" image)
             sb.AppendLine($"write_ts BlobXferPullStart && \\");
             sb.AppendLine($"docker pull --quiet {BlobxferImageName} && \\");
             sb.AppendLine($"write_ts BlobXferPullEnd && \\");
 
-            if(executorImageIsPublic)
+            if (executorImageIsPublic)
             {
+                // Private executor images are pulled via pool ContainerConfiguration
                 sb.AppendLine($"write_ts ExecutorPullStart && docker pull --quiet {executor.Image} && write_ts ExecutorPullEnd && \\");
             }
             
+            // The remainder of the script downloads the inputs, runs the main executor container, and uploads the outputs, including the metrics.txt file
             sb.AppendLine($"write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \\\"Size\\\" | grep - Po '(?i)\\\"Size\\\":\\K([^,]*)') && \\");
             sb.AppendLine($"write_ts DownloadStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {downloadFilesScriptPath} && \\");
