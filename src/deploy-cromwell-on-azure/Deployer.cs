@@ -805,41 +805,26 @@ namespace CromwellOnAzureDeployer
 
         private Task<IStorageAccount> GetOrCreateStorageAccountAsync()
         {
-            if (existingStorageAccount != null)
-            {
-                return Execute(
-                   $"Using Existing Storage Account: {configuration.StorageAccountName}...",
-                    async () =>
-                    {
-                        var storageAccount = existingStorageAccount;
-                        await ConfigureStorageAccount(storageAccount);
-                        return storageAccount;
-                    });
-            }
-
             return Execute(
-                $"Creating New Storage Account: {configuration.StorageAccountName}...",
+                (existingStorageAccount == null ? $"Creating New" : $"Using Existing") + " Storage Account: {configuration.StorageAccountName}...",
                 async () =>
                 {
-                    var storageAccount = await azureClient.StorageAccounts
-                        .Define(configuration.StorageAccountName)
-                        .WithRegion(configuration.RegionName)
-                        .WithExistingResourceGroup(configuration.ResourceGroupName)
-                        .WithOnlyHttpsTraffic()
-                        .CreateAsync(cts.Token);
+                    var storageAccount = existingStorageAccount ??
+                        await azureClient.StorageAccounts
+                            .Define(configuration.StorageAccountName)
+                            .WithRegion(configuration.RegionName)
+                            .WithExistingResourceGroup(configuration.ResourceGroupName)
+                            .WithOnlyHttpsTraffic()
+                            .CreateAsync(cts.Token);
 
-                    await ConfigureStorageAccount(storageAccount);
+                    cts.Token.ThrowIfCancellationRequested();
+                    var blobClient = await GetBlobClientAsync(storageAccount);
+
+                    var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
+                    await Task.WhenAll(defaultContainers.Select(c => blobClient.GetContainerReference(c).CreateIfNotExistsAsync(cts.Token)));
+
                     return storageAccount;
                 });
-        }
-
-        private async Task ConfigureStorageAccount(IStorageAccount storageAccount)
-        {
-            cts.Token.ThrowIfCancellationRequested();
-            var blobClient = await GetBlobClientAsync(storageAccount);
-
-            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
-            await Task.WhenAll(defaultContainers.Select(c => blobClient.GetContainerReference(c).CreateIfNotExistsAsync(cts.Token)));
         }
 
         private async Task<IStorageAccount> GetExistingStorageAccountAsync(string storageAccountName)
@@ -1041,19 +1026,12 @@ namespace CromwellOnAzureDeployer
 
         private Task<BatchAccount> GetOrCreateBatchAccountAsync()
         {
-            if (existingBatchAccount != null)
-            {
-                return Execute(
-                    $"Using Existing Batch Account: {configuration.BatchAccountName}...",
-                    async () => existingBatchAccount
-                );
-            }
-
             return Execute(
-                $"Creating Batch Account: {configuration.BatchAccountName}...",
-                () => new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
-                    .BatchAccount
-                    .CreateAsync(configuration.ResourceGroupName, configuration.BatchAccountName, new BatchAccountCreateParameters { Location = configuration.RegionName }, cts.Token)
+                (existingBatchAccount == null ? $"Creating New" : "Using Existing") + $" Batch Account: {configuration.BatchAccountName}...",
+                async () => existingBatchAccount ?? 
+                    await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
+                        .BatchAccount
+                        .CreateAsync(configuration.ResourceGroupName, configuration.BatchAccountName, new BatchAccountCreateParameters { Location = configuration.RegionName }, cts.Token)
                 );
         }
 
