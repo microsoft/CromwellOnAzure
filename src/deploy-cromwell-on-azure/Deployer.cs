@@ -806,7 +806,7 @@ namespace CromwellOnAzureDeployer
         private Task<IStorageAccount> GetOrCreateStorageAccountAsync()
         {
             return Execute(
-                (existingStorageAccount == null ? $"Creating New" : $"Using Existing") + " Storage Account: {configuration.StorageAccountName}...",
+                (existingStorageAccount == null ? "Creating" : "Using existing") + $" Storage Account: {configuration.StorageAccountName}...",
                 async () =>
                 {
                     var storageAccount = existingStorageAccount ??
@@ -1027,7 +1027,7 @@ namespace CromwellOnAzureDeployer
         private Task<BatchAccount> GetOrCreateBatchAccountAsync()
         {
             return Execute(
-                (existingBatchAccount == null ? $"Creating New" : "Using Existing") + $" Batch Account: {configuration.BatchAccountName}...",
+                (existingBatchAccount == null ? "Creating" : "Using existing") + $" Batch Account: {configuration.BatchAccountName}...",
                 async () => existingBatchAccount ?? 
                     await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
                         .BatchAccount
@@ -1266,7 +1266,7 @@ namespace CromwellOnAzureDeployer
 
                 if (existingBatchAccount == null)
                 {
-                    throw new ValidationException($"If BatchAccountName is provided, the storage account must already exist in subscription {configuration.SubscriptionId} and region {configuration.RegionName}, and be accessible to the user.", displayExample: false);
+                    throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in subscription {configuration.SubscriptionId} and region {configuration.RegionName}, and be accessible to the user.", displayExample: false);
                 }
             }
 
