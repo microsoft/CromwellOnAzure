@@ -22,7 +22,7 @@ You can use these input file URLs directly as they are publicly available.<br/>
 Alternatively, you can choose to upload the data into the "dataset" container in your Cromwell on Azure storage account associated with your host VM.
 You can use [AzCopy](https://docs.microsoft.com/en-us/azure/storage/common/storage-use-azcopy-blobs#copy-a-container-to-another-storage-account) to transfer the required files to your own Storage account [using a shared access signature](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) with "Write" access.<br/>
 
-```
+```[//]: # ([SuppressMessage\("Microsoft.Security", "CS002:SecretInNextLine", Justification="public dataset"\)]) 
 .\azcopy.exe copy 'https://datasettestinputs.blob.core.windows.net/dataset/seq-format-conversion?sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D' 'https://<destination-storage-account-name>.blob.core.windows.net/dataset?<WriteSAS-token>' --recursive --s2s-preserve-access-tier=false
 ```
 You can also do this directly from the Azure Portal, or use other tools including [Microsoft Azure Storage Explorer](https://azure.microsoft.com/features/storage-explorer/) or [blobporter](https://github.com/Azure/blobporter). <br/>
