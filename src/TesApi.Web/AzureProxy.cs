@@ -36,7 +36,6 @@ namespace TesApi.Web
     /// </summary>
     public class AzureProxy : IAzureProxy
     {
-        private const double MbToGbRatio = 0.001;
         private const char BatchJobAttemptSeparator = '-';
         private const string DefaultAzureBillingRegionName = "US West";
 
@@ -119,7 +118,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="cosmosDbAccountName"></param>
         /// <returns>The CosmosDB endpoint and key of the specified account</returns>
-        public async Task<(Uri, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName)
+        public async Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName)
         {
             var azureClient = await GetAzureManagementClientAsync();
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
@@ -135,7 +134,7 @@ namespace TesApi.Web
 
             var key = (await azureClient.WithSubscription(account.Manager.SubscriptionId).CosmosDBAccounts.ListKeysAsync(account.ResourceGroupName, account.Name)).PrimaryMasterKey;
 
-            return (new Uri(account.DocumentEndpoint), key);
+            return (account.DocumentEndpoint, key);
         }
 
         /// <summary>
@@ -324,12 +323,8 @@ namespace TesApi.Web
                         {
                             nodeState = node.State;
                             var nodeError = node.Errors?.FirstOrDefault();
-
-                            if (nodeError != null && nodeError.Code != null)
-                            {
-                                nodeErrorCode = nodeError.Code;
-                                nodeErrorDetails = nodeError.ErrorDetails?.Select(e => e.Value);
-                            }
+                            nodeErrorCode = nodeError?.Code;
+                            nodeErrorDetails = nodeError?.ErrorDetails?.Select(e => e.Value);
                         }
                     }
                     else
@@ -625,7 +620,7 @@ namespace TesApi.Web
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, $"Error looking up or retrieving contents of file '{fileName}'");
+                logger.LogError(ex, $"Error looking up or retrieving contents of CWL file '{fileName}'");
             }
 
             content = null;
@@ -675,6 +670,11 @@ namespace TesApi.Web
         /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
         private async Task<IEnumerable<VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
         {
+            const double mbToGbRatio = 0.001;
+            const double mibToGbRatio = 0.001048576;
+
+            static double ConvertMBOrMiBToGB(int value) =>  Math.Round(value * (value % 1024 == 0 ? mibToGbRatio : mbToGbRatio), 3);
+
             var azureClient = await GetAzureManagementClientAsync();
             var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).VirtualMachines.Sizes.ListByRegionAsync(location)).ToList();
 
@@ -704,9 +704,9 @@ namespace TesApi.Web
                         vmInfos.Add(new VirtualMachineInfo
                         {
                             VmSize = vmPrice.VmSizes[i],
-                            MemoryInGB = vmSize.MemoryInMB * MbToGbRatio,
+                            MemoryInGB = ConvertMBOrMiBToGB(vmSize.MemoryInMB),
                             NumberOfCores = vmSize.NumberOfCores,
-                            ResourceDiskSizeInGB = vmSize.ResourceDiskSizeInMB * MbToGbRatio,
+                            ResourceDiskSizeInGB = ConvertMBOrMiBToGB(vmSize.ResourceDiskSizeInMB),
                             MaxDataDiskCount = vmSize.MaxDataDiskCount,
                             VmSeries = vmPrice.VmSeries[i],
                             LowPriority = vmPrice.LowPriority,
@@ -885,14 +885,14 @@ namespace TesApi.Web
             };
         }
 
-        ///<inheritdoc/>
+        /// <inheritdoc/>
         public async Task<ContainerRegistryInfo> GetContainerRegistryInfoAsync(string imageName)
         {
             return (await GetAccessibleContainerRegistriesAsync())
                 .FirstOrDefault(reg => reg.RegistryServer.Equals(imageName.Split('/').FirstOrDefault(), StringComparison.OrdinalIgnoreCase));
         }
 
-        ///<inheritdoc/>
+        /// <inheritdoc/>
         public async Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName)
         {
             return (await GetAccessibleStorageAccountsAsync())

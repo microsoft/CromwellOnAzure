@@ -32,7 +32,7 @@ namespace TesApi.Web
             this.repository = repository;
             this.azureProxy = azureProxy;
             this.logger = logger;
-            isStopped = bool.TryParse(configuration["DisableBatchJobCleanup"], out var disableBatchJobCleanup) ? disableBatchJobCleanup : false;
+            isStopped = configuration.GetValue("DisableBatchJobCleanup", false);
         }
 
         /// <summary>
@@ -102,16 +102,15 @@ namespace TesApi.Web
                 var tesTaskId = jobId.Split(new[] { '-' })[0];
                 logger.LogInformation($"TES task Id to delete: {tesTaskId}");
 
-                RepositoryItem<TesTask> repositoryItem = null;
-                var itemFound = await repository.TryGetItemAsync(tesTaskId, item => repositoryItem = item);
+                TesTask tesTask = null;
 
-                if (itemFound)
+                if (await repository.TryGetItemAsync(tesTaskId, item => tesTask = item))
                 {
-                    if (repositoryItem.Value.State == TesState.COMPLETEEnum ||
-                        repositoryItem.Value.State == TesState.EXECUTORERROREnum ||
-                        repositoryItem.Value.State == TesState.SYSTEMERROREnum ||
-                        repositoryItem.Value.State == TesState.CANCELEDEnum ||
-                        repositoryItem.Value.State == TesState.UNKNOWNEnum)
+                    if (tesTask.State == TesState.COMPLETEEnum ||
+                        tesTask.State == TesState.EXECUTORERROREnum ||
+                        tesTask.State == TesState.SYSTEMERROREnum ||
+                        tesTask.State == TesState.CANCELEDEnum ||
+                        tesTask.State == TesState.UNKNOWNEnum)
                     {
                         await azureProxy.DeleteBatchJobAsync(tesTaskId);
                     }

@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -29,14 +29,14 @@ namespace TesApi.Models
         /// </summary>
         /// <value>Time the executor started, in RFC 3339 format.</value>
         [DataMember(Name = "start_time")]
-        public string StartTime { get; set; }
+        public DateTimeOffset? StartTime { get; set; }
 
         /// <summary>
         /// Time the executor ended, in RFC 3339 format.
         /// </summary>
         /// <value>Time the executor ended, in RFC 3339 format.</value>
         [DataMember(Name = "end_time")]
-        public string EndTime { get; set; }
+        public DateTimeOffset? EndTime { get; set; }
 
         /// <summary>
         /// Stdout content.  This is meant for convenience. No guarantees are made about the content. Implementations may chose different approaches: only the head, only the tail, a URL reference only, etc.  In order to capture the full stdout users should set Executor.stdout to a container file path, and use Task.outputs to upload that file to permanent storage.

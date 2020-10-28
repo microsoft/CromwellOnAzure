@@ -25,7 +25,7 @@ namespace TesApi.Web
     public class Startup
     {
         private const string CosmosDbDatabaseId = "TES";
-        private const string CosmosDbCollectionId = "Tasks";
+        private const string CosmosDbContainerId = "Tasks";
         private const string CosmosDbPartitionId = "01";
         private const string defaultAzureOfferDurableId = "MS-AZR-0003p";
 
@@ -43,7 +43,7 @@ namespace TesApi.Web
             this.hostingEnvironment = hostingEnvironment;
             logger = loggerFactory.CreateLogger<Startup>();
             this.loggerFactory = loggerFactory;
-            azureOfferDurableId = Configuration["AzureOfferDurableId"] ?? defaultAzureOfferDurableId;
+            azureOfferDurableId = Configuration.GetValue("AzureOfferDurableId", defaultAzureOfferDurableId);
         }
 
         /// <summary>
@@ -76,7 +76,7 @@ namespace TesApi.Web
 
             (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
 
-            var cosmosDbRepository = new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, CosmosDbDatabaseId, CosmosDbCollectionId, CosmosDbPartitionId);
+            var cosmosDbRepository = new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, CosmosDbDatabaseId, CosmosDbContainerId, CosmosDbPartitionId);
             var repository = new CachingWithRetriesRepository<TesTask>(cosmosDbRepository);
 
             services.AddSingleton<IRepository<TesTask>>(repository);
