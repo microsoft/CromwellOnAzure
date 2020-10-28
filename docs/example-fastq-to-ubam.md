@@ -4,7 +4,7 @@ This document describes how to run an example workflow that converts a pair of F
 
 ## Run a sample workflow
 
-In this example, we will run a workflow written in WDL that converts a pair of FASTQ files to uBAM for a small part of NA12878 sample.
+In this example, we will run a workflow written in WDL that converts a pair of FASTQ files to uBAM for a small part of the NA12878 sample.
 
 
 ## Access input data 
