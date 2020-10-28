@@ -1401,6 +1401,23 @@ namespace CromwellOnAzureDeployer
             ValidateSubscriptionId(configuration.SubscriptionId);
             ValidateRegionName(configuration.RegionName);
             ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
+            if (configuration.Update)
+            {
+                ValidateUpdateScenario();
+            }
+        }
+
+        private void ValidateUpdateScenario()
+        {
+            if (configuration.StorageAccountName != null)
+            {
+                throw new ValidationException("invalid to specify StorageAccountName in an Update scenario");
+            }
+
+            if (configuration.BatchAccountName != null)
+            {
+                throw new ValidationException("invalid to specify BatchAccountName in an Update scenario");
+            }
         }
 
         private static void DisplayValidationExceptionAndExit(ValidationException validationException)
