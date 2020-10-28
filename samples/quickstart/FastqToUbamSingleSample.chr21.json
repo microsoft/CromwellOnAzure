@@ -1,6 +1,0 @@
-{
-  "WorkflowUrl": "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/samples/quickstart/FastqToUbamSingleSample.wdl",
-  "WorkflowInputsUrl": "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/master/samples/quickstart/FastqToUbamSingleSample.chr21.inputs.json",
-  "WorkflowOptionsUrl": null,
-  "WorkflowDependenciesUrl": null
-}
