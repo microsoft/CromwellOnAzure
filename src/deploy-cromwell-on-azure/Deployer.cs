@@ -71,7 +71,7 @@ namespace CromwellOnAzureDeployer
         private Configuration configuration { get; set; }
         private TokenCredentials tokenCredentials;
         private IAzure azureSubscriptionClient { get; set; }
-        private IAuthenticated azureGeneralClient { get; set; }
+        private IAuthenticated azureClient { get; set; }
         private IResourceManager resourceManagerClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
@@ -99,9 +99,9 @@ namespace CromwellOnAzureDeployer
 
                 tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
                 azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
-                azureSubscriptionClient = GetAzureSubscriptionClient(azureCredentials);
-                azureGeneralClient = GetAzureGeneralClient(azureCredentials);
-                subscriptionIds = (await azureGeneralClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
+                azureClient = GetAzureClient(azureCredentials);
+                azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
+                subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
 
                 await ValidateSubscriptionResourceGroupStorageAndBatchAccountsAsync(configuration);
@@ -543,17 +543,7 @@ namespace CromwellOnAzureDeployer
             return warningCount > 0;
         }
 
-        private IAzure GetAzureSubscriptionClient(AzureCredentials azureCredentials)
-        {
-            if (azureGeneralClient == null)
-            {
-                azureGeneralClient = GetAzureGeneralClient(azureCredentials);
-            }
-
-            return azureGeneralClient.WithSubscription(configuration.SubscriptionId);
-        }
-
-        private IAuthenticated GetAzureGeneralClient(AzureCredentials azureCredentials)
+        private IAuthenticated GetAzureClient(AzureCredentials azureCredentials)
         {
             return Azure
                 .Configure()
@@ -843,7 +833,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task<IStorageAccount> GetExistingStorageAccountAsync(string storageAccountName)
         {
-            return (await Task.WhenAll(subscriptionIds.Select(s => azureGeneralClient.WithSubscription(s).StorageAccounts.ListAsync())))
+            return (await Task.WhenAll(subscriptionIds.Select(s => azureClient.WithSubscription(s).StorageAccounts.ListAsync())))
                 .SelectMany(a => a)
                 .SingleOrDefault(a => a.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase) && a.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
         }
@@ -1417,6 +1407,7 @@ namespace CromwellOnAzureDeployer
             ValidateSubscriptionId(configuration.SubscriptionId);
             ValidateRegionName(configuration.RegionName);
             ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
+
             if (configuration.Update)
             {
                 ValidateUpdateScenario();
@@ -1427,12 +1418,12 @@ namespace CromwellOnAzureDeployer
         {
             if (configuration.StorageAccountName != null)
             {
-                throw new ValidationException("invalid to specify StorageAccountName in an Update scenario");
+                throw new ValidationException("StorageAccountName must not be provided when updating");
             }
 
             if (configuration.BatchAccountName != null)
             {
-                throw new ValidationException("invalid to specify BatchAccountName in an Update scenario");
+                throw new ValidationException("BatchAccountName must not be provided when updating");
             }
         }
 
