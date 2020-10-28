@@ -240,17 +240,17 @@ namespace TesApi.Tests
                 BlobXferPullEnd=2020-10-08T02:31:39+00:00
                 ExecutorPullStart=2020-10-08T02:32:39+00:00
                 ExecutorPullEnd=2020-10-08T02:34:39+00:00
-                ExecutorImageSizeInBytes=3221225472
+                ExecutorImageSizeInBytes=3000000000
                 DownloadStart=2020-10-08T02:35:39+00:00
                 DownloadEnd=2020-10-08T02:38:39+00:00
                 ExecutorStart=2020-10-08T02:39:39+00:00
                 ExecutorEnd=2020-10-08T02:43:39+00:00
                 UploadStart=2020-10-08T02:44:39+00:00
                 UploadEnd=2020-10-08T02:49:39+00:00
-                DiskSizeInKB=2097152
-                DiskUsedInKB=262144
-                FileDownloadSizeInBytes=2147483648
-                FileUploadSizeInBytes=4294967296".Replace(" ", "");
+                DiskSizeInKiB=8000000
+                DiskUsedInKiB=1000000
+                FileDownloadSizeInBytes=2000000000
+                FileUploadSizeInBytes=4000000000".Replace(" ", "");
 
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
             azureProxyReturnValues.BatchJobAndTaskState = BatchJobAndTaskStates.TaskCompletedSuccessfully;
@@ -269,7 +269,7 @@ namespace TesApi.Tests
             Assert.AreEqual(180, batchNodeMetrics.FileDownloadDurationInSeconds);
             Assert.AreEqual(240, batchNodeMetrics.ExecutorDurationInSeconds);
             Assert.AreEqual(300, batchNodeMetrics.FileUploadDurationInSeconds);
-            Assert.AreEqual(0.25, batchNodeMetrics.DiskUsedInGB);
+            Assert.AreEqual(1.024, batchNodeMetrics.DiskUsedInGB);
             Assert.AreEqual(12.5f, batchNodeMetrics.DiskUsedPercent);
             Assert.AreEqual(2, batchNodeMetrics.FileDownloadSizeInGB);
             Assert.AreEqual(4, batchNodeMetrics.FileUploadSizeInGB);

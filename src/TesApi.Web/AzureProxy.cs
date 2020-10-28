@@ -36,7 +36,6 @@ namespace TesApi.Web
     /// </summary>
     public class AzureProxy : IAzureProxy
     {
-        private const double MbToGbRatio = 0.001;
         private const char BatchJobAttemptSeparator = '-';
         private const string DefaultAzureBillingRegionName = "US West";
 
@@ -671,6 +670,11 @@ namespace TesApi.Web
         /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
         private async Task<IEnumerable<VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
         {
+            const double mbToGbRatio = 0.001;
+            const double mibToGbRatio = 0.001048576;
+
+            static double ConvertMBOrMiBToGB(int value) =>  Math.Round(value * (value % 1024 == 0 ? mibToGbRatio : mbToGbRatio), 3);
+
             var azureClient = await GetAzureManagementClientAsync();
             var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).VirtualMachines.Sizes.ListByRegionAsync(location)).ToList();
 
@@ -700,9 +704,9 @@ namespace TesApi.Web
                         vmInfos.Add(new VirtualMachineInfo
                         {
                             VmSize = vmPrice.VmSizes[i],
-                            MemoryInGB = vmSize.MemoryInMB * MbToGbRatio,
+                            MemoryInGB = ConvertMBOrMiBToGB(vmSize.MemoryInMB),
                             NumberOfCores = vmSize.NumberOfCores,
-                            ResourceDiskSizeInGB = vmSize.ResourceDiskSizeInMB * MbToGbRatio,
+                            ResourceDiskSizeInGB = ConvertMBOrMiBToGB(vmSize.ResourceDiskSizeInMB),
                             MaxDataDiskCount = vmSize.MaxDataDiskCount,
                             VmSeries = vmPrice.VmSeries[i],
                             LowPriority = vmPrice.LowPriority,
