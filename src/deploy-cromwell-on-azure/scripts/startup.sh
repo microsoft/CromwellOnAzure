@@ -48,8 +48,6 @@ storage_account_name=${kv["DefaultStorageAccountName"]}
 
 write_log "Checking account access (this could take awhile due to role assignment propagation delay)..."
 
-subscription_id=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/compute/subscriptionId?api-version=2017-08-01&format=text")
-
 while :
 do
     write_log "Getting management token..."
@@ -58,18 +56,31 @@ do
     if [ "$http_status" == "200" ]; then
         mgmt_token=$(grep -Po '"access_token":"\K([^"]*)' <<< $content)
 
-        write_log "Getting list of accessible resources..."
-        IFS='~' read content http_status <<< $(curl -s -X GET --write-out '~%{http_code}' "https://management.azure.com/subscriptions/$subscription_id/resources?api-version=2019-05-10" -H "Authorization: Bearer $mgmt_token" -d '')
+        write_log "Getting list of accessible subscriptions..."
+        IFS='~' read content http_status <<< $(curl -s -X GET --write-out '~%{http_code}' "https://management.azure.com/subscriptions?api-version=2019-05-10" -H "Authorization: Bearer $mgmt_token" -d '')
 
         if [ "$http_status" == "200" ]; then
-            resource_ids=$(grep -Po '"id":"\K([^"]*)' <<< $content)
+            subscription_ids=( $(grep -Po '"id":"/subscriptions/\K([^"]*)' <<< $content) )
+
+            write_log "Getting list of accessible resources..."
+            resource_ids=()
+
+            for subscription_id in "${subscription_ids[@]}"
+            do
+                IFS='~' read content http_status <<< $(curl -s -X GET --write-out '~%{http_code}' "https://management.azure.com/subscriptions/$subscription_id/resources?api-version=2019-05-10" -H "Authorization: Bearer $mgmt_token" -d '')
+
+                if [ "$http_status" == "200" ]; then
+                    resource_ids_in_single_sub=( $(grep -Po '"id":"\K([^"]*)' <<< $content) )
+                    resource_ids=("${resource_ids[@]}" "${resource_ids_in_single_sub[@]}")
+                fi
+            done
 
             write_log "Verifying that all required accounts (4) are present in the list of accessible resources..."
 
-            if grep -q "${kv["DefaultStorageAccountName"]}" <<< "$resource_ids" \
-                && grep -q "${kv["CosmosDbAccountName"]}" <<< "$resource_ids" \
-                && grep -q "${kv["BatchAccountName"]}" <<< "$resource_ids" \
-                && grep -q "${kv["ApplicationInsightsAccountName"]}" <<< "$resource_ids"; then
+            if grep -q "${kv["DefaultStorageAccountName"]}" <<< "${resource_ids[@]}" \
+                && grep -q "${kv["CosmosDbAccountName"]}" <<< "${resource_ids[@]}" \
+                && grep -q "${kv["BatchAccountName"]}" <<< "${resource_ids[@]}" \
+                && grep -q "${kv["ApplicationInsightsAccountName"]}" <<< "${resource_ids[@]}"; then
 
                 write_log "Getting storage token..."
                 IFS='~' read content http_status <<< $(curl -s -H Metadata:true --write-out '~%{http_code}' "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://$storage_account_name.blob.core.windows.net")
@@ -90,7 +101,7 @@ do
                 write_log "Not all accounts are accessible, retrying..."
             fi
         else
-            write_log "Resource query failed with $http_status, $content, retrying..."
+            write_log "Subscriptions query failed with $http_status, $content, retrying..."
         fi
     else
         write_log "Management token request failed with $http_status, $content, retrying..."

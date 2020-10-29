@@ -41,24 +41,30 @@ get_accessible_storage_containers () {
   echo_with_ts "Getting list of accessible subscriptions"
   subscription_ids=$(curl -s -X GET "https://management.azure.com/subscriptions/?api-version=2019-08-01" -H "Authorization: Bearer $mgmt_token" | grep -Po '"id":"/subscriptions/\K([^"]*)' )
 
+  resource_filter="resourceType%20eq%20'Microsoft.Storage/storageAccounts'"
+
   for subscription_id in $subscription_ids; do
-    resource_filter="resourceType%20eq%20'Microsoft.Storage/storageAccounts'"
-
     echo_with_ts "Getting list of storage accounts accessible by this VM in subscription $subscription_id"
-    account_ids=$(curl -s -X GET "https://management.azure.com/subscriptions/$subscription_id/resources?%24filter=$resource_filter&api-version=2019-05-10" -H "Authorization: Bearer $mgmt_token" \
-      | grep -Po "/subscriptions/[^\"]*/providers/Microsoft.Storage/storageAccounts/[^\"]*")
+    IFS='~' read content http_status <<< $(curl -s -X GET --write-out '~%{http_code}' "https://management.azure.com/subscriptions/$subscription_id/resources?%24filter=$resource_filter&api-version=2019-05-10" -H "Authorization: Bearer $mgmt_token" -d '')
 
-    for account_id in $account_ids; do
-      account_name=$(grep -Po '/subscriptions/[^"]*/providers/Microsoft.Storage/storageAccounts/\K([^"]*)' <<< "$account_id")
-      echo_with_ts "Getting access key for storage account $account_name"
-      account_key=$(curl -s -X POST "https://management.azure.com/$account_id/listKeys?api-version=2016-12-01" -H "Authorization: Bearer $mgmt_token" -d '' | grep -Po '"key1","value":"\K([^"]*)' )
-      echo_with_ts "Getting list of containers for storage account $account_name"
-      container_names=$(curl -s -X GET "https://$account_name.blob.core.windows.net/?comp=list" -H "Authorization: Bearer $storage_token" -H "x-ms-version: 2018-03-28" -d '' | grep -Po '<Name>\K([^<]*)' )
+    if [ "$http_status" == "200" ]; then
+      account_ids=$(grep -Po "/subscriptions/[^\"]*/providers/Microsoft.Storage/storageAccounts/[^\"]*" <<< $content) || :
 
-      for container_name in $container_names; do
-        result["$account_name/$container_name"]=$account_key
+      for account_id in $account_ids; do
+        account_name=$(grep -Po '/subscriptions/[^"]*/providers/Microsoft.Storage/storageAccounts/\K([^"]*)' <<< "$account_id")
+        echo_with_ts "Getting access key for storage account $account_name"
+        account_key=$(curl -s -X POST "https://management.azure.com/$account_id/listKeys?api-version=2016-12-01" -H "Authorization: Bearer $mgmt_token" -d '' | grep -Po '"key1","value":"\K([^"]*)' )
+        echo_with_ts "Getting list of containers for storage account $account_name"
+        container_names=$(curl -s -X GET "https://$account_name.blob.core.windows.net/?comp=list" -H "Authorization: Bearer $storage_token" -H "x-ms-version: 2018-03-28" -d '' | grep -Po '<Name>\K([^<]*)' )
+
+        for container_name in $container_names; do
+          result["$account_name/$container_name"]=$account_key
+        done
       done
-    done
+    else
+      echo_with_ts "Storage accounts query in subscription $subscription_id failed with $http_status, $content."
+      exit 1
+    fi
   done
 }
 
