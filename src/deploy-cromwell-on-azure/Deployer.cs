@@ -200,7 +200,7 @@ namespace CromwellOnAzureDeployer
                     }
 
                     batchAccount = await GetExistingBatchAccountAsync(batchAccountName)
-                            ?? throw new ValidationException($"Batch account {batchAccountName} does not exist in subscription {configuration.SubscriptionId}.");
+                            ?? throw new ValidationException($"Batch account {batchAccountName} does not exist in region {configuration.RegionName} or is not accessible to the user.");
 
                     configuration.BatchAccountName = batchAccountName;
 
@@ -210,7 +210,7 @@ namespace CromwellOnAzureDeployer
                     }
 
                     storageAccount = await GetExistingStorageAccountAsync(storageAccountName)
-                            ?? throw new ValidationException($"Storage account {storageAccountName} does not exist in subscription {configuration.SubscriptionId}.");
+                            ?? throw new ValidationException($"Storage account {storageAccountName} does not exist in region {configuration.RegionName} or is not accessible to the user.");
 
                     configuration.StorageAccountName = storageAccountName;
 
@@ -1262,7 +1262,7 @@ namespace CromwellOnAzureDeployer
          
                 if (existingStorageAccount == null)
                 {
-                    throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist in subscription {configuration.SubscriptionId} and region {configuration.RegionName}, and be accessible to the user.", displayExample: false);
+                    throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist in region {configuration.RegionName}, and be accessible to the user.", displayExample: false);
                 }
             }
 
@@ -1272,7 +1272,7 @@ namespace CromwellOnAzureDeployer
 
                 if (existingBatchAccount == null)
                 {
-                    throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in subscription {configuration.SubscriptionId} and region {configuration.RegionName}, and be accessible to the user.", displayExample: false);
+                    throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in region {configuration.RegionName}, and be accessible to the user.", displayExample: false);
                 }
             }
 
