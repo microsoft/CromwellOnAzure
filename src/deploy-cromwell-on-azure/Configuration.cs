@@ -12,7 +12,7 @@ namespace CromwellOnAzureDeployer
     public class Configuration
     {
         public string SubscriptionId { get; set; }
-        public string RegionName { get; set; } = "westus2";
+        public string RegionName { get; set; }
         public string MainIdentifierPrefix { get; set; } = "coa";
         public string VmOsVersion { get; set; } = "18.04-LTS";
         public string VmSize { get; set; } = "Standard_D3_v2";
@@ -39,6 +39,7 @@ namespace CromwellOnAzureDeployer
         public string VnetResourceGroupName { get; set; }
         public string VnetName { get; set; }
         public string SubnetName { get; set; }
+        public bool? PrivateNetworking { get; set; } = null;
 
         public static Configuration BuildConfiguration(string[] args)
         {
