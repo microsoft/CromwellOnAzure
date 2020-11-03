@@ -48,6 +48,10 @@ namespace CromwellOnAzureDeployer
             .Handle<Microsoft.Rest.Azure.CloudException>(cloudException => cloudException.Body.Code.Equals("HashConflictOnDifferentRoleAssignmentIds"))
             .RetryAsync();
 
+        private static readonly AsyncRetryPolicy sshCommandRetryPolicy = Policy
+            .Handle<Exception>(ex => !(ex is SshAuthenticationException && ex.Message.StartsWith("Permission")))
+            .WaitAndRetryAsync(5, retryAttempt => TimeSpan.FromSeconds(5));
+
         private const string WorkflowsContainerName = "workflows";
         private const string ConfigurationContainerName = "configuration";
         private const string CromwellConfigurationFileName = "cromwell-application.conf";
@@ -77,8 +81,6 @@ namespace CromwellOnAzureDeployer
         private IEnumerable<string> subscriptionIds { get; set; }
         private bool SkipBillingReaderRoleAssignment { get; set; }
         private bool isResourceGroupCreated { get; set; }
-        private IStorageAccount existingStorageAccount;
-        private BatchAccount existingBatchAccount;
 
         public Deployer(Configuration configuration)
         {
@@ -104,7 +106,7 @@ namespace CromwellOnAzureDeployer
                 subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
 
-                await ValidateSubscriptionResourceGroupStorageAndBatchAccountsAsync(configuration);
+                await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
                 IResourceGroup resourceGroup = null;
                 BatchAccount batchAccount = null;
@@ -124,11 +126,6 @@ namespace CromwellOnAzureDeployer
 
                     RefreshableConsole.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
-                    if (string.IsNullOrWhiteSpace(configuration.VmPassword))
-                    {
-                        throw new ValidationException($"--VmPassword is required for update.");
-                    }
-
                     var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
 
                     if (!existingVms.Any())
@@ -138,7 +135,7 @@ namespace CromwellOnAzureDeployer
 
                     if (existingVms.Count() > 1 && string.IsNullOrWhiteSpace(configuration.VmName))
                     {
-                        throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. --VmName must be provided.");
+                        throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. {nameof(configuration.VmName)} must be provided.");
                     }
 
                     if (!string.IsNullOrWhiteSpace(configuration.VmName))
@@ -156,8 +153,10 @@ namespace CromwellOnAzureDeployer
                     }
 
                     configuration.VmName = linuxVm.Name;
+                    configuration.RegionName = linuxVm.RegionName;
+                    configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() == null;
 
-                    sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+                    sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
 
                     await WaitForSshConnectivityAsync(sshConnectionInfo);
 
@@ -174,7 +173,7 @@ namespace CromwellOnAzureDeployer
 
                     networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault();
 
-                    if (networkSecurityGroup == null)
+                    if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup == null)
                     {
                         if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
                         {
@@ -187,7 +186,7 @@ namespace CromwellOnAzureDeployer
 
                     await ConfigureVmAsync(sshConnectionInfo);
 
-                    var accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
+                    var accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
 
                     if (!accountNames.Any())
                     {
@@ -200,7 +199,7 @@ namespace CromwellOnAzureDeployer
                     }
 
                     batchAccount = await GetExistingBatchAccountAsync(batchAccountName)
-                            ?? throw new ValidationException($"Batch account {batchAccountName} does not exist in region {configuration.RegionName} or is not accessible to the user.");
+                        ?? throw new ValidationException($"Batch account {batchAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
                     configuration.BatchAccountName = batchAccountName;
 
@@ -210,7 +209,7 @@ namespace CromwellOnAzureDeployer
                     }
 
                     storageAccount = await GetExistingStorageAccountAsync(storageAccountName)
-                            ?? throw new ValidationException($"Storage account {storageAccountName} does not exist in region {configuration.RegionName} or is not accessible to the user.");
+                        ?? throw new ValidationException($"Storage account {storageAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
                     configuration.StorageAccountName = storageAccountName;
 
@@ -244,6 +243,11 @@ namespace CromwellOnAzureDeployer
 
                 if (!configuration.Update)
                 {
+                    ValidateRegionName(configuration.RegionName);
+                    ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
+                    storageAccount = await ValidateAndGetExistingStorageAccountAsync();
+                    batchAccount = await ValidateAndGetExistingBatchAccountAsync();
+
                     if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
                     {
                         configuration.BatchAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
@@ -281,7 +285,12 @@ namespace CromwellOnAzureDeployer
 
                     await RegisterResourceProvidersAsync();
                     await ValidateVmAsync();
-                    await ValidateBatchQuotaAsync();
+
+                    if (batchAccount == null)
+                    {
+                        await ValidateBatchAccountQuotaAsync();
+                    }
+
                     var vnetAndSubnet = await ValidateAndGetExistingVirtualNetworkAsync();
 
                     RefreshableConsole.WriteLine();
@@ -303,6 +312,21 @@ namespace CromwellOnAzureDeployer
 
                     managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
 
+                    if (vnetAndSubnet != null)
+                    {
+                        RefreshableConsole.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.subnetName}");
+                    }
+
+                    if (storageAccount != null)
+                    {
+                        RefreshableConsole.WriteLine($"Using existing Storage Account {storageAccount.Name}");
+                    }
+
+                    if (batchAccount != null)
+                    {
+                        RefreshableConsole.WriteLine($"Using existing Batch Account {batchAccount.Name}");
+                    }
+
                     if (vnetAndSubnet == null)
                     {
                         configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
@@ -311,28 +335,29 @@ namespace CromwellOnAzureDeployer
 
                     await Task.WhenAll(new Task[]
                     {
-                        Task.Run(async () => batchAccount = await GetOrCreateBatchAccountAsync()),
+                        Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync()),
                         Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync()),
                         Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
 
-                        Task.Run(() => GetOrCreateStorageAccountAsync()
-                            .ContinueWith(async t =>
-                                {
-                                    storageAccount = t.Result;
-                                    await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
-                                    await WritePersonalizedFilesToStorageAccountAsync(storageAccount, managedIdentity.Name);
-                                },
-                                TaskContinuationOptions.OnlyOnRanToCompletion)
-                            .Unwrap()),
+                        Task.Run(async () => {
+                            storageAccount ??= await CreateStorageAccountAsync();
+                            await CreateDefaultStorageContainersAsync(storageAccount);
+                            await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
+                            await WritePersonalizedFilesToStorageAccountAsync(storageAccount, managedIdentity.Name);
+                        }),
 
                         Task.Run(() => CreateVirtualMachineAsync(managedIdentity, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName)
                             .ContinueWith(async t =>
                                 {
                                     linuxVm = t.Result;
-                                    networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
-                                    await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
 
-                                    sshConnectionInfo = new ConnectionInfo(linuxVm.GetPrimaryPublicIPAddress().Fqdn, configuration.VmUsername, new PasswordAuthenticationMethod(configuration.VmUsername, configuration.VmPassword));
+                                    if (!configuration.PrivateNetworking.GetValueOrDefault())
+                                    {
+                                        networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
+                                        await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
+                                    }
+
+                                    sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
                                     await WaitForSshConnectivityAsync(sshConnectionInfo);
                                     await ConfigureVmAsync(sshConnectionInfo);
                                 },
@@ -435,7 +460,7 @@ namespace CromwellOnAzureDeployer
             var timeout = TimeSpan.FromMinutes(10);
 
             return Execute(
-                "Waiting for VM to accept SSH connections...",
+                $"Waiting for VM to accept SSH connections at {sshConnectionInfo.Host}...",
                 async () =>
                 {
                     var startTime = DateTime.UtcNow;
@@ -478,7 +503,7 @@ namespace CromwellOnAzureDeployer
                 {
                     while (!cts.IsCancellationRequested)
                     {
-                        var (numberOfRunningContainers, _, _) = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, "sudo docker ps -a | grep -c 'Up ' || :");
+                        var (numberOfRunningContainers, _, _) = await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo docker ps -a | grep -c 'Up ' || :");
 
                         if (numberOfRunningContainers == "4")
                         {
@@ -498,7 +523,7 @@ namespace CromwellOnAzureDeployer
                 {
                     while (!cts.IsCancellationRequested)
                     {
-                        var (isCromwellAvailable, _, _) = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, "[ $(sudo docker logs cromwellazure_triggerservice_1 | grep -c 'Cromwell is available.') -gt 0 ] && echo 1 || echo 0");
+                        var (isCromwellAvailable, _, _) = await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "[ $(sudo docker logs cromwellazure_triggerservice_1 | grep -c 'Cromwell is available.') -gt 0 ] && echo 1 || echo 0");
 
                         if (isCromwellAvailable == "1")
                         {
@@ -518,7 +543,7 @@ namespace CromwellOnAzureDeployer
                 {
                     while (!cts.IsCancellationRequested)
                     {
-                        var (startupLogContent, _, _) = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/startup.log || echo ''");
+                        var (startupLogContent, _, _) = await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/startup.log || echo ''");
 
                         if (startupLogContent.Contains("Startup complete"))
                         {
@@ -539,7 +564,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task<bool> MountWarningsExistAsync(ConnectionInfo sshConnectionInfo)
         {
-            var warningCount = int.Parse((await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"grep -c 'WARNING' {CromwellAzureRootDir}/mount.blobfuse.log || :")).Output);
+            var warningCount = int.Parse((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"grep -c 'WARNING' {CromwellAzureRootDir}/mount.blobfuse.log || :")).Output);
             return warningCount > 0;
         }
 
@@ -650,7 +675,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task<Version> GetInstalledCromwellOnAzureVersionAsync(ConnectionInfo sshConnectionInfo)
         {
-            var versionString = (await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $@"grep -sPo 'CromwellOnAzureVersion=\K(.*)$' {CromwellAzureRootDir}/env-00-coa-version.txt || :")).Output;
+            var versionString = (await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $@"grep -sPo 'CromwellOnAzureVersion=\K(.*)$' {CromwellAzureRootDir}/env-00-coa-version.txt || :")).Output;
 
             return !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
         }
@@ -662,7 +687,7 @@ namespace CromwellOnAzureDeployer
                 async () =>
                 {
                     await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (GetFileContent("scripts", "mount-data-disk.sh"), $"/tmp/mount-data-disk.sh", true));
-                    await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"/tmp/mount-data-disk.sh");
+                    await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"/tmp/mount-data-disk.sh");
                 });
         }
 
@@ -807,28 +832,16 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(cts.Token)));
         }
 
-        private Task<IStorageAccount> GetOrCreateStorageAccountAsync()
+        private Task<IStorageAccount> CreateStorageAccountAsync()
         {
             return Execute(
-                (existingStorageAccount == null ? "Creating" : "Using existing") + $" Storage Account: {configuration.StorageAccountName}...",
-                async () =>
-                {
-                    var storageAccount = existingStorageAccount ??
-                        await azureSubscriptionClient.StorageAccounts
-                            .Define(configuration.StorageAccountName)
-                            .WithRegion(configuration.RegionName)
-                            .WithExistingResourceGroup(configuration.ResourceGroupName)
-                            .WithOnlyHttpsTraffic()
-                            .CreateAsync(cts.Token);
-
-                    cts.Token.ThrowIfCancellationRequested();
-                    var blobClient = await GetBlobClientAsync(storageAccount);
-
-                    var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
-                    await Task.WhenAll(defaultContainers.Select(c => blobClient.GetContainerReference(c).CreateIfNotExistsAsync(cts.Token)));
-
-                    return storageAccount;
-                });
+                $"Creating Storage Account: {configuration.StorageAccountName}...",
+                () => azureSubscriptionClient.StorageAccounts
+                    .Define(configuration.StorageAccountName)
+                    .WithRegion(configuration.RegionName)
+                    .WithExistingResourceGroup(configuration.ResourceGroupName)
+                    .WithOnlyHttpsTraffic()
+                    .CreateAsync(cts.Token));
         }
 
         private async Task<IStorageAccount> GetExistingStorageAccountAsync(string storageAccountName)
@@ -843,6 +856,14 @@ namespace CromwellOnAzureDeployer
             return (await Task.WhenAll(subscriptionIds.Select(s => new BatchManagementClient(tokenCredentials) { SubscriptionId = s }.BatchAccount.ListAsync())))
                 .SelectMany(a => a)
                 .SingleOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase) && a.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private async Task CreateDefaultStorageContainersAsync(IStorageAccount storageAccount)
+        {
+            var blobClient = await GetBlobClientAsync(storageAccount);
+
+            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
+            await Task.WhenAll(defaultContainers.Select(c => blobClient.GetContainerReference(c).CreateIfNotExistsAsync(cts.Token)));
         }
 
         private Task WriteNonPersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount)
@@ -942,22 +963,22 @@ namespace CromwellOnAzureDeployer
             const int dataDiskSizeGiB = 32;
             const int dataDiskLun = 0;
 
-            return Execute(
-                $"Creating Linux VM: {configuration.VmName}...",
-                () => azureSubscriptionClient.VirtualMachines.Define(configuration.VmName)
-                    .WithRegion(configuration.RegionName)
-                    .WithExistingResourceGroup(configuration.ResourceGroupName)
-                    .WithExistingPrimaryNetwork(vnet)
-                    .WithSubnet(subnetName)
-                    .WithPrimaryPrivateIPAddressDynamic()
-                    .WithNewPrimaryPublicIPAddress(configuration.VmName)
-                    .WithLatestLinuxImage("Canonical", "UbuntuServer", configuration.VmOsVersion)
-                    .WithRootUsername(configuration.VmUsername)
-                    .WithRootPassword(configuration.VmPassword)
-                    .WithNewDataDisk(dataDiskSizeGiB, dataDiskLun, CachingTypes.None)
-                    .WithSize(configuration.VmSize)
-                    .WithExistingUserAssignedManagedServiceIdentity(managedIdentity)
-                    .CreateAsync(cts.Token));
+            var vmDefinitionPart1 = azureSubscriptionClient.VirtualMachines.Define(configuration.VmName)
+                .WithRegion(configuration.RegionName)
+                .WithExistingResourceGroup(configuration.ResourceGroupName)
+                .WithExistingPrimaryNetwork(vnet)
+                .WithSubnet(subnetName)
+                .WithPrimaryPrivateIPAddressDynamic();
+
+            var vmDefinitionPart2 = (configuration.PrivateNetworking.GetValueOrDefault() ? vmDefinitionPart1.WithoutPrimaryPublicIPAddress() : vmDefinitionPart1.WithNewPrimaryPublicIPAddress(configuration.VmName))
+                .WithLatestLinuxImage("Canonical", "UbuntuServer", configuration.VmOsVersion)
+                .WithRootUsername(configuration.VmUsername)
+                .WithRootPassword(configuration.VmPassword)
+                .WithNewDataDisk(dataDiskSizeGiB, dataDiskLun, CachingTypes.None)
+                .WithSize(configuration.VmSize)
+                .WithExistingUserAssignedManagedServiceIdentity(managedIdentity);
+
+            return Execute($"Creating Linux VM: {configuration.VmName}...", () => vmDefinitionPart2.CreateAsync(cts.Token));
         }
 
         private Task<(INetwork virtualNetwork, string subnetName)> CreateVnetAsync(IResourceGroup resourceGroup, string name, string addressSpace)
@@ -1030,15 +1051,13 @@ namespace CromwellOnAzureDeployer
                     .CreateAsync(cts.Token));
         }
 
-        private Task<BatchAccount> GetOrCreateBatchAccountAsync()
+        private Task<BatchAccount> CreateBatchAccountAsync()
         {
             return Execute(
-                (existingBatchAccount == null ? "Creating" : "Using existing") + $" Batch Account: {configuration.BatchAccountName}...",
-                async () => existingBatchAccount ?? 
-                    await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
-                        .BatchAccount
-                        .CreateAsync(configuration.ResourceGroupName, configuration.BatchAccountName, new BatchAccountCreateParameters { Location = configuration.RegionName }, cts.Token)
-                );
+                $"Creating Batch Account: {configuration.BatchAccountName}...",
+                () => new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
+                    .BatchAccount
+                    .CreateAsync(configuration.ResourceGroupName, configuration.BatchAccountName, new BatchAccountCreateParameters { Location = configuration.RegionName }, cts.Token));
         }
 
         private Task<IResourceGroup> CreateResourceGroupAsync()
@@ -1180,6 +1199,16 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private static ConnectionInfo GetSshConnectionInfo(IVirtualMachine linuxVm, string vmUsername, string vmPassword)
+        {
+            var publicIPAddress = linuxVm.GetPrimaryPublicIPAddress();
+
+            return new ConnectionInfo(
+                publicIPAddress != null ? publicIPAddress.Fqdn : linuxVm.GetPrimaryNetworkInterface().PrimaryPrivateIP,
+                vmUsername,
+                new PasswordAuthenticationMethod(vmUsername, vmPassword));
+        }
+
         private static void ValidateMainIdentifierPrefix(string prefix)
         {
             const int maxLength = 12;
@@ -1204,11 +1233,6 @@ namespace CromwellOnAzureDeployer
 
         private static void ValidateRegionName(string regionName)
         {
-            if (string.IsNullOrWhiteSpace(regionName))
-            {
-                throw new ValidationException("RegionName is required.");
-            }
-
             var invalidRegionsRegex = new Regex("^(germany|china|usgov|usdod)");
             var validRegionNames = Region.Values.Select(r => r.Name).Where(rn => !invalidRegionsRegex.IsMatch(rn));
 
@@ -1218,15 +1242,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private static void ValidateSubscriptionId(string subscriptionId)
-        {
-            if (string.IsNullOrWhiteSpace(subscriptionId))
-            {
-                throw new ValidationException($"SubscriptionId is required.");
-            }
-        }
-
-        private async Task ValidateSubscriptionResourceGroupStorageAndBatchAccountsAsync(Configuration configuration)
+        private async Task ValidateSubscriptionAndResourceGroupAsync(Configuration configuration)
         {
             const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
@@ -1244,36 +1260,11 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException($"Invalid or inaccessible subcription id '{configuration.SubscriptionId}'. Make sure that subscription exists and that you are either an Owner or have Contributor and User Access Administrator roles on the subscription.", displayExample: false);
             }
 
-            if (configuration.Update && string.IsNullOrEmpty(configuration.ResourceGroupName))
-            {
-                throw new ValidationException($"ResourceGroupName is required for the update.", displayExample: false);
-            }
-
             var rgExists = !string.IsNullOrEmpty(configuration.ResourceGroupName) && await azureSubscriptionClient.ResourceGroups.ContainAsync(configuration.ResourceGroupName);
 
             if (!string.IsNullOrEmpty(configuration.ResourceGroupName) && !rgExists)
             {
                 throw new ValidationException($"If ResourceGroupName is provided, the resource group must already exist.", displayExample: false);
-            }
-
-            if (configuration.StorageAccountName != null)
-            {
-                existingStorageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName);
-         
-                if (existingStorageAccount == null)
-                {
-                    throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist in region {configuration.RegionName}, and be accessible to the user.", displayExample: false);
-                }
-            }
-
-            if (configuration.BatchAccountName != null)
-            {
-                existingBatchAccount = await GetExistingBatchAccountAsync(configuration.BatchAccountName);
-
-                if (existingBatchAccount == null)
-                {
-                    throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in region {configuration.RegionName}, and be accessible to the user.", displayExample: false);
-                }
             }
 
             var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
@@ -1311,17 +1302,43 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task<(INetwork virtualNetwork, string subnetName)?> ValidateAndGetExistingVirtualNetworkAsync()
+        private async Task<IStorageAccount> ValidateAndGetExistingStorageAccountAsync()
         {
-            if (string.IsNullOrWhiteSpace(configuration.VnetName) && string.IsNullOrWhiteSpace(configuration.VnetResourceGroupName))
+            if (configuration.StorageAccountName == null)
             {
                 return null;
             }
 
-            if ((!string.IsNullOrWhiteSpace(configuration.VnetName) && string.IsNullOrWhiteSpace(configuration.VnetResourceGroupName)) ||
-                (string.IsNullOrWhiteSpace(configuration.VnetName) && !string.IsNullOrWhiteSpace(configuration.VnetResourceGroupName)))
+            return await GetExistingStorageAccountAsync(configuration.StorageAccountName)
+                ?? throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist in subscription {configuration.SubscriptionId} and region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+        }
+
+        private async Task<BatchAccount> ValidateAndGetExistingBatchAccountAsync()
+        {
+            if (configuration.BatchAccountName == null)
             {
-                throw new ValidationException("Both --VnetResourceGroup and --VnetName are required when using the existing virtual network.");
+                return null;
+            }
+
+            return await GetExistingBatchAccountAsync(configuration.BatchAccountName)
+                ?? throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in subscription {configuration.SubscriptionId} and region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+        }
+
+        private async Task<(INetwork virtualNetwork, string subnetName)?> ValidateAndGetExistingVirtualNetworkAsync()
+        {
+            if (string.IsNullOrWhiteSpace(configuration.VnetName) && string.IsNullOrWhiteSpace(configuration.VnetResourceGroupName))
+            {
+                if (configuration.PrivateNetworking.GetValueOrDefault())
+                {
+                    throw new ValidationException("VnetResourceGroup and VnetName are required when using private networking.");
+                }
+
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(configuration.VnetName) ^ string.IsNullOrWhiteSpace(configuration.VnetResourceGroupName))
+            {
+                throw new ValidationException("Both VnetResourceGroup and VnetName are required when using the existing virtual network.");
             }
 
             var vnet = await azureSubscriptionClient.Networks.GetByResourceGroupAsync(configuration.VnetResourceGroupName, configuration.VnetName);
@@ -1338,7 +1355,7 @@ namespace CromwellOnAzureDeployer
 
             if (vnet.Subnets.Count() > 1 && string.IsNullOrWhiteSpace(configuration.SubnetName))
             {
-                throw new ValidationException($"More than one subnet exists in virtual network  '{configuration.VnetName}'. --SubnetName is required.");
+                throw new ValidationException($"More than one subnet exists in virtual network  '{configuration.VnetName}'. SubnetName is required.");
             }
 
             var subnet = vnet.Subnets.Keys.FirstOrDefault(k => string.IsNullOrWhiteSpace(configuration.SubnetName) || k.Equals(configuration.SubnetName, StringComparison.OrdinalIgnoreCase));
@@ -1351,7 +1368,7 @@ namespace CromwellOnAzureDeployer
             return (vnet, subnet);
         }
 
-        private async Task ValidateBatchQuotaAsync()
+        private async Task ValidateBatchAccountQuotaAsync()
         {
             var accountQuota = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.Location.GetQuotasAsync(configuration.RegionName)).AccountQuota;
             var existingBatchAccountCount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).AsEnumerable().Count(b => b.Location.Equals(configuration.RegionName));
@@ -1404,27 +1421,53 @@ namespace CromwellOnAzureDeployer
 
         private void ValidateInitialCommandLineArgsAsync()
         {
-            ValidateSubscriptionId(configuration.SubscriptionId);
-            ValidateRegionName(configuration.RegionName);
-            ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
-
-            if (configuration.Update)
+            void ThrowIfProvidedForUpdate(object attributeValue, string attributeName)
             {
-                ValidateUpdateScenario();
-            }
-        }
-
-        private void ValidateUpdateScenario()
-        {
-            if (configuration.StorageAccountName != null)
-            {
-                throw new ValidationException("StorageAccountName must not be provided when updating");
+                if (configuration.Update && attributeValue != null)
+                {
+                    throw new ValidationException($"{attributeName} must not be provided when updating", false);
+                }
             }
 
-            if (configuration.BatchAccountName != null)
+            void ThrowIfNotProvidedForUpdate(string attributeValue, string attributeName)
             {
-                throw new ValidationException("BatchAccountName must not be provided when updating");
+                if (configuration.Update && string.IsNullOrWhiteSpace(attributeValue))
+                {
+                    throw new ValidationException($"{attributeName} is required for update.", false);
+                }
             }
+
+            void ThrowIfNotProvided(string attributeValue, string attributeName)
+            {
+                if (string.IsNullOrWhiteSpace(attributeValue))
+                {
+                    throw new ValidationException($"{attributeName} is required.", false);
+                }
+            }
+
+            void ThrowIfNotProvidedForInstall(string attributeValue, string attributeName)
+            {
+                if (!configuration.Update && string.IsNullOrWhiteSpace(attributeValue))
+                {
+                    throw new ValidationException($"{attributeName} is required.", false);
+                }
+            }
+
+            ThrowIfNotProvided(configuration.SubscriptionId, nameof(configuration.SubscriptionId));
+
+            ThrowIfNotProvidedForInstall(configuration.RegionName, nameof(configuration.RegionName));
+
+            ThrowIfNotProvidedForUpdate(configuration.ResourceGroupName, nameof(configuration.ResourceGroupName));
+            ThrowIfNotProvidedForUpdate(configuration.VmPassword, nameof(configuration.VmPassword));
+
+            ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
+            ThrowIfProvidedForUpdate(configuration.StorageAccountName, nameof(configuration.StorageAccountName));
+            ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
+            ThrowIfProvidedForUpdate(configuration.CosmosDbAccountName, nameof(configuration.CosmosDbAccountName));
+            ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
+            ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
+            ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
+            ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
         }
 
         private static void DisplayValidationExceptionAndExit(ValidationException validationException)
@@ -1606,6 +1649,11 @@ namespace CromwellOnAzureDeployer
             sshClient.Disconnect();
 
             return (output, error, exitStatus);
+        }
+
+        private Task<(string Output, string Error, int ExitStatus)> ExecuteCommandOnVirtualMachineWithRetriesAsync(ConnectionInfo sshConnectionInfo, string command)
+        {
+            return sshCommandRetryPolicy.ExecuteAsync(() => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, command));
         }
 
         private async Task UploadFilesToVirtualMachineAsync(ConnectionInfo sshConnectionInfo, params (string fileContent, string remoteFilePath, bool makeExecutable)[] files)
