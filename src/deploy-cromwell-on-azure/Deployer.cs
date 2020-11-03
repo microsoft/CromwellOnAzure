@@ -239,6 +239,11 @@ namespace CromwellOnAzureDeployer
                     {
                         await PatchContainersToMountFileV210Async(storageAccount, managedIdentity.Name);
                     }
+
+                    if (installedVersion == null || installedVersion < new Version(2, 2))
+                    {
+                        await PatchContainersToMountFileV220Async(storageAccount);
+                    }
                 }
 
                 if (!configuration.Update)
@@ -1178,6 +1183,23 @@ namespace CromwellOnAzureDeployer
                             .Replace("where the VM has Contributor role", $"where the identity '{managedIdentityName}' has 'Contributor' role")
                             .Replace("where VM's identity", "where CoA VM")
                             .Replace("that the VM's identity has Contributor role", $"that the identity '{managedIdentityName}' has 'Contributor' role");
+
+                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountText);
+                    }
+                });
+        }
+
+        private Task PatchContainersToMountFileV220Async(IStorageAccount storageAccount)
+        {
+            return Execute(
+                $"Commenting out msgenpublicdata/inputs in '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container. It will be removed in v2.3",
+                async () =>
+                {
+                    var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName);
+
+                    if (containersToMountText != null)
+                    {
+                        containersToMountText = containersToMountText.Replace("https://msgenpublicdata", $"#https://msgenpublicdata");
 
                         await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountText);
                     }
