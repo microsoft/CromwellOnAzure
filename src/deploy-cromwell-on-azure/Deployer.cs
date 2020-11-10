@@ -1360,7 +1360,7 @@ namespace CromwellOnAzureDeployer
 
             if (string.IsNullOrWhiteSpace(configuration.VnetName) ^ string.IsNullOrWhiteSpace(configuration.VnetResourceGroupName))
             {
-                throw new ValidationException("Both VnetResourceGroup and VnetName are required when using the existing virtual network.");
+                throw new ValidationException("Both VnetResourceGroupName and VnetName are required when using the existing virtual network.");
             }
 
             var vnet = await azureSubscriptionClient.Networks.GetByResourceGroupAsync(configuration.VnetResourceGroupName, configuration.VnetName);
