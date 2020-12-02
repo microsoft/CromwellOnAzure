@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using Common;
 using Microsoft.Rest.Azure;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
@@ -30,6 +31,14 @@ namespace CromwellOnAzureDeployer.Tests
             CloudException exception = null;
             var error = exception.ToCloudErrorType();
             Assert.IsTrue(error == CloudErrorType.NotSet);
+        }
+
+        [TestMethod]
+        public void SerializingTriggerFileExcludesObsoleteProperties()
+        {
+            var workflow = new Workflow();
+            var json = JsonConvert.SerializeObject(workflow, ExcludeObsoletePropertiesContractResolver.GetSettings());
+            Assert.IsFalse(json.Contains("\"WorkflowInputsUrl\""));
         }
     }
 }
