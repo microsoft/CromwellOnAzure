@@ -39,6 +39,7 @@ namespace CromwellOnAzureDeployer.Tests
             var workflow = new Workflow();
             var json = JsonConvert.SerializeObject(workflow, ExcludeObsoletePropertiesContractResolver.GetSettings());
             Assert.IsFalse(json.Contains("\"WorkflowInputsUrl\""));
+            Assert.IsTrue(json.Contains("\"WorkflowInputsUrls\""));
         }
     }
 }

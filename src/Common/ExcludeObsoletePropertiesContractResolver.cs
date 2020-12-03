@@ -1,8 +1,4 @@
-﻿// License: https://creativecommons.org/licenses/by-sa/4.0/
-// Derived from: https://stackoverflow.com/a/56694483 (author: https://stackoverflow.com/users/10263/brian-rogers)
-
-using System;
-using System.Linq;
+﻿using System;
 using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -14,16 +10,20 @@ namespace Common
         /// <summary>
         /// Prevents serialization of properties that are marked obsolete
         /// </summary>
-        protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
+        protected override JsonProperty CreateProperty(MemberInfo memberInfo, MemberSerialization memberSerialization)
         {
-            var property = base.CreateProperty(member, memberSerialization);
+            var jsonProperty = base.CreateProperty(memberInfo, memberSerialization);
 
-            if (property.AttributeProvider.GetAttributes(inherit: true).OfType<ObsoleteAttribute>().Any())
+            foreach (var attribute in jsonProperty.AttributeProvider.GetAttributes(inherit: true))
             {
-                property.ShouldSerialize = _ => false;
+                if (attribute.GetType() == typeof(ObsoleteAttribute))
+                {
+                    jsonProperty.ShouldSerialize = _ => false;
+                    break;
+                }
             }
 
-            return property;
+            return jsonProperty;
         }
 
         public static JsonSerializerSettings GetSettings()
