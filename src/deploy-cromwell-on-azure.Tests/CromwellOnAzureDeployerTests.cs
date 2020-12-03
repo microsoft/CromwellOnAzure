@@ -37,7 +37,7 @@ namespace CromwellOnAzureDeployer.Tests
         public void SerializingTriggerFileExcludesObsoleteProperties()
         {
             var workflow = new Workflow();
-            var json = JsonConvert.SerializeObject(workflow, ExcludeObsoletePropertiesContractResolver.GetSettings());
+            string json = JsonConvert.SerializeObject(workflow);
             Assert.IsFalse(json.Contains("\"WorkflowInputsUrl\""));
             Assert.IsTrue(json.Contains("\"WorkflowInputsUrls\""));
         }
