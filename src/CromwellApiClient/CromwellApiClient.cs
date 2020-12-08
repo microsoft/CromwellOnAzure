@@ -316,14 +316,7 @@ namespace CromwellApiClient
                 this.Filename = filename;
                 this.ParameterName = parameterName;
 
-                if (removeTabs)
-                {
-                    this.Data = EncodeToUtf8AndRemoveTabsAndDecode(data);
-                }
-                else
-                {
-                    this.Data = data;
-                }
+                this.Data = removeTabs ? EncodeToUtf8AndRemoveTabsAndDecode(data) : data;
             }
 
             /// <summary>
