@@ -65,50 +65,50 @@ namespace CromwellApiClient
         }
 
         public async Task<PostWorkflowResponse> PostWorkflowAsync(
-            string workflowSourceFilename, 
+            string workflowSourceFilename,
             byte[] workflowSourceData,
-            List<string> workflowInputsFilename, 
+            List<string> workflowInputsFilename,
             List<byte[]> workflowInputsData,
-            string workflowOptionsFilename = null, 
+            string workflowOptionsFilename = null,
             byte[] workflowOptionsData = null,
-            string workflowDependenciesFilename = null, 
+            string workflowDependenciesFilename = null,
             byte[] workflowDependenciesData = null)
         {
             var files = AccumulatePostFiles(
-                workflowSourceFilename, 
+                workflowSourceFilename,
                 workflowSourceData,
-                workflowInputsFilename, 
+                workflowInputsFilename,
                 workflowInputsData,
-                workflowOptionsFilename, 
+                workflowOptionsFilename,
                 workflowOptionsData,
-                workflowDependenciesFilename, 
+                workflowDependenciesFilename,
                 workflowDependenciesData);
             return await PostAsync<PostWorkflowResponse>(string.Empty, files);
         }
 
         internal List<FileToPost> AccumulatePostFiles(
-            string workflowSourceFilename, 
+            string workflowSourceFilename,
             byte[] workflowSourceData,
-            List<string> workflowInputsFilename, 
+            List<string> workflowInputsFilename,
             List<byte[]> workflowInputsData,
-            string workflowOptionsFilename = null, 
+            string workflowOptionsFilename = null,
             byte[] workflowOptionsData = null,
-            string workflowDependenciesFilename = null, 
+            string workflowDependenciesFilename = null,
             byte[] workflowDependenciesData = null)
         {
             var files = new List<FileToPost> {
-                new FileToPost(workflowSourceFilename, workflowSourceData, "workflowSource")
+                new FileToPost(workflowSourceFilename, workflowSourceData, "workflowSource", removeTabs: true)
             };
 
             for (var i = 0; i < workflowInputsFilename.Count; i++)
             {
                 var parameterName = i == 0 ? "workflowInputs" : "workflowInputs_" + (i + 1);
-                files.Add(new FileToPost(workflowInputsFilename[i], workflowInputsData[i], parameterName));
+                files.Add(new FileToPost(workflowInputsFilename[i], workflowInputsData[i], parameterName, removeTabs: true));
             }
 
             if (workflowOptionsFilename != null && workflowOptionsData != null)
             {
-                files.Add(new FileToPost(workflowOptionsFilename, workflowOptionsData, "workflowOptions"));
+                files.Add(new FileToPost(workflowOptionsFilename, workflowOptionsData, "workflowOptions", removeTabs: true));
             }
 
             if (workflowDependenciesFilename != null && workflowDependenciesData != null)
@@ -311,11 +311,19 @@ namespace CromwellApiClient
             public string Filename { get; set; }
             public byte[] Data { get; set; }
 
-            internal FileToPost(string filename, byte[] data, string parameterName)
+            internal FileToPost(string filename, byte[] data, string parameterName, bool removeTabs = false)
             {
                 this.Filename = filename;
-                this.Data = EncodeToUtf8AndRemoveTabsAndDecode(data);
                 this.ParameterName = parameterName;
+
+                if (removeTabs)
+                {
+                    this.Data = EncodeToUtf8AndRemoveTabsAndDecode(data);
+                }
+                else
+                {
+                    this.Data = data;
+                }
             }
 
             /// <summary>
