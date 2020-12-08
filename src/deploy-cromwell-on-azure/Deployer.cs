@@ -58,6 +58,7 @@ namespace CromwellOnAzureDeployer
         private const string ContainersToMountFileName = "containers-to-mount";
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
+        private const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
 
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
 
@@ -662,7 +663,7 @@ namespace CromwellOnAzureDeployer
         {
             if (configuration.Update)
             {
-                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cd {CromwellAzureRootDir} && sudo docker-compose down");
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cd {CromwellAzureRootDirSymLink} && sudo docker-compose down");
             }
 
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"echo '{configuration.VmPassword}' | sudo -S -p '' /bin/bash -c \"echo '{configuration.VmUsername} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/z_{configuration.VmUsername}\"");
