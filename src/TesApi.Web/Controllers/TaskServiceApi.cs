@@ -17,11 +17,11 @@ using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using Swashbuckle.AspNetCore.Annotations;
 using TesApi.Attributes;
 using TesApi.Models;
@@ -38,13 +38,6 @@ namespace TesApi.Controllers
         private readonly IRepository<TesTask> repository;
         private readonly ILogger<TaskServiceApiController> logger;
         private readonly IAzureProxy azureProxy;
-
-        private static readonly Dictionary<TesView, JsonSerializerSettings> TesJsonSerializerSettings = new Dictionary<TesView, JsonSerializerSettings>
-        {
-            { TesView.MINIMAL, new JsonSerializerSettings{ ContractResolver = MinimalTesTaskContractResolver.Instance } },
-            { TesView.BASIC, new JsonSerializerSettings{ ContractResolver = BasicTesTaskContractResolver.Instance } },
-            { TesView.FULL, new JsonSerializerSettings{ ContractResolver = FullTesTaskContractResolver.Instance } }
-        };
 
         /// <summary>
         /// Contruct a <see cref="TaskServiceApiController"/>
@@ -242,16 +235,9 @@ namespace TesApi.Controllers
                 return BadRequest($"Invalid view parameter value. If provided, it must be one of: {string.Join(", ", Enum.GetNames(typeof(TesView)))}");
             }
 
-            var jsonResult = new JsonResult(value, TesJsonSerializerSettings[viewEnum]) { StatusCode = 200 };
+            var jsonResult = new JsonResult(value, new JsonSerializerOptions { Converters = { new JsonTesTaskConverter(viewEnum) } } ) { StatusCode = 200 };
 
             return jsonResult;
-        }
-
-        private enum TesView
-        {
-            MINIMAL,
-            BASIC,
-            FULL
         }
     }
 }

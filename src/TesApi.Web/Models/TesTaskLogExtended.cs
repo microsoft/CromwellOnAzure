@@ -6,7 +6,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace TesApi.Models
 {
@@ -143,7 +144,7 @@ namespace TesApi.Models
         {
             string value = null;
             var hasValue = this.Metadata != null && this.Metadata.TryGetValue(key, out value);
-            result = hasValue ? JsonConvert.DeserializeObject($"\"{value}\"", type) : default;
+            result = hasValue ? JsonSerializer.Deserialize($"\"{value}\"", type) : default;
             return hasValue;
         }
 
@@ -157,7 +158,7 @@ namespace TesApi.Models
         {
             if (value != null)
             {
-                this.GetOrAddMetadata()[key] = JsonConvert.SerializeObject(value).Trim('"');
+                this.GetOrAddMetadata()[key] = JsonSerializer.Serialize(value).Trim('"');
             }
             else if (this.Metadata != null && this.Metadata.ContainsKey(key))
             {

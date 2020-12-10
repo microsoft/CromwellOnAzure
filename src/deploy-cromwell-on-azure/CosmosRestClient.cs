@@ -3,10 +3,9 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
 
 namespace CromwellOnAzureDeployer
 {
@@ -34,18 +33,18 @@ namespace CromwellOnAzureDeployer
         public async Task<ThroughputProperties> GetContainerRequestThroughputAsync(string databaseName, string containerName)
         {
             var containerResponse = await GetAsync(this.endpoint, $"dbs/{databaseName}/colls/{containerName}", this.key, "colls", $"dbs/{databaseName}/colls/{containerName}");
-            var containerResourceId = JsonConvert.DeserializeObject<JObject>(containerResponse)["_rid"];
+            var containerResourceId = JsonDocument.Parse(containerResponse).RootElement.GetProperty("_rid").GetString();
 
             var query = $"{{\"query\":\"select * from root r where r.offerResourceId='{containerResourceId}'\"}}";
             var offerQueryResponse = await QueryAsync(this.endpoint, "offers", this.key, "offers", "", query);
 
-            return JsonConvert.DeserializeObject<OfferQueryResponse>(offerQueryResponse).Offers.FirstOrDefault();
+            return JsonSerializer.Deserialize<OfferQueryResponse>(offerQueryResponse).Offers.FirstOrDefault();
         }
 
         public async Task SwitchContainerRequestThroughputToAutoAsync(string databaseName, string containerName)
         {
             var offer = await GetContainerRequestThroughputAsync(databaseName, containerName);
-            await PutAsync(this.endpoint, offer.SelfLink, this.key, "offers", offer.OfferRID.ToLower(), JsonConvert.SerializeObject(offer), ("x-ms-cosmos-migrate-offer-to-autopilot", "true"));
+            await PutAsync(this.endpoint, offer.SelfLink, this.key, "offers", offer.OfferRID.ToLower(), JsonSerializer.Serialize(offer), ("x-ms-cosmos-migrate-offer-to-autopilot", "true"));
         }
 
         async Task<string> GetAsync(string baseUrl, string relativeUrl, string key, string resourceType, string resourceId)
@@ -131,32 +130,31 @@ namespace CromwellOnAzureDeployer
 
     public class OfferQueryResponse
     {
-        [JsonProperty(PropertyName = "Offers", NullValueHandling = NullValueHandling.Ignore)]
+        [JsonPropertyName("Offers")]
         public ThroughputProperties[] Offers { get; set; }
     }
 
     public class ThroughputProperties
     {
-        [JsonProperty(PropertyName = "_etag", NullValueHandling = NullValueHandling.Ignore)]
+        [JsonPropertyName("_etag")]
         public string ETag { get; set; }
 
-        [JsonConverter(typeof(UnixDateTimeConverter))]
-        [JsonProperty(PropertyName = "_ts", NullValueHandling = NullValueHandling.Ignore)]
+        [JsonPropertyName("_ts")]
         public DateTime? LastModified { get; set; }
 
-        [JsonProperty(PropertyName = "_self", NullValueHandling = NullValueHandling.Ignore)]
+        [JsonPropertyName("_self")]
         public string SelfLink { get; set; }
 
-        [JsonProperty(PropertyName = "_rid", NullValueHandling = NullValueHandling.Ignore)]
+        [JsonPropertyName("_rid")]
         public string OfferRID { get; set; }
 
-        [JsonProperty(PropertyName = "offerResourceId", NullValueHandling = NullValueHandling.Ignore)]
+        [JsonPropertyName("offerResourceId")]
         public string ResourceRID { get; set; }
 
-        [JsonProperty(PropertyName = "offerVersion", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonPropertyName("offerVersion")]
         public string OfferVersion { get; set; }
 
-        [JsonProperty(PropertyName = "content", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonPropertyName("content")]
         public OfferContentProperties Content { get; set; }
 
         [JsonIgnore]
@@ -168,16 +166,16 @@ namespace CromwellOnAzureDeployer
 
     public class OfferContentProperties
     {
-        [JsonProperty(PropertyName = "offerThroughput", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonPropertyName("offerThroughput")]
         public int? OfferThroughput { get; set; }
 
-        [JsonProperty(PropertyName = "offerAutopilotSettings", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonPropertyName("offerAutopilotSettings")]
         public OfferAutoscaleProperties OfferAutoscaleSettings { get; set; }
     }
 
     public class OfferAutoscaleProperties
     {
-        [JsonProperty(PropertyName = "maxThroughput", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonPropertyName("maxThroughput")]
         public int? MaxThroughput { get; set; }
     }
 }

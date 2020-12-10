@@ -5,7 +5,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace TesApi.Web
 {
@@ -48,7 +48,7 @@ namespace TesApi.Web
             var idProperty = typeof(T).GetProperties()
                 .FirstOrDefault(info =>
                     (info.GetCustomAttribute<DataMemberAttribute>(false)?.Name.Equals(IdFieldName) ?? false)
-                    || (info.GetCustomAttribute<JsonPropertyAttribute>(false)?.PropertyName.Equals(IdFieldName) ?? false)
+                    || (info.GetCustomAttribute<JsonPropertyNameAttribute>(false)?.Name.Equals(IdFieldName) ?? false)
                     || info.Name.Equals(IdFieldName));
 
             if (idProperty != null)
@@ -59,7 +59,7 @@ namespace TesApi.Web
             var idField = typeof(T).GetFields()
                 .FirstOrDefault(info =>
                     (info.GetCustomAttribute<DataMemberAttribute>(false)?.Name.Equals(IdFieldName) ?? false)
-                    || (info.GetCustomAttribute<JsonPropertyAttribute>(false)?.PropertyName.Equals(IdFieldName) ?? false)
+                    || (info.GetCustomAttribute<JsonPropertyNameAttribute>(false)?.Name.Equals(IdFieldName) ?? false)
                     || info.Name.Equals(IdFieldName));
 
             if (idField != null)

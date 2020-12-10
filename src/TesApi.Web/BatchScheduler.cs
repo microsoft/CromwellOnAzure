@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
@@ -16,7 +17,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Auth;
 using Microsoft.WindowsAzure.Storage.Blob;
-using Newtonsoft.Json;
 using TesApi.Models;
 
 namespace TesApi.Web
@@ -421,7 +421,7 @@ namespace TesApi.Web
 
             if (azureBatchJobAndTaskState.ActiveJobWithMissingAutoPool)
             {
-                var batchJobInfo = JsonConvert.SerializeObject(azureBatchJobAndTaskState);
+                var batchJobInfo = JsonSerializer.Serialize(azureBatchJobAndTaskState);
                 logger.LogWarning($"Found active job without auto pool for TES task {tesTask.Id}. Deleting the job and requeuing the task. BatchJobInfo: {batchJobInfo}");
                 return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.ActiveJobWithMissingAutoPool, FailureReason = BatchTaskState.ActiveJobWithMissingAutoPool.ToString() };
             }
@@ -479,7 +479,7 @@ namespace TesApi.Web
                 case TaskState.Running:
                     return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.Running };
                 case TaskState.Completed:
-                    var batchJobInfo = JsonConvert.SerializeObject(azureBatchJobAndTaskState);
+                    var batchJobInfo = JsonSerializer.Serialize(azureBatchJobAndTaskState);
 
                     if (azureBatchJobAndTaskState.TaskExitCode == 0 && azureBatchJobAndTaskState.TaskFailureInformation == null)
                     {

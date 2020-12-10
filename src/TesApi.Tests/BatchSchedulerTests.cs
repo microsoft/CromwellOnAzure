@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using LazyCache;
@@ -16,7 +17,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using Newtonsoft.Json;
 using TesApi.Models;
 using TesApi.Web;
 
@@ -657,7 +657,7 @@ namespace TesApi.Tests
 
         private static TesTask GetTesTask()
         {
-            return JsonConvert.DeserializeObject<TesTask>(File.ReadAllText("testask1.json"));
+            return JsonSerializer.Deserialize<TesTask>(File.ReadAllText("testask1.json"));
         }
 
         private static Mock<IAzureProxy> GetMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)

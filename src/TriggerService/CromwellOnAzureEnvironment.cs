@@ -7,12 +7,12 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Common;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
 [assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace TriggerService
@@ -110,7 +110,7 @@ namespace TriggerService
 
         internal async Task<ProcessedTriggerInfo> ProcessBlobTrigger(string blobTriggerJson)
         {
-            var triggerInfo = JsonConvert.DeserializeObject<Workflow>(blobTriggerJson);
+            var triggerInfo = JsonSerializer.Deserialize<Workflow>(blobTriggerJson);
             if (triggerInfo == null)
             {
                 throw new ArgumentNullException("must have data in the Trigger File");

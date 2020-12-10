@@ -2,8 +2,8 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Text.Json;
 using Microsoft.Rest.Azure;
-using Newtonsoft.Json;
 
 namespace CromwellOnAzureDeployer
 {
@@ -20,7 +20,7 @@ namespace CromwellOnAzureDeployer
 
             try
             {
-                return JsonConvert.DeserializeObject<CloudErrorWrapper>(content)?.Error;
+                return JsonSerializer.Deserialize<CloudErrorWrapper>(content)?.Error;
             }
             catch
             {

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Linq;
 using CromwellApiClient;
@@ -10,7 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using Newtonsoft.Json;
 
 namespace TriggerService.Tests
 {
@@ -232,7 +232,7 @@ namespace TriggerService.Tests
             var triggerFileContent = 
                 @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
-                    ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
+                    ""WorkflowInputsUrls"":" + JsonSerializer.Serialize(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
                 }";
@@ -247,7 +247,7 @@ namespace TriggerService.Tests
                 @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
-                    ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
+                    ""WorkflowInputsUrls"":" + JsonSerializer.Serialize(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
                 }";
@@ -277,7 +277,7 @@ namespace TriggerService.Tests
                 @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
-                    ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
+                    ""WorkflowInputsUrls"":" + JsonSerializer.Serialize(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
                     ""WorkflowDependenciesUrl"":null
                 }";

@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,8 +26,6 @@ using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage.Blob;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using TesApi.Models;
 
 namespace TesApi.Web
@@ -255,7 +254,7 @@ namespace TesApi.Web
             }
             catch (Exception ex)
             {
-                var batchError = JsonConvert.SerializeObject((ex as BatchException)?.RequestInformation?.BatchError);
+                var batchError = JsonSerializer.Serialize((ex as BatchException)?.RequestInformation?.BatchError);
                 logger.LogError(ex, $"Deleting {job.Id} because adding task to it failed. Batch error: {batchError}");
                 await batchClient.JobOperations.DeleteJobAsync(job.Id);
                 throw;
@@ -650,9 +649,9 @@ namespace TesApi.Web
 
         private IEnumerable<VmPrice> ExtractVmPricesFromRateCardResponse(string pricingContent)
         {
-            return JObject.Parse(pricingContent)["Meters"]
-                .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
-                .Select(m => new { MeterNames = m["MeterName"].ToString(), MeterSubCategories = m["MeterSubCategory"].ToString().Replace(" Series", ""), PricePerHour = decimal.Parse(m["MeterRates"]["0"].ToString()) })
+            return JsonDocument.Parse(pricingContent).RootElement.GetProperty("Meters").EnumerateArray()
+                .Where(m => m.GetProperty("MeterCategory").ValueEquals("Virtual Machines") && m.GetProperty("MeterStatus").ValueEquals("Active") && m.GetProperty("MeterRegion").GetString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
+                .Select(m => new { MeterNames = m.GetProperty("MeterName").GetString(), MeterSubCategories = m.GetProperty("MeterSubCategory").GetString().Replace(" Series", ""), PricePerHour = m.GetProperty("MeterRates").EnumerateArray().First().GetDecimal() })
                 .Where(m => !m.MeterSubCategories.Contains("Windows"))
                 .Select(m => new { MeterNames = m.MeterNames.Replace(" Low Priority", ""), m.MeterSubCategories, m.PricePerHour, LowPriority = m.MeterNames.Contains(" Low Priority") })
                 .Select(m => new VmPrice
@@ -688,7 +687,7 @@ namespace TesApi.Web
             catch
             {
                 logger.LogWarning("Using default VM prices. Please see: https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access");
-                vmPrices = JsonConvert.DeserializeObject<IEnumerable<VmPrice>>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "DefaultVmPrices.json")));
+                vmPrices = JsonSerializer.Deserialize<IEnumerable<VmPrice>>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "DefaultVmPrices.json")));
             }
 
             var vmInfos = new List<VirtualMachineInfo>();
