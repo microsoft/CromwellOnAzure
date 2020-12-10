@@ -209,10 +209,10 @@ Here is the summary of all configuration parameters:
 Configuration   parameter | Has default | Validated | Used by update | Comment
 -- | -- | -- | -- | --
 string   SubscriptionId | N | Y | Y | Azure Subscription Id - Always required
-string   RegionName = "westus"; | Y | Y | N | Azure region name to deploy to - Required for new install
-string   MainIdentifierPrefix = "coa"; | Y | Y | N | Prefix for all resources to be deployed - Required to deploy but defaults to "coa"
-string   VmOsVersion = "18.04-LTS"; | Y | N | N | OS Version of the Linux Ubuntu VM to use as the host - Not required and defaults to Ubuntu 18.04 LTS
-string   VmSize   = "Standard_D3_v2"; | Y | N | N | VM size of the Linux Ubuntu VM to use as the host - Not required and defaults to [Standard_D3_v2](https://docs.microsoft.com/en-us/azure/cloud-services/cloud-services-sizes-specs#dv2-series)
+string   RegionName | N | Y | N | Azure region name to deploy to - Required for new install
+string   MainIdentifierPrefix = "coa" | Y | Y | N | Prefix for all resources to be deployed - Required to deploy but defaults to "coa"
+string   VmOsVersion = "18.04-LTS" | Y | N | N | OS Version of the Linux Ubuntu VM to use as the host - Not required and defaults to Ubuntu 18.04 LTS
+string   VmSize   = "Standard_D3_v2" | Y | N | N | VM size of the Linux Ubuntu VM to use as the host - Not required and defaults to [Standard_D3_v2](https://docs.microsoft.com/en-us/azure/cloud-services/cloud-services-sizes-specs#dv2-series)
 string   VmUsername = "vmadmin"; | Y | N | Y | Username created on Cromwell on Azure Linux host - Not required and defaults to "vmadmin"
 string   VmPassword | Y | N | Y | Required for update
 string   VnetResourceGroupName | Y | Y | N | Available starting version 2.1. The resource group name of the specified virtual network to use - Not required, generated automatically if not provided. If specified, VnetName and SubnetName must be provided.
@@ -228,7 +228,7 @@ string   VmName | Y | N | Y | Name of the VM host that is part of the Cromwell o
 string   CromwellVersion | Y | N | Y | Cromwell version to use
 bool     SkipTestWorkflow = false; | Y | Y | Y | Set to true to skip running the default [test workflow](../README.md/#Hello-World-WDL-test)
 bool     Update =   false; | Y | Y | Y | Set to true if you want to [update your existing Cromwell on Azure deployment](/release-notes/2.0.0.md/#Update-instructions) to the latest version. Required for update
-
+bool     PrivateNetworking = false; | Y | Y | N | Available starting version 2.2. Set to true to create the host VM without public IP address. If set, VnetResourceGroupName, VnetName and SubnetName must be provided (and already exist). The deployment must be initiated from a machine that has access to that subnet. 
 
 ### Use a specific Cromwell version
 #### Before deploying Cromwell on Azure
