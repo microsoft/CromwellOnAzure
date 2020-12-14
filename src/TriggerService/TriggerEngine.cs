@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Common;
 using Microsoft.Extensions.Logging;
 
 namespace TriggerService
@@ -74,16 +75,9 @@ namespace TriggerService
 
         private async Task WaitForCromwellToBecomeAvailableAsync()
         {
-            var isCromwellAvailable = await environment.IsCromwellAvailableAsync();
-
-            if (isCromwellAvailable)
-            {
-                return;
-            }
-
             var haveLoggedOnce = false;
 
-            while (!isCromwellAvailable)
+            while (!await environment.IsCromwellAvailableAsync())
             {
                 if (!haveLoggedOnce)
                 {
@@ -92,10 +86,9 @@ namespace TriggerService
                 }
 
                 await Task.Delay(availabilityWaitTime);
-                isCromwellAvailable = await environment.IsCromwellAvailableAsync();
             }
 
-            logger.LogInformation($"Cromwell is available.");
+            logger.LogInformation(Constants.CromwellIsAvailableMessage);
         }
 
         private async Task WaitForAzureStorageToBecomeAvailableAsync()
