@@ -661,12 +661,14 @@ namespace CromwellOnAzureDeployer
 
         private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo)
         {
+            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"echo '{configuration.VmPassword}' | sudo -S -p '' /bin/bash -c \"echo '{configuration.VmUsername} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/z_{configuration.VmUsername}\"");
+            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod --shell /bin/bash {configuration.VmUsername}");
+
             if (configuration.Update)
             {
-                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cd {CromwellAzureRootDirSymLink} && sudo docker-compose down");
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down'");
             }
 
-            await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"echo '{configuration.VmPassword}' | sudo -S -p '' /bin/bash -c \"echo '{configuration.VmUsername} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/z_{configuration.VmUsername}\"");
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo mkdir -p {CromwellAzureRootDir} && sudo chown {configuration.VmUsername} {CromwellAzureRootDir} && sudo chmod ug=rwx,o= {CromwellAzureRootDir}");
             await WriteNonPersonalizedFilesToVmAsync(sshConnectionInfo);
@@ -731,7 +733,7 @@ namespace CromwellOnAzureDeployer
                 $"Running installation script on the VM...",
                 async () =>
                 {
-                    await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"{CromwellAzureRootDir}/install-cromwellazure.sh");
+                    await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo {CromwellAzureRootDir}/install-cromwellazure.sh");
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod -aG docker {configuration.VmUsername}");
                 });
         }
@@ -1700,7 +1702,9 @@ namespace CromwellOnAzureDeployer
                 var (output, _, _) = await sshClient.ExecuteCommandAsync($"sudo mkdir -p {dir} && owner=$(stat -c '%U' {dir}) && mask=$(stat -c '%a' {dir}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {dir} && echo 1 ))");
                 var dirWasMadeWritableToOthers = output == "1";
 
+                await sshClient.ExecuteCommandAsync($"sudo touch {remoteFilePath} && owner=$(stat -c '%U' {remoteFilePath}) && mask=$(stat -c '%a' {remoteFilePath}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {remoteFilePath} && echo 1 ))");
                 await sftpClient.UploadFileAsync(input, remoteFilePath, true);
+                await sshClient.ExecuteCommandAsync($"sudo chmod o-w {remoteFilePath}");
 
                 if (makeExecutable)
                 {
