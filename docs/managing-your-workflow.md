@@ -15,8 +15,8 @@ In order to run a WDL file, you must modify/create a workflow with the following
 ```
 runtime {
     cpu: 1
-    memory: 2 GB
-    disk: 10 GB
+    memory: "2 GB"
+    disk: "10 GB"
     docker:
     maxRetries: 0
     preemptible: true
