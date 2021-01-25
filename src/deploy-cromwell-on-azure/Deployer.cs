@@ -661,6 +661,8 @@ namespace CromwellOnAzureDeployer
 
         private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo)
         {
+            // If the user was added or password reset via Azure portal, assure that the user will not be prompted
+            // for password on each command and make bash the default shell.
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"echo '{configuration.VmPassword}' | sudo -S -p '' /bin/bash -c \"echo '{configuration.VmUsername} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/z_{configuration.VmUsername}\"");
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod --shell /bin/bash {configuration.VmUsername}");
 
