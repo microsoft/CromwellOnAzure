@@ -1704,7 +1704,8 @@ namespace CromwellOnAzureDeployer
                 var (output, _, _) = await sshClient.ExecuteCommandAsync($"sudo mkdir -p {dir} && owner=$(stat -c '%U' {dir}) && mask=$(stat -c '%a' {dir}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {dir} && echo 1 ))");
                 var dirWasMadeWritableToOthers = output == "1";
 
-                await sshClient.ExecuteCommandAsync($"sudo touch {remoteFilePath} && owner=$(stat -c '%U' {remoteFilePath}) && mask=$(stat -c '%a' {remoteFilePath}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {remoteFilePath} && echo 1 ))");
+                // Make the destination file writable for the current user. The user running the update might not be the same user that created the file.
+                await sshClient.ExecuteCommandAsync($"sudo touch {remoteFilePath} && sudo chmod o+w {remoteFilePath}");
                 await sftpClient.UploadFileAsync(input, remoteFilePath, true);
                 await sshClient.ExecuteCommandAsync($"sudo chmod o-w {remoteFilePath}");
 
