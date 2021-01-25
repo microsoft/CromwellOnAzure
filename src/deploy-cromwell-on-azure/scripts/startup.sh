@@ -63,7 +63,8 @@ do
             subscription_ids=( $(grep -Po '"id":"/subscriptions/\K([^"]*)' <<< $content) )
 
             write_log "Getting list of accessible resources..."
-            resource_ids=()
+            # Initializing array with single empty string to avoid unbound variable error in bash version < 4.4
+            resource_ids=("")
 
             for subscription_id in "${subscription_ids[@]}"
             do
