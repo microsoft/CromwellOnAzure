@@ -119,7 +119,7 @@ Deleting all the resources in the Resource Group may take a while but as soon as
 If you see an issue that is unrelated to your permissions, and re-trying the installer does not fix it, please file a bug on our GitHub issues.
 
 ### Upgrade my Cromwell on Azure instance
-Starting in version 1.x, for convenience, some configuration files are hosted on your Cromwell on Azure storage account, in the "configuration" container - `containers-to-mount`, and `cromwell-application.conf`. You can modify and save these file using Azure Portal UI "Edit Blob" option or simply upload a new file to replace the existing one. [Follow these steps](https://github.com/microsoft/CromwellOnAzure/releases/tag/2.0.0) to upgrade your Cromwell on Azure instance to 2.x.
+Starting in version 1.x, for convenience, some configuration files are hosted on your Cromwell on Azure storage account, in the "configuration" container - `containers-to-mount`, and `cromwell-application.conf`. You can modify and save these file using Azure Portal UI "Edit Blob" option or simply upload a new file to replace the existing one. [Follow these steps](https://github.com/microsoft/CromwellOnAzure/releases/tag/2.2.1) to upgrade your Cromwell on Azure instance to 2.x.
 
 ## Analysis
 ### Job failed immediately
@@ -227,7 +227,7 @@ string   ApplicationInsightsAccountName | Y | N | N | The name of the Applicatio
 string   VmName | Y | N | Y | Name of the VM host that is part of the Cromwell on Azure deployment to update - Required for update if multiple VMs exist in the resource group
 string   CromwellVersion | Y | N | Y | Cromwell version to use
 bool     SkipTestWorkflow = false; | Y | Y | Y | Set to true to skip running the default [test workflow](../README.md/#Hello-World-WDL-test)
-bool     Update =   false; | Y | Y | Y | Set to true if you want to [update your existing Cromwell on Azure deployment](/release-notes/2.0.0.md/#Update-instructions) to the latest version. Required for update
+bool     Update =   false; | Y | Y | Y | Set to true if you want to [update your existing Cromwell on Azure deployment](/release-notes/2.2.1.md/#Update-instructions) to the latest version. Required for update
 bool     PrivateNetworking = false; | Y | Y | N | Available starting version 2.2. Set to true to create the host VM without public IP address. If set, VnetResourceGroupName, VnetName and SubnetName must be provided (and already exist). The deployment must be initiated from a machine that has access to that subnet. 
 
 ### Use a specific Cromwell version
