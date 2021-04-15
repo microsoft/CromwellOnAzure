@@ -45,7 +45,7 @@ services:
       - /bin/sh
       - -c
     command: ["ln -sf /mysql-init/init-user.sql /docker-entrypoint-initdb.d/init_user.sql \
-      && docker-entrypoint.sh mysqld --init-file /mysql-init/unlock-change-log.sql"]
+      && docker-entrypoint.sh mysqld --init-file /mysql-init/unlock-change-log.sql --disable-log-bin"]
     expose:
       - "3306"
     restart: unless-stopped
