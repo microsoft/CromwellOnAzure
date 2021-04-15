@@ -125,7 +125,7 @@ namespace TesApi.Controllers
             // example: /cromwell-executions/test/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script
             tesTask.WorkflowId = tesTask
                 ?.Inputs
-                ?.FirstOrDefault(i => i?.Path?.StartsWith(rootExecutionPath, StringComparison.OrdinalIgnoreCase) == true)
+                ?.FirstOrDefault(i => i?.Name?.Equals("commandScript", StringComparison.OrdinalIgnoreCase) == true)
                 ?.Path
                 ?.Split('/', StringSplitOptions.RemoveEmptyEntries)
                 ?.Skip(2)
