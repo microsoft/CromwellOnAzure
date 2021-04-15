@@ -71,7 +71,7 @@ namespace TesApi.Tests
             {
                 Description = taskDescription,
                 Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
-                Inputs = new List<TesInput> { new TesInput { Path = $"/cromwell-executions/test/{cromwellWorkflowId}/call-hello/test-subworkflow/{cromwellSubWorkflowId}/call-subworkflow/shard-8/execution/script" } }
+                Inputs = new List<TesInput> { new TesInput { Name = "commandScript", Path = $"/cromwell-executions/test/{cromwellWorkflowId}/call-hello/test-subworkflow/{cromwellSubWorkflowId}/call-subworkflow/shard-8/execution/script" } }
             };
 
             var controller = this.GetTaskServiceApiController();
@@ -245,14 +245,15 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task CreateTaskAsync_ExtractsWorkflowId()
         {
-            var cromwellWorkflowId = "daf1a044-d741-4db9-8eb5-d6fd0519b1f1";
-            var taskDescription = $"{cromwellWorkflowId}:BackendJobDescriptorKey_CommandCallNode_wf_hello.hello:-1:1";
+            var cromwellWorkflowId = Guid.NewGuid().ToString();
+            var cromwellSubWorkflowId = Guid.NewGuid().ToString();
+            var taskDescription = $"{cromwellSubWorkflowId}:BackendJobDescriptorKey_CommandCallNode_wf_hello.hello:-1:1";
 
             var tesTask = new TesTask()
             {
                 Description = taskDescription,
                 Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
-                Inputs = new List<TesInput> { new TesInput { Path = "/cromwell-executions/test/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script" } }
+                Inputs = new List<TesInput> { new TesInput { Name = "commandScript", Path = $"/cromwell-executions/test/{cromwellWorkflowId}/call-hello/test-subworkflow/{cromwellSubWorkflowId}/call-subworkflow/shard-8/execution/script" } }
             };
 
             var controller = this.GetTaskServiceApiController();
@@ -455,7 +456,7 @@ namespace TesApi.Tests
             {
                 Name = "test.cwl",
                 Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
-                Inputs = new List<TesInput> { new TesInput { Path = "/cromwell-executions/test.cwl/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script" } },
+                Inputs = new List<TesInput> { new TesInput { Name = "commandScript", Path = "/cromwell-executions/test.cwl/daf1a044-d741-4db9-8eb5-d6fd0519b1f1/call-hello/execution/script" } },
                 Resources = tesResourcesReceivedFromCromwell
             };
 
