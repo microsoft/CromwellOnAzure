@@ -16,7 +16,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace TesApi.Models
+namespace Common.TesModels
 {
     /// <summary>
     /// CreateTaskResponse describes a response from the CreateTask endpoint.

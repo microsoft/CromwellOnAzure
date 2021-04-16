@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 
-namespace TesApi.Web
+namespace Common
 {
     /// <summary>
     /// A general repository interface for persistence of T instances

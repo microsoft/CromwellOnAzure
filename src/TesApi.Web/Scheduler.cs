@@ -2,14 +2,14 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Common;
+using Common.TesModels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using TesApi.Models;
 
 namespace TesApi.Web
 {

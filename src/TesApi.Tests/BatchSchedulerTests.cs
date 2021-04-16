@@ -7,6 +7,8 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Common;
+using Common.TesModels;
 using LazyCache;
 using LazyCache.Providers;
 using Microsoft.Azure.Batch;
@@ -17,7 +19,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
-using TesApi.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests

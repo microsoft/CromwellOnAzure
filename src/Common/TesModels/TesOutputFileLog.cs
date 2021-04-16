@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -12,40 +12,38 @@
  */
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace TesApi.Models
+namespace Common.TesModels
 {
     /// <summary>
-    /// ServiceInfo describes information about the service, such as storage details, resource availability, and other documentation.
+    /// OutputFileLog describes a single output file. This describes file details after the task has completed successfully, for logging purposes.
     /// </summary>
     [DataContract]
-    public partial class TesServiceInfo : IEquatable<TesServiceInfo>
+    public partial class TesOutputFileLog : IEquatable<TesOutputFileLog>
     {
         /// <summary>
-        /// Returns the name of the service, e.g. \&quot;ohsu-compbio-funnel\&quot;.
+        /// URL of the file in storage, e.g. s3://bucket/file.txt
         /// </summary>
-        /// <value>Returns the name of the service, e.g. \&quot;ohsu-compbio-funnel\&quot;.</value>
-        [DataMember(Name = "name")]
-        public string Name { get; set; }
+        /// <value>URL of the file in storage, e.g. s3://bucket/file.txt</value>
+        [DataMember(Name = "url")]
+        public string Url { get; set; }
 
         /// <summary>
-        /// Returns a documentation string, e.g. \&quot;Hey, we&#39;re OHSU Comp. Bio!\&quot;.
+        /// Path of the file inside the container. Must be an absolute path.
         /// </summary>
-        /// <value>Returns a documentation string, e.g. \&quot;Hey, we&#39;re OHSU Comp. Bio!\&quot;.</value>
-        [DataMember(Name = "doc")]
-        public string Doc { get; set; }
+        /// <value>Path of the file inside the container. Must be an absolute path.</value>
+        [DataMember(Name = "path")]
+        public string Path { get; set; }
 
         /// <summary>
-        /// Lists some, but not necessarily all, storage locations supported by the service.  Must be in a valid URL format. e.g.  file:///path/to/local/funnel-storage s3://ohsu-compbio-funnel/storage etc.
+        /// Size of the file in bytes.
         /// </summary>
-        /// <value>Lists some, but not necessarily all, storage locations supported by the service.  Must be in a valid URL format. e.g.  file:///path/to/local/funnel-storage s3://ohsu-compbio-funnel/storage etc.</value>
-        [DataMember(Name = "storage")]
-        public List<string> Storage { get; set; }
+        /// <value>Size of the file in bytes.</value>
+        [DataMember(Name = "size_bytes")]
+        public string SizeBytes { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -54,10 +52,10 @@ namespace TesApi.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class TesServiceInfo {\n");
-            sb.Append("  Name: ").Append(Name).Append("\n");
-            sb.Append("  Doc: ").Append(Doc).Append("\n");
-            sb.Append("  Storage: ").Append(Storage).Append("\n");
+            sb.Append("class TesOutputFileLog {\n");
+            sb.Append("  Url: ").Append(Url).Append("\n");
+            sb.Append("  Path: ").Append(Path).Append("\n");
+            sb.Append("  SizeBytes: ").Append(SizeBytes).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -88,15 +86,15 @@ namespace TesApi.Models
                 return true;
             }
 
-            return obj.GetType() == GetType() && Equals((TesServiceInfo)obj);
+            return obj.GetType() == GetType() && Equals((TesOutputFileLog)obj);
         }
 
         /// <summary>
-        /// Returns true if TesServiceInfo instances are equal
+        /// Returns true if TesOutputFileLog instances are equal
         /// </summary>
-        /// <param name="other">Instance of TesServiceInfo to be compared</param>
+        /// <param name="other">Instance of TesOutputFileLog to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(TesServiceInfo other)
+        public bool Equals(TesOutputFileLog other)
         {
             if (other is null)
             {
@@ -110,19 +108,19 @@ namespace TesApi.Models
 
             return
                 (
-                    Name == other.Name ||
-                    Name != null &&
-                    Name.Equals(other.Name)
+                    Url == other.Url ||
+                    Url != null &&
+                    Url.Equals(other.Url)
                 ) &&
                 (
-                    Doc == other.Doc ||
-                    Doc != null &&
-                    Doc.Equals(other.Doc)
+                    Path == other.Path ||
+                    Path != null &&
+                    Path.Equals(other.Path)
                 ) &&
                 (
-                    Storage == other.Storage ||
-                    Storage != null &&
-                    Storage.SequenceEqual(other.Storage)
+                    SizeBytes == other.SizeBytes ||
+                    SizeBytes != null &&
+                    SizeBytes.Equals(other.SizeBytes)
                 );
         }
 
@@ -136,19 +134,19 @@ namespace TesApi.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Name != null)
+                if (Url != null)
                 {
-                    hashCode = hashCode * 59 + Name.GetHashCode();
+                    hashCode = hashCode * 59 + Url.GetHashCode();
                 }
 
-                if (Doc != null)
+                if (Path != null)
                 {
-                    hashCode = hashCode * 59 + Doc.GetHashCode();
+                    hashCode = hashCode * 59 + Path.GetHashCode();
                 }
 
-                if (Storage != null)
+                if (SizeBytes != null)
                 {
-                    hashCode = hashCode * 59 + Storage.GetHashCode();
+                    hashCode = hashCode * 59 + SizeBytes.GetHashCode();
                 }
 
                 return hashCode;
@@ -158,12 +156,12 @@ namespace TesApi.Models
         #region Operators
 #pragma warning disable 1591
 
-        public static bool operator ==(TesServiceInfo left, TesServiceInfo right)
+        public static bool operator ==(TesOutputFileLog left, TesOutputFileLog right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(TesServiceInfo left, TesServiceInfo right)
+        public static bool operator !=(TesOutputFileLog left, TesOutputFileLog right)
         {
             return !Equals(left, right);
         }

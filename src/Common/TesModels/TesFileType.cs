@@ -14,7 +14,7 @@
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
 
-namespace TesApi.Models
+namespace Common.TesModels
 {
     /// <summary>
     /// Gets or Sets tesFileType

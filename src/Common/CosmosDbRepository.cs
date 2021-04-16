@@ -1,7 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace TesApi.Web
+namespace Common
 {
     using System;
     using System.Collections.Generic;

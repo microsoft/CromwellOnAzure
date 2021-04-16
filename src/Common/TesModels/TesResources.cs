@@ -18,7 +18,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace TesApi.Models
+namespace Common.TesModels
 {
     /// <summary>
     /// Resources describes the resources requested by a task.

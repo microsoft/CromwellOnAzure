@@ -16,7 +16,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace TesApi.Models
+namespace Common.TesModels
 {
     /// <summary>
     /// Output describes Task output files.

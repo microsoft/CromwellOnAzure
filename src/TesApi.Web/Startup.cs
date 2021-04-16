@@ -4,6 +4,8 @@
 using System;
 using System.IO;
 using System.Reflection;
+using Common;
+using Common.TesModels;
 using LazyCache;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -15,7 +17,6 @@ using Microsoft.OpenApi.Models;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 using TesApi.Filters;
-using TesApi.Models;
 
 namespace TesApi.Web
 {

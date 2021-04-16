@@ -5,11 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Common.TesModels;
 using LazyCache;
 using Microsoft.Azure.Batch;
 using Polly;
 using Polly.Retry;
-using TesApi.Models;
 
 namespace TesApi.Web
 {

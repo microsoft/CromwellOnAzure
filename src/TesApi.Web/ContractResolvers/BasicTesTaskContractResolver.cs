@@ -4,9 +4,10 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Common;
+using Common.TesModels;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
-using TesApi.Models;
 
 namespace TesApi.Web
 {

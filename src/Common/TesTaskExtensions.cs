@@ -3,9 +3,9 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using TesApi.Web;
+using Common.TesModels;
 
-namespace TesApi.Models
+namespace Common
 {
     /// <summary>
     /// <see cref="TesTask"/> extensions

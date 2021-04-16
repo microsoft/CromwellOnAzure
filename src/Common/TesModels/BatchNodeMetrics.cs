@@ -1,7 +1,4 @@
-﻿using System;
-using TesApi.Models;
-
-namespace TesApi.Models
+﻿namespace Common.TesModels
 {
     /// <summary>
     /// Contains task execution metrics when task is handled by Azure Batch 

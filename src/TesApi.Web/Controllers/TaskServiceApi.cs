@@ -14,17 +14,17 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Common;
+using Common.TesModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Swashbuckle.AspNetCore.Annotations;
 using TesApi.Attributes;
-using TesApi.Models;
 using TesApi.Web;
 
 namespace TesApi.Controllers

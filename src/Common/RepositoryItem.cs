@@ -7,7 +7,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
 
-namespace TesApi.Web
+namespace Common
 {
     /// <summary>
     /// Base class for items stored in <see cref="IRepository{T}"/>. The type must contain a property named "id".

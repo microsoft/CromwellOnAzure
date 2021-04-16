@@ -6,12 +6,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
+using Common;
+using Common.TesModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using TesApi.Controllers;
-using TesApi.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests
