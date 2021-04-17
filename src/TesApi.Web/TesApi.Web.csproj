@@ -40,6 +40,6 @@
     </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Common\Common.csproj" />
+    <ProjectReference Include="..\Common.Tes\Common.Tes.csproj" />
   </ItemGroup>
 </Project>
