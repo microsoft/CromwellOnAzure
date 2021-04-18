@@ -9,6 +9,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		CodeCoverage.runsettings = CodeCoverage.runsettings
 		src\CommonAssemblyInfo.cs = src\CommonAssemblyInfo.cs
 		Dockerfile = Dockerfile
+		global.json = global.json
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CromwellApiClient", "src\CromwellApiClient\CromwellApiClient.csproj", "{98D92D1C-7D23-4517-A5FB-D7948544F15F}"
@@ -27,7 +28,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tes", "src\Common.Te
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TriggerService.Tests", "src\TriggerService.Tests\TriggerService.Tests.csproj", "{6AE9D93D-FBFA-4B94-8046-CDF10886F15B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "src\Common\Common.csproj", "{1D5F3C4A-5A69-4A86-BF80-D075DBDD0307}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "src\Common\Common.csproj", "{1D5F3C4A-5A69-4A86-BF80-D075DBDD0307}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
