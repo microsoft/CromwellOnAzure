@@ -2,10 +2,10 @@
 // Licensed under the MIT License.
 
 using System.IO;
-using Tes.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Tes.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests

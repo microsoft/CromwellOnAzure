@@ -4,9 +4,9 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Tes.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
+using Tes.Models;
 
 namespace TesApi.Web
 {

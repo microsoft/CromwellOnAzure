@@ -4,13 +4,13 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Tes.Models;
 using LazyCache;
 using LazyCache.Providers;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Polly.Utilities;
+using Tes.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests
