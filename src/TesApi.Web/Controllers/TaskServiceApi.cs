@@ -17,13 +17,13 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Common;
-using Common.TesModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Swashbuckle.AspNetCore.Annotations;
+using Tes.Models;
+using Tes.Repository;
 using TesApi.Attributes;
 using TesApi.Web;
 

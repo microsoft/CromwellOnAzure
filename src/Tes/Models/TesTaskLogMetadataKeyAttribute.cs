@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Common.TesModels
+namespace Tes.Models
 {
     public class TesTaskLogMetadataKeyAttribute : Attribute
     {

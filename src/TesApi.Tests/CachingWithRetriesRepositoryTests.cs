@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
-using Common;
-using Common.TesModels;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Polly.Utilities;
+using Tes.Models;
+using Tes.Repository;
 using TesApi.Web;
 
 namespace TesApi.Tests

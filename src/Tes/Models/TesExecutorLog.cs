@@ -16,7 +16,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace Common.TesModels
+namespace Tes.Models
 {
     /// <summary>
     /// ExecutorLog describes logging information related to an Executor.

@@ -3,9 +3,9 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using Common.TesModels;
+using Tes.Models;
 
-namespace Common
+namespace Tes.Extensions
 {
     /// <summary>
     /// <see cref="TesTask"/> extensions

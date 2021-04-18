@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -16,20 +16,34 @@ using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace Common.TesModels
+namespace Tes.Models
 {
     /// <summary>
-    /// CreateTaskResponse describes a response from the CreateTask endpoint.
+    /// OutputFileLog describes a single output file. This describes file details after the task has completed successfully, for logging purposes.
     /// </summary>
     [DataContract]
-    public partial class TesCreateTaskResponse : IEquatable<TesCreateTaskResponse>
+    public partial class TesOutputFileLog : IEquatable<TesOutputFileLog>
     {
         /// <summary>
-        /// Task identifier assigned by the server.
+        /// URL of the file in storage, e.g. s3://bucket/file.txt
         /// </summary>
-        /// <value>Task identifier assigned by the server.</value>
-        [DataMember(Name = "id")]
-        public string Id { get; set; }
+        /// <value>URL of the file in storage, e.g. s3://bucket/file.txt</value>
+        [DataMember(Name = "url")]
+        public string Url { get; set; }
+
+        /// <summary>
+        /// Path of the file inside the container. Must be an absolute path.
+        /// </summary>
+        /// <value>Path of the file inside the container. Must be an absolute path.</value>
+        [DataMember(Name = "path")]
+        public string Path { get; set; }
+
+        /// <summary>
+        /// Size of the file in bytes.
+        /// </summary>
+        /// <value>Size of the file in bytes.</value>
+        [DataMember(Name = "size_bytes")]
+        public string SizeBytes { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -38,8 +52,10 @@ namespace Common.TesModels
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class TesCreateTaskResponse {\n");
-            sb.Append("  Id: ").Append(Id).Append("\n");
+            sb.Append("class TesOutputFileLog {\n");
+            sb.Append("  Url: ").Append(Url).Append("\n");
+            sb.Append("  Path: ").Append(Path).Append("\n");
+            sb.Append("  SizeBytes: ").Append(SizeBytes).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -70,15 +86,15 @@ namespace Common.TesModels
                 return true;
             }
 
-            return obj.GetType() == GetType() && Equals((TesCreateTaskResponse)obj);
+            return obj.GetType() == GetType() && Equals((TesOutputFileLog)obj);
         }
 
         /// <summary>
-        /// Returns true if TesCreateTaskResponse instances are equal
+        /// Returns true if TesOutputFileLog instances are equal
         /// </summary>
-        /// <param name="other">Instance of TesCreateTaskResponse to be compared</param>
+        /// <param name="other">Instance of TesOutputFileLog to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(TesCreateTaskResponse other)
+        public bool Equals(TesOutputFileLog other)
         {
             if (other is null)
             {
@@ -92,9 +108,19 @@ namespace Common.TesModels
 
             return
                 (
-                    Id == other.Id ||
-                    Id != null &&
-                    Id.Equals(other.Id)
+                    Url == other.Url ||
+                    Url != null &&
+                    Url.Equals(other.Url)
+                ) &&
+                (
+                    Path == other.Path ||
+                    Path != null &&
+                    Path.Equals(other.Path)
+                ) &&
+                (
+                    SizeBytes == other.SizeBytes ||
+                    SizeBytes != null &&
+                    SizeBytes.Equals(other.SizeBytes)
                 );
         }
 
@@ -108,9 +134,19 @@ namespace Common.TesModels
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Id != null)
+                if (Url != null)
                 {
-                    hashCode = hashCode * 59 + Id.GetHashCode();
+                    hashCode = hashCode * 59 + Url.GetHashCode();
+                }
+
+                if (Path != null)
+                {
+                    hashCode = hashCode * 59 + Path.GetHashCode();
+                }
+
+                if (SizeBytes != null)
+                {
+                    hashCode = hashCode * 59 + SizeBytes.GetHashCode();
                 }
 
                 return hashCode;
@@ -120,12 +156,12 @@ namespace Common.TesModels
         #region Operators
 #pragma warning disable 1591
 
-        public static bool operator ==(TesCreateTaskResponse left, TesCreateTaskResponse right)
+        public static bool operator ==(TesOutputFileLog left, TesOutputFileLog right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(TesCreateTaskResponse left, TesCreateTaskResponse right)
+        public static bool operator !=(TesOutputFileLog left, TesOutputFileLog right)
         {
             return !Equals(left, right);
         }

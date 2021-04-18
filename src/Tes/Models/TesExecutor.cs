@@ -18,7 +18,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace Common.TesModels
+namespace Tes.Models
 {
     /// <summary>
     /// Executor describes a command to be executed, and its environment.

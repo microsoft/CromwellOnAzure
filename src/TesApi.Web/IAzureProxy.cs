@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Common.TesModels;
+using Tes.Models;
 using Microsoft.Azure.Batch;
 
 namespace TesApi.Web

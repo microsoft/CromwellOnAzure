@@ -3,7 +3,7 @@
 
 using System;
 
-namespace Common
+namespace Tes.Models
 {
     /// <summary>
     /// Exception that extends <see cref="Exception"/> with FailureReason property.

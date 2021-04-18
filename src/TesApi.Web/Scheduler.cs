@@ -5,11 +5,12 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Common;
-using Common.TesModels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Tes.Extensions;
+using Tes.Models;
+using Tes.Repository;
 
 namespace TesApi.Web
 {

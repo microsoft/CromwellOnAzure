@@ -4,8 +4,9 @@
 using System;
 using System.Linq;
 using System.Runtime.Serialization;
+using Tes.Repository;
 
-namespace Common.TesModels
+namespace Tes.Models
 {
     public partial class TesTask : RepositoryItem<TesTask>
     {

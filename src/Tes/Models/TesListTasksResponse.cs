@@ -18,34 +18,27 @@ using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace Common.TesModels
+namespace Tes.Models
 {
     /// <summary>
-    /// ServiceInfo describes information about the service, such as storage details, resource availability, and other documentation.
+    /// ListTasksResponse describes a response from the ListTasks endpoint.
     /// </summary>
     [DataContract]
-    public partial class TesServiceInfo : IEquatable<TesServiceInfo>
+    public partial class TesListTasksResponse : IEquatable<TesListTasksResponse>
     {
         /// <summary>
-        /// Returns the name of the service, e.g. \&quot;ohsu-compbio-funnel\&quot;.
+        /// List of tasks.
         /// </summary>
-        /// <value>Returns the name of the service, e.g. \&quot;ohsu-compbio-funnel\&quot;.</value>
-        [DataMember(Name = "name")]
-        public string Name { get; set; }
+        /// <value>List of tasks.</value>
+        [DataMember(Name = "tasks")]
+        public List<TesTask> Tasks { get; set; }
 
         /// <summary>
-        /// Returns a documentation string, e.g. \&quot;Hey, we&#39;re OHSU Comp. Bio!\&quot;.
+        /// Token used to return the next page of results. See TaskListRequest.next_page_token
         /// </summary>
-        /// <value>Returns a documentation string, e.g. \&quot;Hey, we&#39;re OHSU Comp. Bio!\&quot;.</value>
-        [DataMember(Name = "doc")]
-        public string Doc { get; set; }
-
-        /// <summary>
-        /// Lists some, but not necessarily all, storage locations supported by the service.  Must be in a valid URL format. e.g.  file:///path/to/local/funnel-storage s3://ohsu-compbio-funnel/storage etc.
-        /// </summary>
-        /// <value>Lists some, but not necessarily all, storage locations supported by the service.  Must be in a valid URL format. e.g.  file:///path/to/local/funnel-storage s3://ohsu-compbio-funnel/storage etc.</value>
-        [DataMember(Name = "storage")]
-        public List<string> Storage { get; set; }
+        /// <value>Token used to return the next page of results. See TaskListRequest.next_page_token</value>
+        [DataMember(Name = "next_page_token")]
+        public string NextPageToken { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -54,10 +47,9 @@ namespace Common.TesModels
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class TesServiceInfo {\n");
-            sb.Append("  Name: ").Append(Name).Append("\n");
-            sb.Append("  Doc: ").Append(Doc).Append("\n");
-            sb.Append("  Storage: ").Append(Storage).Append("\n");
+            sb.Append("class TesListTasksResponse {\n");
+            sb.Append("  Tasks: ").Append(Tasks).Append("\n");
+            sb.Append("  NextPageToken: ").Append(NextPageToken).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -88,15 +80,15 @@ namespace Common.TesModels
                 return true;
             }
 
-            return obj.GetType() == GetType() && Equals((TesServiceInfo)obj);
+            return obj.GetType() == GetType() && Equals((TesListTasksResponse)obj);
         }
 
         /// <summary>
-        /// Returns true if TesServiceInfo instances are equal
+        /// Returns true if TesListTasksResponse instances are equal
         /// </summary>
-        /// <param name="other">Instance of TesServiceInfo to be compared</param>
+        /// <param name="other">Instance of TesListTasksResponse to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(TesServiceInfo other)
+        public bool Equals(TesListTasksResponse other)
         {
             if (other is null)
             {
@@ -110,19 +102,14 @@ namespace Common.TesModels
 
             return
                 (
-                    Name == other.Name ||
-                    Name != null &&
-                    Name.Equals(other.Name)
+                    Tasks == other.Tasks ||
+                    Tasks != null &&
+                    Tasks.SequenceEqual(other.Tasks)
                 ) &&
                 (
-                    Doc == other.Doc ||
-                    Doc != null &&
-                    Doc.Equals(other.Doc)
-                ) &&
-                (
-                    Storage == other.Storage ||
-                    Storage != null &&
-                    Storage.SequenceEqual(other.Storage)
+                    NextPageToken == other.NextPageToken ||
+                    NextPageToken != null &&
+                    NextPageToken.Equals(other.NextPageToken)
                 );
         }
 
@@ -136,19 +123,14 @@ namespace Common.TesModels
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Name != null)
+                if (Tasks != null)
                 {
-                    hashCode = hashCode * 59 + Name.GetHashCode();
+                    hashCode = hashCode * 59 + Tasks.GetHashCode();
                 }
 
-                if (Doc != null)
+                if (NextPageToken != null)
                 {
-                    hashCode = hashCode * 59 + Doc.GetHashCode();
-                }
-
-                if (Storage != null)
-                {
-                    hashCode = hashCode * 59 + Storage.GetHashCode();
+                    hashCode = hashCode * 59 + NextPageToken.GetHashCode();
                 }
 
                 return hashCode;
@@ -158,12 +140,12 @@ namespace Common.TesModels
         #region Operators
 #pragma warning disable 1591
 
-        public static bool operator ==(TesServiceInfo left, TesServiceInfo right)
+        public static bool operator ==(TesListTasksResponse left, TesListTasksResponse right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(TesServiceInfo left, TesServiceInfo right)
+        public static bool operator !=(TesListTasksResponse left, TesListTasksResponse right)
         {
             return !Equals(left, right);
         }

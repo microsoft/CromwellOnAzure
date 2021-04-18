@@ -1,7 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-namespace Common.TesModels
+namespace Tes.Models
 {
     /// <summary>
     /// VirtualMachineInfo contains the runtime specs for a VM
