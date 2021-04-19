@@ -14,8 +14,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
+using Tes.Models;
+using Tes.Repository;
 using TesApi.Filters;
-using TesApi.Models;
 
 namespace TesApi.Web
 {

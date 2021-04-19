@@ -17,7 +17,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
-using TesApi.Models;
+using Tes.Extensions;
+using Tes.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests

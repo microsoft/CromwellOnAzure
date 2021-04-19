@@ -7,8 +7,9 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
+using Tes.Extensions;
 
-namespace TesApi.Models
+namespace Tes.Models
 {
     /// <summary>
     /// TaskLog describes logging information related to a Task.

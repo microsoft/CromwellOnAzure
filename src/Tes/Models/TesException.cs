@@ -3,7 +3,7 @@
 
 using System;
 
-namespace TesApi.Web
+namespace Tes.Models
 {
     /// <summary>
     /// Exception that extends <see cref="Exception"/> with FailureReason property.

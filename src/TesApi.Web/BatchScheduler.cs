@@ -17,7 +17,8 @@ using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Auth;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
-using TesApi.Models;
+using Tes.Extensions;
+using Tes.Models;
 
 namespace TesApi.Web
 {

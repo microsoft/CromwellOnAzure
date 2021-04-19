@@ -16,18 +16,30 @@ using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace TesApi.Models
+namespace Tes.Models
 {
     /// <summary>
-    /// OutputFileLog describes a single output file. This describes file details after the task has completed successfully, for logging purposes.
+    /// Input describes Task input files.
     /// </summary>
     [DataContract]
-    public partial class TesOutputFileLog : IEquatable<TesOutputFileLog>
+    public partial class TesInput : IEquatable<TesInput>
     {
         /// <summary>
-        /// URL of the file in storage, e.g. s3://bucket/file.txt
+        /// Gets or Sets Name
         /// </summary>
-        /// <value>URL of the file in storage, e.g. s3://bucket/file.txt</value>
+        [DataMember(Name = "name")]
+        public string Name { get; set; }
+
+        /// <summary>
+        /// Gets or Sets Description
+        /// </summary>
+        [DataMember(Name = "description")]
+        public string Description { get; set; }
+
+        /// <summary>
+        /// REQUIRED, unless \&quot;content\&quot; is set.  URL in long term storage, for example: s3://my-object-store/file1 gs://my-bucket/file2 file:///path/to/my/file /path/to/my/file etc...
+        /// </summary>
+        /// <value>REQUIRED, unless \&quot;content\&quot; is set.  URL in long term storage, for example: s3://my-object-store/file1 gs://my-bucket/file2 file:///path/to/my/file /path/to/my/file etc...</value>
         [DataMember(Name = "url")]
         public string Url { get; set; }
 
@@ -39,11 +51,17 @@ namespace TesApi.Models
         public string Path { get; set; }
 
         /// <summary>
-        /// Size of the file in bytes.
+        /// Gets or Sets Type
         /// </summary>
-        /// <value>Size of the file in bytes.</value>
-        [DataMember(Name = "size_bytes")]
-        public string SizeBytes { get; set; }
+        [DataMember(Name = "type")]
+        public TesFileType Type { get; set; }
+
+        /// <summary>
+        /// File content literal.  Implementations should support a minimum of 128 KiB in this field and may define its own maximum. UTF-8 encoded  If content is not empty, \&quot;url\&quot; must be ignored.
+        /// </summary>
+        /// <value>File content literal.  Implementations should support a minimum of 128 KiB in this field and may define its own maximum. UTF-8 encoded  If content is not empty, \&quot;url\&quot; must be ignored.</value>
+        [DataMember(Name = "content")]
+        public string Content { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -52,10 +70,13 @@ namespace TesApi.Models
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("class TesOutputFileLog {\n");
+            sb.Append("class TesInput {\n");
+            sb.Append("  Name: ").Append(Name).Append("\n");
+            sb.Append("  Description: ").Append(Description).Append("\n");
             sb.Append("  Url: ").Append(Url).Append("\n");
             sb.Append("  Path: ").Append(Path).Append("\n");
-            sb.Append("  SizeBytes: ").Append(SizeBytes).Append("\n");
+            sb.Append("  Type: ").Append(Type).Append("\n");
+            sb.Append("  Content: ").Append(Content).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -86,15 +107,15 @@ namespace TesApi.Models
                 return true;
             }
 
-            return obj.GetType() == GetType() && Equals((TesOutputFileLog)obj);
+            return obj.GetType() == GetType() && Equals((TesInput)obj);
         }
 
         /// <summary>
-        /// Returns true if TesOutputFileLog instances are equal
+        /// Returns true if TesInput instances are equal
         /// </summary>
-        /// <param name="other">Instance of TesOutputFileLog to be compared</param>
+        /// <param name="other">Instance of TesInput to be compared</param>
         /// <returns>Boolean</returns>
-        public bool Equals(TesOutputFileLog other)
+        public bool Equals(TesInput other)
         {
             if (other is null)
             {
@@ -108,6 +129,16 @@ namespace TesApi.Models
 
             return
                 (
+                    Name == other.Name ||
+                    Name != null &&
+                    Name.Equals(other.Name)
+                ) &&
+                (
+                    Description == other.Description ||
+                    Description != null &&
+                    Description.Equals(other.Description)
+                ) &&
+                (
                     Url == other.Url ||
                     Url != null &&
                     Url.Equals(other.Url)
@@ -118,9 +149,13 @@ namespace TesApi.Models
                     Path.Equals(other.Path)
                 ) &&
                 (
-                    SizeBytes == other.SizeBytes ||
-                    SizeBytes != null &&
-                    SizeBytes.Equals(other.SizeBytes)
+                    Type == other.Type ||
+                    Type.Equals(other.Type)
+                ) &&
+                (
+                    Content == other.Content ||
+                    Content != null &&
+                    Content.Equals(other.Content)
                 );
         }
 
@@ -134,6 +169,16 @@ namespace TesApi.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
+                if (Name != null)
+                {
+                    hashCode = hashCode * 59 + Name.GetHashCode();
+                }
+
+                if (Description != null)
+                {
+                    hashCode = hashCode * 59 + Description.GetHashCode();
+                }
+
                 if (Url != null)
                 {
                     hashCode = hashCode * 59 + Url.GetHashCode();
@@ -144,9 +189,10 @@ namespace TesApi.Models
                     hashCode = hashCode * 59 + Path.GetHashCode();
                 }
 
-                if (SizeBytes != null)
+                hashCode = hashCode * 59 + Type.GetHashCode();
+                if (Content != null)
                 {
-                    hashCode = hashCode * 59 + SizeBytes.GetHashCode();
+                    hashCode = hashCode * 59 + Content.GetHashCode();
                 }
 
                 return hashCode;
@@ -156,12 +202,12 @@ namespace TesApi.Models
         #region Operators
 #pragma warning disable 1591
 
-        public static bool operator ==(TesOutputFileLog left, TesOutputFileLog right)
+        public static bool operator ==(TesInput left, TesInput right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(TesOutputFileLog left, TesOutputFileLog right)
+        public static bool operator !=(TesInput left, TesInput right)
         {
             return !Equals(left, right);
         }

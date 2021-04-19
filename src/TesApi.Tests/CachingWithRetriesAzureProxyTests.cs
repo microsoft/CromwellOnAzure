@@ -10,7 +10,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Polly.Utilities;
-using TesApi.Models;
+using Tes.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests

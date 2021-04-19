@@ -10,8 +10,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using Tes.Models;
+using Tes.Repository;
 using TesApi.Controllers;
-using TesApi.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests

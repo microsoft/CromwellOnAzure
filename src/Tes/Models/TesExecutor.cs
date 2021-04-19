@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -18,7 +18,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace TesApi.Models
+namespace Tes.Models
 {
     /// <summary>
     /// Executor describes a command to be executed, and its environment.
