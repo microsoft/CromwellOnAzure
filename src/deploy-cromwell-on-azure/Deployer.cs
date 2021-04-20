@@ -806,7 +806,7 @@ namespace CromwellOnAzureDeployer
         {
             return Execute(
                 "Rebooting VM...",
-                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"sudo reboot"));
+                () => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, "nohup sudo -b bash -c 'reboot' &>/dev/null"));
         }
 
         private Task AssignVmAsDataReaderToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
