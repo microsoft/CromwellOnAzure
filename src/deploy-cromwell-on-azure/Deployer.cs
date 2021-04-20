@@ -384,7 +384,7 @@ namespace CromwellOnAzureDeployer
                 }
 
                 await WriteCoaVersionToVmAsync(sshConnectionInfo);
-                await RestartVmAsync(linuxVm);
+                await RebootVmAsync(sshConnectionInfo);
                 await WaitForSshConnectivityAsync(sshConnectionInfo);
 
                 if (!await IsStartupSuccessfulAsync(sshConnectionInfo))
@@ -802,15 +802,11 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private Task RestartVmAsync(IVirtualMachine linuxVm)
+        private Task RebootVmAsync(ConnectionInfo sshConnectionInfo)
         {
             return Execute(
-                "Restarting VM...",
-                async () =>
-                {
-                    await linuxVm.RestartAsync(cts.Token);
-                    return Task.CompletedTask;
-                });
+                "Rebooting VM...",
+                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"sudo reboot"));
         }
 
         private Task AssignVmAsDataReaderToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
