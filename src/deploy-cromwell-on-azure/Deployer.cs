@@ -802,11 +802,21 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private Task RebootVmAsync(ConnectionInfo sshConnectionInfo)
+        private async Task RebootVmAsync(ConnectionInfo sshConnectionInfo)
         {
-            return Execute(
+            await Execute(
                 "Rebooting VM...",
-                () => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, "nohup sudo -b bash -c 'reboot' &>/dev/null"));
+                async () =>
+                {
+                    try
+                    {
+                        await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, "nohup sudo -b bash -c 'reboot' &>/dev/null");
+                    }
+                    catch (SshConnectionException)
+                    {
+                        return;
+                    }
+                });
         }
 
         private Task AssignVmAsDataReaderToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
