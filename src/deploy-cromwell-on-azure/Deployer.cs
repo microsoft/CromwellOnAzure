@@ -384,7 +384,7 @@ namespace CromwellOnAzureDeployer
                 }
 
                 await WriteCoaVersionToVmAsync(sshConnectionInfo);
-                await RestartVmAsync(linuxVm);
+                await RebootVmAsync(sshConnectionInfo);
                 await WaitForSshConnectivityAsync(sshConnectionInfo);
 
                 if (!await IsStartupSuccessfulAsync(sshConnectionInfo))
@@ -802,14 +802,20 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private Task RestartVmAsync(IVirtualMachine linuxVm)
+        private Task RebootVmAsync(ConnectionInfo sshConnectionInfo)
         {
             return Execute(
-                "Restarting VM...",
+                "Rebooting VM...",
                 async () =>
                 {
-                    await linuxVm.RestartAsync(cts.Token);
-                    return Task.CompletedTask;
+                    try
+                    {
+                        await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, "nohup sudo -b bash -c 'reboot' &>/dev/null");
+                    }
+                    catch (SshConnectionException)
+                    {
+                        return;
+                    }
                 });
         }
 
