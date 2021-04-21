@@ -802,9 +802,9 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task RebootVmAsync(ConnectionInfo sshConnectionInfo)
+        private Task RebootVmAsync(ConnectionInfo sshConnectionInfo)
         {
-            await Execute(
+            return Execute(
                 "Rebooting VM...",
                 async () =>
                 {
