@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 using System.Threading.Tasks;
-using TesApi.Models;
+using Tes.Models;
 
 namespace TesApi.Web
 {

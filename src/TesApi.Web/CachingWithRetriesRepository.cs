@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using Polly;
 using Polly.Retry;
+using Tes.Repository;
 
 namespace TesApi.Web
 {

@@ -27,7 +27,7 @@ using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using TesApi.Models;
+using Tes.Models;
 
 namespace TesApi.Web
 {

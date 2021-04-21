@@ -5,7 +5,7 @@ using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using TesApi.Models;
+using Tes.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests

@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Polly.Utilities;
-using TesApi.Models;
+using Tes.Models;
+using Tes.Repository;
 using TesApi.Web;
 
 namespace TesApi.Tests

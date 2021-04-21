@@ -5,7 +5,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using TesApi.Models;
+using Tes.Models;
+using Tes.Repository;
 using TesApi.Web;
 
 namespace TesApi.Tests

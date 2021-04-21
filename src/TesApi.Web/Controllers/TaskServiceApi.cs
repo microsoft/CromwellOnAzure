@@ -14,7 +14,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -23,8 +22,9 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Swashbuckle.AspNetCore.Annotations;
+using Tes.Models;
+using Tes.Repository;
 using TesApi.Attributes;
-using TesApi.Models;
 using TesApi.Web;
 
 namespace TesApi.Controllers

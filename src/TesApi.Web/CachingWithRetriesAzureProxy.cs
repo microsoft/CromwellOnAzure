@@ -9,7 +9,7 @@ using LazyCache;
 using Microsoft.Azure.Batch;
 using Polly;
 using Polly.Retry;
-using TesApi.Models;
+using Tes.Models;
 
 namespace TesApi.Web
 {

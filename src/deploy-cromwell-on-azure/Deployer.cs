@@ -38,7 +38,6 @@ using Polly;
 using Polly.Retry;
 using Renci.SshNet;
 using Renci.SshNet.Common;
-using static Microsoft.Azure.Management.Fluent.Azure;
 
 namespace CromwellOnAzureDeployer
 {
@@ -76,7 +75,7 @@ namespace CromwellOnAzureDeployer
         private Configuration configuration { get; set; }
         private TokenCredentials tokenCredentials;
         private IAzure azureSubscriptionClient { get; set; }
-        private IAuthenticated azureClient { get; set; }
+        private Azure.IAuthenticated azureClient { get; set; }
         private IResourceManager resourceManagerClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
@@ -574,7 +573,7 @@ namespace CromwellOnAzureDeployer
             return warningCount > 0;
         }
 
-        private IAuthenticated GetAzureClient(AzureCredentials azureCredentials)
+        private Azure.IAuthenticated GetAzureClient(AzureCredentials azureCredentials)
         {
             return Azure
                 .Configure()
