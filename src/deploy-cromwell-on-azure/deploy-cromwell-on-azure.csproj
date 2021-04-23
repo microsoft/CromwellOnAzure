@@ -49,63 +49,28 @@
     <None Update="samples\config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="scripts\containers-to-mount">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\cromwell-application.conf">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\docker-compose.yml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\cromwellazure.service">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\env-01-account-names.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\env-00-coa-version.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\env-02-internal-images.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\env-03-external-images.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\env-04-settings.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\mount-data-disk.sh">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\install-cromwellazure.sh">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\mount.blobfuse">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\mount_containers.sh">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\startup.sh">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\wait-for-it.sh">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\mysql-init\init-user.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="scripts\mysql-init\unlock-change-log.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="testInputs.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="test.wdl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="scripts\containers-to-mount" />
+    <EmbeddedResource Include="scripts\cromwell-application.conf" />
+    <EmbeddedResource Include="scripts\cromwellazure.service" />
+    <EmbeddedResource Include="scripts\docker-compose.yml" />
+    <EmbeddedResource Include="scripts\env-00-coa-version.txt" />
+    <EmbeddedResource Include="scripts\env-01-account-names.txt" />
+    <EmbeddedResource Include="scripts\env-02-internal-images.txt" />
+    <EmbeddedResource Include="scripts\env-03-external-images.txt" />
+    <EmbeddedResource Include="scripts\env-04-settings.txt" />
+    <EmbeddedResource Include="scripts\install-cromwellazure.sh" />
+    <EmbeddedResource Include="scripts\mount-data-disk.sh" />
+    <EmbeddedResource Include="scripts\mount.blobfuse" />
+    <EmbeddedResource Include="scripts\mount_containers.sh" />
+    <EmbeddedResource Include="scripts\mysql\init-user.sql" />
+    <EmbeddedResource Include="scripts\mysql\unlock-change-log.sql" />
+    <EmbeddedResource Include="scripts\startup.sh" />
+    <EmbeddedResource Include="scripts\wait-for-it.sh" />
+    <EmbeddedResource Include="test.wdl" />
+    <EmbeddedResource Include="testInputs.json" />
   </ItemGroup>
 
 </Project>
