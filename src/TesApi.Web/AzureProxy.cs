@@ -767,6 +767,11 @@ namespace TesApi.Web
         private static IEnumerable<string> GetVmSizesSupportedByBatch()
         {
             return new List<string> {
+                "Standard_D2d_v4",
+                "Standard_D4d_v4",
+                "Standard_D8d_v4",
+                "Standard_D16d_v4",
+                "Standard_F48s_v2",
                 "Standard_A1",
                 "Standard_A1_v2",
                 "Standard_A10",

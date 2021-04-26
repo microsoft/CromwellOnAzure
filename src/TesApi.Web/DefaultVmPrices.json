@@ -2472,5 +2472,45 @@
     ],
     "PricePerHour": 0.122,
     "LowPriority": true
+  },
+{
+    "VmSizes": [
+      "Standard_D2d_v4"
+    ],
+    "VmSeries": [
+      "Ddv4"
+    ],
+    "PricePerHour": 0.122,
+    "LowPriority": true
+  },
+{
+    "VmSizes": [
+      "Standard_D4d_v4"
+    ],
+    "VmSeries": [
+      "Ddv4"
+    ],
+    "PricePerHour": 0.122,
+    "LowPriority": true
+  },
+{
+    "VmSizes": [
+      "Standard_D8d_v4"
+    ],
+    "VmSeries": [
+      "Ddv4"
+    ],
+    "PricePerHour": 0.122,
+    "LowPriority": true
+  },
+{
+    "VmSizes": [
+      "Standard_D16d_v4"
+    ],
+    "VmSeries": [
+      "Ddv4"
+    ],
+    "PricePerHour": 0.122,
+    "LowPriority": true
   }
 ]
