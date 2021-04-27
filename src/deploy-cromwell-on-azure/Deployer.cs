@@ -1077,11 +1077,14 @@ namespace CromwellOnAzureDeployer
 
         private Task<IResourceGroup> CreateResourceGroupAsync()
         {
+            var tags = DelimitedTextToDictionary(configuration.Tags, "=", ",");
+
             return Execute(
                 $"Creating Resource Group: {configuration.ResourceGroupName}...",
                 () => azureSubscriptionClient.ResourceGroups
                     .Define(configuration.ResourceGroupName)
                     .WithRegion(configuration.RegionName)
+                    .WithTags(tags)
                     .CreateAsync(cts.Token));
         }
 
@@ -1485,6 +1488,18 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
+            void ThrowIfTagsFormatIsUnacceptable(string attributeValue, string attributeName)
+            {
+                try
+                {
+                    DelimitedTextToDictionary(attributeValue, "=", ",");
+                }
+                catch
+                {
+                    throw new ValidationException($"{attributeName} is specified in incorrect format. Try as TagName=TagValue,TagName=TagValue in double quotes", false);
+                }
+            }
+
             ThrowIfNotProvided(configuration.SubscriptionId, nameof(configuration.SubscriptionId));
 
             ThrowIfNotProvidedForInstall(configuration.RegionName, nameof(configuration.RegionName));
@@ -1500,6 +1515,8 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
+            ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
+            ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
         }
 
         private static void DisplayValidationExceptionAndExit(ValidationException validationException)
@@ -1770,9 +1787,9 @@ namespace CromwellOnAzureDeployer
 
         private static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
         {
-            return text.Split(rowDelimiter)
-                .Select(line => { var parts = line.Split(fieldDelimiter); return new KeyValuePair<string, string>(parts[0], parts[1]); })
-                .ToDictionary(kv => kv.Key, kv => kv.Value);
+            return text.Trim().Split(rowDelimiter)
+                .Select(r => r.Trim().Split(fieldDelimiter))
+                .ToDictionary(f => f[0].Trim(), f => f[1].Trim());
         }
 
         private class ValidationException : Exception
