@@ -1077,15 +1077,24 @@ namespace CromwellOnAzureDeployer
 
         private Task<IResourceGroup> CreateResourceGroupAsync()
         {
-            var tags = DelimitedTextToDictionary(configuration.Tags, "=", ",");
-
-            return Execute(
-                $"Creating Resource Group: {configuration.ResourceGroupName}...",
-                () => azureSubscriptionClient.ResourceGroups
-                    .Define(configuration.ResourceGroupName)
-                    .WithRegion(configuration.RegionName)
-                    .WithTags(tags)
-                    .CreateAsync(cts.Token));
+            if (!string.IsNullOrWhiteSpace(configuration.Tags.Trim()))
+            {
+                return Execute(
+                    $"Creating Resource Group: {configuration.ResourceGroupName}...",
+                    () => azureSubscriptionClient.ResourceGroups
+                        .Define(configuration.ResourceGroupName)
+                        .WithRegion(configuration.RegionName)
+                        .WithTags(DelimitedTextToDictionary(configuration.Tags, "=", ","))
+                        .CreateAsync(cts.Token));
+            }
+            else {
+                return Execute(
+                    $"Creating Resource Group: {configuration.ResourceGroupName}...",
+                    () => azureSubscriptionClient.ResourceGroups
+                        .Define(configuration.ResourceGroupName)
+                        .WithRegion(configuration.RegionName)
+                        .CreateAsync(cts.Token));
+            }
         }
 
         private Task<IIdentity> CreateUserManagedIdentityAsync(IResourceGroup resourceGroup)
@@ -1492,7 +1501,10 @@ namespace CromwellOnAzureDeployer
             {
                 try
                 {
-                    DelimitedTextToDictionary(attributeValue, "=", ",");
+                    if (!string.IsNullOrWhiteSpace(attributeValue.Trim()))
+                    {
+                        DelimitedTextToDictionary(attributeValue, "=", ",");
+                    }
                 }
                 catch
                 {

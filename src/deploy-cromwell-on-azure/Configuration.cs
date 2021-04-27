@@ -40,7 +40,7 @@ namespace CromwellOnAzureDeployer
         public string VnetName { get; set; }
         public string SubnetName { get; set; }
         public bool? PrivateNetworking { get; set; } = null;
-        public string Tags { get; set; } = String.Empty;
+        public string Tags { get; set; } = null;
 
         public static Configuration BuildConfiguration(string[] args)
         {
