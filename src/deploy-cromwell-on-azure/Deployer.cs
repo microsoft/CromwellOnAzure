@@ -435,10 +435,10 @@ namespace CromwellOnAzureDeployer
                     RefreshableConsole.WriteLine($"After receiving the quota, read the docs to run a test workflow and confirm successful deployment.", ConsoleColor.Yellow);
                     exitCode = 2;
                 }
-                
+
                 RefreshableConsole.WriteLine($"Completed in {mainTimer.Elapsed.TotalMinutes:n1} minutes.");
 
-                return exitCode;                
+                return exitCode;
             }
             catch (ValidationException validationException)
             {
@@ -1072,7 +1072,8 @@ namespace CromwellOnAzureDeployer
 
         private Task<IResourceGroup> CreateResourceGroupAsync()
         {
-            var tags = DelimitedTextToDictionary(configuration.Tags.Trim());
+            var tags = DelimitedTextToDictionary(configuration.Tags, "=", ",");
+
             return Execute(
                 $"Creating Resource Group: {configuration.ResourceGroupName}...",
                 () => azureSubscriptionClient.ResourceGroups
@@ -1486,7 +1487,7 @@ namespace CromwellOnAzureDeployer
             {
                 try
                 {
-                    DelimitedTextToDictionary(attributeValue);                    
+                    DelimitedTextToDictionary(attributeValue, "=", ",");                    
                 }
                 catch
                 {
@@ -1782,8 +1783,8 @@ namespace CromwellOnAzureDeployer
         private static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
         {
             return text.Trim().Split(rowDelimiter)
-                .Select(line => { var parts = line.Trim().Split(fieldDelimiter); return new KeyValuePair<string, string>(parts[0], parts[1]); })
-                .ToDictionary(kv => kv.Key.Trim(), kv => kv.Value.Trim());
+                .Select(r => r.Trim().Split(fieldDelimiter))
+                .ToDictionary(f => f[0].Trim(), f => f[1].Trim());
         }
 
         private class ValidationException : Exception
