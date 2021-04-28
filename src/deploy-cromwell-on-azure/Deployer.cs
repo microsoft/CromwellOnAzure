@@ -1077,7 +1077,7 @@ namespace CromwellOnAzureDeployer
 
         private Task<IResourceGroup> CreateResourceGroupAsync()
         {
-            if (!string.IsNullOrWhiteSpace(configuration.Tags.Trim()))
+            if (!string.IsNullOrWhiteSpace(configuration.Tags?.Trim()))
             {
                 return Execute(
                     $"Creating Resource Group: {configuration.ResourceGroupName}...",
@@ -1501,7 +1501,7 @@ namespace CromwellOnAzureDeployer
             {
                 try
                 {
-                    if (!string.IsNullOrWhiteSpace(attributeValue.Trim()))
+                    if (!string.IsNullOrWhiteSpace(attributeValue?.Trim()))
                     {
                         DelimitedTextToDictionary(attributeValue, "=", ",");
                     }
