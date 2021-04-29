@@ -18,7 +18,6 @@ using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
-using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Services.AppAuthentication;
@@ -28,6 +27,7 @@ using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Tes.Models;
+using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TesApi.Web
 {
@@ -729,11 +729,11 @@ namespace TesApi.Web
         /// Gets an authenticated Azure Client instance
         /// </summary>
         /// <returns>An authenticated Azure Client instance</returns>
-        private static async Task<Azure.IAuthenticated> GetAzureManagementClientAsync()
+        private static async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync()
         {
             var accessToken = await GetAzureAccessTokenAsync();
             var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, AzureEnvironment.AzureGlobalCloud);
-            var azureClient = Azure.Authenticate(azureCredentials);
+            var azureClient = FluentAzure.Authenticate(azureCredentials);
 
             return azureClient;
         }

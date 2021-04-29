@@ -716,8 +716,8 @@ namespace CromwellOnAzureDeployer
                         (GetFileContent("scripts", "docker-compose.yml"), $"{CromwellAzureRootDir}/docker-compose.yml", false),
                         (GetFileContent("scripts", "cromwellazure.service"), "/lib/systemd/system/cromwellazure.service", false),
                         (GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true),
-                        (GetFileContent("scripts", "mysql-init", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
-                        (GetFileContent("scripts", "mysql-init", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
+                        (GetFileContent("scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
+                        (GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
                     }));
         }
 
@@ -1264,9 +1264,11 @@ namespace CromwellOnAzureDeployer
 
         private static string GetFileContent(params string[] pathComponentsRelativeToAppBase)
         {
-            var absoluteFilepath = Path.Combine(pathComponentsRelativeToAppBase.Prepend(AppContext.BaseDirectory).ToArray());
+            var embeddedResourceName = $"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}";
+            var embeddedResourceStream = typeof(Deployer).Assembly.GetManifestResourceStream(embeddedResourceName);
 
-            return File.ReadAllText(absoluteFilepath).Replace("\r\n", "\n");
+            using var reader = new StreamReader(embeddedResourceStream);
+            return reader.ReadToEnd().Replace("\r\n", "\n");
         }
 
         private static void ValidateRegionName(string regionName)
