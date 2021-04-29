@@ -1,0 +1,22 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
+FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build-env
+WORKDIR /app
+
+# Restore packages in separate layer
+COPY TriggerService/TriggerService.csproj TriggerService/
+COPY Tes/Tes.csproj Tes/
+COPY Common/Common.csproj Common/
+COPY CromwellApiClient/CromwellApiClient.csproj CromwellApiClient/
+RUN dotnet restore TriggerService/TriggerService.csproj
+
+# Copy the rest of the files and publish
+COPY . ./
+RUN dotnet publish -c Release -o out --no-restore TriggerService/TriggerService.csproj
+
+# Build runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:5.0
+WORKDIR /app
+COPY --from=build-env /app/out .
+ENTRYPOINT ["dotnet", "TriggerService.dll"]
