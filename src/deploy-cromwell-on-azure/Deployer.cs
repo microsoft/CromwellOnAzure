@@ -244,6 +244,11 @@ namespace CromwellOnAzureDeployer
                     {
                         await PatchContainersToMountFileV220Async(storageAccount);
                     }
+
+                    if (installedVersion == null || installedVersion < new Version(2, 4))
+                    {
+                        await PatchContainersToMountFileV240Async(storageAccount);
+                    }
                 }
 
                 if (!configuration.Update)
@@ -1216,6 +1221,24 @@ namespace CromwellOnAzureDeployer
                     if (containersToMountText != null)
                     {
                         containersToMountText = containersToMountText.Replace("https://msgenpublicdata", $"#https://msgenpublicdata");
+
+                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountText);
+                    }
+                });
+        }
+
+        private Task PatchContainersToMountFileV240Async(IStorageAccount storageAccount)
+        {
+            return Execute(
+                $"Removing reference to msgenpublicdata/inputs in '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container.",
+                async () =>
+                {
+                    var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName);
+
+                    if (containersToMountText != null)
+                    {
+                        var regex = new Regex("^.*msgenpublicdata.blob.core.windows.net/inputs.*(\n|\r|\r\n)", RegexOptions.Multiline);
+                        containersToMountText = regex.Replace(containersToMountText, string.Empty);
 
                         await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountText);
                     }
