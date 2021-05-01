@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -13,6 +14,8 @@ using Common;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Tes.Models;
+using Tes.Repository;
 
 [assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace TriggerService
@@ -23,13 +26,13 @@ namespace TriggerService
         private IAzureStorage storage { get; set; }
         internal ICromwellApiClient cromwellApiClient { get; set; }
         private readonly ILogger<AzureStorage> logger;
-
-        public CromwellOnAzureEnvironment(ILoggerFactory loggerFactory, IAzureStorage storage, ICromwellApiClient cromwellApiClient)
+        private IRepository<TesTask> tesTaskRepository;
+        public CromwellOnAzureEnvironment(ILoggerFactory loggerFactory, IAzureStorage storage, ICromwellApiClient cromwellApiClient, IRepository<TesTask> tesTaskRepository)
         {
             this.storage = storage;
             this.cromwellApiClient = cromwellApiClient;
             this.logger = loggerFactory.CreateLogger<AzureStorage>();
-
+            this.tesTaskRepository = tesTaskRepository;
             logger.LogInformation($"Cromwell URL: {cromwellApiClient.GetUrl()}");
         }
 
@@ -103,7 +106,7 @@ namespace TriggerService
                 catch (Exception exc)
                 {
                     logger.LogError(exc, $"Exception in ExecuteNewWorkflowsAsync for {blobTrigger.Uri.AbsoluteUri}");
-                    await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Failed);
+                    await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Failed, exc.ToString());
                 }
             }
         }
@@ -176,7 +179,7 @@ namespace TriggerService
                         case WorkflowStatus.Failed:
                             {
                                 logger.LogInformation($"Setting to failed Id: {id}");
-                                await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Failed);
+                                await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Failed, await GetWorkflowFailureReason(id, statusResponse.Status));
                                 await UploadOutputsAsync(blobTrigger, id, sampleName);
                                 await UploadTimingAsync(blobTrigger, id, sampleName);
                                 break;
@@ -316,6 +319,34 @@ namespace TriggerService
             catch (Exception exc)
             {
                 logger.LogWarning(exc, $"Getting timing threw an exception for Id: {id}");
+            }
+        }
+
+        private async Task<string> GetWorkflowFailureReason(Guid workflowid, WorkflowStatus workFlowStatus)
+        {
+
+            if (workFlowStatus == WorkflowStatus.Failed)
+            {
+                var tesTasks = await tesTaskRepository.GetItemsAsync(
+                        predicate: t =>
+                        t.WorkflowId == workflowid.ToString() &&
+                        (t.State == TesState.EXECUTORERROREnum ||
+                        t.State == TesState.SYSTEMERROREnum ||
+                        t.State == TesState.COMPLETEEnum && t.CromwellResultCode != 0)); 
+
+                return JsonConvert.SerializeObject(tesTasks.Select(t =>
+                new Dictionary<string, object>
+                {
+                    { "Logs.SystemLogs", t.Logs[0].SystemLogs },
+                    { "Executor.StdErr", t.Executors[0].Stderr },
+                    { "Executor.StdOut", t.Executors[0].Stdout },
+                    { "Logs.FailureReason",t.Logs[0].FailureReason },
+                    { "CromwellResultCode", t.CromwellResultCode}
+                }).ToList());
+            }
+            else 
+            {
+                return "Workflow Aborted";
             }
         }
     }

@@ -11,6 +11,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
+using Tes.Repository;
+using Tes.Models;
 
 namespace TriggerService.Tests
 {
@@ -94,6 +96,8 @@ namespace TriggerService.Tests
 
             var azStorageMock = new Mock<IAzureStorage>();
 
+            var cosmosdbRepositoryMock = new Mock<IRepository<TesTask>>();
+
             azStorageMock.Setup(az => az
                 .DownloadBlockBlobAsync(It.IsAny<string>()))
                 .Returns(Task.FromResult(blobData));
@@ -117,7 +121,8 @@ namespace TriggerService.Tests
             var environment = new CromwellOnAzureEnvironment(
                 serviceProvider.GetRequiredService<ILoggerFactory>(),
                 azStorageMock.Object,
-                new CromwellApiClient.CromwellApiClient("http://cromwell:8000"));
+                new CromwellApiClient.CromwellApiClient("http://cromwell:8000"),
+                cosmosdbRepositoryMock.Object);
 
             return environment;
         }

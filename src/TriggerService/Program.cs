@@ -3,9 +3,17 @@
 
 using System;
 using System.Configuration;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
+using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Rest;
+using Tes.Models;
+using Tes.Repository;
+using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TriggerService
 {
@@ -20,6 +28,7 @@ namespace TriggerService
         {
             var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(Environment.GetEnvironmentVariable("ApplicationInsightsAccountName"));
             var defaultStorageAccountName = Environment.GetEnvironmentVariable("DefaultStorageAccountName");
+            var defaultCosmosDbAccountName = Environment.GetEnvironmentVariable("CosmosdbAccountName");
             var cromwellUrl = ConfigurationManager.AppSettings.Get("CromwellUrl");
 
             var serviceCollection = new ServiceCollection()
@@ -45,15 +54,59 @@ namespace TriggerService
 
             var cloudStorageAccount = await AzureStorage.GetCloudStorageAccountUsingMsiAsync(defaultStorageAccountName);
 
+            var cosmosDbDatabaseId = "TES";
+            var cosmosDbContainerId = "Tasks";
+            var CosmosDbPartitionId = "01";
+
+            (var cosmosDbEndpoint, var cosmosDbKey) = await GetCosmosDbEndpointAndKeyAsync(ConfigurationManager.AppSettings.Get("CosmosdbAccountName"));
+
             var environment = new CromwellOnAzureEnvironment(
                             serviceProvider.GetRequiredService<ILoggerFactory>(),
                             new AzureStorage(serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<AzureStorage>(), cloudStorageAccount, new System.Net.Http.HttpClient()),
-                            new CromwellApiClient.CromwellApiClient(cromwellUrl));
+                            new CromwellApiClient.CromwellApiClient(cromwellUrl),
+                            new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, cosmosDbDatabaseId, cosmosDbContainerId, CosmosDbPartitionId));
 
             serviceCollection.AddSingleton(s => new TriggerEngine(s.GetRequiredService<ILoggerFactory>(), environment));
             serviceProvider = serviceCollection.BuildServiceProvider();
             var engine = serviceProvider.GetService<TriggerEngine>();
             await engine.RunAsync();
+        }
+
+        private static async Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName)
+        {
+            var azureClient = await GetAzureManagementClientAsync();
+            var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
+
+            var account = (await Task.WhenAll(subscriptionIds.Select(async subId => await azureClient.WithSubscription(subId).CosmosDBAccounts.ListAsync())))
+                .SelectMany(a => a)
+                .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase));
+
+            if (account == null)
+            {
+                throw new Exception($"CosmosDB account '{cosmosDbAccountName} does not exist or the TES app service does not have Account Reader role on the account.");
+            }
+
+            var key = (await azureClient.WithSubscription(account.Manager.SubscriptionId).CosmosDBAccounts.ListKeysAsync(account.ResourceGroupName, account.Name)).PrimaryMasterKey;
+
+            return (account.DocumentEndpoint, key);
+        }
+
+        /// <summary>
+        /// Gets an authenticated Azure Client instance
+        /// </summary>
+        /// <returns>An authenticated Azure Client instance</returns>
+        private static async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync()
+        {
+            var accessToken = await GetAzureAccessTokenAsync();
+            var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, AzureEnvironment.AzureGlobalCloud);
+            var azureClient = FluentAzure.Authenticate(azureCredentials);
+
+            return azureClient;
+        }
+
+        private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
+        {
+            return new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
         }
     }
 }

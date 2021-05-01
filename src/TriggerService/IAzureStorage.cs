@@ -16,7 +16,7 @@ namespace TriggerService
         Task<byte[]> DownloadBlockBlobAsync(string blobUrl);
         Task<string> UploadFileFromPathAsync(string path, string container, string blobName);
         Task<string> UploadFileTextAsync(string content, string container, string blobName);
-        Task MutateStateAsync(string container, string blobName, AzureStorage.WorkflowState newState);
+        Task MutateStateAsync(string container, string blobName, AzureStorage.WorkflowState newState, string workflowFailureDetails="");
         Task SetStateToInProgressAsync(string container, string blobName, string id);
         Task DeleteAllBlobsAsync(string container);
         Task DeleteContainerAsync(string container);

@@ -9,7 +9,6 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
-using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Services.AppAuthentication;
@@ -17,6 +16,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TriggerService
 {
@@ -86,7 +86,7 @@ namespace TriggerService
             }
         }
 
-        public async Task MutateStateAsync(string container, string blobName, WorkflowState newState)
+        public async Task MutateStateAsync(string container, string blobName, WorkflowState newState, string workflowFailureDetails = "")
         {
             var newStateText = $"{newState.ToString().ToLowerInvariant()}";
             var containerReference = blobClient.GetContainerReference(container);
@@ -95,7 +95,7 @@ namespace TriggerService
             logger.LogInformation($"Mutating state from '{oldStateText}' to '{newStateText}' for {blob.Uri.AbsoluteUri}");
             var newBlobName = blobName.Replace(oldStateText, $"{newState.ToString().ToLowerInvariant()}");
             var data = await blob.DownloadTextAsync();
-            await UploadFileTextAsync(data, container, newBlobName);
+            await UploadFileTextAsync($"{data} \n 'Workflow Failure Details': {workflowFailureDetails}", container, newBlobName);
             await blob.DeleteIfExistsAsync();
         }
 
@@ -213,11 +213,15 @@ namespace TriggerService
             public string SubscriptionId { get; set; }
         }
 
-        private static async Task<Azure.IAuthenticated> GetAzureManagementClientAsync()
+        /// <summary>
+        /// Gets an authenticated Azure Client instance
+        /// </summary>
+        /// <returns>An authenticated Azure Client instance</returns>
+        private static async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync()
         {
             var accessToken = await GetAzureAccessTokenAsync();
             var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, AzureEnvironment.AzureGlobalCloud);
-            var azureClient = Azure.Authenticate(azureCredentials);
+            var azureClient = FluentAzure.Authenticate(azureCredentials);
 
             return azureClient;
         }
