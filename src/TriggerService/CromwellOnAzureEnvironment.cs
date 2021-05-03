@@ -324,10 +324,13 @@ namespace TriggerService
 
         private async Task<string> GetWorkflowFailureReason(Guid workflowid, WorkflowStatus workFlowStatus)
         {
-
-            if (workFlowStatus == WorkflowStatus.Failed)
+            switch (workFlowStatus)
             {
-                var tesTasks = await tesTaskRepository.GetItemsAsync(
+                case WorkflowStatus.Aborted:
+                    return "Workflow Aborted";
+
+                case WorkflowStatus.Failed:
+                        var tesTasks = await tesTaskRepository.GetItemsAsync(
                         predicate: t =>
                         t.WorkflowId == workflowid.ToString() &&
                         (t.State == TesState.EXECUTORERROREnum ||
@@ -337,16 +340,15 @@ namespace TriggerService
                 return JsonConvert.SerializeObject(tesTasks.Select(t =>
                 new Dictionary<string, object>
                 {
-                    { "Logs.SystemLogs", t.Logs[0].SystemLogs },
+                    { "Logs.FailureReason", t.Logs[t.Logs.Count -1].FailureReason },
+                    { "Logs.SystemLogs", t.Logs[t.Logs.Count -1].SystemLogs },
                     { "Executor.StdErr", t.Executors[0].Stderr },
                     { "Executor.StdOut", t.Executors[0].Stdout },
-                    { "Logs.FailureReason",t.Logs[0].FailureReason },
                     { "CromwellResultCode", t.CromwellResultCode}
-                }).ToList());
-            }
-            else 
-            {
-                return "Workflow Aborted";
+                }).ToList());                  
+                
+                default:
+                    return string.Empty;
             }
         }
     }
