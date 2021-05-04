@@ -465,7 +465,7 @@ namespace TesApi.Web
 
             foreach (var subId in subscriptionIds)
             {
-                List<IRegistry> registries;
+                var registries = new List<IRegistry>();
 
                 try
                 {
