@@ -465,20 +465,30 @@ namespace TesApi.Web
 
             foreach (var subId in subscriptionIds)
             {
+                List<IRegistry> registries;
+
                 try
                 {
-                    var registries = await azureClient.WithSubscription(subId).ContainerRegistries.ListAsync();
+                    registries = (await azureClient.WithSubscription(subId).ContainerRegistries.ListAsync()).ToList();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning($"TES service has no permission to list container registries in subscription {subId}.  Exception: {ex}");
+                    continue;
+                }
 
-                    foreach (var r in registries)
+                foreach (var r in registries)
+                {
+                    try
                     {
                         var server = await r.GetCredentialsAsync();
                         var info = new ContainerRegistryInfo { RegistryServer = r.LoginServerUrl, Username = server.Username, Password = server.AccessKeys[AccessKeyType.Primary] };
                         infos.Add(info);
                     }
-                }
-                catch (Exception)
-                {
-                    logger.LogWarning($"TES service has no permission to list container registries in subscription {subId}.");
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning($"TES service has no permission to get credentials for registry {r.LoginServerUrl}.  Please verify that 'Admin user' is enabled in the 'Access Keys' area in the Azure Portal for this container registry.  Exception: {ex}");
+                    }
                 }
             }
 
