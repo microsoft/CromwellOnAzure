@@ -473,7 +473,7 @@ namespace TesApi.Web
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning($"TES service has no permission to list container registries in subscription {subId}.  Exception: {ex}");
+                    logger.LogWarning($"TES service doesn't have permission to list container registries in subscription {subId}.  Exception: {ex}");
                     continue;
                 }
 
@@ -487,7 +487,7 @@ namespace TesApi.Web
                     }
                     catch (Exception ex)
                     {
-                        logger.LogWarning($"TES service has no permission to get credentials for registry {r.LoginServerUrl}.  Please verify that 'Admin user' is enabled in the 'Access Keys' area in the Azure Portal for this container registry.  Exception: {ex}");
+                        logger.LogWarning($"TES service doesn't have permission to get credentials for registry {r.LoginServerUrl}.  Please verify that 'Admin user' is enabled in the 'Access Keys' area in the Azure Portal for this container registry.  Exception: {ex}");
                     }
                 }
             }
