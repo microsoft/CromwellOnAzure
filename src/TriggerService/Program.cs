@@ -28,7 +28,7 @@ namespace TriggerService
         {
             var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(Environment.GetEnvironmentVariable("ApplicationInsightsAccountName"));
             var defaultStorageAccountName = Environment.GetEnvironmentVariable("DefaultStorageAccountName");
-            var defaultCosmosDbAccountName = Environment.GetEnvironmentVariable("CosmosdbAccountName");
+            var cosmosDbAccountName = Environment.GetEnvironmentVariable("CosmosDbAccountName");
             var cromwellUrl = ConfigurationManager.AppSettings.Get("CromwellUrl");
 
             var serviceCollection = new ServiceCollection()
@@ -58,7 +58,7 @@ namespace TriggerService
             var cosmosDbContainerId = "Tasks";
             var CosmosDbPartitionId = "01";
 
-            (var cosmosDbEndpoint, var cosmosDbKey) = await GetCosmosDbEndpointAndKeyAsync(ConfigurationManager.AppSettings.Get("CosmosdbAccountName"));
+            (var cosmosDbEndpoint, var cosmosDbKey) = await GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
 
             var environment = new CromwellOnAzureEnvironment(
                             serviceProvider.GetRequiredService<ILoggerFactory>(),
@@ -74,6 +74,11 @@ namespace TriggerService
 
         private static async Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName)
         {
+            if (string.IsNullOrWhiteSpace(cosmosDbAccountName))
+            {
+                throw new Exception($"CosmosDbAccountName cannot be null.");
+            }
+
             var azureClient = await GetAzureManagementClientAsync();
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
 
