@@ -465,30 +465,27 @@ namespace TesApi.Web
 
             foreach (var subId in subscriptionIds)
             {
-                var registries = new List<IRegistry>();
-
                 try
                 {
-                    registries = (await azureClient.WithSubscription(subId).ContainerRegistries.ListAsync()).ToList();
+                    var registries = (await azureClient.WithSubscription(subId).ContainerRegistries.ListAsync()).ToList();
+
+                    foreach (var r in registries)
+                    {
+                        try
+                        {
+                            var server = await r.GetCredentialsAsync();
+                            var info = new ContainerRegistryInfo { RegistryServer = r.LoginServerUrl, Username = server.Username, Password = server.AccessKeys[AccessKeyType.Primary] };
+                            infos.Add(info);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning($"TES service doesn't have permission to get credentials for registry {r.LoginServerUrl}.  Please verify that 'Admin user' is enabled in the 'Access Keys' area in the Azure Portal for this container registry.  Exception: {ex}");
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
                     logger.LogWarning($"TES service doesn't have permission to list container registries in subscription {subId}.  Exception: {ex}");
-                    continue;
-                }
-
-                foreach (var r in registries)
-                {
-                    try
-                    {
-                        var server = await r.GetCredentialsAsync();
-                        var info = new ContainerRegistryInfo { RegistryServer = r.LoginServerUrl, Username = server.Username, Password = server.AccessKeys[AccessKeyType.Primary] };
-                        infos.Add(info);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning($"TES service doesn't have permission to get credentials for registry {r.LoginServerUrl}.  Please verify that 'Admin user' is enabled in the 'Access Keys' area in the Azure Portal for this container registry.  Exception: {ex}");
-                    }
                 }
             }
 
