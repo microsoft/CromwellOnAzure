@@ -4,12 +4,17 @@
 using System;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Text.RegularExpressions;
 using Tes.Repository;
 
 namespace Tes.Models
 {
     public partial class TesTask : RepositoryItem<TesTask>
     {
+        private static readonly Regex CromwellTaskInstanceNameRegex = new Regex("(.*):[^:]*:[^:]*");
+        private static readonly Regex CromwellShardRegex = new Regex(".*:([^:]*):[^:]*");
+        private static readonly Regex CromwellAttemptRegex = new Regex(".*:([^:]*)");
+
         /// <summary>
         /// Number of retries attempted
         /// </summary>
@@ -46,5 +51,23 @@ namespace Tes.Models
         /// </summary>
         [IgnoreDataMember]
         public int? CromwellResultCode => this.Logs?.LastOrDefault()?.CromwellResultCode;
+
+        /// <summary>
+        /// Cromwell task description without shard and attempt numbers
+        /// </summary>
+        [IgnoreDataMember]
+        public string CromwellTaskInstanceName => CromwellTaskInstanceNameRegex.Match(this.Description).Groups[1].Value;
+
+        /// <summary>
+        /// Cromwell shard number
+        /// </summary>
+        [IgnoreDataMember]
+        public int? CromwellShard => int.TryParse(CromwellShardRegex.Match(this.Description).Groups[1].Value, out var result) ? result : null;
+
+        /// <summary>
+        /// Cromwell attempt number
+        /// </summary>
+        [IgnoreDataMember]
+        public int? CromwellAttempt => int.TryParse(CromwellAttemptRegex.Match(this.Description).Groups[1].Value, out var result) ? result : null;
     }
 }
