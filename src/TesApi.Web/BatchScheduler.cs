@@ -248,9 +248,9 @@ namespace TesApi.Web
             try
             {
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
-                var virtualMachineInfo = await GetVmSizeAsync(tesTask.Resources);
+                var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
-                await CheckBatchAccountQuotas((int)tesTask.Resources.CpuCores.GetValueOrDefault(DefaultCoreCount), virtualMachineInfo.LowPriority ?? false);
+                await CheckBatchAccountQuotas(virtualMachineInfo.NumberOfCores.Value, virtualMachineInfo.LowPriority ?? false);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
 
@@ -271,6 +271,19 @@ namespace TesApi.Web
             catch (AzureBatchQuotaMaxedOutException exception)
             {
                 logger.LogInformation($"Not enough quota available for task Id {tesTask.Id}. Reason: {exception.Message}. Task will remain in queue.");
+            }
+            catch (AzureBatchLowQuotaException exception)
+            {
+                tesTask.State = TesState.SYSTEMERROREnum;
+                tesTask.SetFailureReason("InsufficientBatchQuota", exception.Message);
+                logger.LogError(exception.Message);
+            }
+            catch (AzureBatchVirtualMachineAvailabilityException exception)
+            {
+                tesTask.State = TesState.SYSTEMERROREnum;
+                tesTask.AddTesTaskLog(); // Adding new log here because this exception is thrown from GetVmSizeAsync() and AddTesTaskLog() above is called after that. This way each attempt will have its own log entry.
+                tesTask.SetFailureReason("NoVmSizeAvailable", exception.Message);
+                logger.LogError(exception.Message);
             }
             catch (TesException exc)
             {
@@ -913,23 +926,32 @@ namespace TesApi.Web
         /// <summary>
         /// Gets the cheapest available VM size that satisfies the <see cref="TesTask"/> execution requirements
         /// </summary>
-        /// <param name="tesResources"><see cref="TesResources"/></param>
+        /// <param name="tesTask"><see cref="TesTask"/></param>
         /// <returns>The virtual machine info</returns>
-        private async Task<VirtualMachineInfo> GetVmSizeAsync(TesResources tesResources)
+        private async Task<VirtualMachineInfo> GetVmSizeAsync(TesTask tesTask)
         {
+            var tesResources = tesTask.Resources;
+
             var requiredNumberOfCores = tesResources.CpuCores.GetValueOrDefault(DefaultCoreCount);
             var requiredMemoryInGB = tesResources.RamGb.GetValueOrDefault(DefaultMemoryGb);
             var requiredDiskSizeInGB = tesResources.DiskGb.GetValueOrDefault(DefaultDiskGb);
             var preemptible = usePreemptibleVmsOnly || tesResources.Preemptible.GetValueOrDefault(true);
 
+            var previouslyFailedVmSizes = tesTask.Logs?
+                .Where(log => log.FailureReason == BatchTaskState.NodeAllocationFailed.ToString() && log.VirtualMachineInfo?.VmSize != null)
+                .Select(log => log.VirtualMachineInfo.VmSize)
+                .Distinct()
+                .ToList();
+
             var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
 
             var selectedVm = virtualMachineInfoList
-                .Where(x =>
-                    x.LowPriority == preemptible
-                    && x.NumberOfCores >= requiredNumberOfCores
-                    && x.MemoryInGB >= requiredMemoryInGB
-                    && x.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
+                .Where(vm =>
+                    vm.LowPriority == preemptible
+                    && vm.NumberOfCores >= requiredNumberOfCores
+                    && vm.MemoryInGB >= requiredMemoryInGB
+                    && vm.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
+                .Where(vm => previouslyFailedVmSizes == null || !previouslyFailedVmSizes.Contains(vm.VmSize))
                 .OrderBy(x => x.PricePerHour)
                 .FirstOrDefault();
 
@@ -941,17 +963,22 @@ namespace TesApi.Web
                         && x.NumberOfCores >= requiredNumberOfCores
                         && x.MemoryInGB >= requiredMemoryInGB
                         && x.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
+                    .Where(vm => previouslyFailedVmSizes == null || !previouslyFailedVmSizes.Contains(vm.VmSize))
                     .OrderBy(x => x.PricePerHour)
                     .FirstOrDefault();
 
-                var noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible})";
+                var noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}";
 
                 if (alternateVm != null)
                 {
                     noVmFoundMessage += $" Please note that a VM with LowPriority={!preemptible} WAS found however.";
                 }
 
-                logger.LogError(noVmFoundMessage);
+                if (previouslyFailedVmSizes != null)
+                {
+                    noVmFoundMessage += $"The following VmSizes were excluded from consideration because of {BatchTaskState.NodeAllocationFailed} error(s) on previous attempts: {string.Join(", ", previouslyFailedVmSizes)}";
+                }
+
                 throw new AzureBatchVirtualMachineAvailabilityException(noVmFoundMessage);
             }
 
