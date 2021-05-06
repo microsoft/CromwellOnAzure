@@ -321,7 +321,7 @@ For these changes to take effect, be sure to restart your Cromwell on Azure VM t
 
 ### Use private Docker containers hosted on Azure
 Cromwell on Azure supports private Docker images for your WDL tasks hosted on [Azure Container Registry or ACR](https://docs.microsoft.com/en-us/azure/container-registry/).
-To allow the host VM to use an ACR, [add the VM identity as a Contributor](../README.md/#Connect-to-existing-Azure-resources-I-own-that-are-not-part-of-the-Cromwell-on-Azure-instance-by-default) to the Container Registry via Azure Portal or Azure CLI.<br/>
+To allow the host VM to use an ACR, [add the VM identity as a Contributor](../README.md/#Connect-to-existing-Azure-resources-I-own-that-are-not-part-of-the-Cromwell-on-Azure-instance-by-default) to the Container Registry via the Azure Portal or Azure CLI.  Also, set "Admin user" to "Enabled" in the ACR's "Access keys" section in the Azure Portal.<br/>
 
 ### Configure my Cromwell on Azure instance to always use dedicated batch VMs to avoid getting preempted
 By default, your workflows will run on low priority Azure batch nodes.<br/>
