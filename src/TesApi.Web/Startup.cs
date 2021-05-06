@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using LazyCache;
 using Microsoft.AspNetCore.Builder;
@@ -64,6 +65,11 @@ namespace TesApi.Web
             var azureProxy = new AzureProxy(Configuration["BatchAccountName"], azureOfferDurableId, loggerFactory.CreateLogger<AzureProxy>());
             IAzureProxy cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy, cache);
             IStorageAccessProvider storageAccessProvider = new StorageAccessProvider(loggerFactory.CreateLogger<StorageAccessProvider>(), Configuration, cachingAzureProxy);
+
+            var configurationUtils = new ConfigurationUtils(Configuration, cachingAzureProxy, storageAccessProvider, loggerFactory.CreateLogger<ConfigurationUtils>());
+            var allowedVmSizes = configurationUtils.ProcessAllowedVmSizesConfigurationAndGetAllowedVmSizesAsync().Result;
+
+            Configuration["AllowedVmSizes"] = allowedVmSizes != null && allowedVmSizes.Any() ? string.Join(',', allowedVmSizes) : null;
 
             services.AddSingleton(cachingAzureProxy);
             services.AddSingleton(azureProxy);
