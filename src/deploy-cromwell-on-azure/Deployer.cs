@@ -1009,7 +1009,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var vnet = await azureSubscriptionClient.Networks
                         .Define(name)
-                        .WithRegion(resourceGroup.Region)
+                        .WithRegion(configuration.RegionName)
                         .WithExistingResourceGroup(resourceGroup)
                         .WithAddressSpace(addressSpace)
                         .DefineSubnet("subnet1").WithAddressPrefix(addressSpace).Attach()
@@ -1028,7 +1028,7 @@ namespace CromwellOnAzureDeployer
             return Execute(
                 $"Creating Network Security Group: {networkSecurityGroupName}...",
                 () => azureSubscriptionClient.NetworkSecurityGroups.Define(networkSecurityGroupName)
-                    .WithRegion(resourceGroup.RegionName)
+                    .WithRegion(configuration.RegionName)
                     .WithExistingResourceGroup(resourceGroup)
                     .DefineRule(ruleName)
                     .AllowInbound()
@@ -1104,7 +1104,7 @@ namespace CromwellOnAzureDeployer
             return Execute(
                 $"Creating user-managed identity: {managedIdentityName}...",
                 () => azureSubscriptionClient.Identities.Define(managedIdentityName)
-                    .WithRegion(resourceGroup.RegionName)
+                    .WithRegion(configuration.RegionName)
                     .WithExistingResourceGroup(resourceGroup)
                     .CreateAsync());
         }
@@ -1373,7 +1373,7 @@ namespace CromwellOnAzureDeployer
             }
 
             return await GetExistingStorageAccountAsync(configuration.StorageAccountName)
-                ?? throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist in subscription {configuration.SubscriptionId} and region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+                ?? throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
         }
 
         private async Task<BatchAccount> ValidateAndGetExistingBatchAccountAsync()
@@ -1384,7 +1384,7 @@ namespace CromwellOnAzureDeployer
             }
 
             return await GetExistingBatchAccountAsync(configuration.BatchAccountName)
-                ?? throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in subscription {configuration.SubscriptionId} and region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+                ?? throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
         }
 
         private async Task<(INetwork virtualNetwork, string subnetName)?> ValidateAndGetExistingVirtualNetworkAsync()
@@ -1409,6 +1409,11 @@ namespace CromwellOnAzureDeployer
             if (vnet == null)
             {
                 throw new ValidationException($"Virtual network '{configuration.VnetName}' does not exist in resource group '{configuration.VnetResourceGroupName}'.");
+            }
+
+            if(!vnet.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ValidationException($"Virtual network '{configuration.VnetName}' must be in the same region that you are depoying to ({configuration.RegionName}).");
             }
 
             if (!vnet.Subnets.Any())
