@@ -63,6 +63,7 @@ namespace TesApi.Web
 
             var azureProxy = new AzureProxy(Configuration["BatchAccountName"], azureOfferDurableId, loggerFactory.CreateLogger<AzureProxy>());
             IAzureProxy cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy, cache);
+            IStorageAccessProvider storageAccessProvider = new StorageAccessProvider(loggerFactory.CreateLogger<StorageAccessProvider>(), Configuration, cachingAzureProxy);
 
             services.AddSingleton(cachingAzureProxy);
             services.AddSingleton(azureProxy);
@@ -81,7 +82,7 @@ namespace TesApi.Web
             var repository = new CachingWithRetriesRepository<TesTask>(cosmosDbRepository);
 
             services.AddSingleton<IRepository<TesTask>>(repository);
-            services.AddSingleton<IBatchScheduler>(new BatchScheduler(loggerFactory.CreateLogger<BatchScheduler>(), Configuration, cachingAzureProxy));
+            services.AddSingleton<IBatchScheduler>(new BatchScheduler(loggerFactory.CreateLogger<BatchScheduler>(), Configuration, cachingAzureProxy, storageAccessProvider));
 
             services
                 .AddSwaggerGen(c =>
