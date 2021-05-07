@@ -86,6 +86,28 @@ namespace TriggerService
             }
         }
 
+        public async Task<string> GetSerializedWorkflowTrigger(string container, string blobName)
+        {
+            var workflowtrigger = string.Empty;
+            
+            try
+            {
+                using (var memoryStream = new MemoryStream())
+                {
+                    var containerReference = blobClient.GetContainerReference(container);
+                    var blob = containerReference.GetBlockBlobReference(blobName);
+                    await blob.DownloadToStreamAsync(memoryStream);
+                    workflowtrigger = System.Text.Encoding.UTF8.GetString(memoryStream.ToArray());
+                }
+            }
+            catch (Exception e)
+            {
+                logger.LogError($"Exeption downloading workflow trigger {blobName} to stream: {e}");
+            }
+
+            return workflowtrigger;           
+        }
+
         public async Task MutateStateAsync(string container, string blobName, WorkflowState newState, string workflowFailureDetails = "")
         {
             var newStateText = $"{newState.ToString().ToLowerInvariant()}";
@@ -93,9 +115,8 @@ namespace TriggerService
             var blob = containerReference.GetBlockBlobReference(blobName);
             var oldStateText = blobName.Substring(0, blobName.IndexOf('/'));
             logger.LogInformation($"Mutating state from '{oldStateText}' to '{newStateText}' for {blob.Uri.AbsoluteUri}");
-            var newBlobName = blobName.Replace(oldStateText, $"{newState.ToString().ToLowerInvariant()}");
-            var data = await blob.DownloadTextAsync();
-            await UploadFileTextAsync($"{data} \n 'Workflow Failure Details': {workflowFailureDetails}", container, newBlobName);
+            var newBlobName = blobName.Replace(oldStateText, $"{newState.ToString().ToLowerInvariant()}");            
+            await UploadFileTextAsync($"{workflowFailureDetails}", container, newBlobName);
             await blob.DeleteIfExistsAsync();
         }
 
