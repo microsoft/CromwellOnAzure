@@ -79,11 +79,17 @@ namespace TesApi.Tests
             azureProxyReturnValues.BatchQuotas = new AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 9, LowPriorityCoreQuota = 17 };
 
             azureProxyReturnValues.ActiveNodeCountByVmSize = new List<AzureBatchNodeCount> {
-                new AzureBatchNodeCount { VirtualMachineSize = "VmSize1", DedicatedNodeCount = 4, LowPriorityNodeCount = 8 }  // 8 (4 * 2) dedicated and 16 ( 8 * 2) low pri cores are used
+                new AzureBatchNodeCount { VirtualMachineSize = "VmSize1", DedicatedNodeCount = 4, LowPriorityNodeCount = 8 }  // 8 (4 * 2) dedicated and 16 (8 * 2) low pri cores are in use, there is no more room for 2 cores
             };
 
-            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 2, RamGb = 1, Preemptible = false }, azureProxyReturnValues));
-            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 2, RamGb = 1, Preemptible = true }, azureProxyReturnValues));
+            // The actual CPU core count (2) of the selected VM is used for quota calculation, not the TesResources CpuCores requirement
+            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 1, RamGb = 1, Preemptible = false }, azureProxyReturnValues));
+            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 1, RamGb = 1, Preemptible = true }, azureProxyReturnValues));
+
+            azureProxyReturnValues.ActiveNodeCountByVmSize = new List<AzureBatchNodeCount> {
+                new AzureBatchNodeCount { VirtualMachineSize = "VmSize1", DedicatedNodeCount = 4, LowPriorityNodeCount = 7 }  // 8 dedicated and 14 low pri cores are in use
+            };
+
             Assert.AreEqual(TesState.INITIALIZINGEnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 1, RamGb = 1, Preemptible = true }, azureProxyReturnValues));
         }
 
@@ -209,10 +215,46 @@ namespace TesApi.Tests
         {
             var tesTask = GetTesTask();
 
+            var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
+
+            azureProxyReturnValues.VmSizesAndPrices = new List<VirtualMachineInfo> {
+                new VirtualMachineInfo { VmSize = "VmSize1", LowPriority = false, NumberOfCores = 2, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 1 },
+                new VirtualMachineInfo { VmSize = "VmSize2", LowPriority = false, NumberOfCores = 2, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 2 },
+                new VirtualMachineInfo { VmSize = "VmSize3", LowPriority = false, NumberOfCores = 2, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 3 },
+                new VirtualMachineInfo { VmSize = "VmSize4", LowPriority = false, NumberOfCores = 2, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 4 },
+                new VirtualMachineInfo { VmSize = "VmSize5", LowPriority = false, NumberOfCores = 2, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 5 }
+            };
+
+            await GetNewTesTaskStateAsync(tesTask, azureProxyReturnValues);
             Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(tesTask, BatchJobAndTaskStates.NodeAllocationFailed));
+            await GetNewTesTaskStateAsync(tesTask, azureProxyReturnValues);
             Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(tesTask, BatchJobAndTaskStates.NodeAllocationFailed));
+            await GetNewTesTaskStateAsync(tesTask, azureProxyReturnValues);
             Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(tesTask, BatchJobAndTaskStates.NodeAllocationFailed));
+            await GetNewTesTaskStateAsync(tesTask, azureProxyReturnValues);
             Assert.AreEqual(TesState.EXECUTORERROREnum, await GetNewTesTaskStateAsync(tesTask, BatchJobAndTaskStates.NodeAllocationFailed));
+        }
+
+        [TestMethod]
+        public async Task TaskThatFailsWithNodeAllocationErrorIsRequeuedOnDifferentVmSize()
+        {
+            var tesTask = GetTesTask();
+
+            await GetNewTesTaskStateAsync(tesTask);
+            await GetNewTesTaskStateAsync(tesTask, BatchJobAndTaskStates.NodeAllocationFailed);
+            var firstAttemptVmSize = tesTask.Logs[0].VirtualMachineInfo.VmSize;
+
+            await GetNewTesTaskStateAsync(tesTask);
+            await GetNewTesTaskStateAsync(tesTask, BatchJobAndTaskStates.NodeAllocationFailed);
+            var secondAttemptVmSize = tesTask.Logs[1].VirtualMachineInfo.VmSize;
+
+            Assert.AreNotEqual(firstAttemptVmSize, secondAttemptVmSize);
+
+            // There are only two suitable VMs, and both have been excluded because of the NodeAllocationFailed error on the two earlier attempts
+            await GetNewTesTaskStateAsync(tesTask);
+
+            Assert.AreEqual(TesState.SYSTEMERROREnum, tesTask.State);
+            Assert.AreEqual("NoVmSizeAvailable", tesTask.FailureReason);
         }
 
         [TestMethod]
@@ -630,30 +672,33 @@ namespace TesApi.Tests
             return (jobId, cloudTask, poolInformation);
         }
 
+        private static async Task<TesState> GetNewTesTaskStateAsync(TesTask tesTask, AzureProxyReturnValues azureProxyReturnValues)
+        {
+            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(azureProxyReturnValues));
+
+            return tesTask.State;
+        }
+
         private static Task<TesState> GetNewTesTaskStateAsync(TesState currentTesTaskState, AzureBatchJobAndTaskState azureBatchJobAndTaskState)
         {
             var tesTask = new TesTask { Id = "test", State = currentTesTaskState };
             return GetNewTesTaskStateAsync(tesTask, azureBatchJobAndTaskState);
         }
 
-        private static async Task<TesState> GetNewTesTaskStateAsync(TesTask tesTask, AzureBatchJobAndTaskState azureBatchJobAndTaskState)
+        private static Task<TesState> GetNewTesTaskStateAsync(TesTask tesTask, AzureBatchJobAndTaskState? azureBatchJobAndTaskState = null)
         {
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
-            azureProxyReturnValues.BatchJobAndTaskState = azureBatchJobAndTaskState;
+            azureProxyReturnValues.BatchJobAndTaskState = azureBatchJobAndTaskState ?? azureProxyReturnValues.BatchJobAndTaskState;
 
-            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(azureProxyReturnValues));
-
-            return tesTask.State;
+            return GetNewTesTaskStateAsync(tesTask, azureProxyReturnValues);
         }
 
-        private static async Task<TesState> GetNewTesTaskStateAsync(TesResources resources, AzureProxyReturnValues azureProxyReturnValues)
+        private static Task<TesState> GetNewTesTaskStateAsync(TesResources resources, AzureProxyReturnValues azureProxyReturnValues)
         {
             var tesTask = GetTesTask();
             tesTask.Resources = resources;
 
-            await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(azureProxyReturnValues));
-
-            return tesTask.State;
+            return GetNewTesTaskStateAsync(tesTask, azureProxyReturnValues);
         }
 
         private static TesTask GetTesTask()
