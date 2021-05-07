@@ -8,14 +8,10 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Web;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Auth;
-using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Tes.Extensions;
 using Tes.Models;
@@ -39,7 +35,6 @@ namespace TesApi.Web
         private const string DockerInDockerImageName = "docker";
         private const string BlobxferImageName = "mcr.microsoft.com/blobxfer";
         private static readonly Regex queryStringRegex = new Regex(@"[^\?.]*(\?.*)");
-        private static readonly TimeSpan sasTokenDuration = TimeSpan.FromDays(3);
         private readonly ILogger logger;
         private readonly IAzureProxy azureProxy;
         private readonly IStorageAccessProvider storageAccessProvider;
@@ -47,7 +42,7 @@ namespace TesApi.Web
         private readonly bool usePreemptibleVmsOnly;
 
         /// <summary>
-        /// Manages execution of TES tasks on Azure Batch 
+        /// Orchestrates <see cref="TesTask"/>s on Azure Batch
         /// </summary>
         /// <param name="logger">Logger <see cref="ILogger"/></param>
         /// <param name="configuration">Configuration <see cref="IConfiguration"/></param>
