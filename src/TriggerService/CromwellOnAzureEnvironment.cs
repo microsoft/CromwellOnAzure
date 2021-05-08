@@ -340,9 +340,9 @@ namespace TriggerService
                     return "{ Logs.FailureReason, 'Workflow Aborted' }";
                     
                 case WorkflowStatus.Failed:
-                        var tesTasks = await tesTaskRepository.GetItemsAsync(
-                        predicate: t =>
-                        t.WorkflowId == workflowid.ToString());
+                    
+                    var tesTasks = await tesTaskRepository.GetItemsAsync(
+                        predicate: t => t.WorkflowId == workflowid.ToString());
 
                     //take all failed tasks 
                     var failedTesTasks = from testask in tesTasks 
@@ -352,19 +352,22 @@ namespace TriggerService
                                          select testask;
 
                     //gather failed tasks which have passed in later attempts
-                    var eliminateSuccessfulreattempts = from ft in failedTesTasks
-                                                        join tasks in tesTasks on
-                                                        new { ft.CromwellTaskInstanceName, ft.CromwellShard } equals new { tasks.CromwellTaskInstanceName, tasks.CromwellShard }
-                                                        where (ft.State == TesState.EXECUTORERROREnum || ft.State == TesState.SYSTEMERROREnum) && (tasks.State == TesState.COMPLETEEnum)
-                                                        select ft;
+                    var eliminateSuccessfulreattempts = from tasks in tesTasks
+                                                        join fld in failedTesTasks on
+                                                        new { tasks.CromwellTaskInstanceName, tasks.CromwellShard } equals new { fld.CromwellTaskInstanceName, fld.CromwellShard }
+                                                        where (fld.State == TesState.EXECUTORERROREnum || fld.State == TesState.SYSTEMERROREnum) && (tasks.State == TesState.COMPLETEEnum && tasks.CromwellShard > 1)
+                                                        select tasks;
 
                     //filter out failed tasks that succeeded in later attempts.
-                    var filteredFailedTasks = from ft in failedTesTasks
-                                              join tasktoeliminate in eliminateSuccessfulreattempts on ft.Id equals tasktoeliminate.Id into filteredFailedTesTasks 
-                                              from cromwellTaskInstance in filteredFailedTesTasks.DefaultIfEmpty()
-                                              select ft;
+                    var filteredFailedTasks = from failedtask in failedTesTasks
+                                              where !eliminateSuccessfulreattempts.Any(t => t.CromwellTaskInstanceName== failedtask.CromwellTaskInstanceName && t.CromwellShard == failedtask.CromwellShard)
+                                              select failedtask;
 
-                    return JsonConvert.SerializeObject(filteredFailedTasks.Select(t =>
+                    var LatestfailedAttemptquery = filteredFailedTasks.GroupBy(r => new { r.CromwellTaskInstanceName, r.CromwellShard })
+                        .Select(g => g.OrderByDescending(ge => ge.CromwellAttempt))
+                        .First();
+                        
+                    return JsonConvert.SerializeObject(LatestfailedAttemptquery.Select(t =>
                    $@"{{Logs.FailureReason: '{t.Logs[t.Logs.Count -1].FailureReason}', Logs.FailureReason: '{t.Logs[t.Logs.Count -1].FailureReason}', Logs.SystemLogs: '{t.Logs[t.Logs.Count -1].SystemLogs}', Executor.StdErr: '{t.Executors[0].Stderr}', Executor.StdOut: '{t.Executors[0].Stdout}', CromwellResultCode: '{t.CromwellResultCode}'}}").ToList());                  
                 
                 default:                    
