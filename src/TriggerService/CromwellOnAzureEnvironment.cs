@@ -365,12 +365,7 @@ namespace TriggerService
                                               select ft;
 
                     return JsonConvert.SerializeObject(filteredFailedTasks.Select(t =>
-                   $@"Logs.FailureReason:{t.Logs[t.Logs.Count -1].FailureReason}, 
-                      Logs.FailureReason: {t.Logs[t.Logs.Count -1].FailureReason}, 
-                      Logs.SystemLogs: {t.Logs[t.Logs.Count -1].SystemLogs},
-                      Executor.StdErr: {t.Executors[0].Stderr},
-                      Executor.StdOut: {t.Executors[0].Stdout},
-                      CromwellResultCode: {t.CromwellResultCode}").ToList());                  
+                   $@"{{Logs.FailureReason: '{t.Logs[t.Logs.Count -1].FailureReason}', Logs.FailureReason: '{t.Logs[t.Logs.Count -1].FailureReason}', Logs.SystemLogs: '{t.Logs[t.Logs.Count -1].SystemLogs}', Executor.StdErr: '{t.Executors[0].Stderr}', Executor.StdOut: '{t.Executors[0].Stdout}', CromwellResultCode: '{t.CromwellResultCode}'}}").ToList());                  
                 
                 default:                    
                     return string.Empty;
