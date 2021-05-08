@@ -189,8 +189,7 @@ namespace TriggerService
                                 break;
                             }
                         case WorkflowStatus.Succeeded:
-                            {
-                                wfInstance.WorkflowFailureDetails = await Task.FromResult(string.Empty);
+                            {                                
                                 await UploadOutputsAsync(blobTrigger, id, sampleName);
                                 await UploadTimingAsync(blobTrigger, id, sampleName);
                                 await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Succeeded, JsonConvert.SerializeObject(wfInstance));
