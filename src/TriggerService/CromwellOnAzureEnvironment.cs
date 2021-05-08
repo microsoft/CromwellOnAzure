@@ -363,12 +363,13 @@ namespace TriggerService
                                               where !eliminateSuccessfulreattempts.Any(t => t.CromwellTaskInstanceName== failedtask.CromwellTaskInstanceName && t.CromwellShard == failedtask.CromwellShard)
                                               select failedtask;
 
+                    //Get final failed attempt of each tesTask that caused the Workflow to fail. 
                     var LatestfailedAttemptquery = filteredFailedTasks.GroupBy(r => new { r.CromwellTaskInstanceName, r.CromwellShard })
                         .Select(g => g.OrderByDescending(ge => ge.CromwellAttempt))
                         .First();
                         
                     return JsonConvert.SerializeObject(LatestfailedAttemptquery.Select(t =>
-                   $@"{{Logs.FailureReason: '{t.Logs[t.Logs.Count -1].FailureReason}', Logs.FailureReason: '{t.Logs[t.Logs.Count -1].FailureReason}', Logs.SystemLogs: '{t.Logs[t.Logs.Count -1].SystemLogs}', Executor.StdErr: '{t.Executors[0].Stderr}', Executor.StdOut: '{t.Executors[0].Stdout}', CromwellResultCode: '{t.CromwellResultCode}'}}").ToList());                  
+                   $@"{{Task.Id: '{t.Id}', Logs.FailureReason: '{t.Logs[t.Logs.Count -1].FailureReason}', Logs.FailureReason: '{t.Logs[t.Logs.Count -1].FailureReason}', Logs.SystemLogs: '{t.Logs[t.Logs.Count -1].SystemLogs}', Executor.StdErr: '{t.Executors[0].Stderr}', Executor.StdOut: '{t.Executors[0].Stdout}', CromwellResultCode: '{t.CromwellResultCode}'}}").ToList());                  
                 
                 default:                    
                     return string.Empty;
