@@ -333,33 +333,51 @@ namespace TriggerService
             }
         }
 
-        private async Task<string> GetWorkflowFailureReason(Guid workflowid, WorkflowStatus workFlowStatus)
+        private async Task<List<Dictionary<string, object>>> GetWorkflowFailureReason(Guid workflowid, WorkflowStatus workFlowStatus)
         {
             switch (workFlowStatus)
             {
                 case WorkflowStatus.Aborted:
-                    return "Workflow Aborted";
-
+                    dynamic dm = JsonConvert.DeserializeObject("{Logs.FailureReason, 'Workflow Aborted' }");
+                    return dm;
                 case WorkflowStatus.Failed:
                         var tesTasks = await tesTaskRepository.GetItemsAsync(
                         predicate: t =>
-                        t.WorkflowId == workflowid.ToString() &&
-                        (t.State == TesState.EXECUTORERROREnum ||
-                        t.State == TesState.SYSTEMERROREnum ||
-                        t.State == TesState.COMPLETEEnum && t.CromwellResultCode != 0)); 
+                        t.WorkflowId == workflowid.ToString());
 
-                return JsonConvert.SerializeObject(tesTasks.Select(t =>
-                new Dictionary<string, object>
-                {
-                    { "Logs.FailureReason", t.Logs[t.Logs.Count -1].FailureReason },
-                    { "Logs.SystemLogs", t.Logs[t.Logs.Count -1].SystemLogs },
-                    { "Executor.StdErr", t.Executors[0].Stderr },
-                    { "Executor.StdOut", t.Executors[0].Stdout },
-                    { "CromwellResultCode", t.CromwellResultCode}
-                }).ToList());                  
+                    //take all failed tasks 
+                    var failedTesTasks = from testask in tesTasks 
+                                         where testask.State == TesState.EXECUTORERROREnum ||
+                                         testask.State == TesState.SYSTEMERROREnum ||
+                                         (testask.State == TesState.COMPLETEEnum && testask.CromwellResultCode !=0)
+                                         select testask;
+
+                    //gather failed tasks which have passed in later attempts
+                    var eliminateSuccessfulreattempts = from ft in failedTesTasks
+                                                        join tasks in tesTasks on
+                                                        new { ft.CromwellTaskInstanceName, ft.CromwellShard } equals new { tasks.CromwellTaskInstanceName, tasks.CromwellShard }
+                                                        where (ft.State == TesState.EXECUTORERROREnum || ft.State == TesState.SYSTEMERROREnum) && (tasks.State == TesState.COMPLETEEnum)
+                                                        select ft;
+
+                    //filter out failed tasks that succeeded in later attempts.
+                    var filteredFailedTasks = from ft in failedTesTasks
+                                              join tasktoeliminate in eliminateSuccessfulreattempts on ft.Id equals tasktoeliminate.Id into filteredFailedTesTasks 
+                                              from cromwellTaskInstance in filteredFailedTesTasks.DefaultIfEmpty()
+                                              select ft;
+
+                    return filteredFailedTasks.Select(t =>
+                    new Dictionary<string, object>
+                    {
+                        { "Logs.FailureReason", t.Logs[t.Logs.Count -1].FailureReason },
+                        { "Logs.SystemLogs", t.Logs[t.Logs.Count -1].SystemLogs },
+                        { "Executor.StdErr", t.Executors[0].Stderr },
+                        { "Executor.StdOut", t.Executors[0].Stdout },
+                        { "CromwellResultCode", t.CromwellResultCode}
+                    }).ToList();                  
                 
                 default:
-                    return string.Empty;
+                    dynamic dict = JsonConvert.DeserializeObject("{}");
+                    return dict;
             }
         }
     }
