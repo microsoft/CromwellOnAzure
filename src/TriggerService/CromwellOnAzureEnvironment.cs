@@ -332,13 +332,13 @@ namespace TriggerService
             }
         }
 
-        private async Task<List<Dictionary<string, object>>> GetWorkflowFailureReason(Guid workflowid, WorkflowStatus workFlowStatus)
+        private async Task<string> GetWorkflowFailureReason(Guid workflowid, WorkflowStatus workFlowStatus)
         {
             switch (workFlowStatus)
             {
                 case WorkflowStatus.Aborted:
-                    dynamic dm = JsonConvert.DeserializeObject("{Logs.FailureReason, 'Workflow Aborted' }");
-                    return dm;
+                    return "{ Logs.FailureReason, 'Workflow Aborted' }";
+                    
                 case WorkflowStatus.Failed:
                         var tesTasks = await tesTaskRepository.GetItemsAsync(
                         predicate: t =>
@@ -364,19 +364,16 @@ namespace TriggerService
                                               from cromwellTaskInstance in filteredFailedTesTasks.DefaultIfEmpty()
                                               select ft;
 
-                    return filteredFailedTasks.Select(t =>
-                    new Dictionary<string, object>
-                    {
-                        { "Logs.FailureReason", t.Logs[t.Logs.Count -1].FailureReason },
-                        { "Logs.SystemLogs", t.Logs[t.Logs.Count -1].SystemLogs },
-                        { "Executor.StdErr", t.Executors[0].Stderr },
-                        { "Executor.StdOut", t.Executors[0].Stdout },
-                        { "CromwellResultCode", t.CromwellResultCode}
-                    }).ToList();                  
+                    return JsonConvert.SerializeObject(filteredFailedTasks.Select(t =>
+                   $@"Logs.FailureReason:{t.Logs[t.Logs.Count -1].FailureReason}, 
+                      Logs.FailureReason: {t.Logs[t.Logs.Count -1].FailureReason}, 
+                      Logs.SystemLogs: {t.Logs[t.Logs.Count -1].SystemLogs},
+                      Executor.StdErr: {t.Executors[0].Stderr},
+                      Executor.StdOut: {t.Executors[0].Stdout},
+                      CromwellResultCode: {t.CromwellResultCode}").ToList());                  
                 
-                default:
-                    dynamic dict = JsonConvert.DeserializeObject("{}");
-                    return dict;
+                default:                    
+                    return string.Empty;
             }
         }
     }
