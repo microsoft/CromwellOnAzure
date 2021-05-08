@@ -8,14 +8,10 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Web;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Auth;
-using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Tes.Extensions;
 using Tes.Models;
@@ -39,43 +35,26 @@ namespace TesApi.Web
         private const string DockerInDockerImageName = "docker";
         private const string BlobxferImageName = "mcr.microsoft.com/blobxfer";
         private static readonly Regex queryStringRegex = new Regex(@"[^\?.]*(\?.*)");
-        private static readonly TimeSpan sasTokenDuration = TimeSpan.FromDays(3);
         private readonly ILogger logger;
         private readonly IAzureProxy azureProxy;
-        private readonly string defaultStorageAccountName;
+        private readonly IStorageAccessProvider storageAccessProvider;
         private readonly List<TesTaskStateTransition> tesTaskStateTransitions;
         private readonly bool usePreemptibleVmsOnly;
-        private readonly List<ExternalStorageContainerInfo> externalStorageContainers;
 
         /// <summary>
-        /// Default constructor invoked by ASP.NET Core DI
+        /// Orchestrates <see cref="TesTask"/>s on Azure Batch
         /// </summary>
-        /// <param name="logger">Logger instance provided by ASP.NET Core DI</param>
-        /// <param name="configuration">Configuration</param>
-        /// <param name="azureProxy">Azure proxy</param>
-        public BatchScheduler(ILogger logger, IConfiguration configuration, IAzureProxy azureProxy)
+        /// <param name="logger">Logger <see cref="ILogger"/></param>
+        /// <param name="configuration">Configuration <see cref="IConfiguration"/></param>
+        /// <param name="azureProxy">Azure proxy <see cref="IAzureProxy"/></param>
+        /// <param name="storageAccessProvider">Storage access provider <see cref="IStorageAccessProvider"/></param>
+        public BatchScheduler(ILogger logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider)
         {
             this.logger = logger;
             this.azureProxy = azureProxy;
+            this.storageAccessProvider = storageAccessProvider;
 
-            defaultStorageAccountName = configuration["DefaultStorageAccountName"];    // This account contains the cromwell-executions container
             usePreemptibleVmsOnly = configuration.GetValue("UsePreemptibleVmsOnly", false);
-
-            externalStorageContainers = configuration["ExternalStorageContainers"]?.Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(uri => {
-                    if (StorageAccountUrlSegments.TryCreate(uri, out var s))
-                    { 
-                        return new ExternalStorageContainerInfo { BlobEndpoint = s.BlobEndpoint, AccountName = s.AccountName, ContainerName = s.ContainerName, SasToken = s.SasToken };
-                    }
-                    else
-                    {
-                        logger.LogError($"Invalid value '{uri}' found in 'ExternalStorageContainers' configuration. Value must be a valid azure storage account or container URL.");
-                        return null;
-                    }})
-                .Where(storageAccountInfo => storageAccountInfo != null)
-                .ToList();
-
-            logger.LogInformation($"DefaultStorageAccountName: {defaultStorageAccountName}");
             logger.LogInformation($"usePreemptibleVmsOnly: {usePreemptibleVmsOnly}");
 
             static bool tesTaskIsQueuedInitializingOrRunning(TesTask tesTask) => tesTask.State == TesState.QUEUEDEnum || tesTask.State == TesState.INITIALIZINGEnum || tesTask.State == TesState.RUNNINGEnum;
@@ -204,41 +183,6 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Checks if the specified string represents a HTTP URL that is publicly accessible
-        /// </summary>
-        /// <param name="uriString">URI string</param>
-        /// <returns>True if the URL can be used as is, without adding SAS token to it</returns>
-        private async Task<bool> IsPublicHttpUrl(string uriString)
-        {
-            var isHttpUrl = Uri.TryCreate(uriString, UriKind.Absolute, out var uri) && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
-
-            if (!isHttpUrl)
-            {
-                return false;
-            }
-                        
-            if (HttpUtility.ParseQueryString(uri.Query).Get("sig") != null)
-            {
-                return true;
-            }
-
-            if (StorageAccountUrlSegments.TryCreate(uriString, out var parts))
-            {
-                if (await TryGetStorageAccountInfoAsync(parts.AccountName))
-                {
-                    return false;
-                }
-
-                if (TryGetExternalStorageAccountInfo(parts.AccountName, parts.ContainerName, out _))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
         /// Adds a new Azure Batch pool/job/task for the given <see cref="TesTask"/>
         /// </summary>
         /// <param name="tesTask">The <see cref="TesTask"/> to schedule on Azure Batch</param>
@@ -296,113 +240,6 @@ namespace TesApi.Web
                 tesTask.State = TesState.SYSTEMERROREnum;
                 tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
                 logger.LogError(exc, exc.Message);
-            }
-        }
-
-        private async Task<bool> TryGetStorageAccountInfoAsync(string accountName, Action<StorageAccountInfo> onSuccess = null)
-        {
-            try
-            {
-                var storageAccountInfo = await azureProxy.GetStorageAccountInfoAsync(accountName);
-
-                if (storageAccountInfo != null)
-                {
-                    onSuccess?.Invoke(storageAccountInfo);
-                    return true;
-                }
-                else
-                {
-                    logger.LogError($"Could not find storage account '{accountName}'. Either the account does not exist or the TES app service does not have permission to it.");
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, $"Exception while getting storage account '{accountName}'");
-            }
-
-            return false;
-        }
-
-        private bool TryGetExternalStorageAccountInfo(string accountName, string containerName, out ExternalStorageContainerInfo result)
-        {
-            result = externalStorageContainers?.FirstOrDefault(c =>
-                c.AccountName.Equals(accountName, StringComparison.OrdinalIgnoreCase)
-                && (string.IsNullOrEmpty(c.ContainerName) || c.ContainerName.Equals(containerName, StringComparison.OrdinalIgnoreCase)));
-
-            return result != null;
-        }
-
-        /// <summary>
-        /// Returns an Azure Storage Blob or Container URL with SAS token given a path that uses one of the following formats: 
-        /// - /accountName/containerName
-        /// - /accountName/containerName/blobName
-        /// - /cromwell-executions/blobName
-        /// - https://accountName.blob.core.windows.net/containerName
-        /// - https://accountName.blob.core.windows.net/containerName/blobName
-        /// </summary>
-        /// <param name="path">The file path to convert. Two-part path is treated as container path. Paths with three or more parts are treated as blobs.</param>
-        /// <param name="getContainerSas">Get the container SAS even if path is longer than two parts</param>
-        /// <returns>An Azure Block Blob or Container URL with SAS token</returns>
-        private async Task<string> MapLocalPathToSasUrlAsync(string path, bool getContainerSas = false)
-        {
-            // TODO: Optional: If path is /container/... where container matches the name of the container in the default storage account, prepend the account name to the path.
-            // This would allow the user to omit the account name for files stored in the default storage account
-
-            // /cromwell-executions/... URLs become /defaultStorageAccountName/cromwell-executions/... to unify how URLs starting with /acct/container/... pattern are handled.
-            if (path.StartsWith(CromwellPathPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                path = $"/{defaultStorageAccountName}{path}";
-            }
-
-            if(!StorageAccountUrlSegments.TryCreate(path, out var pathSegments))
-            {
-                logger.LogError($"Could not parse path '{path}'.");
-                return null;
-            }
-
-            if (TryGetExternalStorageAccountInfo(pathSegments.AccountName, pathSegments.ContainerName, out var externalStorageAccountInfo))
-            {
-                return new StorageAccountUrlSegments(externalStorageAccountInfo.BlobEndpoint, pathSegments.ContainerName, pathSegments.BlobName, externalStorageAccountInfo.SasToken).ToUriString();
-            }
-            else
-            {
-                StorageAccountInfo storageAccountInfo = null;
-                
-                if(!await TryGetStorageAccountInfoAsync(pathSegments.AccountName, info => storageAccountInfo = info))
-                { 
-                    logger.LogError($"Could not find storage account '{pathSegments.AccountName}' corresponding to path '{path}'. Either the account does not exist or the TES app service does not have permission to it.");
-                    return null;
-                }
-
-                try
-                {
-                    var accountKey = await azureProxy.GetStorageAccountKeyAsync(storageAccountInfo);
-                    var resultPathSegments = new StorageAccountUrlSegments(storageAccountInfo.BlobEndpoint, pathSegments.ContainerName, pathSegments.BlobName);
-                        
-                    if (pathSegments.IsContainer || getContainerSas)
-                    {
-                        var policy = new SharedAccessBlobPolicy()
-                        {
-                            Permissions = SharedAccessBlobPermissions.Add | SharedAccessBlobPermissions.Create | SharedAccessBlobPermissions.List | SharedAccessBlobPermissions.Read | SharedAccessBlobPermissions.Write,
-                            SharedAccessExpiryTime = DateTime.Now.Add(sasTokenDuration)
-                        };
-
-                        var containerUri = new StorageAccountUrlSegments(storageAccountInfo.BlobEndpoint, pathSegments.ContainerName).ToUri();
-                        resultPathSegments.SasToken = new CloudBlobContainer(containerUri, new StorageCredentials(storageAccountInfo.Name, accountKey)).GetSharedAccessSignature(policy, null, SharedAccessProtocol.HttpsOnly, null);
-                    }
-                    else
-                    {
-                        var policy = new SharedAccessBlobPolicy() { Permissions = SharedAccessBlobPermissions.Read, SharedAccessExpiryTime = DateTime.Now.Add(sasTokenDuration) };
-                        resultPathSegments.SasToken = new CloudBlob(resultPathSegments.ToUri(), new StorageCredentials(storageAccountInfo.Name, accountKey)).GetSharedAccessSignature(policy, null, null, SharedAccessProtocol.HttpsOnly, null);
-                    }
-
-                    return resultPathSegments.ToUriString();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, $"Could not get the key of storage account '{pathSegments.AccountName}'. Make sure that the TES app service has Contributor access to it.");
-                    return null;
-                }
             }
         }
 
@@ -606,11 +443,11 @@ namespace TesApi.Web
 
             var batchExecutionDirectoryPath = GetBatchExecutionDirectoryPath(task);
             var metricsPath = $"{batchExecutionDirectoryPath}/metrics.txt";
-            var metricsUrl = new Uri(await MapLocalPathToSasUrlAsync(metricsPath, getContainerSas: true));
+            var metricsUrl = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync(metricsPath, getContainerSas: true));
 
             // TODO: Cromwell bug: Cromwell command write_tsv() generates a file in the execution directory, for example execution/write_tsv_3922310b441805fc43d52f293623efbc.tmp. These are not passed on to TES inputs.
             // WORKAROUND: Get the list of files in the execution directory and add them to task inputs.
-            var executionDirectoryUri = new Uri(await MapLocalPathToSasUrlAsync(cromwellExecutionDirectoryPath, getContainerSas: true));
+            var executionDirectoryUri = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync(cromwellExecutionDirectoryPath, getContainerSas: true));
             var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.Contains($"/{BatchExecutionDirectoryName}/"));
             var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
             var filesToDownload = await Task.WhenAll(inputFiles.Union(additionalInputFiles).Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
@@ -631,13 +468,12 @@ namespace TesApi.Web
                 + $" && echo FileDownloadSizeInBytes=$total_bytes >> {metricsPath}";
 
             var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
-            var writableDownloadFilesScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(downloadFilesScriptPath, getContainerSas: true));
-            var downloadFilesScriptUrl = await MapLocalPathToSasUrlAsync(downloadFilesScriptPath);
-            await azureProxy.UploadBlobAsync(writableDownloadFilesScriptUrl, downloadFilesScriptContent);
+            var downloadFilesScriptUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(downloadFilesScriptPath);
+            await this.storageAccessProvider.UploadBlobAsync(downloadFilesScriptPath, downloadFilesScriptContent);
 
             var filesToUpload = await Task.WhenAll(
                 task.Outputs.Select(async f =>
-                    new TesOutput { Path = f.Path, Url = await MapLocalPathToSasUrlAsync(f.Path, getContainerSas: true), Name = f.Name, Type = f.Type }));
+                    new TesOutput { Path = f.Path, Url = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(f.Path, getContainerSas: true), Name = f.Name, Type = f.Type }));
 
             // Ignore missing stdout/stderr files. CWL workflows have an issue where if the stdout/stderr are redirected, they are still listed in the TES outputs
             // Ignore any other missing files and directories. WDL tasks can have optional output files.
@@ -653,9 +489,8 @@ namespace TesApi.Web
                 + $" && echo FileUploadSizeInBytes=$total_bytes >> {metricsPath}";
 
             var uploadFilesScriptPath = $"{batchExecutionDirectoryPath}/{UploadFilesScriptFileName}";
-            var writableUploadFilesScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(uploadFilesScriptPath, getContainerSas: true));
-            var uploadFilesScriptUrl = await MapLocalPathToSasUrlAsync(uploadFilesScriptPath);
-            await azureProxy.UploadBlobAsync(writableUploadFilesScriptUrl, uploadFilesScriptContent);
+            var uploadFilesScriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(uploadFilesScriptPath);
+            await this.storageAccessProvider.UploadBlobAsync(uploadFilesScriptPath, uploadFilesScriptContent);
 
             var executor = task.Executors.First();
 
@@ -695,23 +530,20 @@ namespace TesApi.Web
             sb.AppendLine($"/bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKiB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKiB=${{disk[2]}} >> /mnt{metricsPath}' && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url \"{metricsUrl}\" --local-path \"{metricsPath}\" --rename --no-recursive");
 
-            var batchScript = sb.ToString();
-
             var batchScriptPath = $"{batchExecutionDirectoryPath}/{BatchScriptFileName}";
-            var writableBatchScriptUrl = new Uri(await MapLocalPathToSasUrlAsync(batchScriptPath, getContainerSas: true));
-            var batchScriptUrl = await MapLocalPathToSasUrlAsync(batchScriptPath);
-            await azureProxy.UploadBlobAsync(writableBatchScriptUrl, batchScript);
+            await this.storageAccessProvider.UploadBlobAsync(batchScriptPath, sb.ToString());
 
-            var batchExecutionDirectoryUrl = await MapLocalPathToSasUrlAsync($"{batchExecutionDirectoryPath}", getContainerSas: true);
+            var batchScriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(batchScriptPath);
+            var batchExecutionDirectorySasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"{batchExecutionDirectoryPath}", getContainerSas: true);
 
             var cloudTask = new CloudTask(taskId, $"/bin/sh /mnt{batchScriptPath}")
             {
                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-                ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(batchScriptUrl, $"/mnt{batchScriptPath}"), ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptUrl, $"/mnt{uploadFilesScriptPath}") },
+                ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(batchScriptSasUrl, $"/mnt{batchScriptPath}"), ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptSasUrl, $"/mnt{uploadFilesScriptPath}") },
                 OutputFiles = new List<OutputFile> {
                     new OutputFile(
                         "../std*.txt",
-                        new OutputFileDestination(new OutputFileBlobContainerDestination(batchExecutionDirectoryUrl)),
+                        new OutputFileDestination(new OutputFileBlobContainerDestination(batchExecutionDirectorySasUrl)),
                         new OutputFileUploadOptions(OutputFileUploadCondition.TaskFailure))
                 }
             };
@@ -764,21 +596,19 @@ namespace TesApi.Web
 
             if (inputFile.Content != null || IsCromwellCommandScript(inputFile))
             {
-                inputFileUrl = await MapLocalPathToSasUrlAsync(inputFile.Path);
-                var writableUrl = new Uri(await MapLocalPathToSasUrlAsync(inputFile.Path, getContainerSas: true));
+                inputFileUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(inputFile.Path);
 
-                var content = inputFile.Content ?? await azureProxy.DownloadBlobAsync(new Uri(inputFileUrl));
+                var content = inputFile.Content ?? await this.storageAccessProvider.DownloadBlobAsync(inputFile.Path);
                 content = IsCromwellCommandScript(inputFile) ? RemoveQueryStringsFromLocalFilePaths(content, queryStringsToRemoveFromLocalFilePaths) : content;
 
-                await azureProxy.UploadBlobAsync(writableUrl, content);
+                await this.storageAccessProvider.UploadBlobAsync(inputFile.Path, content);
             }
             else if (TryGetCromwellTmpFilePath(inputFile.Url, out var localPath))
             {
-                inputFileUrl = await MapLocalPathToSasUrlAsync(inputFile.Path);
-                var writableUrl = new Uri(await MapLocalPathToSasUrlAsync(inputFile.Path, getContainerSas: true));
-                await azureProxy.UploadBlobFromFileAsync(writableUrl, localPath);
+                inputFileUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(inputFile.Path);
+                await this.storageAccessProvider.UploadBlobFromFileAsync(inputFile.Path, localPath);
             }
-            else if (await this.IsPublicHttpUrl(inputFile.Url))
+            else if (await this.storageAccessProvider.IsPublicHttpUrl(inputFile.Url))
             {
                 inputFileUrl = inputFile.Url;
             }
@@ -787,7 +617,7 @@ namespace TesApi.Web
                 // Convert file:///account/container/blob paths to /account/container/blob
                 var url = Uri.TryCreate(inputFile.Url, UriKind.Absolute, out var tempUrl) && tempUrl.IsFile ? tempUrl.AbsolutePath : inputFile.Url;
 
-                var mappedUrl = await MapLocalPathToSasUrlAsync(url);
+                var mappedUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(url);
 
                 if (mappedUrl != null)
                 {
@@ -1016,14 +846,14 @@ namespace TesApi.Web
 
             try
             {
-                var cromwellRcContent = await GetFileContentAsync($"{GetCromwellExecutionDirectoryPath(tesTask)}/rc");
+                var cromwellRcContent = await this.storageAccessProvider.DownloadBlobAsync($"{GetCromwellExecutionDirectoryPath(tesTask)}/rc");
 
                 if (cromwellRcContent != null && int.TryParse(cromwellRcContent, out var temp))
                 {
                     cromwellRcCode = temp;
                 }
 
-                var metricsContent = await GetFileContentAsync($"{GetBatchExecutionDirectoryPath(tesTask)}/metrics.txt");
+                var metricsContent = await this.storageAccessProvider.DownloadBlobAsync($"{GetBatchExecutionDirectoryPath(tesTask)}/metrics.txt");
 
                 if (metricsContent != null)
                 {
@@ -1063,18 +893,6 @@ namespace TesApi.Web
             }
 
             return (batchNodeMetrics, taskStartTime, taskEndTime, cromwellRcCode);
-        }
-
-        private async Task<string> GetFileContentAsync(string path)
-        {
-            try
-            {
-                return await azureProxy.DownloadBlobAsync(new Uri(await MapLocalPathToSasUrlAsync(path)));
-            }
-            catch
-            {
-                return null;
-            }
         }
 
         private static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
