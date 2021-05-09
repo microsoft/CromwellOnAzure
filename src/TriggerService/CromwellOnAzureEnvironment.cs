@@ -348,19 +348,21 @@ namespace TriggerService
                     var failedTesTasks = from testask in tesTasks 
                                          where testask.State == TesState.EXECUTORERROREnum ||
                                          testask.State == TesState.SYSTEMERROREnum ||
-                                         (testask.State == TesState.COMPLETEEnum && testask.CromwellResultCode !=0)
+                                         (testask.State == TesState.COMPLETEEnum && testask.CromwellResultCode != 0)
                                          select testask;
 
-                    //gather failed tasks which have passed in later attempts
-                    var eliminateSuccessfulreattempts = from tasks in tesTasks
-                                                        join fld in failedTesTasks on
-                                                        new { tasks.CromwellTaskInstanceName, tasks.CromwellShard } equals new { fld.CromwellTaskInstanceName, fld.CromwellShard }
-                                                        where (fld.State == TesState.EXECUTORERROREnum || fld.State == TesState.SYSTEMERROREnum) && (tasks.State == TesState.COMPLETEEnum && tasks.CromwellShard > 1)
-                                                        select tasks;
+                    //take all successfully completed tasks
+                    var completedTesTasks = from testask in tesTasks
+                                         where testask.State == TesState.COMPLETEEnum && 
+                                         testask.CromwellResultCode == 0
+                                         select testask;
 
                     //filter out failed tasks that succeeded in later attempts.
                     var filteredFailedTasks = from failedtask in failedTesTasks
-                                              where !eliminateSuccessfulreattempts.Any(t => t.CromwellTaskInstanceName== failedtask.CromwellTaskInstanceName && t.CromwellShard == failedtask.CromwellShard)
+                                              where !completedTesTasks.Any(t => 
+                                              t.CromwellTaskInstanceName == failedtask.CromwellTaskInstanceName && 
+                                              t.CromwellShard == failedtask.CromwellShard && 
+                                              t.CromwellAttempt > failedtask.CromwellAttempt)
                                               select failedtask;
 
                     //Get final failed attempt of each tesTask that caused the Workflow to fail. 
