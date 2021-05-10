@@ -222,18 +222,18 @@ namespace TriggerService
                 try
                 {
                     id = ExtractWorkflowId(blobTrigger, AzureStorage.WorkflowState.Abort);
-                    wfInstance.WorkflowFailureDetails = await GetWorkflowFailureReason(id, WorkflowStatus.Aborted); wfInstance = JsonConvert.DeserializeObject(await storage.GetSerializedWorkflowTrigger(blobTrigger.Container.Name, blobTrigger.Name));
-                    
                     logger.LogInformation($"Aborting workflow ID: {id} Url: {blobTrigger.Uri.AbsoluteUri}");
                     
                     await cromwellApiClient.PostAbortAsync(id);
+                    
                     wfInstance.WorkflowFailureDetails = await GetWorkflowFailureReason(id, WorkflowStatus.Aborted);
                     await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Abort, JsonConvert.SerializeObject(wfInstance));
                 }
                 catch (Exception exc)
                 {
                     logger.LogError(exc, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger}.  Id: {id}");
-                    await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Abort);
+                    wfInstance.WorkflowFailureDetails = exc;
+                    await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Abort, JsonConvert.SerializeObject(wfInstance));
                 }
             }
         }
@@ -332,12 +332,12 @@ namespace TriggerService
             }
         }
 
-        private async Task<string> GetWorkflowFailureReason(Guid workflowid, WorkflowStatus workFlowStatus)
+        private async Task<dynamic> GetWorkflowFailureReason(Guid workflowid, WorkflowStatus workFlowStatus)
         {
             switch (workFlowStatus)
             {
                 case WorkflowStatus.Aborted:
-                    return "{ Logs.FailureReason, 'Workflow Aborted' }";
+                    return new { Logs_FailureReason="Workflow Aborted" };
                     
                 case WorkflowStatus.Failed:
                     
@@ -366,15 +366,22 @@ namespace TriggerService
                                               select failedtask;
 
                     //Get final failed attempt of each tesTask that caused the Workflow to fail. 
-                    var LatestfailedAttemptquery = filteredFailedTasks.GroupBy(r => new { r.CromwellTaskInstanceName, r.CromwellShard })
-                        .Select(g => g.OrderByDescending(ge => ge.CromwellAttempt))
-                        .First();
-                        
-                    return JsonConvert.SerializeObject(LatestfailedAttemptquery.Select(t =>
-                   $@"{{Task.Id: '{t.Id}', Logs.FailureReason: '{t.Logs[t.Logs.Count -1].FailureReason}', Logs.FailureReason: '{t.Logs[t.Logs.Count -1].FailureReason}', Logs.SystemLogs: '{t.Logs[t.Logs.Count -1].SystemLogs}', Executor.StdErr: '{t.Executors[0].Stderr}', Executor.StdOut: '{t.Executors[0].Stdout}', CromwellResultCode: '{t.CromwellResultCode}'}}").ToList());                  
+                    var latestfailedAttemptquery = from failedtesTask in filteredFailedTasks
+                                                   group failedtesTask by (failedtesTask.CromwellTaskInstanceName, failedtesTask.CromwellShard)
+                                                   into groups
+                                                   select groups.OrderByDescending(p => p.CromwellAttempt).First();
+
+
+                    return JsonConvert.SerializeObject(latestfailedAttemptquery.Select(t =>
+                   new {Task_Id=t.Id,
+                        Logs_FailureReason= t.Logs[t.Logs.Count -1].FailureReason,
+                        Logs_SystemLogs= t.Logs[t.Logs.Count -1].SystemLogs,
+                        Executor_StdErr=t.Executors[0].Stderr, 
+                        Executor_StdOut=t.Executors[0].Stdout,
+                        CromwellResultCode=t.CromwellResultCode}).ToList());                  
                 
                 default:                    
-                    return string.Empty;
+                    return new { };
             }
         }
     }
