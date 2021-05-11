@@ -103,10 +103,21 @@ namespace TriggerService
 
                     await storage.SetStateToInProgressAsync(blobTrigger.Container.Name, blobTrigger.Name, response.Id.ToString());
                 }
-                catch (Exception exc)
+                catch (Exception e)
                 {
-                    logger.LogError(exc, $"Exception in ExecuteNewWorkflowsAsync for {blobTrigger.Uri.AbsoluteUri}");
-                    await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Failed, exc.ToString());
+                    logger.LogError(e, $"Exception in ExecuteNewWorkflowsAsync for {blobTrigger.Uri.AbsoluteUri}");
+                    
+                    await storage.MutateStateAsync(
+                        blobTrigger.Container.Name,
+                        blobTrigger.Name,
+                        AzureStorage.WorkflowState.Failed,
+                        (w) => {
+                            w.WorkflowFailureDetails = new WorkflowFailureInfo
+                            {
+                                WorkflowFailureReason = e.Message,
+                                WorkflowFailureReasonDetail = e.ToString()
+                            };
+                        });
                 }
             }
         }
@@ -161,38 +172,44 @@ namespace TriggerService
                 }
 
                 var id = Guid.Empty;
-                dynamic wfInstance= JsonConvert.DeserializeObject("{}");
                 try
                 {
                     id = ExtractWorkflowId(blobTrigger, AzureStorage.WorkflowState.InProgress);
                     var sampleName = ExtractSampleName(blobTrigger);
-                    var statusResponse = await cromwellApiClient.GetStatusAsync(id);
+                    var statusResponse = await cromwellApiClient.GetStatusAsync(id);                  
                     
-                    wfInstance = JsonConvert.DeserializeObject(await storage.GetSerializedWorkflowTrigger(blobTrigger.Container.Name, blobTrigger.Name));
-                    
-
                     switch (statusResponse.Status)
                     {
                         case WorkflowStatus.Running:
                             {
-                                await UploadTimingAsync(blobTrigger, id, sampleName);
+                                await UploadTimingAsync(id, sampleName);
                                 break;
                             }
                         case WorkflowStatus.Aborted:
                         case WorkflowStatus.Failed:
-                            {
-                                wfInstance.WorkflowFailureDetails = await GetWorkflowFailureReason(id, statusResponse.Status);                                
-                                logger.LogInformation($"Setting to failed Id: {id}");
-                                await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Failed, JsonConvert.SerializeObject(wfInstance));
-                                await UploadOutputsAsync(blobTrigger, id, sampleName);
-                                await UploadTimingAsync(blobTrigger, id, sampleName);
+                            {                                
+                                logger.LogInformation($"Setting to failed Id: {id}");                                
+                                
+                                await UploadOutputsAsync(id, sampleName);
+                                await UploadTimingAsync(id, sampleName);
+                                
+                                await storage.MutateStateAsync(
+                                    blobTrigger.Container.Name, 
+                                    blobTrigger.Name,
+                                    AzureStorage.WorkflowState.Failed,
+                                    async (w) => {
+                                        w.WorkflowFailureDetails = await GetWorkflowFailureReason(id);
+                                    });
                                 break;
                             }
                         case WorkflowStatus.Succeeded:
                             {                                
-                                await UploadOutputsAsync(blobTrigger, id, sampleName);
-                                await UploadTimingAsync(blobTrigger, id, sampleName);
-                                await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Succeeded, JsonConvert.SerializeObject(wfInstance));
+                                await UploadOutputsAsync(id, sampleName);
+                                await UploadTimingAsync(id, sampleName);
+                                await storage.MutateStateAsync(
+                                    blobTrigger.Container.Name, 
+                                    blobTrigger.Name, 
+                                    AzureStorage.WorkflowState.Succeeded);
                                 break;
                             }
                     }
@@ -200,8 +217,16 @@ namespace TriggerService
                 catch (CromwellApiException cromwellException) when (cromwellException?.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
                 {
                     logger.LogError(cromwellException, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.StorageUri.PrimaryUri.AbsoluteUri}.  Id: {id}  Cromwell reported workflow as NotFound (404).  Mutating state to Failed.");
-                    wfInstance.WorkflowFailureDetails = cromwellException.ToString();
-                    await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Failed, JsonConvert.SerializeObject(wfInstance));
+                   
+                    await storage.MutateStateAsync(
+                        blobTrigger.Container.Name, 
+                        blobTrigger.Name, 
+                        AzureStorage.WorkflowState.Failed, 
+                        (w) => {
+                            w.WorkflowFailureDetails = new WorkflowFailureInfo {
+                                WorkflowFailureReason = "Exception in UpdateWorkflowStatusesAsync",
+                                WorkflowFailureReasonDetail = cromwellException.ToString()};
+                        });
                 }
                 catch (Exception exception)
                 {
@@ -217,23 +242,33 @@ namespace TriggerService
             foreach (var blobTrigger in blobTriggers)
             {
                 var id = Guid.Empty;
-                dynamic wfInstance = await storage.GetSerializedWorkflowTrigger(blobTrigger.Container.Name, blobTrigger.Name);
 
                 try
                 {
                     id = ExtractWorkflowId(blobTrigger, AzureStorage.WorkflowState.Abort);
                     logger.LogInformation($"Aborting workflow ID: {id} Url: {blobTrigger.Uri.AbsoluteUri}");
-                    
-                    await cromwellApiClient.PostAbortAsync(id);
-                    
-                    wfInstance.WorkflowFailureDetails = await GetWorkflowFailureReason(id, WorkflowStatus.Aborted);
-                    await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Abort, JsonConvert.SerializeObject(wfInstance));
+                    await cromwellApiClient.PostAbortAsync(id);                                        
+                    await storage.MutateStateAsync(
+                        blobTrigger.Container.Name, 
+                        blobTrigger.Name, 
+                        AzureStorage.WorkflowState.Failed,
+                        (w) => {
+                            w.WorkflowFailureDetails = new WorkflowFailureInfo{
+                                WorkflowFailureReason = "Workflow Aborted"};
+                        });
                 }
-                catch (Exception exc)
+                catch (Exception e)
                 {
-                    logger.LogError(exc, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger}.  Id: {id}");
-                    wfInstance.WorkflowFailureDetails = exc;
-                    await storage.MutateStateAsync(blobTrigger.Container.Name, blobTrigger.Name, AzureStorage.WorkflowState.Abort, JsonConvert.SerializeObject(wfInstance));
+                    logger.LogError(e, $"Exception in AbortWorkflowsAsync for {blobTrigger}.  Id: {id}");
+                    await storage.MutateStateAsync(
+                        blobTrigger.Container.Name, 
+                        blobTrigger.Name, 
+                        AzureStorage.WorkflowState.Failed,
+                        (w) => {
+                            w.WorkflowFailureDetails = new WorkflowFailureInfo{
+                                WorkflowFailureReason = "Exception in AbortWorkflowsAsync",
+                                WorkflowFailureReasonDetail = e.ToString()};
+                        });
                 }
             }
         }
@@ -290,7 +325,7 @@ namespace TriggerService
             return blobNameRegex.Match(url)?.Groups[1].Value.Replace("/", "_");
         }
 
-        private async Task UploadOutputsAsync(Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob blobTrigger, Guid id, string sampleName)
+        private async Task UploadOutputsAsync(Guid id, string sampleName)
         {
             const string outputsContainer = "outputs";
 
@@ -314,7 +349,7 @@ namespace TriggerService
             }
         }
 
-        private async Task UploadTimingAsync(Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob blobTrigger, Guid id, string sampleName)
+        private async Task UploadTimingAsync(Guid id, string sampleName)
         {
             const string outputsContainer = "outputs";
 
@@ -332,57 +367,47 @@ namespace TriggerService
             }
         }
 
-        private async Task<dynamic> GetWorkflowFailureReason(Guid workflowid, WorkflowStatus workFlowStatus)
+        private async Task<WorkflowFailureInfo> GetWorkflowFailureReason(Guid workflowid)
         {
-            switch (workFlowStatus)
-            {
-                case WorkflowStatus.Aborted:
-                    return new { Logs_FailureReason="Workflow Aborted" };
-                    
-                case WorkflowStatus.Failed:
-                    
-                    var tesTasks = await tesTaskRepository.GetItemsAsync(
+            var tesTasks = await tesTaskRepository.GetItemsAsync(
                         predicate: t => t.WorkflowId == workflowid.ToString());
 
-                    //take all failed tasks 
-                    var failedTesTasks = from testask in tesTasks 
-                                         where testask.State == TesState.EXECUTORERROREnum ||
-                                         testask.State == TesState.SYSTEMERROREnum ||
-                                         (testask.State == TesState.COMPLETEEnum && testask.CromwellResultCode != 0)
-                                         select testask;
+            //take all failed tasks 
+            var failedTesTasks = from testask in tesTasks 
+                                    where testask.State == TesState.EXECUTORERROREnum ||
+                                    testask.State == TesState.SYSTEMERROREnum ||
+                                    (testask.State == TesState.COMPLETEEnum && testask.CromwellResultCode != 0)
+                                    select testask;
 
-                    //take all successfully completed tasks
-                    var completedTesTasks = from testask in tesTasks
-                                         where testask.State == TesState.COMPLETEEnum && 
-                                         testask.CromwellResultCode == 0
-                                         select testask;
+            //take all successfully completed tasks
+            var completedTesTasks = from testask in tesTasks
+                                    where testask.State == TesState.COMPLETEEnum && 
+                                    testask.CromwellResultCode == 0
+                                    select testask;
 
-                    //filter out failed tasks that succeeded in later attempts.
-                    var filteredFailedTasks = from failedtask in failedTesTasks
-                                              where !completedTesTasks.Any(t => 
-                                              t.CromwellTaskInstanceName == failedtask.CromwellTaskInstanceName && 
-                                              t.CromwellShard == failedtask.CromwellShard && 
-                                              t.CromwellAttempt > failedtask.CromwellAttempt)
-                                              select failedtask;
+            //filter out failed tasks that succeeded in later attempts.
+            var filteredFailedTasks = from failedtask in failedTesTasks
+                                        where !completedTesTasks.Any(t => 
+                                        t.CromwellTaskInstanceName == failedtask.CromwellTaskInstanceName && 
+                                        t.CromwellShard == failedtask.CromwellShard && 
+                                        t.CromwellAttempt > failedtask.CromwellAttempt)
+                                        select failedtask;
 
-                    //Get final failed attempt of each tesTask that caused the Workflow to fail. 
-                    var latestfailedAttemptquery = from failedtesTask in filteredFailedTasks
-                                                   group failedtesTask by (failedtesTask.CromwellTaskInstanceName, failedtesTask.CromwellShard)
-                                                   into groups
-                                                   select groups.OrderByDescending(p => p.CromwellAttempt).First();
+            //Get final failed attempt of each tesTask that caused the Workflow to fail. 
+            var latestfailedAttemptquery = from failedtesTask in filteredFailedTasks
+                                            group failedtesTask by (failedtesTask.CromwellTaskInstanceName, failedtesTask.CromwellShard)
+                                            into groups
+                                            select groups.OrderByDescending(p => p.CromwellAttempt).First();
 
-
-                    return JsonConvert.SerializeObject(latestfailedAttemptquery.Select(t =>
-                   new {Task_Id=t.Id,
-                        Logs_FailureReason= t.Logs[t.Logs.Count -1].FailureReason,
-                        Logs_SystemLogs= t.Logs[t.Logs.Count -1].SystemLogs,
-                        Executor_StdErr=t.Executors[0].Stderr, 
-                        Executor_StdOut=t.Executors[0].Stdout,
-                        CromwellResultCode=t.CromwellResultCode}).ToList());                  
-                
-                default:                    
-                    return new { };
-            }
+            return new WorkflowFailureInfo {
+                 FailedTaskDetails = latestfailedAttemptquery.Select(t => 
+                 new FailedTaskInfo {
+                     FailureReason = t.Logs?.LastOrDefault()?.FailureReason, 
+                     SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs, 
+                     StdErr = t.Executors?.FirstOrDefault()?.Stderr,
+                     StdOut = t.Executors?.FirstOrDefault()?.Stdout,
+                     TaskId = t.Id,
+                     CromwellResultCode = t.CromwellResultCode.GetValueOrDefault()}).ToList()};
         }
     }
 }

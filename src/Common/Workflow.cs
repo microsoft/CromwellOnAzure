@@ -12,5 +12,6 @@ namespace Common
         public List<string> WorkflowInputsUrls { get; set; }
         public string WorkflowOptionsUrl { get; set; }
         public string WorkflowDependenciesUrl { get; set; }
+        public WorkflowFailureInfo WorkflowFailureDetails { get; set; }
     }
 }

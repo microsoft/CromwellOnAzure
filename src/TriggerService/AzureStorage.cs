@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Common;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
@@ -16,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+using Newtonsoft.Json;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TriggerService
@@ -86,37 +88,29 @@ namespace TriggerService
             }
         }
 
-        public async Task<string> GetSerializedWorkflowTrigger(string container, string blobName)
-        {
-            var workflowtrigger = string.Empty;
-            
-            try
-            {
-                using (var memoryStream = new MemoryStream())
-                {
-                    var containerReference = blobClient.GetContainerReference(container);
-                    var blob = containerReference.GetBlockBlobReference(blobName);
-                    await blob.DownloadToStreamAsync(memoryStream);
-                    workflowtrigger = System.Text.Encoding.UTF8.GetString(memoryStream.ToArray());
-                }
-            }
-            catch (Exception e)
-            {
-                logger.LogError($"Exeption downloading workflow trigger {blobName} to stream: {e}");
-            }
-
-            return workflowtrigger;           
-        }
-
-        public async Task MutateStateAsync(string container, string blobName, WorkflowState newState, string workflowFailureDetails = "")
+        public async Task MutateStateAsync(string container, string blobName, WorkflowState newState, Action<Workflow> action = null)
         {
             var newStateText = $"{newState.ToString().ToLowerInvariant()}";
             var containerReference = blobClient.GetContainerReference(container);
             var blob = containerReference.GetBlockBlobReference(blobName);
             var oldStateText = blobName.Substring(0, blobName.IndexOf('/'));
+            var newBlobName = blobName.Replace(oldStateText, $"{newState.ToString().ToLowerInvariant()}");
+
             logger.LogInformation($"Mutating state from '{oldStateText}' to '{newStateText}' for {blob.Uri.AbsoluteUri}");
-            var newBlobName = blobName.Replace(oldStateText, $"{newState.ToString().ToLowerInvariant()}");            
-            await UploadFileTextAsync($"{workflowFailureDetails}", container, newBlobName);
+            
+            var workflow = JsonConvert.DeserializeObject<Workflow>(await blob.DownloadTextAsync());
+
+            action?.Invoke(workflow);
+            
+            await UploadFileTextAsync(
+                JsonConvert.SerializeObject(
+                    workflow, 
+                    Formatting.Indented, 
+                    new JsonSerializerSettings {
+                        NullValueHandling = NullValueHandling.Ignore}),
+                    container, 
+                    newBlobName);
+            
             await blob.DeleteIfExistsAsync();
         }
 
