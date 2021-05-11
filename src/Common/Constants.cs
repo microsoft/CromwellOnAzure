@@ -2,6 +2,6 @@
 {
     public static class Constants
     {
-        public static string CromwellIsAvailableMessage = "Cromwell is available.";
+        public const string CromwellSystemName = "Cromwell";
     }
 }

@@ -10,11 +10,12 @@ namespace TriggerService
 {
     public class TriggerEngine
     {
-        private static readonly TimeSpan availabilityWaitTime = TimeSpan.FromSeconds(30);
         private readonly ILogger logger;
-        private readonly CromwellOnAzureEnvironment environment;
+        private readonly ICromwellOnAzureEnvironment environment;
+        private AvailabilityTracker cromwellAvailability = new AvailabilityTracker();
+        private AvailabilityTracker azStorageAvailability = new AvailabilityTracker();
 
-        public TriggerEngine(ILoggerFactory loggerFactory, CromwellOnAzureEnvironment environment)
+        public TriggerEngine(ILoggerFactory loggerFactory, ICromwellOnAzureEnvironment environment)
         {
             logger = loggerFactory.CreateLogger<TriggerEngine>();
             this.environment = environment;
@@ -25,96 +26,37 @@ namespace TriggerService
             logger.LogInformation("Trigger Service successfully started.");
 
             await Task.WhenAll(
-                UpdateExistingWorkflowsContinuouslyAsync(),
-                ProcessAndAbortWorkflowsContinuouslyAsync());
+                RunContinuouslyAsync(() => environment.UpdateExistingWorkflowsAsync(), nameof(environment.UpdateExistingWorkflowsAsync)),
+                RunContinuouslyAsync(() => environment.ProcessAndAbortWorkflowsAsync(), nameof(environment.ProcessAndAbortWorkflowsAsync)));
         }
 
-        public async Task UpdateExistingWorkflowsContinuouslyAsync()
+        private async Task RunContinuouslyAsync(Func<Task> task, string description)
         {
             while (true)
             {
                 try
                 {
                     await Task.WhenAll(
-                        WaitForCromwellToBecomeAvailableAsync(),
-                        WaitForAzureStorageToBecomeAvailableAsync());
+                        cromwellAvailability.WaitForAsync(
+                            () => environment.IsCromwellAvailableAsync(),
+                            TimeSpan.FromSeconds(30),
+                            Constants.CromwellSystemName,
+                            msg => logger.LogInformation(msg)),
+                        azStorageAvailability.WaitForAsync(
+                            () => environment.IsAzureStorageAvailableAsync(),
+                            TimeSpan.FromSeconds(30),
+                            "Azure Storage",
+                            msg => logger.LogInformation(msg)));
 
-                    await environment.UpdateExistingWorkflowsAsync();
-
+                    await task.Invoke();
                     await Task.Delay(TimeSpan.FromSeconds(20));
                 }
                 catch (Exception exc)
                 {
-                    logger.LogError(exc, "UpdateExistingWorkflowsContinuouslyAsync exception");
+                    logger.LogError(exc, $"RunContinuously exception for {description}");
                     await Task.Delay(TimeSpan.FromSeconds(1));
                 }
             }
-        }
-
-        public async Task ProcessAndAbortWorkflowsContinuouslyAsync()
-        {
-            while (true)
-            {
-                try
-                {
-                    await Task.WhenAll(
-                        WaitForCromwellToBecomeAvailableAsync(),
-                        WaitForAzureStorageToBecomeAvailableAsync());
-
-                    await environment.ProcessAndAbortWorkflowsAsync();
-
-                    await Task.Delay(TimeSpan.FromSeconds(20));
-                }
-                catch (Exception exc)
-                {
-                    logger.LogError(exc, "ProcessAndAbortWorkflowsContinuouslyAsync exception");
-                    await Task.Delay(TimeSpan.FromSeconds(1));
-                }
-            }
-        }
-
-        private async Task WaitForCromwellToBecomeAvailableAsync()
-        {
-            var haveLoggedOnce = false;
-
-            while (!await environment.IsCromwellAvailableAsync())
-            {
-                if (!haveLoggedOnce)
-                {
-                    logger.LogInformation($"Waiting {availabilityWaitTime.TotalSeconds:n0}s for Cromwell to become available...");
-                    haveLoggedOnce = true;
-                }
-
-                await Task.Delay(availabilityWaitTime);
-            }
-
-            logger.LogInformation(Constants.CromwellIsAvailableMessage);
-        }
-
-        private async Task WaitForAzureStorageToBecomeAvailableAsync()
-        {
-            var isAzureStorageAvailable = await environment.IsAzureStorageAvailableAsync();
-
-            if (isAzureStorageAvailable)
-            {
-                return;
-            }
-
-            var haveLoggedOnce = false;
-
-            while (!isAzureStorageAvailable)
-            {
-                if (!haveLoggedOnce)
-                {
-                    logger.LogInformation($"Waiting {availabilityWaitTime.TotalSeconds:n0}s for Azure Storage to become available...");
-                    haveLoggedOnce = true;
-                }
-
-                await Task.Delay(availabilityWaitTime);
-                isAzureStorageAvailable = await environment.IsAzureStorageAvailableAsync();
-            }
-
-            logger.LogInformation($"Azure Storage is available.");
         }
     }
 }

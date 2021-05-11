@@ -17,7 +17,7 @@ using Newtonsoft.Json;
 [assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace TriggerService
 {
-    public class CromwellOnAzureEnvironment
+    public class CromwellOnAzureEnvironment : ICromwellOnAzureEnvironment
     {
         private static readonly Regex blobNameRegex = new Regex("^(?:https?://|/)?[^/]+/[^/]+/([^?.]+)");  // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs in the trigger file.
         private IAzureStorage storage { get; set; }
@@ -240,7 +240,7 @@ namespace TriggerService
 
             byte[] data;
 
-            if ((Uri.TryCreate(url, UriKind.Absolute, out var uri) 
+            if ((Uri.TryCreate(url, UriKind.Absolute, out var uri)
                 && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase)
                 && uri.ParseQueryString().Get("sig") == null)
                 || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase))
