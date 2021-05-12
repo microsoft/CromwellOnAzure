@@ -389,7 +389,7 @@ namespace TriggerService
             return new WorkflowFailureInfo {
                  FailedTaskDetails = failedTesTasks.Select(t =>  {
                      
-                     if (t.CromwellResultCode != 0)
+                     if (t.CromwellResultCode.HasValue && t.CromwellResultCode != 0)
                      {
                          const string BatchExecutionDirectoryName = "__batch";
                          var executor = t.Executors?.LastOrDefault();
