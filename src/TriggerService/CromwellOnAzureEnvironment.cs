@@ -379,44 +379,61 @@ namespace TriggerService
             var tesTasks = await tesTaskRepository.GetItemsAsync(
                         predicate: t => t.WorkflowId == workflowid.ToString());
 
-            //take all failed tasks 
-            var failedTesTasks = from testask in tesTasks 
-                                    where testask.State == TesState.EXECUTORERROREnum ||
-                                    testask.State == TesState.SYSTEMERROREnum ||
-                                    (testask.State == TesState.COMPLETEEnum && testask.CromwellResultCode != 0)
-                                    select testask;
+            var failedTesTasks = tesTasks
+                .GroupBy(t => new { t.CromwellTaskInstanceName, t.CromwellShard })
+                .Select(grp => grp.OrderBy(t => t.CromwellAttempt).Last())
+                .Where(t => t.FailureReason != null);            
 
-            //take all successfully completed tasks
-            var completedTesTasks = from testask in tesTasks
-                                    where testask.State == TesState.COMPLETEEnum && 
-                                    testask.CromwellResultCode == 0
-                                    select testask;
-
-            //filter out failed tasks that succeeded in later attempts.
-            var filteredFailedTasks = from failedtask in failedTesTasks
-                                        where !completedTesTasks.Any(t => 
-                                        t.CromwellTaskInstanceName == failedtask.CromwellTaskInstanceName && 
-                                        t.CromwellShard == failedtask.CromwellShard && 
-                                        t.CromwellAttempt > failedtask.CromwellAttempt)
-                                        select failedtask;
-
-            //Get final failed attempt of each tesTask that caused the Workflow to fail. 
-            var latestfailedAttemptquery = from failedtesTask in filteredFailedTasks
-                                            group failedtesTask by (failedtesTask.CromwellTaskInstanceName, failedtesTask.CromwellShard)
-                                            into groups
-                                            select groups.OrderByDescending(p => p.CromwellAttempt).First();
-
-            logger.LogInformation($"Surfacing {latestfailedAttemptquery.Count()} failed task details to trigger file");
+            logger.LogInformation($"Surfacing {failedTesTasks.Count()} failed task details to trigger file");
 
             return new WorkflowFailureInfo {
-                 FailedTaskDetails = latestfailedAttemptquery.Select(t => 
-                 new FailedTaskInfo {
-                     FailureReason = t.Logs?.LastOrDefault()?.FailureReason, 
-                     SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs, 
-                     StdErr = t.Executors?.FirstOrDefault()?.Stderr,
-                     StdOut = t.Executors?.FirstOrDefault()?.Stdout,
-                     TaskId = t.Id,
-                     CromwellResultCode = t.CromwellResultCode.GetValueOrDefault()}).ToList()};
+                 FailedTaskDetails = failedTesTasks.Select(t =>  {
+                     
+                     if (t.CromwellResultCode != 0)
+                     {
+                         const string BatchExecutionDirectoryName = "__batch";
+                         var executor = t.Executors?.LastOrDefault();
+                         var executionDirectoryPath = GetParentPath(executor?.Stdout);                         
+                         var batchExecutionDirectoryPath = executionDirectoryPath != null ? $"{executionDirectoryPath}/{BatchExecutionDirectoryName}" : null;
+                         
+                         return new FailedTaskInfo
+                         {
+                             FailureReason = t.Logs?.LastOrDefault()?.FailureReason,
+                             SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs,
+                             StdErr = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stderr.txt" : null,
+                             StdOut = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stdout.txt" : null,
+                             TaskId = t.Id,
+                             CromwellResultCode = t.CromwellResultCode.GetValueOrDefault()
+                         }; 
+                     }
+
+                     return new FailedTaskInfo
+                     {
+                         FailureReason = t.Logs?.LastOrDefault()?.FailureReason,
+                         SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs,
+                         StdErr = t.Executors?.FirstOrDefault()?.Stderr,
+                         StdOut = t.Executors?.FirstOrDefault()?.Stdout,
+                         TaskId = t.Id,
+                         CromwellResultCode = t.CromwellResultCode.GetValueOrDefault()
+                     };
+                 }).ToList<FailedTaskInfo>()};
+        }
+
+        /// <summary>
+        /// Get the parent path of the given path
+        /// </summary>
+        /// <param name="path">The path</param>
+        /// <returns>The parent path</returns>
+        private static string GetParentPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return null;
+            }
+
+            var pathComponents = path.TrimEnd('/').Split('/');
+
+            return string.Join('/', pathComponents.Take(pathComponents.Length - 1));
         }
     }
 }
