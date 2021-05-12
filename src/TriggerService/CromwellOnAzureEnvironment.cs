@@ -398,7 +398,7 @@ namespace TriggerService
                          
                          return new FailedTaskInfo
                          {
-                             FailureReason = t.Logs?.LastOrDefault()?.FailureReason,
+                             FailureReason = t.FailureReason,
                              SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs,
                              StdErr = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stderr.txt" : null,
                              StdOut = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stdout.txt" : null,
@@ -409,7 +409,7 @@ namespace TriggerService
 
                      return new FailedTaskInfo
                      {
-                         FailureReason = t.Logs?.LastOrDefault()?.FailureReason,
+                         FailureReason = t.FailureReason,
                          SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs,
                          StdErr = t.Executors?.FirstOrDefault()?.Stderr,
                          StdOut = t.Executors?.FirstOrDefault()?.Stdout,
