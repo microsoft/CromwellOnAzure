@@ -197,8 +197,15 @@ namespace TriggerService
                                     blobTrigger.Container.Name, 
                                     blobTrigger.Name,
                                     AzureStorage.WorkflowState.Failed,
-                                    async (w) => {
-                                        w.WorkflowFailureDetails = await GetWorkflowFailureReason(id);
+                                    (w) => {
+                                        try
+                                        {
+                                            w.WorkflowFailureDetails = GetWorkflowFailureReason(id).Result;
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            logger.LogError($"Exception in Getting Workflow Failure Reason: {e}");
+                                        }
                                     });
                                 break;
                             }
@@ -398,6 +405,8 @@ namespace TriggerService
                                             group failedtesTask by (failedtesTask.CromwellTaskInstanceName, failedtesTask.CromwellShard)
                                             into groups
                                             select groups.OrderByDescending(p => p.CromwellAttempt).First();
+
+            logger.LogInformation($"Surfacing {latestfailedAttemptquery.Count()} failed task details to trigger file");
 
             return new WorkflowFailureInfo {
                  FailedTaskDetails = latestfailedAttemptquery.Select(t => 
