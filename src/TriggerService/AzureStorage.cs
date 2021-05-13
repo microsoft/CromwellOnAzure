@@ -107,7 +107,7 @@ namespace TriggerService
                     workflow, 
                     Formatting.Indented, 
                     new JsonSerializerSettings {
-                        NullValueHandling = NullValueHandling.Ignore}),
+                         ContractResolver = new NullSerializationContractResolver()}),
                     container, 
                     newBlobName);
             
