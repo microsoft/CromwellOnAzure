@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -186,6 +185,20 @@ namespace TriggerService
                                 break;
                             }
                         case WorkflowStatus.Aborted:
+                            {
+                                logger.LogInformation($"Setting to failed Id: {id}");
+
+                                await UploadOutputsAsync(id, sampleName);
+                                await UploadTimingAsync(id, sampleName);
+
+                                await storage.MutateStateAsync(
+                                    blobTrigger.Container.Name,
+                                    blobTrigger.Name,
+                                    AzureStorage.WorkflowState.Failed,
+                                    wf => wf.WorkflowFailureDetails = new WorkflowFailureInfo {
+                                        WorkflowFailureReason = "Workflow Aborted"});
+                                break;
+                            }
                         case WorkflowStatus.Failed:
                             {                                
                                 logger.LogInformation($"Setting to failed Id: {id}");                                
@@ -193,20 +206,12 @@ namespace TriggerService
                                 await UploadOutputsAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
                                 
+                                var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id);
                                 await storage.MutateStateAsync(
                                     blobTrigger.Container.Name, 
                                     blobTrigger.Name,
                                     AzureStorage.WorkflowState.Failed,
-                                    (w) => {
-                                        try
-                                        {
-                                            w.WorkflowFailureDetails = GetWorkflowFailureReason(id).Result;
-                                        }
-                                        catch (Exception e)
-                                        {
-                                            logger.LogError($"Exception in Getting Workflow Failure Reason: {e}");
-                                        }
-                                    });
+                                    wf => wf.WorkflowFailureDetails = workflowFailureInfo);
                                 break;
                             }
                         case WorkflowStatus.Succeeded:
@@ -332,6 +337,18 @@ namespace TriggerService
             return blobNameRegex.Match(url)?.Groups[1].Value.Replace("/", "_");
         }
 
+        private static string GetParentPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return null;
+            }
+
+            var pathComponents = path.TrimEnd('/').Split('/');
+
+            return string.Join('/', pathComponents.Take(pathComponents.Length - 1));
+        }
+
         private async Task UploadOutputsAsync(Guid id, string sampleName)
         {
             const string outputsContainer = "outputs";
@@ -374,7 +391,7 @@ namespace TriggerService
             }
         }
 
-        private async Task<WorkflowFailureInfo> GetWorkflowFailureReason(Guid workflowid)
+        private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowid)
         {
             var tesTasks = await tesTaskRepository.GetItemsAsync(
                         predicate: t => t.WorkflowId == workflowid.ToString());
@@ -387,53 +404,32 @@ namespace TriggerService
             logger.LogInformation($"Surfacing {failedTesTasks.Count()} failed task details to trigger file");
 
             return new WorkflowFailureInfo {
-                 FailedTaskDetails = failedTesTasks.Select(t =>  {
-                     
-                     if (t.CromwellResultCode.HasValue && t.CromwellResultCode != 0)
-                     {
-                         const string BatchExecutionDirectoryName = "__batch";
-                         var executor = t.Executors?.LastOrDefault();
-                         var executionDirectoryPath = GetParentPath(executor?.Stdout);                         
-                         var batchExecutionDirectoryPath = executionDirectoryPath != null ? $"{executionDirectoryPath}/{BatchExecutionDirectoryName}" : null;
-                         
-                         return new FailedTaskInfo
-                         {
-                             FailureReason = t.FailureReason,
-                             SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs,
-                             StdErr = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stderr.txt" : null,
-                             StdOut = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stdout.txt" : null,
-                             TaskId = t.Id,
-                             CromwellResultCode = t.CromwellResultCode.GetValueOrDefault()
-                         }; 
-                     }
+                FailedTaskDetails = failedTesTasks.Select(t => {
 
-                     return new FailedTaskInfo
-                     {
-                         FailureReason = t.FailureReason,
-                         SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs,
-                         StdErr = t.Executors?.FirstOrDefault()?.Stderr,
-                         StdOut = t.Executors?.FirstOrDefault()?.Stdout,
-                         TaskId = t.Id,
-                         CromwellResultCode = t.CromwellResultCode.GetValueOrDefault()
-                     };
-                 }).ToList<FailedTaskInfo>()};
-        }
+                    const string BatchExecutionDirectoryName = "__batch";
+                    var batchFailed = (t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode).GetValueOrDefault() != 0;
 
-        /// <summary>
-        /// Get the parent path of the given path
-        /// </summary>
-        /// <param name="path">The path</param>
-        /// <returns>The parent path</returns>
-        private static string GetParentPath(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return null;
-            }
+                    var executor = batchFailed ? t.Executors?.LastOrDefault() : t.Executors?.FirstOrDefault();
+                    var executionDirectoryPath = batchFailed ? GetParentPath(executor?.Stdout) : null;
+                    var batchExecutionDirectoryPath = batchFailed ? $"{executionDirectoryPath}/{BatchExecutionDirectoryName}" : null;
 
-            var pathComponents = path.TrimEnd('/').Split('/');
+                    var stdErr = batchFailed ? $"{batchExecutionDirectoryPath}/stderr.txt" : executor?.Stderr;
+                    var stdOut = batchFailed ? $"{batchExecutionDirectoryPath}/stdout.txt" : executor?.Stdout;
+                    
+                    return new FailedTaskInfo {
+                        CromwellResultCode = t.CromwellResultCode,
+                        FailureReason = t.FailureReason,
+                        TaskId = t.Id,
+                        StdErr = stdErr,
+                        StdOut = stdOut,
+                        SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs?
+                        .Where(log => !log.Equals(t.FailureReason)).ToList() };}).ToList<FailedTaskInfo>(),
+                
+                WorkflowFailureReason = failedTesTasks.Any(t =>
+                    t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode.GetValueOrDefault() != 0)?
+                    "BatchFailed": "OneOrMoreTaskFailed"
+                };
 
-            return string.Join('/', pathComponents.Take(pathComponents.Length - 1));
         }
     }
 }

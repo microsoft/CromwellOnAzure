@@ -13,6 +13,6 @@ namespace Common
         public List<string> SystemLogs { get; set; } 
         public string StdOut { get; set; }
         public string StdErr { get; set; }
-        public int CromwellResultCode { get; set; }
+        public int? CromwellResultCode { get; set; }
     }
 }
