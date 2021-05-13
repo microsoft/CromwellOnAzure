@@ -15,12 +15,15 @@ namespace Common
             //if the property is decorated then it has a value other than null.
             var properties = base.CreateProperties(type, memberSerialization);
             var fieldsInfo = type.GetFields();
-            var  typeproperties = fieldsInfo.Where(f =>
-            f.CustomAttributes.Count() == 0 ||
+            var  filteredproperties = fieldsInfo.Where(f =>
+            f.CustomAttributes.Count() == 0 
+            ||
             (f.CustomAttributes.Any(y =>
-            y.AttributeType == typeof(DoNotSerializeIfNull)) && f.GetValue(null) != null)).ToList();
-            return properties.Where(p => 
-            fieldsInfo.Any(f => f.Name.ToLower().Equals(p.PropertyName.ToLower()))).ToList();
+            y.AttributeType == typeof(DoNotSerializeIfNull)) 
+            && 
+            f.GetValue(null) != null)).ToList();
+            return properties.Where(p =>
+            filteredproperties.Any(f => f.Name.ToLower().Equals(p.PropertyName.ToLower()) == true)).ToList();
         }
     }
 }
