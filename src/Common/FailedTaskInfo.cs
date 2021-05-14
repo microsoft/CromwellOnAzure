@@ -13,24 +13,24 @@ namespace Common
     {
         [JsonProperty]
         public string TaskId { get; set; }
-        public bool ShouldSerializeTaskId() { return this.TaskId != null; }
+        public bool ShouldSerializeTaskId() { return !(this.TaskId is null); }
 
         [JsonProperty]
         public string FailureReason { get; set; }
 
-        public bool ShouldSerializeFailureReason() { return this.FailureReason != null; }
+        public bool ShouldSerializeFailureReason() { return !(this.FailureReason is null); }
 
         [JsonProperty]
         public List<string> SystemLogs { get; set; }
-        public bool ShouldSerializeSystemLogs() { return this.SystemLogs != null; }
+        public bool ShouldSerializeSystemLogs() { return !(this.SystemLogs is null); }
 
         [JsonProperty]
         public string StdOut { get; set; }
-        public bool ShouldSerializeStdOut() { return this.StdOut != null; }
+        public bool ShouldSerializeStdOut() { return !(this.StdOut is null); }
 
         [JsonProperty]
         public string StdErr { get; set; }
-        public bool ShouldSerializeStdErr() { return this.StdErr != null; }
+        public bool ShouldSerializeStdErr() { return !(this.StdErr is null); }
 
         [JsonProperty]
         public int? CromwellResultCode { get; set; }

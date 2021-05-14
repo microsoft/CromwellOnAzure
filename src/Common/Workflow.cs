@@ -33,6 +33,6 @@ namespace Common
 
         [JsonProperty]
         public WorkflowFailureInfo WorkflowFailureDetails { get; set; }
-        public bool ShouldSerializeWorkflowFailureDetails() { return this.WorkflowFailureDetails == null ? true : false; }
+        public bool ShouldSerializeWorkflowFailureDetails() { return !(this.WorkflowFailureDetails is null); }
     }
 }
