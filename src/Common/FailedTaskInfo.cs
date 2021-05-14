@@ -1,8 +1,8 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 namespace Common
@@ -17,7 +17,6 @@ namespace Common
 
         [JsonProperty]
         public string FailureReason { get; set; }
-
         public bool ShouldSerializeFailureReason() { return !(this.FailureReason is null); }
 
         [JsonProperty]
@@ -34,7 +33,6 @@ namespace Common
 
         [JsonProperty]
         public int? CromwellResultCode { get; set; }
-
         public bool ShouldSerializeCromwellResultCode() { return this.CromwellResultCode.HasValue; }
     }
 }

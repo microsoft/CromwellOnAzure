@@ -113,8 +113,8 @@ namespace TriggerService
                         (w) => {
                             w.WorkflowFailureDetails = new WorkflowFailureInfo
                             {
-                                WorkflowFailureReason = e.Message,
-                                WorkflowFailureReasonDetail = e.ToString()
+                                WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell",
+                                WorkflowFailureReasonDetail = e.Message
                             };
                         });
                 }
@@ -196,7 +196,7 @@ namespace TriggerService
                                     blobTrigger.Name,
                                     AzureStorage.WorkflowState.Failed,
                                     wf => wf.WorkflowFailureDetails = new WorkflowFailureInfo {
-                                        WorkflowFailureReason = "Workflow Aborted"});
+                                        WorkflowFailureReason = "Aborted"});
                                 break;
                             }
                         case WorkflowStatus.Failed:
@@ -236,8 +236,8 @@ namespace TriggerService
                         AzureStorage.WorkflowState.Failed, 
                         (w) => {
                             w.WorkflowFailureDetails = new WorkflowFailureInfo {
-                                WorkflowFailureReason = "Exception in UpdateWorkflowStatusesAsync",
-                                WorkflowFailureReasonDetail = cromwellException.ToString()};
+                                WorkflowFailureReason = "MutatedToFailedDueToCromwellApiException",
+                                WorkflowFailureReasonDetail = cromwellException.Message};
                         });
                 }
                 catch (Exception exception)
@@ -266,7 +266,7 @@ namespace TriggerService
                         AzureStorage.WorkflowState.Failed,
                         (w) => {
                             w.WorkflowFailureDetails = new WorkflowFailureInfo{
-                                WorkflowFailureReason = "Workflow Aborted"};
+                                WorkflowFailureReason = "Aborted"};
                         });
                 }
                 catch (Exception e)
@@ -278,8 +278,8 @@ namespace TriggerService
                         AzureStorage.WorkflowState.Failed,
                         (w) => {
                             w.WorkflowFailureDetails = new WorkflowFailureInfo{
-                                WorkflowFailureReason = "Exception in AbortWorkflowsAsync",
-                                WorkflowFailureReasonDetail = e.ToString()};
+                                WorkflowFailureReason = "ErrorOccuredWhileAbortingWorkflow",
+                                WorkflowFailureReasonDetail = e.Message};
                         });
                 }
             }
@@ -407,14 +407,15 @@ namespace TriggerService
                 FailedTaskDetails = failedTesTasks.Select(t => {
 
                     const string BatchExecutionDirectoryName = "__batch";
-                    var batchFailed = (t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode).GetValueOrDefault() != 0;
+
+                    var batchFailed = t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode.GetValueOrDefault() != 0;
 
                     var executor = batchFailed ? t.Executors?.LastOrDefault() : t.Executors?.FirstOrDefault();
                     var executionDirectoryPath = batchFailed ? GetParentPath(executor?.Stdout) : null;
                     var batchExecutionDirectoryPath = batchFailed ? $"{executionDirectoryPath}/{BatchExecutionDirectoryName}" : null;
 
-                    var stdErr = batchFailed ? $"{batchExecutionDirectoryPath}/stderr.txt" : executor?.Stderr;
-                    var stdOut = batchFailed ? $"{batchExecutionDirectoryPath}/stdout.txt" : executor?.Stdout;
+                    var stdErr = batchFailed ? $"{batchExecutionDirectoryPath}/stderr.txt" : null;
+                    var stdOut = batchFailed ? $"{batchExecutionDirectoryPath}/stdout.txt" : null;
                     
                     return new FailedTaskInfo {
                         CromwellResultCode = t.CromwellResultCode,
@@ -427,9 +428,7 @@ namespace TriggerService
                 
                 WorkflowFailureReason = failedTesTasks.Any(t =>
                     t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode.GetValueOrDefault() != 0)?
-                    "BatchFailed": "OneOrMoreTaskFailed"
-                };
-
+                    "BatchFailed": "OneOrMoreTasksFailed"};
         }
     }
 }
