@@ -103,13 +103,9 @@ namespace TriggerService
             action?.Invoke(workflow);
             
             await UploadFileTextAsync(
-                JsonConvert.SerializeObject(
-                    workflow, 
-                    Formatting.Indented, 
-                    new JsonSerializerSettings {
-                         ContractResolver = new NullSerializationContractResolver()}),
-                    container, 
-                    newBlobName);
+                JsonConvert.SerializeObject(workflow, Formatting.Indented), 
+                container, 
+                newBlobName);
             
             await blob.DeleteIfExistsAsync();
         }
