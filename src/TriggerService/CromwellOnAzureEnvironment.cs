@@ -158,18 +158,13 @@ namespace TriggerService
 
         }
 
-        public async Task UpdateWorkflowStatusesAsync()
+        public async Task<List<Workflow>> UpdateWorkflowStatusesAsync()
         {
-            var blobTriggers = await storage.GetWorkflowsByStateAsync(AzureStorage.WorkflowState.InProgress);
-
+            var wfWithUpdatedStatuses = new List<Workflow>();
+            var blobTriggers = await storage.GetWorkflowsReadyForStateUpdateAsync(AzureStorage.WorkflowState.InProgress);
+            
             foreach (var blobTrigger in blobTriggers)
             {
-                if ((DateTime.UtcNow - blobTrigger.Properties.LastModified.Value).TotalMinutes < 1)
-                {
-                    // Cromwell REST API is not transactional.  PostWorkflow then GetStatus immediately results in 404.
-                    continue;
-                }
-
                 var id = Guid.Empty;
                 try
                 {
@@ -191,12 +186,13 @@ namespace TriggerService
                                 await UploadOutputsAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
-                                await storage.MutateStateAsync(
+                                wfWithUpdatedStatuses.Add(
+                                    await storage.MutateStateAsync(
                                     blobTrigger.Container.Name,
                                     blobTrigger.Name,
                                     AzureStorage.WorkflowState.Failed,
                                     wf => wf.WorkflowFailureDetails = new WorkflowFailureInfo {
-                                        WorkflowFailureReason = "Aborted"});
+                                        WorkflowFailureReason = "Aborted"}));
 
                                 break;
                             }
@@ -208,12 +204,13 @@ namespace TriggerService
                                 await UploadTimingAsync(id, sampleName);
                                 
                                 var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id);
-                                
-                                await storage.MutateStateAsync(
+
+                                wfWithUpdatedStatuses.Add(
+                                    await storage.MutateStateAsync(
                                     blobTrigger.Container.Name, 
                                     blobTrigger.Name,
                                     AzureStorage.WorkflowState.Failed,
-                                    wf => wf.WorkflowFailureDetails = workflowFailureInfo);
+                                    wf => wf.WorkflowFailureDetails = workflowFailureInfo));
 
                                 break;
                             }
@@ -222,10 +219,11 @@ namespace TriggerService
                                 await UploadOutputsAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
-                                await storage.MutateStateAsync(
+                                wfWithUpdatedStatuses.Add(
+                                    await storage.MutateStateAsync(
                                     blobTrigger.Container.Name, 
                                     blobTrigger.Name, 
-                                    AzureStorage.WorkflowState.Succeeded);
+                                    AzureStorage.WorkflowState.Succeeded));
                                 
                                 break;
                             }
@@ -234,22 +232,24 @@ namespace TriggerService
                 catch (CromwellApiException cromwellException) when (cromwellException?.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
                 {
                     logger.LogError(cromwellException, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.StorageUri.PrimaryUri.AbsoluteUri}.  Id: {id}  Cromwell reported workflow as NotFound (404).  Mutating state to Failed.");
-                   
-                    await storage.MutateStateAsync(
+
+                    wfWithUpdatedStatuses.Add(await storage.MutateStateAsync(
                         blobTrigger.Container.Name, 
                         blobTrigger.Name, 
                         AzureStorage.WorkflowState.Failed, 
                         (w) => {
                             w.WorkflowFailureDetails = new WorkflowFailureInfo {
                                 WorkflowFailureReason = "CromwellApiException",
-                                WorkflowFailureReasonDetail = "Cromwell reported workflow as NotFound (404)"};});
+                                WorkflowFailureReasonDetail = "Cromwell reported workflow as NotFound (404)"};}));
 
                 }
                 catch (Exception exception)
                 {
                     logger.LogError(exception, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.StorageUri.PrimaryUri.AbsoluteUri}.  Id: {id}");
                 }
+                
             }
+            return wfWithUpdatedStatuses;
         }
 
         public async Task AbortWorkflowsAsync()
