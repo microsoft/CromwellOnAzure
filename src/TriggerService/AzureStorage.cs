@@ -109,7 +109,7 @@ namespace TriggerService
             var blob = containerReference.GetBlockBlobReference(blobName);
             await blob.DeleteIfExistsAsync();   
         }
-        public async Task<Workflow> MutateStateAsync(string container, string blobName, WorkflowState newState, Action<Workflow> action = null)
+        public async Task<string> MutateStateAsync(string container, string blobName, WorkflowState newState, Action<Workflow> action = null)
         {
             var newStateText = $"{newState.ToString().ToLowerInvariant()}";          
             var oldStateText = blobName.Substring(0, blobName.IndexOf('/'));
@@ -128,7 +128,7 @@ namespace TriggerService
             
             await DeleteBlobIfExistsAsync(container, blobName);
 
-            return workflow;
+            return newBlobName;
         }
 
         public async Task SetStateToInProgressAsync(string container, string blobName, string id)

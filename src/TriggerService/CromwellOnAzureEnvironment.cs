@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -158,9 +159,9 @@ namespace TriggerService
 
         }
 
-        public async Task<List<Workflow>> UpdateWorkflowStatusesAsync()
+        public async Task<ConcurrentBag<Workflow>> UpdateWorkflowStatusesAsync()
         {
-            var wfWithUpdatedStatuses = new List<Workflow>();
+            var wfWithUpdatedStatuses = new ConcurrentBag<Workflow>();
             var blobTriggers = await storage.GetWorkflowsReadyForStateUpdateAsync(AzureStorage.WorkflowState.InProgress);
             
             foreach (var blobTrigger in blobTriggers)
@@ -186,13 +187,17 @@ namespace TriggerService
                                 await UploadOutputsAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
-                                wfWithUpdatedStatuses.Add(
-                                    await storage.MutateStateAsync(
+                                var mutatedBlobName = await storage.MutateStateAsync(
                                     blobTrigger.Container.Name,
                                     blobTrigger.Name,
                                     AzureStorage.WorkflowState.Failed,
                                     wf => wf.WorkflowFailureDetails = new WorkflowFailureInfo {
-                                        WorkflowFailureReason = "Aborted"}));
+                                        WorkflowFailureReason = "Aborted"});
+
+                                var mutatedworkflow = JsonConvert.DeserializeObject<Workflow>(
+                                    await storage.DownloadBlobTextAsync(blobTrigger.Container.Name, mutatedBlobName));
+
+                                wfWithUpdatedStatuses.Add(mutatedworkflow);
 
                                 break;
                             }
@@ -205,12 +210,18 @@ namespace TriggerService
                                 
                                 var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id);
 
-                                wfWithUpdatedStatuses.Add(
-                                    await storage.MutateStateAsync(
-                                    blobTrigger.Container.Name, 
-                                    blobTrigger.Name,
-                                    AzureStorage.WorkflowState.Failed,
-                                    wf => wf.WorkflowFailureDetails = workflowFailureInfo));
+                                var mutatedBlobName = await storage.MutateStateAsync(
+                                blobTrigger.Container.Name, 
+                                blobTrigger.Name,
+                                AzureStorage.WorkflowState.Failed,
+                                wf => wf.WorkflowFailureDetails = workflowFailureInfo);
+
+                                logger.LogInformation($"Mutated Workflow to : {mutatedBlobName}");
+
+                                var mutatedworkflow = JsonConvert.DeserializeObject<Workflow>(
+                                    await storage.DownloadBlobTextAsync(blobTrigger.Container.Name, mutatedBlobName));
+
+                                wfWithUpdatedStatuses.Add(mutatedworkflow);
 
                                 break;
                             }
@@ -218,12 +229,11 @@ namespace TriggerService
                             {                                
                                 await UploadOutputsAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
-
-                                wfWithUpdatedStatuses.Add(
-                                    await storage.MutateStateAsync(
-                                    blobTrigger.Container.Name, 
-                                    blobTrigger.Name, 
-                                    AzureStorage.WorkflowState.Succeeded));
+                                
+                                await storage.MutateStateAsync(
+                                blobTrigger.Container.Name, 
+                                blobTrigger.Name, 
+                                AzureStorage.WorkflowState.Succeeded);
                                 
                                 break;
                             }
@@ -233,21 +243,25 @@ namespace TriggerService
                 {
                     logger.LogError(cromwellException, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.StorageUri.PrimaryUri.AbsoluteUri}.  Id: {id}  Cromwell reported workflow as NotFound (404).  Mutating state to Failed.");
 
-                    wfWithUpdatedStatuses.Add(await storage.MutateStateAsync(
+                    var mutatedBlobName = await storage.MutateStateAsync(
                         blobTrigger.Container.Name, 
                         blobTrigger.Name, 
                         AzureStorage.WorkflowState.Failed, 
                         (w) => {
                             w.WorkflowFailureDetails = new WorkflowFailureInfo {
                                 WorkflowFailureReason = "CromwellApiException",
-                                WorkflowFailureReasonDetail = "Cromwell reported workflow as NotFound (404)"};}));
+                                WorkflowFailureReasonDetail = "Cromwell reported workflow as NotFound (404)"};});
 
+                    var mutatedworkflow = JsonConvert.DeserializeObject<Workflow>(
+                                    await storage.DownloadBlobTextAsync(blobTrigger.Container.Name, mutatedBlobName));
+
+                    wfWithUpdatedStatuses.Add(mutatedworkflow);
                 }
                 catch (Exception exception)
                 {
                     logger.LogError(exception, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.StorageUri.PrimaryUri.AbsoluteUri}.  Id: {id}");
                 }
-                
+
             }
             return wfWithUpdatedStatuses;
         }

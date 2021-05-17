@@ -16,7 +16,6 @@ using Moq;
 using Tes.Repository;
 using Tes.Models;
 
-
 namespace TriggerService.Tests
 {
     [TestClass]
@@ -43,14 +42,19 @@ namespace TriggerService.Tests
                     .AsEnumerable()));
 
             azStorageMock.Setup(az => az
+            .DownloadBlobTextAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.FromResult(@"{'WorkflowUrl': 'https://bam-to-unmapped-bams.wdl','WorkflowInputsUrl': 'https://bam-to-unmapped-bams.inputs.json','WorkflowFailureDetails': {'WorkflowFailureReason': 'OneOrMoreTasksFailed'}}"));
+
+            azStorageMock.Setup(az => az
+            .DeleteBlobIfExistsAsync(It.IsAny<string>(), It.IsAny<string>()));
+
+            azStorageMock.Setup(az => az
                .MutateStateAsync(It.IsAny<string>(),
                It.IsAny<string>(),
                AzureStorage.WorkflowState.Failed,
                It.IsAny<Action<Workflow>>()))
-               .Returns(Task.FromResult(new Workflow {  
-                   WorkflowFailureDetails = new WorkflowFailureInfo { 
-                    WorkflowFailureReason="OneOrMoreTasksFailed"}}));
-
+                .Returns(Task.FromResult(AzureStorage.WorkflowState.Failed.ToString()));
+            
             var cromwellApiClient = new Mock<ICromwellApiClient>();
             cromwellApiClient.Setup(ac => ac
                 .GetStatusAsync(It.IsAny<Guid>()))
