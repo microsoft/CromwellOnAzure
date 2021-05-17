@@ -28,7 +28,6 @@ namespace TriggerService
         Task<bool> IsSingleBlobExistsFromPrefixAsync(string container, string blobPrefix);
         Task<bool> IsAvailableAsync();
         Task<byte[]> DownloadFileUsingHttpClientAsync(string url);
-        Task<MemoryStream> DownloadBlobTextInMemoryAsync(string container, string blobName);
         Task<string> DownloadBlobTextAsync(string container, string blobName);
         Task DeleteBlobIfExistsAsync(string container, string blobName);
     }

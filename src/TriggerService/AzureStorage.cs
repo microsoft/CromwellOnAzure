@@ -88,19 +88,11 @@ namespace TriggerService
             }
         }
 
-        public async Task<MemoryStream> DownloadBlobTextInMemoryAsync(string container, string blobName)
+        public async Task<string> DownloadBlobTextAsync(string container, string blobName)
         {
             var containerReference = blobClient.GetContainerReference(container);
             var blob = containerReference.GetBlockBlobReference(blobName);
-            var mem = new MemoryStream();
-            await blob.DownloadToStreamAsync(mem);
-            return mem;
-        }
-
-        public async Task<string> DownloadBlobTextAsync(string container, string blobName)
-        {
-            var reader = new StreamReader(await DownloadBlobTextInMemoryAsync(container, blobName));
-            return reader.ReadToEnd();
+            return await blob.DownloadTextAsync();
         }
 
         public async Task DeleteBlobIfExistsAsync(string container, string blobName)
