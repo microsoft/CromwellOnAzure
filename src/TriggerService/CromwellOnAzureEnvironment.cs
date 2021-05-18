@@ -91,7 +91,7 @@ namespace TriggerService
                 try
                 {
                     logger.LogInformation($"Processing new workflow trigger: {blobTrigger.Uri.AbsoluteUri}");
-                    var blobTriggerJson = await blobTrigger.DownloadTextAsync();
+                    var blobTriggerJson = await storage.DownloadBlobTextAsync(blobTrigger.Container.Name, blobTrigger.Name);
                     var processedTriggerInfo = await ProcessBlobTrigger(blobTriggerJson);
 
                     var response = await cromwellApiClient.PostWorkflowAsync(
@@ -169,8 +169,8 @@ namespace TriggerService
                 var id = Guid.Empty;
                 try
                 {
-                    id = ExtractWorkflowId(blobTrigger, AzureStorage.WorkflowState.InProgress);
-                    var sampleName = ExtractSampleName(blobTrigger);
+                    id = ExtractWorkflowId(blobTrigger.Name, AzureStorage.WorkflowState.InProgress);
+                    var sampleName = ExtractSampleName(blobTrigger.Name, AzureStorage.WorkflowState.InProgress);
                     var statusResponse = await cromwellApiClient.GetStatusAsync(id);                  
                     
                     switch (statusResponse.Status)
@@ -276,7 +276,7 @@ namespace TriggerService
 
                 try
                 {
-                    id = ExtractWorkflowId(blobTrigger, AzureStorage.WorkflowState.Abort);
+                    id = ExtractWorkflowId(blobTrigger.Name, AzureStorage.WorkflowState.Abort);
                     logger.LogInformation($"Aborting workflow ID: {id} Url: {blobTrigger.Uri.AbsoluteUri}");
                     await cromwellApiClient.PostAbortAsync(id);                                        
                     
@@ -349,7 +349,7 @@ namespace TriggerService
             return string.Join('/', blobNameDetailsArray);
         }
 
-        private static string DeriveWorkflowBlobNameFromAbsolutePath(string blobNameOrAbsolutePath)
+        private static string DeriveWorkflowBlobName(string blobNameOrAbsolutePath)
         {
             var blobNameDetailsArray = blobNameOrAbsolutePath.Split('/');
             var detailsArrayLength = blobNameDetailsArray.Length;
@@ -358,7 +358,7 @@ namespace TriggerService
 
         public async Task<string> MutateStateAsync(string container, string blobAbsolutePath, AzureStorage.WorkflowState newState, Action<Workflow> action = null)
         {
-            var blobName = DeriveWorkflowBlobNameFromAbsolutePath(blobAbsolutePath);
+            var blobName = DeriveWorkflowBlobName(blobAbsolutePath);
             var newStateText = $"{newState.ToString().ToLowerInvariant()}";
             var oldStateText = GetWorkflowOldStateText(blobAbsolutePath);            
             var newBlobName = DeriveWorkflowBlobNameAfterMutation(blobAbsolutePath, newState);
@@ -379,9 +379,10 @@ namespace TriggerService
             return newBlobName;
         }
 
-        public async Task SetStateToInProgressAsync(string container, string blobAbsolutePath, string id)
+        public async Task SetStateToInProgressAsync(string container, string blobNameOrAbsolutePath, string id)
         {
-            var blobName = DeriveWorkflowBlobNameFromAbsolutePath(blobAbsolutePath);
+            //Test cases pass AbsolutePath where as the application passes blobName
+            var blobName = DeriveWorkflowBlobName(blobNameOrAbsolutePath);
             var data = await storage.DownloadBlobTextAsync(container, blobName);
             var newBlobName = blobName.Replace("new/", $"{AzureStorage.WorkflowState.InProgress.ToString().ToLowerInvariant()}/");
             newBlobName = newBlobName.Replace(".json", $".{id}.json");
@@ -389,17 +390,17 @@ namespace TriggerService
             await storage.DeleteBlobIfExistsAsync(container, blobName);
         }
 
-        private static Guid ExtractWorkflowId(Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob blobTrigger, AzureStorage.WorkflowState currentState)
+        private static Guid ExtractWorkflowId(string blobTriggerName, AzureStorage.WorkflowState currentState)
         {
-            var blobName = blobTrigger.Name.Substring(currentState.ToString().Length + 1);
+            var blobName = blobTriggerName.Substring(currentState.ToString().Length + 1);
             var withoutExtension = Path.GetFileNameWithoutExtension(blobName);
             var textId = withoutExtension.Substring(withoutExtension.LastIndexOf('.') + 1);
             return Guid.Parse(textId);
         }
 
-        private static string ExtractSampleName(Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob blobTrigger)
+        private static string ExtractSampleName(string blobTriggerName, AzureStorage.WorkflowState currentState)
         {
-            var blobName = blobTrigger.Name.Substring(AzureStorage.WorkflowState.InProgress.ToString().Length + 1);
+            var blobName = blobTriggerName.Substring(currentState.ToString().Length + 1);
             var withoutExtension = Path.GetFileNameWithoutExtension(blobName);
             return withoutExtension.Substring(0, withoutExtension.LastIndexOf('.'));
         }
