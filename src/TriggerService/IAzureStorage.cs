@@ -2,11 +2,8 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
-using Common;
 using Microsoft.WindowsAzure.Storage.Blob;
 
 namespace TriggerService
@@ -19,12 +16,12 @@ namespace TriggerService
         Task<byte[]> DownloadBlockBlobAsync(string blobUrl);
         Task<string> UploadFileFromPathAsync(string path, string container, string blobName);
         Task<string> UploadFileTextAsync(string content, string container, string blobName);
-        Task<string> MutateStateAsync(string container, string blobName, AzureStorage.WorkflowState newState, Action<Workflow> action = null);
-        Task SetStateToInProgressAsync(string container, string blobName, string id);
+        //Task<string> MutateStateAsync(string container, string blobName, AzureStorage.WorkflowState newState, Action<Workflow> action = null);
+        //Task SetStateToInProgressAsync(string container, string blobName, string id);
         Task DeleteAllBlobsAsync(string container);
         Task DeleteContainerAsync(string container);
-        Task<IEnumerable<CloudBlockBlob>> GetWorkflowsByStateAsync(AzureStorage.WorkflowState state);
-        Task<IEnumerable<CloudBlockBlob>> GetWorkflowsReadyForStateUpdateAsync(AzureStorage.WorkflowState state);
+        Task<IEnumerable<CloudBlockBlob>> GetBlobsByStateAsync(AzureStorage.WorkflowState state);
+        Task<IEnumerable<CloudBlockBlob>> GetRecentlyUpdatedBlobsAsync(AzureStorage.WorkflowState state);
         Task<bool> IsSingleBlobExistsFromPrefixAsync(string container, string blobPrefix);
         Task<bool> IsAvailableAsync();
         Task<byte[]> DownloadFileUsingHttpClientAsync(string url);

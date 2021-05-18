@@ -8,7 +8,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Common;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
@@ -17,7 +16,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
-using Newtonsoft.Json;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TriggerService
@@ -101,45 +99,13 @@ namespace TriggerService
             var blob = containerReference.GetBlockBlobReference(blobName);
             await blob.DeleteIfExistsAsync();   
         }
-        public async Task<string> MutateStateAsync(string container, string blobName, WorkflowState newState, Action<Workflow> action = null)
-        {
-            var newStateText = $"{newState.ToString().ToLowerInvariant()}";          
-            var oldStateText = blobName.Substring(0, blobName.IndexOf('/'));
-            var newBlobName = blobName.Replace(oldStateText, $"{newState.ToString().ToLowerInvariant()}");
-
-            logger.LogInformation($"Mutating state from '{oldStateText}' to '{newStateText}' for {blobName}");
-            
-            var workflow = JsonConvert.DeserializeObject<Workflow>(await DownloadBlobTextAsync(container, blobName));
-
-            action?.Invoke(workflow);
-            
-            await UploadFileTextAsync(
-                JsonConvert.SerializeObject(workflow, Formatting.Indented), 
-                container, 
-                newBlobName);
-            
-            await DeleteBlobIfExistsAsync(container, blobName);
-
-            return newBlobName;
-        }
-
-        public async Task SetStateToInProgressAsync(string container, string blobName, string id)
-        {
-            var containerReference = blobClient.GetContainerReference(container);
-            var blob = containerReference.GetBlockBlobReference(blobName);
-            var data = await blob.DownloadTextAsync();
-            var newBlobName = blobName.Replace("new/", $"{AzureStorage.WorkflowState.InProgress.ToString().ToLowerInvariant()}/");
-            newBlobName = newBlobName.Replace(".json", $".{id}.json");
-            await UploadFileTextAsync(data, container, newBlobName);
-            await blob.DeleteIfExistsAsync();
-        }
 
         /// <summary>
         /// Return all blobs for a given state, except readme files
         /// </summary>
         /// <param name="state">Workflow state to query for</param>
         /// <returns></returns>
-        public async Task<IEnumerable<CloudBlockBlob>> GetWorkflowsByStateAsync(WorkflowState state)
+        public async Task<IEnumerable<CloudBlockBlob>> GetBlobsByStateAsync(WorkflowState state)
         {
             var containerReference = blobClient.GetContainerReference(WorkflowsContainerName);
             var lowercaseState = state.ToString().ToLowerInvariant();
@@ -153,15 +119,9 @@ namespace TriggerService
         /// </summary>
         /// <param name="state">Workflow state to query for</param>
         /// <returns></returns>
-        public async Task<IEnumerable<CloudBlockBlob>> GetWorkflowsReadyForStateUpdateAsync(WorkflowState state)
+        public async Task<IEnumerable<CloudBlockBlob>> GetRecentlyUpdatedBlobsAsync(WorkflowState state)
         {
-            var containerReference = blobClient.GetContainerReference(WorkflowsContainerName);
-            var lowercaseState = state.ToString().ToLowerInvariant();
-            var blobs = await GetBlobsWithPrefixAsync(containerReference, lowercaseState);
-            var readmeBlobName = $"{lowercaseState}/readme.txt";
-            return blobs.Where(blob => 
-            (!blob.Name.Equals(readmeBlobName, StringComparison.OrdinalIgnoreCase)) 
-            && (DateTime.UtcNow - blob.Properties.LastModified.Value < new TimeSpan(1, 0, 0)));        
+            return (await GetBlobsByStateAsync(state)).Where(blob => DateTime.UtcNow - blob.Properties.LastModified.Value < new TimeSpan(1, 0, 0));        
         }
 
         public async Task<string> UploadFileFromPathAsync(string path, string container, string blobName)

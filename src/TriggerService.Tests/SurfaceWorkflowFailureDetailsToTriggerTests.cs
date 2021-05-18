@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Linq.Expressions;
-using Common;
 using CromwellApiClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -22,7 +21,7 @@ namespace TriggerService.Tests
     public class SurfaceWorkflowFailureDetailsToTriggerTests
     {
         [TestMethod]
-        public async Task WorkflowFailureCausedByTesTaskFailureAsync()
+        public async Task SurfaceWorkflowFailure_From_FailingTesTasksAsync()
         {
             var serviceCollection = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder.AddConsole());
@@ -36,9 +35,9 @@ namespace TriggerService.Tests
             var mockWorkflow_id = Guid.NewGuid();
 
             azStorageMock.Setup(az => az
-                .GetWorkflowsReadyForStateUpdateAsync(AzureStorage.WorkflowState.InProgress))
+                .GetRecentlyUpdatedBlobsAsync(AzureStorage.WorkflowState.InProgress))
                 .Returns(Task.FromResult(new List<CloudBlockBlob> {
-                    new CloudBlockBlob(new Uri($@"http://tempuri.org/InProgress/InProgress.Sample.{mockWorkflow_id}.json"))}
+                    new CloudBlockBlob(new Uri($@"http://tempuri.org/workflow/inprogress/inprogress.Sample.{mockWorkflow_id}.json"))}
                     .AsEnumerable()));
 
             azStorageMock.Setup(az => az
@@ -49,12 +48,16 @@ namespace TriggerService.Tests
             .DeleteBlobIfExistsAsync(It.IsAny<string>(), It.IsAny<string>()));
 
             azStorageMock.Setup(az => az
+            .UploadFileTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(Task.FromResult(It.IsAny<string>()));
+                
+            /*azStorageMock.Setup(az => az
                .MutateStateAsync(It.IsAny<string>(),
                It.IsAny<string>(),
                AzureStorage.WorkflowState.Failed,
                It.IsAny<Action<Workflow>>()))
-                .Returns(Task.FromResult(AzureStorage.WorkflowState.Failed.ToString()));
-            
+                .Returns(Task.FromResult(AzureStorage.WorkflowState.Failed.ToString()));*/
+
             var cromwellApiClient = new Mock<ICromwellApiClient>();
             cromwellApiClient.Setup(ac => ac
                 .GetStatusAsync(It.IsAny<Guid>()))
