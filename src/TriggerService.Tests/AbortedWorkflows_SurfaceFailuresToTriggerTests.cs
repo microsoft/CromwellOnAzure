@@ -20,9 +20,9 @@ namespace TriggerService.Tests
     [TestClass]
     public class AbortedWorkflows_SurfaceFailuresToTriggerTests
     {
-        private readonly IServiceCollection serviceCollection;
+        private IServiceCollection serviceCollection;
 
-        private readonly ServiceProvider serviceProvider;
+        private ServiceProvider serviceProvider;
 
         private readonly Mock<IAzureStorage> azStorageMock;
 
@@ -30,9 +30,9 @@ namespace TriggerService.Tests
 
         private readonly Mock<ICromwellApiClient> cromwellApiClient;
 
-        private readonly CromwellOnAzureEnvironment environment;
+        private CromwellOnAzureEnvironment environment;
 
-        private readonly Guid mockWorkflow_id;
+        private Guid mockWorkflow_id;
 
         public AbortedWorkflows_SurfaceFailuresToTriggerTests()
         {
@@ -45,23 +45,7 @@ namespace TriggerService.Tests
 
             this.cosmosdbRepositoryMock = new Mock<IRepository<TesTask>>();
 
-            this.cromwellApiClient = new Mock<ICromwellApiClient>();
-
-            this.mockWorkflow_id = Guid.NewGuid();
-
-            this.azStorageMock.Setup(az => az
-                .GetWorkflowBlobsToAbortAsync())
-                .Returns(Task.FromResult(new List<CloudBlockBlob> {
-                    new CloudBlockBlob(new Uri(@$"http://tempuri.org/workflow/abort/abort.Sample.{this.mockWorkflow_id}.json"))}
-                    .AsEnumerable()));
-
-            this.azStorageMock.Setup(az => az
-            .DownloadBlobTextAsync(It.IsAny<string>(), $"abort/abort.Sample.{ mockWorkflow_id}.json"))
-            .Returns(Task.FromResult(@"{'WorkflowUrl': 'https://bam-to-unmapped-bams.wdl','WorkflowInputsUrl': 'https://bam-to-unmapped-bams.inputs.json'}"));
-
-            this.azStorageMock.Setup(az => az
-            .DownloadBlobTextAsync(It.IsAny<string>(), $"failed/abort.Sample.{ mockWorkflow_id}.json"))
-            .Returns(Task.FromResult(@"{'WorkflowUrl': 'https://bam-to-unmapped-bams.wdl','WorkflowInputsUrl': 'https://bam-to-unmapped-bams.inputs.json','WorkflowFailureDetails': {'WorkflowFailureReason': 'Aborted'}}"));
+            this.cromwellApiClient = new Mock<ICromwellApiClient>();            
 
             this.azStorageMock.Setup(az => az
             .DeleteBlobIfExistsAsync(It.IsAny<string>(), It.IsAny<string>()));
@@ -69,15 +53,7 @@ namespace TriggerService.Tests
             this.azStorageMock.Setup(az => az
             .UploadFileTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
                 .Returns(Task.FromResult(It.IsAny<string>()));
-
-            this.cromwellApiClient.Setup(ac => ac
-                .GetStatusAsync(It.IsAny<Guid>()))
-                .Returns(Task.FromResult(new GetStatusResponse
-                {
-                    Id = Guid.Parse($"{this.mockWorkflow_id}"),
-                    Status = WorkflowStatus.Failed
-                }));
-
+            
             this.cromwellApiClient.Setup(ac => ac
                .GetOutputsAsync(It.IsAny<Guid>()))
                .Returns(Task.FromResult(new GetOutputsResponse { }));
@@ -88,13 +64,35 @@ namespace TriggerService.Tests
 
             this.cromwellApiClient.Setup(ac => ac
             .GetTimingAsync(It.IsAny<Guid>()))
-                .Returns(Task.FromResult(new GetTimingResponse()));
+                .Returns(Task.FromResult(new GetTimingResponse()));            
+        }
 
-            this.environment = new CromwellOnAzureEnvironment(
-                this.serviceProvider.GetRequiredService<ILoggerFactory>(),
-                this.azStorageMock.Object,
-                this.cromwellApiClient.Object,
-                this.cosmosdbRepositoryMock.Object);
+        [TestInitialize]
+        public void TestInitializer()
+        {
+            this.mockWorkflow_id = Guid.NewGuid();
+
+            this.azStorageMock.Setup(az => az
+            .DownloadBlobTextAsync(It.IsAny<string>(), $"abort/abort.Sample.{ this.mockWorkflow_id}.json"))
+            .Returns(Task.FromResult(@"{'WorkflowUrl': 'https://bam-to-unmapped-bams.wdl','WorkflowInputsUrl': 'https://bam-to-unmapped-bams.inputs.json'}"));
+
+            this.azStorageMock.Setup(az => az
+            .DownloadBlobTextAsync(It.IsAny<string>(), $"failed/abort.Sample.{ this.mockWorkflow_id}.json"))
+            .Returns(Task.FromResult(@"{'WorkflowUrl': 'https://bam-to-unmapped-bams.wdl','WorkflowInputsUrl': 'https://bam-to-unmapped-bams.inputs.json','WorkflowFailureDetails': {'WorkflowFailureReason': 'Aborted'}}"));
+
+            this.azStorageMock.Setup(az => az
+                .GetWorkflowBlobsToAbortAsync())
+                .Returns(Task.FromResult(new List<CloudBlockBlob> {
+                    new CloudBlockBlob(new Uri(@$"http://tempuri.org/workflow/abort/abort.Sample.{this.mockWorkflow_id}.json"))}
+                    .AsEnumerable()));
+
+            this.cromwellApiClient.Setup(ac => ac
+                .GetStatusAsync(It.IsAny<Guid>()))
+                .Returns(Task.FromResult(new GetStatusResponse
+                {
+                    Id = Guid.Parse($"{this.mockWorkflow_id}"),
+                    Status = WorkflowStatus.Failed
+                }));
         }
 
         [TestMethod]
@@ -118,7 +116,13 @@ namespace TriggerService.Tests
 
             this.cosmosdbRepositoryMock.Setup(r => r
             .GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()))
-            .Returns(Task.FromResult(failedTesTasks));               
+            .Returns(Task.FromResult(failedTesTasks));
+
+            this.environment = new CromwellOnAzureEnvironment(
+                this.serviceProvider.GetRequiredService<ILoggerFactory>(),
+                this.azStorageMock.Object,
+                this.cromwellApiClient.Object,
+                this.cosmosdbRepositoryMock.Object);
 
             var abortedworkflows = await this.environment.AbortWorkflowsAsync();
 
@@ -154,6 +158,12 @@ namespace TriggerService.Tests
             .GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()))
             .Returns(Task.FromResult(failedTesTasks));
 
+            this.environment = new CromwellOnAzureEnvironment(
+                this.serviceProvider.GetRequiredService<ILoggerFactory>(),
+                this.azStorageMock.Object,
+                this.cromwellApiClient.Object,
+                this.cosmosdbRepositoryMock.Object);
+
             var abortedworkflows = await this.environment.AbortWorkflowsAsync();           
 
             Assert.IsTrue(abortedworkflows.FirstOrDefault()?.WorkflowFailureDetails.WorkflowFailureReason == "Aborted");
@@ -185,6 +195,12 @@ namespace TriggerService.Tests
             .GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()))
             .Returns(Task.FromResult(failedTesTasks));
 
+            this.environment = new CromwellOnAzureEnvironment(
+                this.serviceProvider.GetRequiredService<ILoggerFactory>(),
+                this.azStorageMock.Object,
+                this.cromwellApiClient.Object,
+                this.cosmosdbRepositoryMock.Object);
+
             var abortedworkflows = await this.environment.AbortWorkflowsAsync();
 
             Assert.IsTrue(abortedworkflows.FirstOrDefault()?.WorkflowFailureDetails.WorkflowFailureReason == "Aborted");
@@ -200,6 +216,12 @@ namespace TriggerService.Tests
             this.cosmosdbRepositoryMock.Setup(r => r
             .GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()))
             .Returns(Task.FromResult(failedTesTasks));
+
+            this.environment = new CromwellOnAzureEnvironment(
+                this.serviceProvider.GetRequiredService<ILoggerFactory>(),
+                this.azStorageMock.Object,
+                this.cromwellApiClient.Object,
+                this.cosmosdbRepositoryMock.Object);
 
             var abortedworkflows = await this.environment.AbortWorkflowsAsync();
 
