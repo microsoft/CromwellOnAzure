@@ -688,10 +688,7 @@ namespace TesApi.Web
         /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
         private async Task<IEnumerable<VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
         {
-            const double mbToGbRatio = 0.001;
-            const double mibToGbRatio = 0.001048576;
-
-            static double ConvertMBOrMiBToGB(int value) =>  Math.Round(value * (value % 1024 == 0 ? mibToGbRatio : mbToGbRatio), 3);
+            static double ConvertMiBToGiB(int value) => Math.Round(value / 1024.0, 2);
 
             var azureClient = await GetAzureManagementClientAsync();
             var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).VirtualMachines.Sizes.ListByRegionAsync(location)).ToList();
@@ -723,9 +720,9 @@ namespace TesApi.Web
                     vmInfos.Add(new VirtualMachineInfo
                     {
                         VmSize = supportedVmSize.VmSize,
-                        MemoryInGB = ConvertMBOrMiBToGB(vmSpecification.MemoryInMB),
+                        MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
                         NumberOfCores = vmSpecification.NumberOfCores,
-                        ResourceDiskSizeInGB = ConvertMBOrMiBToGB(vmSpecification.ResourceDiskSizeInMB),
+                        ResourceDiskSizeInGB = ConvertMiBToGiB(vmSpecification.ResourceDiskSizeInMB),
                         MaxDataDiskCount = vmSpecification.MaxDataDiskCount,
                         VmFamily = supportedVmSize.FamilyName,
                         LowPriority = false,
@@ -737,9 +734,9 @@ namespace TesApi.Web
                         vmInfos.Add(new VirtualMachineInfo
                         {
                             VmSize = supportedVmSize.VmSize,
-                            MemoryInGB = ConvertMBOrMiBToGB(vmSpecification.MemoryInMB),
+                            MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
                             NumberOfCores = vmSpecification.NumberOfCores,
-                            ResourceDiskSizeInGB = ConvertMBOrMiBToGB(vmSpecification.ResourceDiskSizeInMB),
+                            ResourceDiskSizeInGB = ConvertMiBToGiB(vmSpecification.ResourceDiskSizeInMB),
                             MaxDataDiskCount = vmSpecification.MaxDataDiskCount,
                             VmFamily = supportedVmSize.FamilyName,
                             LowPriority = true,

@@ -71,7 +71,7 @@ namespace TesApi.Web
 
                 var linesWithWarningsAdded = allowedVmSizesLines.ConvertAll(line =>
                     allowedVmSizesButNotSupported.Contains(line, StringComparer.OrdinalIgnoreCase)
-                        ? $"{line} <-- WARNING: This VM size is misspelled or curently not supported in your region. It will be ignored."
+                        ? $"{line} <-- WARNING: This VM size is either misspelled or not supported in your region. It will be ignored."
                         : line
                 );
 
@@ -105,27 +105,27 @@ namespace TesApi.Web
                     v.VmInfoWithDedicatedPrice.VmFamily,
                     PricePerHourDedicated = v.VmInfoWithDedicatedPrice.PricePerHour?.ToString("###0.000"),
                     PricePerHourLowPri = v.PricePerHourLowPri != null ? v.PricePerHourLowPri?.ToString("###0.000") : "N/A",
-                    MemoryInGB = v.VmInfoWithDedicatedPrice.MemoryInGB?.ToString("####.0"),
+                    MemoryInGiB = v.VmInfoWithDedicatedPrice.MemoryInGB?.ToString(),
                     NumberOfCores = v.VmInfoWithDedicatedPrice.NumberOfCores.ToString(),
-                    ResourceDiskSizeInGB = v.VmInfoWithDedicatedPrice.ResourceDiskSizeInGB.ToString(),
+                    ResourceDiskSizeInGiB = v.VmInfoWithDedicatedPrice.ResourceDiskSizeInGB.ToString(),
                     DedicatedQuota = batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced 
                         ? batchAccountQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(q => q.Name.Equals(v.VmInfoWithDedicatedPrice.VmFamily, StringComparison.OrdinalIgnoreCase))?.CoreQuota.ToString() ?? "N/A"
                         : batchAccountQuotas.DedicatedCoreQuota.ToString()
                 });
 
-            vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = "", VmFamily = "", PricePerHourDedicated = "dedicated", PricePerHourLowPri = "low pri", MemoryInGB = "(GB)", NumberOfCores = "", ResourceDiskSizeInGB = "(GB)", DedicatedQuota = $"quota {(batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? "(per fam.)" : "(total)")}" });
-            vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = "VM Size", VmFamily = "Family", PricePerHourDedicated = "$/hour", PricePerHourLowPri = "$/hour", MemoryInGB = "Memory", NumberOfCores = "CPUs", ResourceDiskSizeInGB = "Disk", DedicatedQuota = "Dedicated CPU" });
+            vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = "", VmFamily = "", PricePerHourDedicated = "dedicated", PricePerHourLowPri = "low pri", MemoryInGiB = "(GiB)", NumberOfCores = "", ResourceDiskSizeInGiB = "(GiB)", DedicatedQuota = $"quota {(batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? "(per fam.)" : "(total)")}" });
+            vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = "VM Size", VmFamily = "Family", PricePerHourDedicated = "$/hour", PricePerHourLowPri = "$/hour", MemoryInGiB = "Memory", NumberOfCores = "CPUs", ResourceDiskSizeInGiB = "Disk", DedicatedQuota = "Dedicated CPU" });
 
             var sizeColWidth = vmInfosAsStrings.Max(v => v.VmSize.Length);
             var seriesColWidth = vmInfosAsStrings.Max(v => v.VmFamily.Length);
             var priceDedicatedColumnWidth = vmInfosAsStrings.Max(v => v.PricePerHourDedicated.Length);
             var priceLowPriColumnWidth = vmInfosAsStrings.Max(v => v.PricePerHourLowPri.Length);
-            var memoryColumnWidth = vmInfosAsStrings.Max(v => v.MemoryInGB.Length);
+            var memoryColumnWidth = vmInfosAsStrings.Max(v => v.MemoryInGiB.Length);
             var coresColumnWidth = vmInfosAsStrings.Max(v => v.NumberOfCores.Length);
-            var diskColumnWidth = vmInfosAsStrings.Max(v => v.ResourceDiskSizeInGB.Length);
+            var diskColumnWidth = vmInfosAsStrings.Max(v => v.ResourceDiskSizeInGiB.Length);
             var dedicatedQuotaColumnWidth = vmInfosAsStrings.Max(v => v.DedicatedQuota.Length);
 
-            return vmInfosAsStrings.Select(v => $"{v.VmSize.PadRight(sizeColWidth)} {v.VmFamily.PadRight(seriesColWidth)} {v.PricePerHourDedicated.PadLeft(priceDedicatedColumnWidth)}  {v.PricePerHourLowPri.PadLeft(priceLowPriColumnWidth)}  {v.MemoryInGB.PadLeft(memoryColumnWidth)}  {v.NumberOfCores.PadLeft(coresColumnWidth)}  {v.ResourceDiskSizeInGB.PadLeft(diskColumnWidth)}  {v.DedicatedQuota.PadLeft(dedicatedQuotaColumnWidth)}");
+            return vmInfosAsStrings.Select(v => $"{v.VmSize.PadRight(sizeColWidth)} {v.VmFamily.PadRight(seriesColWidth)} {v.PricePerHourDedicated.PadLeft(priceDedicatedColumnWidth)}  {v.PricePerHourLowPri.PadLeft(priceLowPriColumnWidth)}  {v.MemoryInGiB.PadLeft(memoryColumnWidth)}  {v.NumberOfCores.PadLeft(coresColumnWidth)}  {v.ResourceDiskSizeInGiB.PadLeft(diskColumnWidth)}  {v.DedicatedQuota.PadLeft(dedicatedQuotaColumnWidth)}");
         }
     }
 }

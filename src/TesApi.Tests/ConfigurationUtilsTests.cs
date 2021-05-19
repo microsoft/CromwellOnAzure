@@ -18,7 +18,7 @@ namespace TesApi.Tests
     public class ConfigurationUtilsTests
     {
         [TestMethod]
-        public async Task Xyz()
+        public async Task ValidateAllowedAndSupportedVmSizesFilesHandling()
         {
             var mockConfiguration = GetMockConfig();
             var mockAzureProxy = GetMockAzureProxy();
@@ -35,14 +35,14 @@ namespace TesApi.Tests
             var expectedAllowedVmSizesFileContent =
                 "VmSize1\n" +
                 "VmSize2\n" +
-                "VmSizeNonExistent <-- WARNING: This VM size is misspelled or curently not supported in your region. It will be ignored.";
+                "VmSizeNonExistent <-- WARNING: This VM size is either misspelled or not supported in your region. It will be ignored.";
 
             var expectedSupportedVmSizesFileContent =
-                "VM Size Family       $/hour   $/hour  Memory  CPUs  Disk     Dedicated CPU\n" +
-                "                  dedicated  low pri    (GB)        (GB)  quota (per fam.)\n" +
-                "VmSize1 VmFamily1    11.000   22.000     3.0     2    20               100\n" +
-                "VmSize2 VmFamily2    33.000   44.000     6.0     4    40                 0\n" +
-                "VmSize3 VmFamily3    55.000      N/A    12.0     8    80               300";
+                "VM Size Family       $/hour   $/hour  Memory  CPUs   Disk     Dedicated CPU\n" +
+                "                  dedicated  low pri   (GiB)        (GiB)  quota (per fam.)\n" +
+                "VmSize1 VmFamily1    11.000   22.000       3     2     20               100\n" +
+                "VmSize2 VmFamily2    33.000   44.000       6     4     40                 0\n" +
+                "VmSize3 VmFamily3    55.000      N/A      12     8     80               300";
 
             Assert.AreEqual(2, allowedVmSizes.Count);
             mockAzureProxy.Verify(m => m.UploadBlobAsync(It.Is<Uri>(x => x.AbsoluteUri.Contains("allowed-vm-sizes")), It.Is<string>(s => s.Equals(expectedAllowedVmSizesFileContent))), Times.Exactly(1));
