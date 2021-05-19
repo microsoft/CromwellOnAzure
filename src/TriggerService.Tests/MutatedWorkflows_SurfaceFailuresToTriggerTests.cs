@@ -18,7 +18,7 @@ using Tes.Models;
 namespace TriggerService.Tests
 {
     [TestClass]
-    public class MutatedToFailedWorkflows_SurfaceFailuresToTriggerTests
+    public class MutatedWorkflows_SurfaceFailuresToTriggerTests
     {
         [TestMethod]
         public async Task SurfaceWorkflowFailure_From_FailingTesTasksAsync()
