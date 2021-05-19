@@ -115,13 +115,22 @@ namespace TriggerService
         }
 
         /// <summary>
+        /// Return all blobs for a WorkflowState.Abort state.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<IEnumerable<CloudBlockBlob>> GetWorkflowBlobsToAbortAsync()
+        {
+            return (await GetBlobsByStateAsync(WorkflowState.Abort));
+        }
+
+        /// <summary>
         /// Return all blobs for a given state LastModified in the past 1 minute, except readme files 
         /// </summary>
         /// <param name="state">Workflow state to query for</param>
         /// <returns></returns>
-        public async Task<IEnumerable<CloudBlockBlob>> GetRecentlyUpdatedBlobsAsync(WorkflowState state)
+        public async Task<IEnumerable<CloudBlockBlob>> GetRecentlyUpdatedInProgressWorkflowBlobsAsync()
         {
-            return (await GetBlobsByStateAsync(state)).Where(blob => DateTime.UtcNow - blob.Properties.LastModified.Value < new TimeSpan(1, 0, 0));        
+            return (await GetBlobsByStateAsync(WorkflowState.InProgress)).Where(blob => DateTime.UtcNow - blob.Properties.LastModified.Value < new TimeSpan(1, 0, 0));        
         }
 
         public async Task<string> UploadFileFromPathAsync(string path, string container, string blobName)

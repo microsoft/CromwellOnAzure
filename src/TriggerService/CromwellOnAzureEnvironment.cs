@@ -162,7 +162,7 @@ namespace TriggerService
         public async Task<ConcurrentBag<Workflow>> UpdateWorkflowStatusesAsync()
         {
             var wfWithUpdatedStatuses = new ConcurrentBag<Workflow>();
-            var blobTriggers = await storage.GetRecentlyUpdatedBlobsAsync(AzureStorage.WorkflowState.InProgress);
+            var blobTriggers = await storage.GetRecentlyUpdatedInProgressWorkflowBlobsAsync();
             
             foreach (var blobTrigger in blobTriggers)
             {
@@ -194,10 +194,10 @@ namespace TriggerService
                                     wf => wf.WorkflowFailureDetails = new WorkflowFailureInfo {
                                         WorkflowFailureReason = "Aborted"});
 
-                                var mutatedworkflow = JsonConvert.DeserializeObject<Workflow>(
-                                    await storage.DownloadBlobTextAsync(blobTrigger.Container.Name, mutatedBlobName));
-
-                                wfWithUpdatedStatuses.Add(mutatedworkflow);
+                                wfWithUpdatedStatuses.Add(JsonConvert
+                                    .DeserializeObject<Workflow>(await storage
+                                    .DownloadBlobTextAsync(blobTrigger.Container.Name,
+                                    mutatedBlobName)));
 
                                 break;
                             }
@@ -218,10 +218,10 @@ namespace TriggerService
 
                                 logger.LogInformation($"Mutated Workflow to : {mutatedBlobName}");
 
-                                var mutatedworkflow = JsonConvert.DeserializeObject<Workflow>(
-                                    await storage.DownloadBlobTextAsync(blobTrigger.Container.Name, mutatedBlobName));
-
-                                wfWithUpdatedStatuses.Add(mutatedworkflow);
+                                wfWithUpdatedStatuses.Add(JsonConvert
+                                    .DeserializeObject<Workflow>(await storage
+                                    .DownloadBlobTextAsync(blobTrigger.Container.Name, 
+                                    mutatedBlobName)));
 
                                 break;
                             }
@@ -250,12 +250,13 @@ namespace TriggerService
                         (w) => {
                             w.WorkflowFailureDetails = new WorkflowFailureInfo {
                                 WorkflowFailureReason = "CromwellApiException",
-                                WorkflowFailureReasonDetail = "Cromwell reported workflow as NotFound (404)"};});
+                                WorkflowFailureReasonDetail = "Cromwell reported workflow as NotFound (404)"};});                    
 
-                    var mutatedworkflow = JsonConvert.DeserializeObject<Workflow>(
-                                    await storage.DownloadBlobTextAsync(blobTrigger.Container.Name, mutatedBlobName));
+                    wfWithUpdatedStatuses.Add(JsonConvert
+                        .DeserializeObject<Workflow>(await storage
+                        .DownloadBlobTextAsync(blobTrigger.Container.Name, 
+                        mutatedBlobName)));
 
-                    wfWithUpdatedStatuses.Add(mutatedworkflow);
                 }
                 catch (Exception exception)
                 {
@@ -266,9 +267,10 @@ namespace TriggerService
             return wfWithUpdatedStatuses;
         }
 
-        public async Task AbortWorkflowsAsync()
+        public async Task<ConcurrentBag<Workflow>> AbortWorkflowsAsync()
         {
-            var blobTriggers = await storage.GetBlobsByStateAsync(AzureStorage.WorkflowState.Abort);
+            var wfWithUpdatedStatuses = new ConcurrentBag<Workflow>();
+            var blobTriggers = await storage.GetWorkflowBlobsToAbortAsync();
             
             foreach (var blobTrigger in blobTriggers)
             {
@@ -278,9 +280,9 @@ namespace TriggerService
                 {
                     id = ExtractWorkflowId(blobTrigger.Name, AzureStorage.WorkflowState.Abort);
                     logger.LogInformation($"Aborting workflow ID: {id} Url: {blobTrigger.Uri.AbsoluteUri}");
-                    await cromwellApiClient.PostAbortAsync(id);                                        
-                    
-                    await MutateStateAsync(
+                    await cromwellApiClient.PostAbortAsync(id);
+
+                    var mutatedBlobName = await MutateStateAsync(
                         blobTrigger.Container.Name, 
                         blobTrigger.Name, 
                         AzureStorage.WorkflowState.Failed,
@@ -288,21 +290,31 @@ namespace TriggerService
                             w.WorkflowFailureDetails = new WorkflowFailureInfo{
                                 WorkflowFailureReason = "Aborted"};});
 
+                    wfWithUpdatedStatuses.Add(JsonConvert
+                                    .DeserializeObject<Workflow>(await storage
+                                    .DownloadBlobTextAsync(blobTrigger.Container.Name,
+                                    mutatedBlobName)));
+
                 }
                 catch (Exception e)
                 {
                     logger.LogError(e, $"Exception in AbortWorkflowsAsync for {blobTrigger}.  Id: {id}");
-                    
-                    await MutateStateAsync(
+
+                    var mutatedBlobName = await MutateStateAsync(
                         blobTrigger.Container.Name, 
                         blobTrigger.Name, 
                         AzureStorage.WorkflowState.Failed,
                         (w) => {
                             w.WorkflowFailureDetails = new WorkflowFailureInfo{
-                                WorkflowFailureReason = "ErrorOccuredWhileAbortingWorkflow",
-                                WorkflowFailureReasonDetail = e.Message};});
+                                WorkflowFailureReason = "Aborted"};});
+
+                    wfWithUpdatedStatuses.Add(JsonConvert
+                                    .DeserializeObject<Workflow>(await storage
+                                    .DownloadBlobTextAsync(blobTrigger.Container.Name,
+                                    mutatedBlobName)));
                 }
             }
+            return wfWithUpdatedStatuses;
         }
 
         public async Task<ProcessedWorkflowItem> GetBlobFileNameAndData(string url)
@@ -502,7 +514,8 @@ namespace TriggerService
                 
                 WorkflowFailureReason = failedTesTasks.Any(t =>
                     (t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode).GetValueOrDefault() != 0) ?
-                    "BatchFailed": "OneOrMoreTasksFailed"};
+                    "BatchFailed": failedTesTasks.Any()? "OneOrMoreTasksFailed": "CromwellFailed"
+            };
 
         }
     }

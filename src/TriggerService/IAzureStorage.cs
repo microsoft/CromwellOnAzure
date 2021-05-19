@@ -20,8 +20,9 @@ namespace TriggerService
         //Task SetStateToInProgressAsync(string container, string blobName, string id);
         Task DeleteAllBlobsAsync(string container);
         Task DeleteContainerAsync(string container);
+        Task<IEnumerable<CloudBlockBlob>> GetWorkflowBlobsToAbortAsync();
         Task<IEnumerable<CloudBlockBlob>> GetBlobsByStateAsync(AzureStorage.WorkflowState state);
-        Task<IEnumerable<CloudBlockBlob>> GetRecentlyUpdatedBlobsAsync(AzureStorage.WorkflowState state);
+        Task<IEnumerable<CloudBlockBlob>> GetRecentlyUpdatedInProgressWorkflowBlobsAsync();
         Task<bool> IsSingleBlobExistsFromPrefixAsync(string container, string blobPrefix);
         Task<bool> IsAvailableAsync();
         Task<byte[]> DownloadFileUsingHttpClientAsync(string url);
