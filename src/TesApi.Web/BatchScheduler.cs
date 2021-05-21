@@ -527,7 +527,8 @@ namespace TesApi.Web
             sb.AppendLine($"write_ts UploadStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \\");
             sb.AppendLine($"write_ts UploadEnd && \\");
-            sb.AppendLine($"/bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKiB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKiB=${{disk[2]}} >> /mnt{metricsPath} && echo CpuModelName='Intel Xeon CPU E5-2673 v3'>> /mnt{metricsPath}' && \\");
+            sb.AppendLine($"/bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKiB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKiB=${{disk[2]}} >> /mnt{metricsPath}' && \\");
+            sb.AppendLine($"/bin/bash -c 'cpuinfo=( `lscpu |sed -nr '/Model name/ s/.*:\\s*(.*) @ .*/\\1/p'` ) && echo CpuModelName=${{cpuinfo}} >> /mnt{metricsPath}' && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url \"{metricsUrl}\" --local-path \"{metricsPath}\" --rename --no-recursive");
 
             var batchScriptPath = $"{batchExecutionDirectoryPath}/{BatchScriptFileName}";
