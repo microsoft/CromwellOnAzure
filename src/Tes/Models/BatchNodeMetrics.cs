@@ -76,5 +76,11 @@
         /// </summary>
         [TesTaskLogMetadataKey("max_res_mem_used_pct")]
         public float? MaxResidentMemoryUsedPercent { get; set; }
+
+        /// <summary>
+        /// CPU Model Name
+        /// </summary>
+        [TesTaskLogMetadataKey("node_cpu_model_name")]
+        public string NodeCpuModelName { get; set; }
     }
 }
