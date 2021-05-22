@@ -31,6 +31,11 @@ namespace TesApi.Web
             this.logger = logger;
         }
 
+        /// <summary>
+        /// ExecuteAsync method
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             logger.LogInformation("Orphaned pool cleanup service started");

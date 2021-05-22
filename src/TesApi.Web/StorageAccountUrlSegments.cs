@@ -32,10 +32,29 @@ namespace TesApi.Web
         {
         }
 
+        /// <summary>
+        /// AccountName
+        /// </summary>
         public string AccountName { get; private set; }
+
+        /// <summary>
+        /// BlobEndpoint
+        /// </summary>
         public string BlobEndpoint { get; private set; }
+
+        /// <summary>
+        /// ContainerName
+        /// </summary>
         public string ContainerName { get; private set; }
+
+        /// <summary>
+        /// BlobName
+        /// </summary>
         public string BlobName { get; private set; }
+
+        /// <summary>
+        /// SasToken
+        /// </summary>
         public string SasToken { get; set; }
 
         /// <summary>
