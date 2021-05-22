@@ -67,9 +67,7 @@ namespace TesApi.Web
             IStorageAccessProvider storageAccessProvider = new StorageAccessProvider(loggerFactory.CreateLogger<StorageAccessProvider>(), Configuration, cachingAzureProxy);
 
             var configurationUtils = new ConfigurationUtils(Configuration, cachingAzureProxy, storageAccessProvider, loggerFactory.CreateLogger<ConfigurationUtils>());
-            var allowedVmSizes = configurationUtils.ProcessAllowedVmSizesConfigurationAndGetAllowedVmSizesAsync().Result;
-
-            Configuration["AllowedVmSizes"] = allowedVmSizes != null && allowedVmSizes.Any() ? string.Join(',', allowedVmSizes) : null;
+            configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync().Wait();
 
             services.AddSingleton(cachingAzureProxy);
             services.AddSingleton(azureProxy);

@@ -8,6 +8,9 @@ using Tes.Models;
 
 namespace TesApi.Web
 {
+    /// <summary>
+    /// Provides methods for handling the configuration files in the configuration container
+    /// </summary>
     public class ConfigurationUtils
     {
         private readonly IConfiguration configuration;
@@ -15,6 +18,13 @@ namespace TesApi.Web
         private readonly IStorageAccessProvider storageAccessProvider;
         private readonly ILogger logger;
 
+        /// <summary>
+        /// The constructor
+        /// </summary>
+        /// <param name="configuration"><see cref="IConfiguration"/></param>
+        /// <param name="azureProxy"><see cref="IAzureProxy"/></param>
+        /// <param name="storageAccessProvider"><see cref="IStorageAccessProvider"/></param>
+        /// <param name="logger"><see cref="ILogger"/></param>
         public ConfigurationUtils(IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, ILogger logger)
         {
             this.configuration = configuration;
@@ -23,15 +33,20 @@ namespace TesApi.Web
             this.logger = logger;
         }
 
-        // TODO TONY - split in three vm info / quota retrieval, allowed file processing, supported file processing
-        public async Task<List<string>> ProcessAllowedVmSizesConfigurationAndGetAllowedVmSizesAsync()
+        /// <summary>
+        /// Combines the allowed-vm-sizes configuration file and list of supported+available VMs to produce the supported-vm-sizes file and tag incorrect 
+        /// entries in the allowed-vm-sizes file with a warning. Sets the AllowedVmSizes configuration key.
+        /// </summary>
+        /// <returns></returns>
+        public async Task ProcessAllowedVmSizesConfigurationFileAsync()
         {
             var defaultStorageAccountName = configuration["DefaultStorageAccountName"];
-
             var supportedVmSizesFilePath = $"/{defaultStorageAccountName}/configuration/supported-vm-sizes";
-            var supportedVmSizes = (await azureProxy.GetVmSizesAndPricesAsync()).OrderBy(v => v.VmFamily).ThenBy(v => v.VmSize).ToList();
+            var allowedVmSizesFilePath = $"/{defaultStorageAccountName}/configuration/allowed-vm-sizes";
+
+            var supportedVmSizes = (await azureProxy.GetVmSizesAndPricesAsync()).ToList();
             var batchAccountQuotas = await azureProxy.GetBatchAccountQuotasAsync();
-            var supportedVmSizesFileContent = string.Join('\n', VirtualMachineInfoToFixedWidthColumns(supportedVmSizes, batchAccountQuotas));
+            var supportedVmSizesFileContent = VirtualMachineInfoToFixedWidthColumns(supportedVmSizes.OrderBy(v => v.VmFamily).ThenBy(v => v.VmSize), batchAccountQuotas);
 
             try
             {
@@ -42,16 +57,15 @@ namespace TesApi.Web
                 logger.LogWarning($"Failed to write {supportedVmSizesFilePath}. Updated VM size information will not be available in the configuration directory. This will not impact the workflow execution.");
             }
 
-            var allowedVmSizesFilePath = $"/{defaultStorageAccountName}/configuration/allowed-vm-sizes";
             var allowedVmSizesFileContent = await storageAccessProvider.DownloadBlobAsync(allowedVmSizesFilePath);
 
             if (allowedVmSizesFileContent == null)
             {
                 logger.LogWarning($"Unable to read from {allowedVmSizesFilePath}. All supported VM sizes will be eligible for Azure Batch task scheduling.");
-                return null;
+                return;
             }
 
-            // Read the file and remove any warnings (those start with "<" following the VM size name)
+            // Read the allowed-vm-sizes configuration file and remove any previous warnings (those start with "<" following the VM size name)
             var allowedVmSizesLines = allowedVmSizesFileContent
                 .Split(new[] { '\r', '\n' })
                 .Select(line => line.Split('<', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? string.Empty)
@@ -67,7 +81,7 @@ namespace TesApi.Web
 
             if (allowedVmSizesButNotSupported.Any())
             {
-                logger.LogWarning($"The following VM sizes are listed in {allowedVmSizesFilePath}, but are misspelled or not currently supported in your region: {string.Join(", ", allowedVmSizesButNotSupported)}. These will be ignored.");
+                logger.LogWarning($"The following VM sizes are listed in {allowedVmSizesFilePath}, but are either misspelled or not supported in your region: {string.Join(", ", allowedVmSizesButNotSupported)}. These will be ignored.");
 
                 var linesWithWarningsAdded = allowedVmSizesLines.ConvertAll(line =>
                     allowedVmSizesButNotSupported.Contains(line, StringComparer.OrdinalIgnoreCase)
@@ -90,10 +104,19 @@ namespace TesApi.Web
                 }
             }
 
-            return allowedAndSupportedVmSizes;
+            if (allowedAndSupportedVmSizes.Any())
+            {
+                this.configuration["AllowedVmSizes"] = string.Join(',', allowedAndSupportedVmSizes);
+            }
         }
 
-        public IEnumerable<string> VirtualMachineInfoToFixedWidthColumns(IEnumerable<VirtualMachineInfo> vmInfos, AzureBatchAccountQuotas batchAccountQuotas)
+        /// <summary>
+        /// Combines the VM feature and price info with Batch quotas and produces the fixed-width list ready for uploading to .
+        /// </summary>
+        /// <param name="vmInfos">List of <see cref="VirtualMachineInfo"/></param>
+        /// <param name="batchAccountQuotas">Batch quotas <see cref="AzureBatchAccountQuotas"/></param>
+        /// <returns></returns>
+        private static string VirtualMachineInfoToFixedWidthColumns(IEnumerable<VirtualMachineInfo> vmInfos, AzureBatchAccountQuotas batchAccountQuotas)
         {
             var vmSizes = vmInfos.Where(v => !v.LowPriority).Select(v => v.VmSize);
 
@@ -125,7 +148,9 @@ namespace TesApi.Web
             var diskColumnWidth = vmInfosAsStrings.Max(v => v.ResourceDiskSizeInGiB.Length);
             var dedicatedQuotaColumnWidth = vmInfosAsStrings.Max(v => v.DedicatedQuota.Length);
 
-            return vmInfosAsStrings.Select(v => $"{v.VmSize.PadRight(sizeColWidth)} {v.VmFamily.PadRight(seriesColWidth)} {v.PricePerHourDedicated.PadLeft(priceDedicatedColumnWidth)}  {v.PricePerHourLowPri.PadLeft(priceLowPriColumnWidth)}  {v.MemoryInGiB.PadLeft(memoryColumnWidth)}  {v.NumberOfCores.PadLeft(coresColumnWidth)}  {v.ResourceDiskSizeInGiB.PadLeft(diskColumnWidth)}  {v.DedicatedQuota.PadLeft(dedicatedQuotaColumnWidth)}");
+            var fixedWidthVmInfos = vmInfosAsStrings.Select(v => $"{v.VmSize.PadRight(sizeColWidth)} {v.VmFamily.PadRight(seriesColWidth)} {v.PricePerHourDedicated.PadLeft(priceDedicatedColumnWidth)}  {v.PricePerHourLowPri.PadLeft(priceLowPriColumnWidth)}  {v.MemoryInGiB.PadLeft(memoryColumnWidth)}  {v.NumberOfCores.PadLeft(coresColumnWidth)}  {v.ResourceDiskSizeInGiB.PadLeft(diskColumnWidth)}  {v.DedicatedQuota.PadLeft(dedicatedQuotaColumnWidth)}");
+            
+            return string.Join('\n', fixedWidthVmInfos);
         }
     }
 }
