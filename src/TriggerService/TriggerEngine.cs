@@ -12,13 +12,17 @@ namespace TriggerService
     {
         private readonly ILogger logger;
         private readonly ICromwellOnAzureEnvironment environment;
+        private readonly TimeSpan mainInterval;
+        private readonly TimeSpan availabilityCheckInterval;
         private AvailabilityTracker cromwellAvailability = new AvailabilityTracker();
         private AvailabilityTracker azStorageAvailability = new AvailabilityTracker();
 
-        public TriggerEngine(ILoggerFactory loggerFactory, ICromwellOnAzureEnvironment environment)
+        public TriggerEngine(ILoggerFactory loggerFactory, ICromwellOnAzureEnvironment environment, TimeSpan mainInterval, TimeSpan availabilityCheckInterval)
         {
             logger = loggerFactory.CreateLogger<TriggerEngine>();
             this.environment = environment;
+            this.mainInterval = mainInterval;
+            this.availabilityCheckInterval = availabilityCheckInterval;
         }
 
         public async Task RunAsync()
@@ -39,17 +43,17 @@ namespace TriggerService
                     await Task.WhenAll(
                         cromwellAvailability.WaitForAsync(
                             () => environment.IsCromwellAvailableAsync(),
-                            TimeSpan.FromSeconds(30),
+                            availabilityCheckInterval,
                             Constants.CromwellSystemName,
                             msg => logger.LogInformation(msg)),
                         azStorageAvailability.WaitForAsync(
                             () => environment.IsAzureStorageAvailableAsync(),
-                            TimeSpan.FromSeconds(30),
+                            availabilityCheckInterval,
                             "Azure Storage",
                             msg => logger.LogInformation(msg)));
 
                     await task.Invoke();
-                    await Task.Delay(TimeSpan.FromSeconds(20));
+                    await Task.Delay(mainInterval);
                 }
                 catch (Exception exc)
                 {
