@@ -66,7 +66,13 @@ namespace TriggerService.Tests
             var lines = loggerFactory.TestLogger.LogLines;
             var availableLines = lines.Where(line => line.Contains("is available", StringComparison.OrdinalIgnoreCase)).ToList();
 
-            // Cromwell and Azure S
+            Console.WriteLine($"availableLines.Count: {availableLines.Count}");
+
+            foreach (var line in availableLines)
+            {
+                Console.WriteLine(line);
+            }
+
             Assert.IsTrue(availableLines.Count == 4);
         }
 
