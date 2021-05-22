@@ -528,7 +528,7 @@ namespace TesApi.Web
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \\");
             sb.AppendLine($"write_ts UploadEnd && \\");
             sb.AppendLine($"/bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKiB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKiB=${{disk[2]}} >> /mnt{metricsPath}' && \\");
-            sb.AppendLine($"/bin/bash -c 'echo CpuModelName=\"`lscpu | grep  'Model name' | cut -f 2 -d':'| awk '{{printf($0)}}'`\"   >> /mnt{metricsPath}' && \\");
+            sb.AppendLine($"write_kv CpuModelName $(lscpu | grep  \\\"Model name\\\" | cut -f 2 -d':'| awk {{printf($0)}}");
             sb.AppendLine($"docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url \"{metricsUrl}\" --local-path \"{metricsPath}\" --rename --no-recursive");
 
             var batchScriptPath = $"{batchExecutionDirectoryPath}/{BatchScriptFileName}";
@@ -865,6 +865,7 @@ namespace TesApi.Web
                         var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKiB", out var diskSizeInKiB)  ? diskSizeInKiB / kiBInGB : (double?)null;
                         var diskUsedInGB = TryGetValueAsDouble(metrics, "DiskUsedInKiB", out var diskUsedInKiB) ? diskUsedInKiB / kiBInGB : (double?)null;
                         var obtainedCpuModelName = metrics.TryGetValue("CpuModelName", out var cpuModelName);
+                        
                         batchNodeMetrics = new BatchNodeMetrics
                         {
                             BlobXferImagePullDurationInSeconds = GetDurationInSeconds(metrics, "BlobXferPullStart", "BlobXferPullEnd"),
