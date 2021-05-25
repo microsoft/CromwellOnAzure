@@ -184,7 +184,7 @@ namespace CromwellOnAzureDeployer
                         await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
                     }
 
-                    await ConfigureVmAsync(sshConnectionInfo);
+                    await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
 
                     var accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
 
@@ -248,6 +248,7 @@ namespace CromwellOnAzureDeployer
                     if (installedVersion == null || installedVersion < new Version(2, 4))
                     {
                         await PatchContainersToMountFileV240Async(storageAccount);
+                        await PatchAccountNamesFileV240Async(sshConnectionInfo, managedIdentity);
                     }
                 }
 
@@ -369,7 +370,7 @@ namespace CromwellOnAzureDeployer
 
                                     sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
                                     await WaitForSshConnectivityAsync(sshConnectionInfo);
-                                    await ConfigureVmAsync(sshConnectionInfo);
+                                    await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
                                 },
                                 TaskContinuationOptions.OnlyOnRanToCompletion)
                             .Unwrap())
@@ -663,7 +664,7 @@ namespace CromwellOnAzureDeployer
             return notRegisteredResourceProviders;
         }
 
-        private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo)
+        private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
         {
             // If the user was added or password reset via Azure portal, assure that the user will not be prompted
             // for password on each command and make bash the default shell.
@@ -683,7 +684,7 @@ namespace CromwellOnAzureDeployer
 
             if (!configuration.Update)
             {
-                await WritePersonalizedFilesToVmAsync(sshConnectionInfo);
+                await WritePersonalizedFilesToVmAsync(sshConnectionInfo, managedIdentity);
             }
         }
 
@@ -744,13 +745,14 @@ namespace CromwellOnAzureDeployer
                 });
         }
 
-        private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo)
+        private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
         {
             var accountsFileContent = GetFileContent("scripts", "env-01-account-names.txt")
                 .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
                 .Replace("{CosmosDbAccountName}", configuration.CosmosDbAccountName)
                 .Replace("{BatchAccountName}", configuration.BatchAccountName)
-                .Replace("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName);
+                .Replace("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName)
+                .Replace("{ManagedIdentityClientId}", managedIdentity.ClientId);
 
             await UploadFilesToVirtualMachineAsync(
                 sshConnectionInfo,
@@ -1242,6 +1244,19 @@ namespace CromwellOnAzureDeployer
 
                         await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountText);
                     }
+                });
+        }
+
+        private Task PatchAccountNamesFileV240Async(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
+        {
+            return Execute(
+                $"Adding Managed Identity ClientId to 'env-01-account-names.txt' file on the VM...",
+                async () =>
+                {
+                    var accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt")).Output);
+                    accountNames["ManagedIdentityClientId"] = managedIdentity.ClientId;
+
+                    await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (DictionaryToDelimitedText(accountNames), $"{CromwellAzureRootDir}/env-01-account-names.txt", false));
                 });
         }
 
@@ -1828,6 +1843,11 @@ namespace CromwellOnAzureDeployer
             return text.Trim().Split(rowDelimiter)
                 .Select(r => r.Trim().Split(fieldDelimiter))
                 .ToDictionary(f => f[0].Trim(), f => f[1].Trim());
+        }
+        
+        private static string DictionaryToDelimitedText(Dictionary<string, string> dictionary, string fieldDelimiter = "=", string rowDelimiter = "\n")
+        {
+            return string.Join(rowDelimiter, dictionary.Select(kv => $"{kv.Key}{fieldDelimiter}{kv.Value}"));
         }
 
         private class ValidationException : Exception
