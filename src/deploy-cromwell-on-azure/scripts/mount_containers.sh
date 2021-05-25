@@ -8,11 +8,11 @@ set -o errtrace
 
 trap 'echo_with_ts "mount_containers failed with exit code $?"' ERR
 
-while getopts ac: option
+while getopts a:c: option
 do
   case "${option}" in
-    a) default_storage_account=${OPTARG};
-    c) managed_identity_client_id=${OPTARG};
+    a) default_storage_account=${OPTARG};;
+    c) managed_identity_client_id=${OPTARG};;
   esac
 done
 
