@@ -80,7 +80,7 @@
         /// <summary>
         /// CPU Model Name
         /// </summary>
-        [TesTaskLogMetadataKey("node_cpu_model_name")]
-        public string NodeCpuModelName { get; set; }
+        [TesTaskLogMetadataKey("vm_cpu_model_name")]
+        public string VmCpuModelName { get; set; }
     }
 }

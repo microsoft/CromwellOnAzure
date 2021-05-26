@@ -528,7 +528,7 @@ namespace TesApi.Web
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \\");
             sb.AppendLine($"write_ts UploadEnd && \\");
             sb.AppendLine($"/bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKiB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKiB=${{disk[2]}} >> /mnt{metricsPath}' && \\");
-            sb.AppendLine($"/bin/bash -c 'cpuname=( `cat /proc/cpuinfo | grep name | head -1 | cut -f 2 -d ':'`) && echo CpuModelName=${{cpuname[*]}} >> /mnt{metricsPath}' && \\");           
+            sb.AppendLine($"write_kv VmCpuModelName \"$(cat /proc/cpuinfo | grep -m1 name | cut -f 2 -d ':' | xargs)\" && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url \"{metricsUrl}\" --local-path \"{metricsPath}\" --rename --no-recursive");
 
             var batchScriptPath = $"{batchExecutionDirectoryPath}/{BatchScriptFileName}";
@@ -864,7 +864,7 @@ namespace TesApi.Web
                          
                         var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKiB", out var diskSizeInKiB)  ? diskSizeInKiB / kiBInGB : (double?)null;
                         var diskUsedInGB = TryGetValueAsDouble(metrics, "DiskUsedInKiB", out var diskUsedInKiB) ? diskUsedInKiB / kiBInGB : (double?)null;
-                        var obtainedCpuModelName = metrics.TryGetValue("CpuModelName", out var cpuModelName);
+                        var obtainedCpuModelName = metrics.TryGetValue("VmCpuModelName", out var cpuModelName);
                         
                         batchNodeMetrics = new BatchNodeMetrics
                         {
@@ -878,7 +878,7 @@ namespace TesApi.Web
                             FileUploadSizeInGB = TryGetValueAsDouble(metrics, "FileUploadSizeInBytes", out var fileUploadSizeInBytes) ? fileUploadSizeInBytes / bytesInGB : (double?)null,
                             DiskUsedInGB = diskUsedInGB,
                             DiskUsedPercent = diskUsedInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsedInGB / diskSizeInGB * 100 ) : null,
-                            NodeCpuModelName = obtainedCpuModelName ? cpuModelName :"Couldn't find value."
+                            VmCpuModelName = obtainedCpuModelName ? cpuModelName :"Couldn't find value."
                         };
 
                         taskStartTime = TryGetValueAsDateTimeOffset(metrics, "BlobXferPullStart", out var startTime) ? (DateTimeOffset?)startTime : null;
