@@ -1,8426 +1,1357 @@
 [
   {
-    "VmSizes": [
-      "Standard_Esv3_Type3"
-    ],
-    "VmSeries": [
-      "ESv3 Dedicated Host"
-    ],
-    "PricePerHour": 6.16,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Msv2_Type1"
-    ],
-    "VmSeries": [
-      "MSv2 Dedicated Host"
-    ],
-    "PricePerHour": 70.899,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M192ids_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 20.841,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M16ms"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 3.995,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_G2",
-      "Standard_GS2"
-    ],
-    "VmSeries": [
-      "G",
-      "GS"
-    ],
-    "PricePerHour": 1.22,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-8s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.016,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 3.192,
-    "LowPriority": false
-  },
+    "VmSize": "Basic_A1",
+    "PricePerHourDedicated": "0.023",
+    "PricePerHourLowPriority": "0.0062"
+  },
+  {
+    "VmSize": "Basic_A2",
+    "PricePerHourDedicated": "0.079",
+    "PricePerHourLowPriority": "0.0162"
+  },
+  {
+    "VmSize": "Basic_A3",
+    "PricePerHourDedicated": "0.188",
+    "PricePerHourLowPriority": "0.0352"
+  },
+  {
+    "VmSize": "Basic_A4",
+    "PricePerHourDedicated": "0.376",
+    "PricePerHourLowPriority": "0.0704"
+  },
+  {
+    "VmSize": "Standard_A1",
+    "PricePerHourDedicated": "0.06",
+    "PricePerHourLowPriority": "0.012"
+  },
+  {
+    "VmSize": "Standard_A1_v2",
+    "PricePerHourDedicated": "0.043",
+    "PricePerHourLowPriority": "0.009"
+  },
+  {
+    "VmSize": "Standard_A10",
+    "PricePerHourDedicated": "0.78",
+    "PricePerHourLowPriority": "0.156"
+  },
+  {
+    "VmSize": "Standard_A11",
+    "PricePerHourDedicated": "1.56",
+    "PricePerHourLowPriority": "0.312"
+  },
+  {
+    "VmSize": "Standard_A2",
+    "PricePerHourDedicated": "0.12",
+    "PricePerHourLowPriority": "0.024"
+  },
+  {
+    "VmSize": "Standard_A2_v2",
+    "PricePerHourDedicated": "0.091",
+    "PricePerHourLowPriority": "0.018"
+  },
+  {
+    "VmSize": "Standard_A2m_v2",
+    "PricePerHourDedicated": "0.119",
+    "PricePerHourLowPriority": "0.024"
+  },
+  {
+    "VmSize": "Standard_A3",
+    "PricePerHourDedicated": "0.24",
+    "PricePerHourLowPriority": "0.048"
+  },
+  {
+    "VmSize": "Standard_A4",
+    "PricePerHourDedicated": "0.48",
+    "PricePerHourLowPriority": "0.096"
+  },
+  {
+    "VmSize": "Standard_A4_v2",
+    "PricePerHourDedicated": "0.191",
+    "PricePerHourLowPriority": "0.038"
+  },
+  {
+    "VmSize": "Standard_A4m_v2",
+    "PricePerHourDedicated": "0.297",
+    "PricePerHourLowPriority": "0.059"
+  },
+  {
+    "VmSize": "Standard_A5",
+    "PricePerHourDedicated": "0.25",
+    "PricePerHourLowPriority": "0.05"
+  },
+  {
+    "VmSize": "Standard_A6",
+    "PricePerHourDedicated": "0.5",
+    "PricePerHourLowPriority": "0.1"
+  },
+  {
+    "VmSize": "Standard_A7",
+    "PricePerHourDedicated": "1",
+    "PricePerHourLowPriority": "0.2"
+  },
+  {
+    "VmSize": "Standard_A8",
+    "PricePerHourDedicated": "0.975",
+    "PricePerHourLowPriority": "0.195"
+  },
+  {
+    "VmSize": "Standard_A8_v2",
+    "PricePerHourDedicated": "0.4",
+    "PricePerHourLowPriority": "0.08"
+  },
+  {
+    "VmSize": "Standard_A8m_v2",
+    "PricePerHourDedicated": "0.594",
+    "PricePerHourLowPriority": "0.119"
+  },
+  {
+    "VmSize": "Standard_A9",
+    "PricePerHourDedicated": "1.95",
+    "PricePerHourLowPriority": "0.39"
+  },
+  {
+    "VmSize": "Standard_D1",
+    "PricePerHourDedicated": "0.077",
+    "PricePerHourLowPriority": "0.015"
+  },
+  {
+    "VmSize": "Standard_D1_v2",
+    "PricePerHourDedicated": "0.07",
+    "PricePerHourLowPriority": "0.0146"
+  },
+  {
+    "VmSize": "Standard_D11",
+    "PricePerHourDedicated": "0.193",
+    "PricePerHourLowPriority": "0.0386"
+  },
+  {
+    "VmSize": "Standard_D11_v2",
+    "PricePerHourDedicated": "0.185",
+    "PricePerHourLowPriority": "0.037"
+  },
+  {
+    "VmSize": "Standard_D12",
+    "PricePerHourDedicated": "0.386",
+    "PricePerHourLowPriority": "0.077"
+  },
+  {
+    "VmSize": "Standard_D12_v2",
+    "PricePerHourDedicated": "0.371",
+    "PricePerHourLowPriority": "0.074"
+  },
+  {
+    "VmSize": "Standard_D13",
+    "PricePerHourDedicated": "0.771",
+    "PricePerHourLowPriority": "0.154"
+  },
+  {
+    "VmSize": "Standard_D13_v2",
+    "PricePerHourDedicated": "0.741",
+    "PricePerHourLowPriority": "0.148"
+  },
+  {
+    "VmSize": "Standard_D14",
+    "PricePerHourDedicated": "1.542",
+    "PricePerHourLowPriority": "0.308"
+  },
+  {
+    "VmSize": "Standard_D14_v2",
+    "PricePerHourDedicated": "1.482",
+    "PricePerHourLowPriority": "0.296"
+  },
+  {
+    "VmSize": "Standard_D15_v2",
+    "PricePerHourDedicated": "1.853",
+    "PricePerHourLowPriority": "0.37"
+  },
+  {
+    "VmSize": "Standard_D16_v3",
+    "PricePerHourDedicated": "0.936",
+    "PricePerHourLowPriority": "0.154"
+  },
+  {
+    "VmSize": "Standard_D16a_v4",
+    "PricePerHourDedicated": "0.896",
+    "PricePerHourLowPriority": "0.179"
+  },
+  {
+    "VmSize": "Standard_D16as_v4",
+    "PricePerHourDedicated": "0.896",
+    "PricePerHourLowPriority": "0.179"
+  },
+  {
+    "VmSize": "Standard_D16d_v4",
+    "PricePerHourDedicated": "1.064",
+    "PricePerHourLowPriority": "0.213"
+  },
+  {
+    "VmSize": "Standard_D16ds_v4",
+    "PricePerHourDedicated": "1.064",
+    "PricePerHourLowPriority": "0.181"
+  },
+  {
+    "VmSize": "Standard_D16s_v3",
+    "PricePerHourDedicated": "0.936",
+    "PricePerHourLowPriority": "0.154"
+  },
+  {
+    "VmSize": "Standard_D2",
+    "PricePerHourDedicated": "0.154",
+    "PricePerHourLowPriority": "0.0308"
+  },
+  {
+    "VmSize": "Standard_D2_v2",
+    "PricePerHourDedicated": "0.14",
+    "PricePerHourLowPriority": "0.0279"
+  },
+  {
+    "VmSize": "Standard_D2_v3",
+    "PricePerHourDedicated": "0.096",
+    "PricePerHourLowPriority": "0.019"
+  },
+  {
+    "VmSize": "Standard_D2a_v4",
+    "PricePerHourDedicated": "0.112",
+    "PricePerHourLowPriority": "0.0224"
+  },
+  {
+    "VmSize": "Standard_D2as_v4",
+    "PricePerHourDedicated": "0.112",
+    "PricePerHourLowPriority": "0.0224"
+  },
+  {
+    "VmSize": "Standard_D2d_v4",
+    "PricePerHourDedicated": "0.113",
+    "PricePerHourLowPriority": "0.0266"
+  },
+  {
+    "VmSize": "Standard_D2ds_v4",
+    "PricePerHourDedicated": "0.133",
+    "PricePerHourLowPriority": "0.0266"
+  },
+  {
+    "VmSize": "Standard_D2s_v3",
+    "PricePerHourDedicated": "0.096",
+    "PricePerHourLowPriority": "0.019"
+  },
+  {
+    "VmSize": "Standard_D3",
+    "PricePerHourDedicated": "0.308",
+    "PricePerHourLowPriority": "0.0616"
+  },
+  {
+    "VmSize": "Standard_D3_v2",
+    "PricePerHourDedicated": "0.279",
+    "PricePerHourLowPriority": "0.0585"
+  },
+  {
+    "VmSize": "Standard_D32_v3",
+    "PricePerHourDedicated": "1.872",
+    "PricePerHourLowPriority": "0.307"
+  },
+  {
+    "VmSize": "Standard_D32a_v4",
+    "PricePerHourDedicated": "1.536",
+    "PricePerHourLowPriority": "0.307"
+  },
+  {
+    "VmSize": "Standard_D32as_v4",
+    "PricePerHourDedicated": "1.536",
+    "PricePerHourLowPriority": "0.307"
+  },
+  {
+    "VmSize": "Standard_D32d_v4",
+    "PricePerHourDedicated": "1.808",
+    "PricePerHourLowPriority": "0.362"
+  },
+  {
+    "VmSize": "Standard_D32ds_v4",
+    "PricePerHourDedicated": "1.808",
+    "PricePerHourLowPriority": "0.362"
+  },
+  {
+    "VmSize": "Standard_D32s_v3",
+    "PricePerHourDedicated": "1.872",
+    "PricePerHourLowPriority": "0.307"
+  },
+  {
+    "VmSize": "Standard_D4",
+    "PricePerHourDedicated": "0.616",
+    "PricePerHourLowPriority": "0.123"
+  },
+  {
+    "VmSize": "Standard_D4_v2",
+    "PricePerHourDedicated": "0.559",
+    "PricePerHourLowPriority": "0.112"
+  },
+  {
+    "VmSize": "Standard_D4_v3",
+    "PricePerHourDedicated": "0.192",
+    "PricePerHourLowPriority": "0.0468"
+  },
+  {
+    "VmSize": "Standard_D48_v3",
+    "PricePerHourDedicated": "2.304",
+    "PricePerHourLowPriority": "0.562"
+  },
+  {
+    "VmSize": "Standard_D48a_v4",
+    "PricePerHourDedicated": "2.304",
+    "PricePerHourLowPriority": "0.538"
+  },
+  {
+    "VmSize": "Standard_D48as_v4",
+    "PricePerHourDedicated": "2.304",
+    "PricePerHourLowPriority": "0.538"
+  },
+  {
+    "VmSize": "Standard_D48d_v4",
+    "PricePerHourDedicated": "3.192",
+    "PricePerHourLowPriority": "0.542"
+  },
+  {
+    "VmSize": "Standard_D48ds_v4",
+    "PricePerHourDedicated": "3.192",
+    "PricePerHourLowPriority": "0.638"
+  },
+  {
+    "VmSize": "Standard_D48s_v3",
+    "PricePerHourDedicated": "2.304",
+    "PricePerHourLowPriority": "0.562"
+  },
+  {
+    "VmSize": "Standard_D4a_v4",
+    "PricePerHourDedicated": "0.224",
+    "PricePerHourLowPriority": "0.0384"
+  },
+  {
+    "VmSize": "Standard_D4as_v4",
+    "PricePerHourDedicated": "0.224",
+    "PricePerHourLowPriority": "0.0384"
+  },
+  {
+    "VmSize": "Standard_D4d_v4",
+    "PricePerHourDedicated": "0.226",
+    "PricePerHourLowPriority": "0.0452"
+  },
+  {
+    "VmSize": "Standard_D4ds_v4",
+    "PricePerHourDedicated": "0.226",
+    "PricePerHourLowPriority": "0.0532"
+  },
+  {
+    "VmSize": "Standard_D4s_v3",
+    "PricePerHourDedicated": "0.192",
+    "PricePerHourLowPriority": "0.0468"
+  },
+  {
+    "VmSize": "Standard_D5_v2",
+    "PricePerHourDedicated": "1.117",
+    "PricePerHourLowPriority": "0.234"
+  },
+  {
+    "VmSize": "Standard_D64_v3",
+    "PricePerHourDedicated": "3.072",
+    "PricePerHourLowPriority": "0.614"
+  },
+  {
+    "VmSize": "Standard_D64a_v4",
+    "PricePerHourDedicated": "3.072",
+    "PricePerHourLowPriority": "0.614"
+  },
+  {
+    "VmSize": "Standard_D64as_v4",
+    "PricePerHourDedicated": "3.072",
+    "PricePerHourLowPriority": "0.614"
+  },
+  {
+    "VmSize": "Standard_D64d_v4",
+    "PricePerHourDedicated": "3.616",
+    "PricePerHourLowPriority": "0.851"
+  },
+  {
+    "VmSize": "Standard_D64ds_v4",
+    "PricePerHourDedicated": "3.616",
+    "PricePerHourLowPriority": "0.723"
+  },
+  {
+    "VmSize": "Standard_D64s_v3",
+    "PricePerHourDedicated": "3.072",
+    "PricePerHourLowPriority": "0.614"
+  },
+  {
+    "VmSize": "Standard_D8_v3",
+    "PricePerHourDedicated": "0.468",
+    "PricePerHourLowPriority": "0.0936"
+  },
+  {
+    "VmSize": "Standard_D8a_v4",
+    "PricePerHourDedicated": "0.448",
+    "PricePerHourLowPriority": "0.0768"
+  },
+  {
+    "VmSize": "Standard_D8as_v4",
+    "PricePerHourDedicated": "0.448",
+    "PricePerHourLowPriority": "0.0768"
+  },
+  {
+    "VmSize": "Standard_D8d_v4",
+    "PricePerHourDedicated": "0.452",
+    "PricePerHourLowPriority": "0.106"
+  },
+  {
+    "VmSize": "Standard_D8ds_v4",
+    "PricePerHourDedicated": "0.452",
+    "PricePerHourLowPriority": "0.106"
+  },
+  {
+    "VmSize": "Standard_D8s_v3",
+    "PricePerHourDedicated": "0.468",
+    "PricePerHourLowPriority": "0.0936"
+  },
+  {
+    "VmSize": "Standard_D96a_v4",
+    "PricePerHourDedicated": "4.608",
+    "PricePerHourLowPriority": "1.075"
+  },
+  {
+    "VmSize": "Standard_D96as_v4",
+    "PricePerHourDedicated": "4.608",
+    "PricePerHourLowPriority": "1.075"
+  },
+  {
+    "VmSize": "Standard_DC1s_v2",
+    "PricePerHourDedicated": "0.198",
+    "PricePerHourLowPriority": "0.0395"
+  },
+  {
+    "VmSize": "Standard_DC2s_v2",
+    "PricePerHourDedicated": "0.395",
+    "PricePerHourLowPriority": "0.0791"
+  },
+  {
+    "VmSize": "Standard_DC4s_v2",
+    "PricePerHourDedicated": "1.028",
+    "PricePerHourLowPriority": "0.158"
+  },
+  {
+    "VmSize": "Standard_DS1",
+    "PricePerHourDedicated": "0.077",
+    "PricePerHourLowPriority": "0.015"
+  },
+  {
+    "VmSize": "Standard_DS1_v2",
+    "PricePerHourDedicated": "0.07",
+    "PricePerHourLowPriority": "0.0146"
+  },
+  {
+    "VmSize": "Standard_DS11",
+    "PricePerHourDedicated": "0.193",
+    "PricePerHourLowPriority": "0.0386"
+  },
+  {
+    "VmSize": "Standard_DS11_v2",
+    "PricePerHourDedicated": "0.185",
+    "PricePerHourLowPriority": "0.037"
+  },
+  {
+    "VmSize": "Standard_DS12",
+    "PricePerHourDedicated": "0.386",
+    "PricePerHourLowPriority": "0.077"
+  },
+  {
+    "VmSize": "Standard_DS12_v2",
+    "PricePerHourDedicated": "0.371",
+    "PricePerHourLowPriority": "0.074"
+  },
+  {
+    "VmSize": "Standard_DS13",
+    "PricePerHourDedicated": "0.771",
+    "PricePerHourLowPriority": "0.154"
+  },
+  {
+    "VmSize": "Standard_DS13_v2",
+    "PricePerHourDedicated": "0.741",
+    "PricePerHourLowPriority": "0.148"
+  },
+  {
+    "VmSize": "Standard_DS14",
+    "PricePerHourDedicated": "1.542",
+    "PricePerHourLowPriority": "0.308"
+  },
+  {
+    "VmSize": "Standard_DS14_v2",
+    "PricePerHourDedicated": "1.482",
+    "PricePerHourLowPriority": "0.296"
+  },
+  {
+    "VmSize": "Standard_DS15_v2",
+    "PricePerHourDedicated": "1.853",
+    "PricePerHourLowPriority": "0.37"
+  },
+  {
+    "VmSize": "Standard_DS2",
+    "PricePerHourDedicated": "0.154",
+    "PricePerHourLowPriority": "0.0308"
+  },
+  {
+    "VmSize": "Standard_DS2_v2",
+    "PricePerHourDedicated": "0.14",
+    "PricePerHourLowPriority": "0.0279"
+  },
+  {
+    "VmSize": "Standard_DS3",
+    "PricePerHourDedicated": "0.308",
+    "PricePerHourLowPriority": "0.0616"
+  },
+  {
+    "VmSize": "Standard_DS3_v2",
+    "PricePerHourDedicated": "0.279",
+    "PricePerHourLowPriority": "0.0585"
+  },
+  {
+    "VmSize": "Standard_DS4",
+    "PricePerHourDedicated": "0.616",
+    "PricePerHourLowPriority": "0.123"
+  },
+  {
+    "VmSize": "Standard_DS4_v2",
+    "PricePerHourDedicated": "0.559",
+    "PricePerHourLowPriority": "0.112"
+  },
+  {
+    "VmSize": "Standard_DS5_v2",
+    "PricePerHourDedicated": "1.117",
+    "PricePerHourLowPriority": "0.234"
+  },
+  {
+    "VmSize": "Standard_E16_v3",
+    "PricePerHourDedicated": "1.12",
+    "PricePerHourLowPriority": "0.202"
+  },
+  {
+    "VmSize": "Standard_E16a_v4",
+    "PricePerHourDedicated": "1.12",
+    "PricePerHourLowPriority": "0.224"
+  },
+  {
+    "VmSize": "Standard_E16as_v4",
+    "PricePerHourDedicated": "1.12",
+    "PricePerHourLowPriority": "0.224"
+  },
+  {
+    "VmSize": "Standard_E16d_v4",
+    "PricePerHourDedicated": "1.152",
+    "PricePerHourLowPriority": "0.23"
+  },
+  {
+    "VmSize": "Standard_E16ds_v4",
+    "PricePerHourDedicated": "1.296",
+    "PricePerHourLowPriority": "0.23"
+  },
+  {
+    "VmSize": "Standard_E16s_v3",
+    "PricePerHourDedicated": "1.12",
+    "PricePerHourLowPriority": "0.202"
+  },
+  {
+    "VmSize": "Standard_E2_v3",
+    "PricePerHourDedicated": "0.148",
+    "PricePerHourLowPriority": "0.0252"
+  },
+  {
+    "VmSize": "Standard_E2a_v4",
+    "PricePerHourDedicated": "0.14",
+    "PricePerHourLowPriority": "0.028"
+  },
+  {
+    "VmSize": "Standard_E2as_v4",
+    "PricePerHourDedicated": "0.14",
+    "PricePerHourLowPriority": "0.028"
+  },
+  {
+    "VmSize": "Standard_E2d_v4",
+    "PricePerHourDedicated": "0.144",
+    "PricePerHourLowPriority": "0.0288"
+  },
+  {
+    "VmSize": "Standard_E2ds_v4",
+    "PricePerHourDedicated": "0.162",
+    "PricePerHourLowPriority": "0.0324"
+  },
+  {
+    "VmSize": "Standard_E2s_v3",
+    "PricePerHourDedicated": "0.148",
+    "PricePerHourLowPriority": "0.0252"
+  },
+  {
+    "VmSize": "Standard_E32_v3",
+    "PricePerHourDedicated": "2.24",
+    "PricePerHourLowPriority": "0.474"
+  },
+  {
+    "VmSize": "Standard_E32a_v4",
+    "PricePerHourDedicated": "2.016",
+    "PricePerHourLowPriority": "0.403"
+  },
+  {
+    "VmSize": "Standard_E32as_v4",
+    "PricePerHourDedicated": "2.016",
+    "PricePerHourLowPriority": "0.403"
+  },
+  {
+    "VmSize": "Standard_E32d_v4",
+    "PricePerHourDedicated": "2.304",
+    "PricePerHourLowPriority": "0.518"
+  },
+  {
+    "VmSize": "Standard_E32ds_v4",
+    "PricePerHourDedicated": "2.304",
+    "PricePerHourLowPriority": "0.518"
+  },
+  {
+    "VmSize": "Standard_E32s_v3",
+    "PricePerHourDedicated": "2.24",
+    "PricePerHourLowPriority": "0.474"
+  },
+  {
+    "VmSize": "Standard_E4_v3",
+    "PricePerHourDedicated": "0.252",
+    "PricePerHourLowPriority": "0.059"
+  },
+  {
+    "VmSize": "Standard_E48_v3",
+    "PricePerHourDedicated": "3.36",
+    "PricePerHourLowPriority": "0.605"
+  },
+  {
+    "VmSize": "Standard_E48a_v4",
+    "PricePerHourDedicated": "3.024",
+    "PricePerHourLowPriority": "0.672"
+  },
+  {
+    "VmSize": "Standard_E48as_v4",
+    "PricePerHourDedicated": "3.024",
+    "PricePerHourLowPriority": "0.672"
+  },
+  {
+    "VmSize": "Standard_E48d_v4",
+    "PricePerHourDedicated": "3.888",
+    "PricePerHourLowPriority": "0.691"
+  },
+  {
+    "VmSize": "Standard_E48ds_v4",
+    "PricePerHourDedicated": "3.888",
+    "PricePerHourLowPriority": "0.778"
+  },
+  {
+    "VmSize": "Standard_E48s_v3",
+    "PricePerHourDedicated": "3.36",
+    "PricePerHourLowPriority": "0.605"
+  },
+  {
+    "VmSize": "Standard_E4a_v4",
+    "PricePerHourDedicated": "0.252",
+    "PricePerHourLowPriority": "0.056"
+  },
+  {
+    "VmSize": "Standard_E4as_v4",
+    "PricePerHourDedicated": "0.252",
+    "PricePerHourLowPriority": "0.056"
+  },
+  {
+    "VmSize": "Standard_E4d_v4",
+    "PricePerHourDedicated": "0.288",
+    "PricePerHourLowPriority": "0.0576"
+  },
+  {
+    "VmSize": "Standard_E4ds_v4",
+    "PricePerHourDedicated": "0.324",
+    "PricePerHourLowPriority": "0.0576"
+  },
+  {
+    "VmSize": "Standard_E4s_v3",
+    "PricePerHourDedicated": "0.252",
+    "PricePerHourLowPriority": "0.059"
+  },
+  {
+    "VmSize": "Standard_E64_v3",
+    "PricePerHourDedicated": "4.032",
+    "PricePerHourLowPriority": "0.806"
+  },
+  {
+    "VmSize": "Standard_E64a_v4",
+    "PricePerHourDedicated": "4.48",
+    "PricePerHourLowPriority": "0.806"
+  },
+  {
+    "VmSize": "Standard_E64as_v4",
+    "PricePerHourDedicated": "4.48",
+    "PricePerHourLowPriority": "0.806"
+  },
+  {
+    "VmSize": "Standard_E64d_v4",
+    "PricePerHourDedicated": "5.184",
+    "PricePerHourLowPriority": "0.922"
+  },
+  {
+    "VmSize": "Standard_E64ds_v4",
+    "PricePerHourDedicated": "5.184",
+    "PricePerHourLowPriority": "1.037"
+  },
+  {
+    "VmSize": "Standard_E64i_v3",
+    "PricePerHourDedicated": "4.032",
+    "PricePerHourLowPriority": "0.806"
+  },
+  {
+    "VmSize": "Standard_E64s_v3",
+    "PricePerHourDedicated": "4.032",
+    "PricePerHourLowPriority": "0.806"
+  },
+  {
+    "VmSize": "Standard_E8_v3",
+    "PricePerHourDedicated": "0.504",
+    "PricePerHourLowPriority": "0.101"
+  },
+  {
+    "VmSize": "Standard_E80ids_v4",
+    "PricePerHourDedicated": "5.76",
+    "PricePerHourLowPriority": "1.152"
+  },
+  {
+    "VmSize": "Standard_E80is_v4",
+    "PricePerHourDedicated": "5.04",
+    "PricePerHourLowPriority": "1.12"
+  },
+  {
+    "VmSize": "Standard_E8a_v4",
+    "PricePerHourDedicated": "0.504",
+    "PricePerHourLowPriority": "0.112"
+  },
+  {
+    "VmSize": "Standard_E8as_v4",
+    "PricePerHourDedicated": "0.504",
+    "PricePerHourLowPriority": "0.112"
+  },
+  {
+    "VmSize": "Standard_E8d_v4",
+    "PricePerHourDedicated": "0.648",
+    "PricePerHourLowPriority": "0.13"
+  },
+  {
+    "VmSize": "Standard_E8ds_v4",
+    "PricePerHourDedicated": "0.648",
+    "PricePerHourLowPriority": "0.115"
+  },
+  {
+    "VmSize": "Standard_E8s_v3",
+    "PricePerHourDedicated": "0.504",
+    "PricePerHourLowPriority": "0.101"
+  },
+  {
+    "VmSize": "Standard_E96a_v4",
+    "PricePerHourDedicated": "6.048",
+    "PricePerHourLowPriority": "1.344"
+  },
+  {
+    "VmSize": "Standard_E96as_v4",
+    "PricePerHourDedicated": "6.048",
+    "PricePerHourLowPriority": "1.344"
+  },
+  {
+    "VmSize": "Standard_F1",
+    "PricePerHourDedicated": "0.062",
+    "PricePerHourLowPriority": "0.012"
+  },
+  {
+    "VmSize": "Standard_F16",
+    "PricePerHourDedicated": "0.996",
+    "PricePerHourLowPriority": "0.159"
+  },
+  {
+    "VmSize": "Standard_F16s",
+    "PricePerHourDedicated": "0.996",
+    "PricePerHourLowPriority": "0.159"
+  },
+  {
+    "VmSize": "Standard_F16s_v2",
+    "PricePerHourDedicated": "0.848",
+    "PricePerHourLowPriority": "0.135"
+  },
+  {
+    "VmSize": "Standard_F1s",
+    "PricePerHourDedicated": "0.062",
+    "PricePerHourLowPriority": "0.012"
+  },
+  {
+    "VmSize": "Standard_F2",
+    "PricePerHourDedicated": "0.099",
+    "PricePerHourLowPriority": "0.0199"
+  },
+  {
+    "VmSize": "Standard_F2s",
+    "PricePerHourDedicated": "0.099",
+    "PricePerHourLowPriority": "0.0199"
+  },
+  {
+    "VmSize": "Standard_F2s_v2",
+    "PricePerHourDedicated": "0.106",
+    "PricePerHourLowPriority": "0.017"
+  },
+  {
+    "VmSize": "Standard_F32s_v2",
+    "PricePerHourDedicated": "1.353",
+    "PricePerHourLowPriority": "0.272"
+  },
+  {
+    "VmSize": "Standard_F4",
+    "PricePerHourDedicated": "0.199",
+    "PricePerHourLowPriority": "0.0398"
+  },
+  {
+    "VmSize": "Standard_F48s_v2",
+    "PricePerHourDedicated": "2.544",
+    "PricePerHourLowPriority": "0.509"
+  },
+  {
+    "VmSize": "Standard_F4s",
+    "PricePerHourDedicated": "0.199",
+    "PricePerHourLowPriority": "0.0398"
+  },
+  {
+    "VmSize": "Standard_F4s_v2",
+    "PricePerHourDedicated": "0.212",
+    "PricePerHourLowPriority": "0.034"
+  },
+  {
+    "VmSize": "Standard_F64s_v2",
+    "PricePerHourDedicated": "3.392",
+    "PricePerHourLowPriority": "0.544"
+  },
+  {
+    "VmSize": "Standard_F72s_v2",
+    "PricePerHourDedicated": "3.816",
+    "PricePerHourLowPriority": "0.612"
+  },
+  {
+    "VmSize": "Standard_F8",
+    "PricePerHourDedicated": "0.398",
+    "PricePerHourLowPriority": "0.0796"
+  },
+  {
+    "VmSize": "Standard_F8s",
+    "PricePerHourDedicated": "0.398",
+    "PricePerHourLowPriority": "0.0796"
+  },
+  {
+    "VmSize": "Standard_F8s_v2",
+    "PricePerHourDedicated": "0.424",
+    "PricePerHourLowPriority": "0.0677"
+  },
+  {
+    "VmSize": "Standard_G1",
+    "PricePerHourDedicated": "0.61",
+    "PricePerHourLowPriority": "0.122"
+  },
+  {
+    "VmSize": "Standard_G2",
+    "PricePerHourDedicated": "1.22",
+    "PricePerHourLowPriority": "0.244"
+  },
+  {
+    "VmSize": "Standard_G3",
+    "PricePerHourDedicated": "2.44",
+    "PricePerHourLowPriority": "0.488"
+  },
+  {
+    "VmSize": "Standard_G4",
+    "PricePerHourDedicated": "4.88",
+    "PricePerHourLowPriority": "0.976"
+  },
+  {
+    "VmSize": "Standard_G5",
+    "PricePerHourDedicated": "8.69",
+    "PricePerHourLowPriority": "1.738"
+  },
+  {
+    "VmSize": "Standard_GS1",
+    "PricePerHourDedicated": "0.61",
+    "PricePerHourLowPriority": "0.122"
+  },
+  {
+    "VmSize": "Standard_GS2",
+    "PricePerHourDedicated": "1.22",
+    "PricePerHourLowPriority": "0.244"
+  },
+  {
+    "VmSize": "Standard_GS3",
+    "PricePerHourDedicated": "2.44",
+    "PricePerHourLowPriority": "0.488"
+  },
+  {
+    "VmSize": "Standard_GS4",
+    "PricePerHourDedicated": "4.88",
+    "PricePerHourLowPriority": "0.976"
+  },
+  {
+    "VmSize": "Standard_GS5",
+    "PricePerHourDedicated": "8.69",
+    "PricePerHourLowPriority": "1.738"
+  },
+  {
+    "VmSize": "Standard_H16",
+    "PricePerHourDedicated": "1.941",
+    "PricePerHourLowPriority": "0.361"
+  },
+  {
+    "VmSize": "Standard_H16_Promo",
+    "PricePerHourDedicated": "1.165",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_H16m",
+    "PricePerHourDedicated": "2.422",
+    "PricePerHourLowPriority": "0.52"
+  },
+  {
+    "VmSize": "Standard_H16m_Promo",
+    "PricePerHourDedicated": "1.454",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_H16mr",
+    "PricePerHourDedicated": "2.664",
+    "PricePerHourLowPriority": "0.533"
+  },
+  {
+    "VmSize": "Standard_H16mr_Promo",
+    "PricePerHourDedicated": "1.717",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_H16r",
+    "PricePerHourDedicated": "2.136",
+    "PricePerHourLowPriority": "0.398"
+  },
+  {
+    "VmSize": "Standard_H16r_Promo",
+    "PricePerHourDedicated": "1.194",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_H8",
+    "PricePerHourDedicated": "0.904",
+    "PricePerHourLowPriority": "0.181"
+  },
+  {
+    "VmSize": "Standard_H8_Promo",
+    "PricePerHourDedicated": "0.543",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_H8m",
+    "PricePerHourDedicated": "1.211",
+    "PricePerHourLowPriority": "0.26"
+  },
+  {
+    "VmSize": "Standard_H8m_Promo",
+    "PricePerHourDedicated": "0.727",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_HB120-16rs_v3",
+    "PricePerHourDedicated": "3.6",
+    "PricePerHourLowPriority": "0.72"
+  },
+  {
+    "VmSize": "Standard_HB120-32rs_v3",
+    "PricePerHourDedicated": "3.6",
+    "PricePerHourLowPriority": "0.72"
+  },
+  {
+    "VmSize": "Standard_HB120-64rs_v3",
+    "PricePerHourDedicated": "3.6",
+    "PricePerHourLowPriority": "0.72"
+  },
+  {
+    "VmSize": "Standard_HB120-96rs_v3",
+    "PricePerHourDedicated": "3.6",
+    "PricePerHourLowPriority": "0.72"
+  },
+  {
+    "VmSize": "Standard_HB120rs_v2",
+    "PricePerHourDedicated": "3.6",
+    "PricePerHourLowPriority": "0.72"
+  },
+  {
+    "VmSize": "Standard_HB120rs_v3",
+    "PricePerHourDedicated": "3.6",
+    "PricePerHourLowPriority": "0.72"
+  },
+  {
+    "VmSize": "Standard_HB60rs",
+    "PricePerHourDedicated": "2.28",
+    "PricePerHourLowPriority": "0.456"
+  },
+  {
+    "VmSize": "Standard_HC44rs",
+    "PricePerHourDedicated": "3.168",
+    "PricePerHourLowPriority": "0.634"
+  },
+  {
+    "VmSize": "Standard_L16s",
+    "PricePerHourDedicated": "1.376",
+    "PricePerHourLowPriority": "0.275"
+  },
+  {
+    "VmSize": "Standard_L16s_v2",
+    "PricePerHourDedicated": "1.248",
+    "PricePerHourLowPriority": "0.25"
+  },
+  {
+    "VmSize": "Standard_L32s",
+    "PricePerHourDedicated": "2.752",
+    "PricePerHourLowPriority": "0.55"
+  },
+  {
+    "VmSize": "Standard_L32s_v2",
+    "PricePerHourDedicated": "2.496",
+    "PricePerHourLowPriority": "0.499"
+  },
+  {
+    "VmSize": "Standard_L48s_v2",
+    "PricePerHourDedicated": "4.128",
+    "PricePerHourLowPriority": "0.749"
+  },
+  {
+    "VmSize": "Standard_L4s",
+    "PricePerHourDedicated": "0.344",
+    "PricePerHourLowPriority": "0.0688"
+  },
+  {
+    "VmSize": "Standard_L64s_v2",
+    "PricePerHourDedicated": "4.992",
+    "PricePerHourLowPriority": "1.101"
+  },
+  {
+    "VmSize": "Standard_L80s_v2",
+    "PricePerHourDedicated": "6.24",
+    "PricePerHourLowPriority": "1.376"
+  },
+  {
+    "VmSize": "Standard_L8s",
+    "PricePerHourDedicated": "0.688",
+    "PricePerHourLowPriority": "0.138"
+  },
+  {
+    "VmSize": "Standard_L8s_v2",
+    "PricePerHourDedicated": "0.688",
+    "PricePerHourLowPriority": "0.125"
+  },
+  {
+    "VmSize": "Standard_M128",
+    "PricePerHourDedicated": "17.339",
+    "PricePerHourLowPriority": "3.468"
+  },
+  {
+    "VmSize": "Standard_M128m",
+    "PricePerHourDedicated": "34.694",
+    "PricePerHourLowPriority": "6.939"
+  },
+  {
+    "VmSize": "Standard_M128ms",
+    "PricePerHourDedicated": "34.694",
+    "PricePerHourLowPriority": "6.939"
+  },
+  {
+    "VmSize": "Standard_M128s",
+    "PricePerHourDedicated": "17.339",
+    "PricePerHourLowPriority": "3.468"
+  },
+  {
+    "VmSize": "Standard_M16ms",
+    "PricePerHourDedicated": "3.995",
+    "PricePerHourLowPriority": "0.799"
+  },
+  {
+    "VmSize": "Standard_M208ms_v2",
+    "PricePerHourDedicated": "44.62",
+    "PricePerHourLowPriority": "11.601"
+  },
+  {
+    "VmSize": "Standard_M208s_v2",
+    "PricePerHourDedicated": "29.003",
+    "PricePerHourLowPriority": "4.462"
+  },
+  {
+    "VmSize": "Standard_M32ls",
+    "PricePerHourDedicated": "2.873",
+    "PricePerHourLowPriority": "0.5746"
+  },
+  {
+    "VmSize": "Standard_M32ms",
+    "PricePerHourDedicated": "6.146",
+    "PricePerHourLowPriority": "1.2292"
+  },
+  {
+    "VmSize": "Standard_M32ts",
+    "PricePerHourDedicated": "2.707",
+    "PricePerHourLowPriority": "0.603"
+  },
+  {
+    "VmSize": "Standard_M416ms_v2",
+    "PricePerHourDedicated": "99.15",
+    "PricePerHourLowPriority": "25.779"
+  },
+  {
+    "VmSize": "Standard_M416s_v2",
+    "PricePerHourDedicated": "64.454",
+    "PricePerHourLowPriority": "12.891"
+  },
+  {
+    "VmSize": "Standard_M64",
+    "PricePerHourDedicated": "8.67",
+    "PricePerHourLowPriority": "1.734"
+  },
+  {
+    "VmSize": "Standard_M64ls",
+    "PricePerHourDedicated": "6.403",
+    "PricePerHourLowPriority": "1.281"
+  },
+  {
+    "VmSize": "Standard_M64m",
+    "PricePerHourDedicated": "10.337",
+    "PricePerHourLowPriority": "3.469"
+  },
+  {
+    "VmSize": "Standard_M64ms",
+    "PricePerHourDedicated": "10.337",
+    "PricePerHourLowPriority": "3.469"
+  },
+  {
+    "VmSize": "Standard_M64s",
+    "PricePerHourDedicated": "8.67",
+    "PricePerHourLowPriority": "1.734"
+  },
+  {
+    "VmSize": "Standard_M8ms",
+    "PricePerHourDedicated": "1.997",
+    "PricePerHourLowPriority": "0.3073"
+  },
+  {
+    "VmSize": "Standard_NC12",
+    "PricePerHourDedicated": "1.8",
+    "PricePerHourLowPriority": "0.432"
+  },
+  {
+    "VmSize": "Standard_NC12_Promo",
+    "PricePerHourDedicated": "0.95",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_NC12s_v2",
+    "PricePerHourDedicated": "4.14",
+    "PricePerHourLowPriority": "0.828"
+  },
+  {
+    "VmSize": "Standard_NC12s_v3",
+    "PricePerHourDedicated": "7.956",
+    "PricePerHourLowPriority": "1.224"
+  },
+  {
+    "VmSize": "Standard_NC16as_T4_v3",
+    "PricePerHourDedicated": "1.204",
+    "PricePerHourLowPriority": "0.241"
+  },
+  {
+    "VmSize": "Standard_NC24",
+    "PricePerHourDedicated": "3.6",
+    "PricePerHourLowPriority": "0.864"
+  },
+  {
+    "VmSize": "Standard_NC24_Promo",
+    "PricePerHourDedicated": "1.584",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_NC24r",
+    "PricePerHourDedicated": "3.96",
+    "PricePerHourLowPriority": "0.792"
+  },
+  {
+    "VmSize": "Standard_NC24r_Promo",
+    "PricePerHourDedicated": "2.091",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_NC24rs_v2",
+    "PricePerHourDedicated": "9.108",
+    "PricePerHourLowPriority": "1.8216"
+  },
+  {
+    "VmSize": "Standard_NC24rs_v3",
+    "PricePerHourDedicated": "13.464",
+    "PricePerHourLowPriority": "3.501"
+  },
+  {
+    "VmSize": "Standard_NC24s_v2",
+    "PricePerHourDedicated": "8.28",
+    "PricePerHourLowPriority": "1.656"
+  },
+  {
+    "VmSize": "Standard_NC24s_v3",
+    "PricePerHourDedicated": "15.912",
+    "PricePerHourLowPriority": "3.182"
+  },
+  {
+    "VmSize": "Standard_NC4as_T4_v3",
+    "PricePerHourDedicated": "0.526",
+    "PricePerHourLowPriority": "0.105"
+  },
+  {
+    "VmSize": "Standard_NC6",
+    "PricePerHourDedicated": "0.9",
+    "PricePerHourLowPriority": "0.18"
+  },
+  {
+    "VmSize": "Standard_NC6_Promo",
+    "PricePerHourDedicated": "0.396",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_NC64as_T4_v3",
+    "PricePerHourDedicated": "5.222",
+    "PricePerHourLowPriority": "0.87"
+  },
+  {
+    "VmSize": "Standard_NC6s_v2",
+    "PricePerHourDedicated": "2.07",
+    "PricePerHourLowPriority": "0.414"
+  },
+  {
+    "VmSize": "Standard_NC6s_v3",
+    "PricePerHourDedicated": "3.06",
+    "PricePerHourLowPriority": "0.796"
+  },
+  {
+    "VmSize": "Standard_NC8as_T4_v3",
+    "PricePerHourDedicated": "0.902",
+    "PricePerHourLowPriority": "0.15"
+  },
+  {
+    "VmSize": "Standard_ND12s",
+    "PricePerHourDedicated": "4.14",
+    "PricePerHourLowPriority": "0.828"
+  },
+  {
+    "VmSize": "Standard_ND24rs",
+    "PricePerHourDedicated": "9.108",
+    "PricePerHourLowPriority": "1.8216"
+  },
+  {
+    "VmSize": "Standard_ND24s",
+    "PricePerHourDedicated": "8.28",
+    "PricePerHourLowPriority": "1.656"
+  },
+  {
+    "VmSize": "Standard_ND40rs_v2",
+    "PricePerHourDedicated": "22.032",
+    "PricePerHourLowPriority": "4.406"
+  },
+  {
+    "VmSize": "Standard_ND40s_v2",
+    "PricePerHourDedicated": "12.24",
+    "PricePerHourLowPriority": "2.448"
+  },
+  {
+    "VmSize": "Standard_ND6s",
+    "PricePerHourDedicated": "2.07",
+    "PricePerHourLowPriority": "0.414"
+  },
+  {
+    "VmSize": "Standard_ND96asr_v4",
+    "PricePerHourDedicated": "27.197",
+    "PricePerHourLowPriority": "5.439"
+  },
+  {
+    "VmSize": "Standard_NP10s",
+    "PricePerHourDedicated": "1.65",
+    "PricePerHourLowPriority": "0.33"
+  },
+  {
+    "VmSize": "Standard_NP20s",
+    "PricePerHourDedicated": "3.3",
+    "PricePerHourLowPriority": "0.66"
+  },
+  {
+    "VmSize": "Standard_NP40s",
+    "PricePerHourDedicated": "6.6",
+    "PricePerHourLowPriority": "1.32"
+  },
+  {
+    "VmSize": "Standard_NV12",
+    "PricePerHourDedicated": "2.28",
+    "PricePerHourLowPriority": "0.496"
+  },
+  {
+    "VmSize": "Standard_NV12_Promo",
+    "PricePerHourDedicated": "1.488",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_NV12s_v3",
+    "PricePerHourDedicated": "1.14",
+    "PricePerHourLowPriority": "0.228"
+  },
+  {
+    "VmSize": "Standard_NV16as_v4",
+    "PricePerHourDedicated": "0.932",
+    "PricePerHourLowPriority": "0.186"
+  },
+  {
+    "VmSize": "Standard_NV24",
+    "PricePerHourDedicated": "4.56",
+    "PricePerHourLowPriority": "0.992"
+  },
+  {
+    "VmSize": "Standard_NV24_Promo",
+    "PricePerHourDedicated": "2.976",
+    "PricePerHourLowPriority": null
+  },
+  {
+    "VmSize": "Standard_NV24s_v3",
+    "PricePerHourDedicated": "2.28",
+    "PricePerHourLowPriority": "0.456"
+  },
+  {
+    "VmSize": "Standard_NV32as_v4",
+    "PricePerHourDedicated": "1.864",
+    "PricePerHourLowPriority": "0.373"
+  },
+  {
+    "VmSize": "Standard_NV48s_v3",
+    "PricePerHourDedicated": "4.56",
+    "PricePerHourLowPriority": "0.912"
+  },
+  {
+    "VmSize": "Standard_NV4as_v4",
+    "PricePerHourDedicated": "0.233",
+    "PricePerHourLowPriority": "0.0466"
+  },
+  {
+    "VmSize": "Standard_NV6",
+    "PricePerHourDedicated": "1.14",
+    "PricePerHourLowPriority": "0.228"
+  },
+  {
+    "VmSize": "Standard_NV6_Promo",
+    "PricePerHourDedicated": "0.684",
+    "PricePerHourLowPriority": null
+  },
   {
-    "VmSizes": [
-      "Standard_NV24s_v3"
-    ],
-    "VmSeries": [
-      "NVSv3"
-    ],
-    "PricePerHour": 0.456,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L16s"
-    ],
-    "VmSeries": [
-      "LS"
-    ],
-    "PricePerHour": 1.376,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4_v3",
-      "Standard_E4s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.059,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-16s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 2.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v2",
-      "Standard_DS2_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.14,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.389,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Mdsv2MedMem_Type1"
-    ],
-    "VmSeries": [
-      "Virtual Machines"
-    ],
-    "PricePerHour": 19.076,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 1.68,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-4ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.648,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M128ds_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 17.342,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC8as_T4_v3"
-    ],
-    "VmSeries": [
-      "NCasv3 T4"
-    ],
-    "PricePerHour": 0.902,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A8m_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.594,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.14,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A9"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 1.95,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.358,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.944,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 5.4,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.056,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64a_v4",
-      "Standard_E64as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 4.48,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 0.0532,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.204,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D3_v2_Promo",
-      "Standard_DS3_v2_-_Expired_Promo"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.279,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Basic_A4"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.376,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC24"
-    ],
-    "VmSeries": [
-      "NC"
-    ],
-    "PricePerHour": 0.864,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_B1ls"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.00124,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M64ms_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 13.168,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64i_v3",
-      "Standard_E64is_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 4.032,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M64ls"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 6.403,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.16,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Dsv4_Type1"
-    ],
-    "VmSeries": [
-      "DSv4 Dedicated Host"
-    ],
-    "PricePerHour": 4.928,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A1_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.009,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC24r_Promo"
-    ],
-    "VmSeries": [
-      "NC"
-    ],
-    "PricePerHour": 2.091,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NV24"
-    ],
-    "VmSeries": [
-      "NV"
-    ],
-    "PricePerHour": 0.992,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.784,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64_v3",
-      "Standard_E64s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.806,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_F2s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.106,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v2",
-      "Standard_DS2_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.0279,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.179,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC16as_T4_v3"
-    ],
-    "VmSeries": [
-      "NCasv3 T4"
-    ],
-    "PricePerHour": 0.289,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D13_v2",
-      "Standard_DS13_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.148,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 2.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M64s_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 8.396,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 0.133,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Esv3_Type1"
-    ],
-    "VmSeries": [
-      "ESv3 Dedicated Host"
-    ],
-    "PricePerHour": 4.312,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.14,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 0.324,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-16ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 2.592,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Easv4_Type1"
-    ],
-    "VmSeries": [
-      "Easv4 Dedicated Host"
-    ],
-    "PricePerHour": 1.478,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 2.688,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.0896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E96d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.778,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.0224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20a_v4",
-      "Standard_E20as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64i_v3",
-      "Standard_E64is_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.806,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-16ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.518,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NV24_Promo"
-    ],
-    "VmSeries": [
-      "NV"
-    ],
-    "PricePerHour": 2.976,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.648,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H16mr_Promo"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 1.717,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-4ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.259,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D12_v2",
-      "Standard_DS12_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.074,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A5"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.25,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v2",
-      "Standard_DS4_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M208s_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 29.003,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.162,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E96-24as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 1.344,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NV48s_v3"
-    ],
-    "VmSeries": [
-      "NVSv3"
-    ],
-    "PricePerHour": 4.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Basic_A3"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.0376,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.13,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M64ms"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 3.469,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.532,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.928,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.336,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.232,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-8ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 1.296,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F64s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 3.392,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F4s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.212,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 0.324,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC24s_v3"
-    ],
-    "VmSeries": [
-      "NCSv3"
-    ],
-    "PricePerHour": 15.912,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.064,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.162,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.0448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E80is_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 5.599,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.113,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D12_v2_Promo",
-      "Standard_DS12_v2_-_Expired_Promo"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.37,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F1",
-      "Standard_F1s"
-    ],
-    "VmSeries": [
-      "F",
-      "FS"
-    ],
-    "PricePerHour": 0.062,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L8s"
-    ],
-    "VmSeries": [
-      "LS"
-    ],
-    "PricePerHour": 0.138,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D5_v2",
-      "Standard_DS5_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 1.117,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F8s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.424,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0665,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.324,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 4.064,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 0.648,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4-2s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.056,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D11_v2_Promo",
-      "Standard_DS11_v2_-_Expired_Promo"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.185,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M16s"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 3.103,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 2.592,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H16_Promo"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 1.165,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M32s"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 6.206,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 4.896,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.778,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8a_v4",
-      "Standard_D8as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.406,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NV12"
-    ],
-    "VmSeries": [
-      "NV"
-    ],
-    "PricePerHour": 0.496,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.792,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B12ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.595,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 0.13,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.464,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32_v3",
-      "Standard_D32s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 1.872,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A8_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.08,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 3.192,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B1s"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.0124,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D14",
-      "Standard_DS14"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.308,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0408,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_F72s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.612,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L8s"
-    ],
-    "VmSeries": [
-      "LS"
-    ],
-    "PricePerHour": 0.688,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.7,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0464,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC24s_v3"
-    ],
-    "VmSeries": [
-      "NCSv3"
-    ],
-    "PricePerHour": 3.182,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.426,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8_v3",
-      "Standard_D8s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.468,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A4m_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.059,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.596,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 3.584,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NV24s_v2"
-    ],
-    "VmSeries": [
-      "NVSv2"
-    ],
-    "PricePerHour": 0.614,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.532,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NV12_Promo"
-    ],
-    "VmSeries": [
-      "NV"
-    ],
-    "PricePerHour": 1.488,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32_v3",
-      "Standard_E32s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.474,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4",
-      "Standard_DS4"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.616,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC12_Promo"
-    ],
-    "VmSeries": [
-      "NC"
-    ],
-    "PricePerHour": 0.95,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48a_v4",
-      "Standard_E48as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.672,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A8m_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.119,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L8s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 0.688,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A1"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.06,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.7,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Basic_A0"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.018,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B4ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.0397,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.0224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-8s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-4as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D15_v2",
-      "Standard_DS15_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.37,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.358,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M128ms"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 34.694,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.0896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_B20ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.198,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A8"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.975,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 3.888,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16a_v4",
-      "Standard_E16as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M416is_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 12.891,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 0.518,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E80ids_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 6.48,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E96-24as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 6.72,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.717,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NV12s_v2"
-    ],
-    "VmSeries": [
-      "NVSv2"
-    ],
-    "PricePerHour": 0.307,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M64dms_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 2.688,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D13",
-      "Standard_DS13"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.771,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M64s"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 1.734,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v2_Promo",
-      "Standard_DS4_v2_-_Expired_Promo"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.559,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.081,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.14,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 1.296,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 1.064,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 3.36,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A10"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.156,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.07,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E96d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.438,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A4_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.038,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E96s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.672,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64_v3",
-      "Standard_E64s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 4.032,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F16s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.848,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D13_v2_Promo",
-      "Standard_DS13_v2_-_Expired_Promo"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.741,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D3_v2",
-      "Standard_DS3_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.279,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 1.62,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0928,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.326,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L48s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 4.128,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.371,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_G2",
-      "Standard_GS2"
-    ],
-    "VmSeries": [
-      "G",
-      "GS"
-    ],
-    "PricePerHour": 0.244,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M192is_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 4.059,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E96_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.227,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-8s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 2.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.08,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Basic_A4"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.0752,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M208ms_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 11.601,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NVsv3_Type1"
-    ],
-    "VmSeries": [
-      "NVSv3 Dedicated Host"
-    ],
-    "PricePerHour": 5.016,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L32s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 2.752,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 1.064,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.18,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32_v3",
-      "Standard_E32s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 2.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC12"
-    ],
-    "VmSeries": [
-      "NC"
-    ],
-    "PricePerHour": 0.432,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4-2ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.0648,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20_v3",
-      "Standard_E20s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NV6s_v2"
-    ],
-    "VmSeries": [
-      "NVSv2"
-    ],
-    "PricePerHour": 0.153,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4-2ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.324,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L96s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 1.651,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8a_v4",
-      "Standard_E8as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.163,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.816,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L96s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 8.256,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 1.296,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.426,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-4ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.13,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-4as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 3.264,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32a_v4",
-      "Standard_E32as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 2.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Mdmsv2MedMem_Type1"
-    ],
-    "VmSeries": [
-      "Virtual Machines"
-    ],
-    "PricePerHour": 38.167,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.448,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-4ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 1.296,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2a_v4",
-      "Standard_E2as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.14,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.538,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L64s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 1.101,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_F32s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.272,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M32ts"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 0.603,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-16ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 1.037,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.13,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.102,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2a_v4",
-      "Standard_D2as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 1.792,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.72,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.266,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B4ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.198,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.648,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-16as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A3"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.116,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v3",
-      "Standard_D4s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.0468,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A8_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.4,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F4s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.034,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.306,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.07,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F48s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.509,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16_v3",
-      "Standard_D16s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.187,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 3.36,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B1ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.00496,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 3.048,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.958,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F2s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.017,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 3.6,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 4.48,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.518,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A9"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.39,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4-2as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.056,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_B20ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.992,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.0324,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A4m_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.297,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E96s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 3.36,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D12",
-      "Standard_DS12"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.0771,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A4"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.096,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48a_v4",
-      "Standard_D48as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.538,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_B16ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.159,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.113,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.344,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B2ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.0198,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D1_v2",
-      "Standard_DS1_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.07,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.254,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.72,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D14_v2",
-      "Standard_DS14_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.296,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H16m"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 0.52,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 3.584,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E96-48as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 6.72,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 4.256,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Esv4_Type1"
-    ],
-    "VmSeries": [
-      "ESv4 Dedicated Host"
-    ],
-    "PricePerHour": 4.928,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-8ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.259,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_DCsv2_Type_1"
-    ],
-    "VmSeries": [
-      "DCsv2 Dedicated Host"
-    ],
-    "PricePerHour": 2.262,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M128ms"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 6.939,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.296,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 0.266,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A4_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.191,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M64s"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 8.67,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC6s_v3"
-    ],
-    "VmSeries": [
-      "NCSv3"
-    ],
-    "PricePerHour": 0.796,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Dsv3_Type1"
-    ],
-    "VmSeries": [
-      "DSv3 Dedicated Host"
-    ],
-    "PricePerHour": 3.943,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2",
-      "Standard_DS2"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.154,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 0.638,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4a_v4",
-      "Standard_D4as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.0448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16a_v4",
-      "Standard_D16as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.179,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 1.037,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.269,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M416s_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 12.891,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_B8ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.397,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-32s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 4.48,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2a_v4",
-      "Standard_E2as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.028,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.259,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC12s_v3"
-    ],
-    "VmSeries": [
-      "NCSv3"
-    ],
-    "PricePerHour": 1.591,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D14_v2",
-      "Standard_DS14_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 1.482,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M192is_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 20.294,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D1",
-      "Standard_DS1"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.015,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.08,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_DC4s_v2"
-    ],
-    "VmSeries": [
-      "DCSv2"
-    ],
-    "PricePerHour": 0.206,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0532,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M128s_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 16.795,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-4s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_B12ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.119,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 0.213,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E96-48as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 1.344,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.9,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.0448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 0.106,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_G3",
-      "Standard_GS3"
-    ],
-    "VmSeries": [
-      "G",
-      "GS"
-    ],
-    "PricePerHour": 2.44,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M64dms_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 13.442,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 4.48,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F64s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.544,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 2.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H16"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 1.941,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4a_v4",
-      "Standard_D4as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.44,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M8ms"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 1.997,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0266,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.324,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D11_v2",
-      "Standard_DS11_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.185,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B8ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.0794,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_F8",
-      "Standard_F8s"
-    ],
-    "VmSeries": [
-      "F",
-      "FS"
-    ],
-    "PricePerHour": 0.498,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A2"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.024,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2_v3",
-      "Standard_E2s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.028,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.14,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.508,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D96s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.688,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.408,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.672,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.344,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 1.296,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M416ms_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 128.9,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M128ds_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 3.468,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.324,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8_v3",
-      "Standard_E8s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.408,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4-2as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0648,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48_v3",
-      "Standard_E48s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.672,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M128s"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 3.468,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48_v3",
-      "Standard_D48s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 2.808,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B16ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.794,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H16mr"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 0.572,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Mmsv2MedMem_Type1"
-    ],
-    "VmSeries": [
-      "MSv2 Dedicated Host"
-    ],
-    "PricePerHour": 37.565,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Basic_A0"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.004,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M416ms_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 25.779,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0408,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M32ls"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 0.64,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_B2ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.0992,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_G4",
-      "Standard_GS4"
-    ],
-    "VmSeries": [
-      "G",
-      "GS"
-    ],
-    "PricePerHour": 0.976,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NV12s_v3"
-    ],
-    "VmSeries": [
-      "NVSv3"
-    ],
-    "PricePerHour": 0.228,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4_v3",
-      "Standard_E4s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.296,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L80s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 6.88,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 0.532,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NV12s_v2"
-    ],
-    "VmSeries": [
-      "NVSv2"
-    ],
-    "PricePerHour": 1.534,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M32ms_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 7.853,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M32dms_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 1.598,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D5_v2",
-      "Standard_DS5_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.223,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 3.6,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H8m_Promo"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 0.78,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.336,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 0.426,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Msm_Type1"
-    ],
-    "VmSeries": [
-      "MS Dedicated Host"
-    ],
-    "PricePerHour": 38.172,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H8m"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 0.26,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A0"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.02,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.592,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-16ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 5.184,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.064,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F48s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 2.544,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Msmv2_Type1"
-    ],
-    "VmSeries": [
-      "MSv2 Dedicated Host"
-    ],
-    "PricePerHour": 141.78,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F1",
-      "Standard_F1s"
-    ],
-    "VmSeries": [
-      "F",
-      "FS"
-    ],
-    "PricePerHour": 0.012,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M16ms"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 0.799,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 0.0266,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L48s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 0.826,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.672,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E80is_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0508,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M192ims_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 41.136,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H16r"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 2.136,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.518,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.7,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M128dms_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 6.939,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20_v3",
-      "Standard_E20s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 1.48,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F2",
-      "Standard_F2s"
-    ],
-    "VmSeries": [
-      "F",
-      "FS"
-    ],
-    "PricePerHour": 0.0249,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.9,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.225,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC64as_T4_v3"
-    ],
-    "VmSeries": [
-      "NCasv3 T4"
-    ],
-    "PricePerHour": 5.222,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Basic_A1"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.0062,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_DC4s_v2"
-    ],
-    "VmSeries": [
-      "DCSv2"
-    ],
-    "PricePerHour": 1.028,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48_v3",
-      "Standard_E48s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 3.36,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_DC8_v2"
-    ],
-    "VmSeries": [
-      "DCSv2"
-    ],
-    "PricePerHour": 2.056,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.219,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M64ls"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 1.281,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.538,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.326,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D96s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.538,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 1.944,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M32ls"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 3.201,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.028,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D13",
-      "Standard_DS13"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.154,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16_v3",
-      "Standard_E16s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D12_v2",
-      "Standard_DS12_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.37,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.028,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.14,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M16s"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 0.621,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A7"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 1.0,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.45,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32a_v4",
-      "Standard_D32as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 1.792,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D14",
-      "Standard_DS14"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 1.542,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M64ms_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 2.634,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.179,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_H16m_Promo"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 1.561,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.485,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M64s_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 1.679,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16_v3",
-      "Standard_E16s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.237,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M128s"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 17.339,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.81,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v3",
-      "Standard_D2s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.023,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC16as_T4_v3"
-    ],
-    "VmSeries": [
-      "NCasv3 T4"
-    ],
-    "PricePerHour": 1.445,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Lsv2_Type1"
-    ],
-    "VmSeries": [
-      "LSv2 Dedicated Host"
-    ],
-    "PricePerHour": 7.568,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96a_v4",
-      "Standard_D96as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 1.075,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NV6_Promo"
-    ],
-    "VmSeries": [
-      "NV"
-    ],
-    "PricePerHour": 0.744,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NV24s_v2"
-    ],
-    "VmSeries": [
-      "NVSv2"
-    ],
-    "PricePerHour": 3.069,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4a_v4",
-      "Standard_E4as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.056,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-4s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_H8"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 0.971,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.36,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.162,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M128ms_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 6.83,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 5.184,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.213,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D11",
-      "Standard_DS11"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.0386,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.09,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L16s"
-    ],
-    "VmSeries": [
-      "LS"
-    ],
-    "PricePerHour": 0.275,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A0"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.004,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 1.4,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.688,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M416s_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 64.454,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.0648,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M32ms"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 7.99,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.319,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.102,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48a_v4",
-      "Standard_E48as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 3.36,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.596,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-2s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E96d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 6.096,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 3.264,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 2.688,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.0324,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16_v3",
-      "Standard_D16s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.936,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A2_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.018,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0816,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2_v3",
-      "Standard_E2s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.148,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E96ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 3.888,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.128,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L80s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 1.376,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC6_Promo"
-    ],
-    "VmSeries": [
-      "NC"
-    ],
-    "PricePerHour": 0.475,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NV6"
-    ],
-    "VmSeries": [
-      "NV"
-    ],
-    "PricePerHour": 0.248,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.179,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D15i_v2",
-      "Standard_DS15i_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 1.852,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D15_v2",
-      "Standard_DS15_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 1.852,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.056,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D14_v2_Promo",
-      "Standard_DS14_v2_-_Expired_Promo"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 1.482,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M64ds_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 1.734,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.8,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D3",
-      "Standard_DS3"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.0616,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.028,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D13_v2",
-      "Standard_DS13_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.741,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8_v3",
-      "Standard_D8s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.0936,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16a_v4",
-      "Standard_E16as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-8as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64_v3",
-      "Standard_D64s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.749,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 2.128,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.979,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E96a_v4",
-      "Standard_E96as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 6.72,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.056,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D5_v2_Promo",
-      "Standard_DS5_v2_-_Expired_Promo"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 1.117,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.14,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 5.184,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B2s"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.0496,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 0.106,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.306,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M208s_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 5.801,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16a_v4",
-      "Standard_D16as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L32s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 0.55,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E96a_v4",
-      "Standard_E96as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 1.344,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L4s"
-    ],
-    "VmSeries": [
-      "LS"
-    ],
-    "PricePerHour": 0.0688,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.18,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0133,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D1_v2",
-      "Standard_DS1_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.014,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v3",
-      "Standard_D4s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.234,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.653,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_G1",
-      "Standard_GS1"
-    ],
-    "VmSeries": [
-      "G",
-      "GS"
-    ],
-    "PricePerHour": 0.61,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.8,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.358,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 3.888,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-16as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 2.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.813,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.102,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC4as_T4_v3"
-    ],
-    "VmSeries": [
-      "NCasv3 T4"
-    ],
-    "PricePerHour": 0.631,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 1.62,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 1.792,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0665,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.856,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F32s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 1.696,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M32ms"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 1.598,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L8s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 0.138,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.162,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_DC2s_v2"
-    ],
-    "VmSeries": [
-      "DCSv2"
-    ],
-    "PricePerHour": 0.514,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F72s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 3.816,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.648,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.958,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 0.532,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 3.712,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-2ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.648,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A2m_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.149,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.13,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Msv2MedMem_Type1"
-    ],
-    "VmSeries": [
-      "MSv2 Dedicated Host"
-    ],
-    "PricePerHour": 18.474,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC24rs_v3"
-    ],
-    "VmSeries": [
-      "NCSv3"
-    ],
-    "PricePerHour": 17.503,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.653,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A11"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 1.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.319,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 0.0266,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M128ms_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 34.15,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0532,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Basic_A3"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.188,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H8"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 0.194,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC24_Promo"
-    ],
-    "VmSeries": [
-      "NC"
-    ],
-    "PricePerHour": 1.901,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F16",
-      "Standard_F16s"
-    ],
-    "VmSeries": [
-      "F",
-      "FS"
-    ],
-    "PricePerHour": 0.996,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A2_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.091,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4-2s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.36,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-8as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D96a_v4",
-      "Standard_D96as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 5.376,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-4as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2a_v4",
-      "Standard_D2as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.0224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E80ids_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 1.296,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.106,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0816,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-2ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.13,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48_v3",
-      "Standard_D48s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.562,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Dasv4_Type1"
-    ],
-    "VmSeries": [
-      "Dasv4 Dedicated Host"
-    ],
-    "PricePerHour": 5.914,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.324,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.816,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Fsv2_Type2"
-    ],
-    "VmSeries": [
-      "FSv2 Dedicated Host"
-    ],
-    "PricePerHour": 4.198,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M128s_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 3.359,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 0.213,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0266,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-8as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E96ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.778,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.225,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_G4",
-      "Standard_GS4"
-    ],
-    "VmSeries": [
-      "G",
-      "GS"
-    ],
-    "PricePerHour": 4.88,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 0.851,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0162,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_B1ms"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.0248,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NV24s_v3"
-    ],
-    "VmSeries": [
-      "NVSv3"
-    ],
-    "PricePerHour": 2.28,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M192ims_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 8.227,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-16as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 4.48,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Basic_A1"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.031,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.014,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-8ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 2.592,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H16r_Promo"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 1.281,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 2.592,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Ddsv4_Type_1"
-    ],
-    "VmSeries": [
-      "Ddsv4 Dedicated Host"
-    ],
-    "PricePerHour": 5.852,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M32dms_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 7.99,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M8ms"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 0.399,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 0.638,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8_v3",
-      "Standard_E8s_v3"
-    ],
-    "VmSeries": [
-      "Ev3",
-      "ESv3"
-    ],
-    "PricePerHour": 0.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.638,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.045,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.81,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 3.192,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NV6s_v2"
-    ],
-    "VmSeries": [
-      "NVSv2"
-    ],
-    "PricePerHour": 0.767,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.114,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D96d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.16,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.358,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC6"
-    ],
-    "VmSeries": [
-      "NC"
-    ],
-    "PricePerHour": 0.216,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A3"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.048,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Easv4_Type1"
-    ],
-    "VmSeries": [
-      "Easv4 Dedicated Host"
-    ],
-    "PricePerHour": 7.392,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-32ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 1.037,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 1.037,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.128,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.163,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 0.778,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC24rs_v3"
-    ],
-    "VmSeries": [
-      "NCSv3"
-    ],
-    "PricePerHour": 3.501,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v3",
-      "Standard_D2s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.117,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A7"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.2,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.259,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0324,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A1_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.043,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.979,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 4.256,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F2",
-      "Standard_F2s"
-    ],
-    "VmSeries": [
-      "F",
-      "FS"
-    ],
-    "PricePerHour": 0.124,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E96d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 3.888,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32a_v4",
-      "Standard_E32as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D96_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.538,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_H16m"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 2.601,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-16s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 4.48,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.204,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0133,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_H16"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 0.388,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64a_v4",
-      "Standard_D64as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 3.584,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M32ms_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 1.571,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.464,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.028,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M128dms_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 34.697,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A2m_v2"
-    ],
-    "VmSeries": [
-      "Av2"
-    ],
-    "PricePerHour": 0.03,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NV48s_v3"
-    ],
-    "VmSeries": [
-      "NVSv3"
-    ],
-    "PricePerHour": 0.912,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC4as_T4_v3"
-    ],
-    "VmSeries": [
-      "NCasv3 T4"
-    ],
-    "PricePerHour": 0.126,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D11",
-      "Standard_DS11"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.193,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 5.4,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D48a_v4",
-      "Standard_D48as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 2.688,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F4",
-      "Standard_F4s"
-    ],
-    "VmSeries": [
-      "F",
-      "FS"
-    ],
-    "PricePerHour": 0.0498,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A11"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.312,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.44,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.081,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E4d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.162,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L88is_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 7.568,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_DC2s_v2"
-    ],
-    "VmSeries": [
-      "DCSv2"
-    ],
-    "PricePerHour": 0.103,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_DC1s_v2"
-    ],
-    "VmSeries": [
-      "DCSv2"
-    ],
-    "PricePerHour": 0.0514,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Esv3_Type2"
-    ],
-    "VmSeries": [
-      "ESv3 Dedicated Host"
-    ],
-    "PricePerHour": 4.774,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.0648,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64_v3",
-      "Standard_D64s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 3.744,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.518,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.213,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64s_v4"
-    ],
-    "VmSeries": [
-      "Dsv4"
-    ],
-    "PricePerHour": 0.717,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32a_v4",
-      "Standard_D32as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.358,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.186,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC6s_v3"
-    ],
-    "VmSeries": [
-      "NCSv3"
-    ],
-    "PricePerHour": 3.978,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Basic_A2"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.0162,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.056,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-32s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 0.0648,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_F16",
-      "Standard_F16s"
-    ],
-    "VmSeries": [
-      "F",
-      "FS"
-    ],
-    "PricePerHour": 0.199,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.133,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.792,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Edsv4_Type_1"
-    ],
-    "VmSeries": [
-      "Edsv4 Dedicated Host"
-    ],
-    "PricePerHour": 5.703,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-32as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 2.592,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E96_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 3.36,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.0162,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M192idms_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 8.337,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8a_v4",
-      "Standard_E8as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D3",
-      "Standard_DS3"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.308,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F16s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.136,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC12s_v3"
-    ],
-    "VmSeries": [
-      "NCSv3"
-    ],
-    "PricePerHour": 7.956,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A6"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.1,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.056,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.632,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.266,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Dasv4_Type1"
-    ],
-    "VmSeries": [
-      "Dasv4 Dedicated Host"
-    ],
-    "PricePerHour": 1.183,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E48ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.389,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A5"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.05,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.626,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Dsv3_Type3"
-    ],
-    "VmSeries": [
-      "DSv3 Dedicated Host"
-    ],
-    "PricePerHour": 4.929,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.056,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.045,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D96d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.638,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A8"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.195,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M208ms_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 58.006,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.16,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L16s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 0.275,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 0.162,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F8",
-      "Standard_F8s"
-    ],
-    "VmSeries": [
-      "F",
-      "FS"
-    ],
-    "PricePerHour": 0.0996,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D16ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.106,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E48_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.68,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 0.266,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4_v2",
-      "Standard_DS4_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.559,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.09,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_H16r"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 0.427,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-8s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A4"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.48,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M64ms"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 17.347,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32_v3",
-      "Standard_D32s_v3"
-    ],
-    "VmSeries": [
-      "Dv3",
-      "DSv3"
-    ],
-    "PricePerHour": 0.374,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.224,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E96_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 5.568,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.508,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M64ds_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 8.67,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_G3",
-      "Standard_GS3"
-    ],
-    "VmSeries": [
-      "G",
-      "GS"
-    ],
-    "PricePerHour": 0.488,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D1",
-      "Standard_DS1"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.077,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Basic_A2"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.081,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L88is_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 1.514,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-2as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D96s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 4.896,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_A6"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.5,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L32s"
-    ],
-    "VmSeries": [
-      "LS"
-    ],
-    "PricePerHour": 0.55,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_B2s"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.00992,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-32as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 4.48,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D16_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.179,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-4s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-8ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 0.518,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A1"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.012,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 1.4,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B1ls"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.0062,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D8d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.45,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D11_v2",
-      "Standard_DS11_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.037,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v2_Promo",
-      "Standard_DS2_v2_-_Expired_Promo"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.14,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.203,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_G5",
-      "Standard_GS5"
-    ],
-    "VmSeries": [
-      "G",
-      "GS"
-    ],
-    "PricePerHour": 1.738,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_G5",
-      "Standard_GS5"
-    ],
-    "VmSeries": [
-      "G",
-      "GS"
-    ],
-    "PricePerHour": 8.69,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_B1s"
-    ],
-    "VmSeries": [
-      "BS"
-    ],
-    "PricePerHour": 0.00248,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64a_v4",
-      "Standard_E64as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 2.128,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.014,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_NC8as_T4_v3"
-    ],
-    "VmSeries": [
-      "NCasv3 T4"
-    ],
-    "PricePerHour": 0.18,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D4",
-      "Standard_DS4"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.123,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D32_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.632,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16-4s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 1.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 2.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M416is_v2"
-    ],
-    "VmSeries": [
-      "MSv2"
-    ],
-    "PricePerHour": 64.454,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_M192idms_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 41.683,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-16s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-4as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.742,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M32s"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 1.241,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A10"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.78,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32ds_v5"
-    ],
-    "VmSeries": [
-      "Edsv5"
-    ],
-    "PricePerHour": 0.259,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_A2"
-    ],
-    "VmSeries": [
-      "A"
-    ],
-    "PricePerHour": 0.12,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-16as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E20s_v5"
-    ],
-    "VmSeries": [
-      "Esv5"
-    ],
-    "PricePerHour": 0.7,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-2as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.56,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 1.27,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.0112,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_H8m"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 1.301,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC24r"
-    ],
-    "VmSeries": [
-      "NC"
-    ],
-    "PricePerHour": 0.95,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M192ids_v2"
-    ],
-    "VmSeries": [
-      "MdSv2"
-    ],
-    "PricePerHour": 4.168,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_DC8_v2"
-    ],
-    "VmSeries": [
-      "DCSv2"
-    ],
-    "PricePerHour": 0.411,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-16s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2_v4"
-    ],
-    "VmSeries": [
-      "Dv4"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D32ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 0.426,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Dsv3_Type2"
-    ],
-    "VmSeries": [
-      "DSv3 Dedicated Host"
-    ],
-    "PricePerHour": 4.436,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_Ms_Type1"
-    ],
-    "VmSeries": [
-      "MS Dedicated Host"
-    ],
-    "PricePerHour": 19.069,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_F4",
-      "Standard_F4s"
-    ],
-    "VmSeries": [
-      "F",
-      "FS"
-    ],
-    "PricePerHour": 0.249,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32-8as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 2.24,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L64s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 5.504,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E16d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 0.259,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D2d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 0.133,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D96ds_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 3.192,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_DC1s_v2"
-    ],
-    "VmSeries": [
-      "DCSv2"
-    ],
-    "PricePerHour": 0.257,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32_v4"
-    ],
-    "VmSeries": [
-      "Ev4"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E4a_v4",
-      "Standard_E4as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 0.28,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D12",
-      "Standard_DS12"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.386,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E20a_v4",
-      "Standard_E20as_v4"
-    ],
-    "VmSeries": [
-      "Eav4",
-      "Easv4"
-    ],
-    "PricePerHour": 1.4,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NV12s_v3"
-    ],
-    "VmSeries": [
-      "NVSv3"
-    ],
-    "PricePerHour": 1.14,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4d_v4"
-    ],
-    "VmSeries": [
-      "Ddv4"
-    ],
-    "PricePerHour": 0.0532,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_H16mr"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 2.861,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D64a_v4",
-      "Standard_D64as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.717,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48s_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.269,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E2d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.127,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_H8_Promo"
-    ],
-    "VmSeries": [
-      "H"
-    ],
-    "PricePerHour": 0.582,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D4d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.133,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E32s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.448,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_M32ts"
-    ],
-    "VmSeries": [
-      "MS"
-    ],
-    "PricePerHour": 3.016,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D3_v2",
-      "Standard_DS3_v2"
-    ],
-    "VmSeries": [
-      "Dv2",
-      "DSv2"
-    ],
-    "PricePerHour": 0.0559,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_L4s"
-    ],
-    "VmSeries": [
-      "LS"
-    ],
-    "PricePerHour": 0.344,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L16s_v2"
-    ],
-    "VmSeries": [
-      "LSv2"
-    ],
-    "PricePerHour": 1.376,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_NC64as_T4_v3"
-    ],
-    "VmSeries": [
-      "NCasv3 T4"
-    ],
-    "PricePerHour": 1.044,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_F8s_v2"
-    ],
-    "VmSeries": [
-      "FSv2"
-    ],
-    "PricePerHour": 0.068,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E64-32ds_v4"
-    ],
-    "VmSeries": [
-      "Edsv4"
-    ],
-    "PricePerHour": 5.184,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_D2",
-      "Standard_DS2"
-    ],
-    "VmSeries": [
-      "D",
-      "DS"
-    ],
-    "PricePerHour": 0.0308,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_Fsv2_Type3"
-    ],
-    "VmSeries": [
-      "FSv2 Dedicated Host"
-    ],
-    "PricePerHour": 5.364,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E2d_v4"
-    ],
-    "VmSeries": [
-      "Edv4"
-    ],
-    "PricePerHour": 0.0324,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D64ds_v4"
-    ],
-    "VmSeries": [
-      "Ddsv4"
-    ],
-    "PricePerHour": 0.851,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E32d_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.032,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_L32s"
-    ],
-    "VmSeries": [
-      "LS"
-    ],
-    "PricePerHour": 2.752,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_G1",
-      "Standard_GS1"
-    ],
-    "VmSeries": [
-      "G",
-      "GS"
-    ],
-    "PricePerHour": 0.122,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D8a_v4",
-      "Standard_D8as_v4"
-    ],
-    "VmSeries": [
-      "Dav4",
-      "Dasv4"
-    ],
-    "PricePerHour": 0.0896,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_D48_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 2.448,
-    "LowPriority": false
-  },
-  {
-    "VmSizes": [
-      "Standard_E96_v5"
-    ],
-    "VmSeries": [
-      ""
-    ],
-    "PricePerHour": 0.672,
-    "LowPriority": true
-  },
-  {
-    "VmSizes": [
-      "Standard_E8-2s_v4"
-    ],
-    "VmSeries": [
-      "Esv4"
-    ],
-    "PricePerHour": 0.112,
-    "LowPriority": true
+    "VmSize": "Standard_NV8as_v4",
+    "PricePerHourDedicated": "0.466",
+    "PricePerHourLowPriority": "0.0932"
   }
 ]

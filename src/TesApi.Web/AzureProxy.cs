@@ -220,8 +220,11 @@ namespace TesApi.Web
                 {
                     ActiveJobAndJobScheduleQuota = batchAccount.ActiveJobAndJobScheduleQuota,
                     DedicatedCoreQuota = batchAccount.DedicatedCoreQuota.Value,
+                    DedicatedCoreQuotaPerVMFamily = batchAccount.DedicatedCoreQuotaPerVMFamily,
+                    DedicatedCoreQuotaPerVMFamilyEnforced = batchAccount.DedicatedCoreQuotaPerVMFamilyEnforced,
                     LowPriorityCoreQuota = batchAccount.LowPriorityCoreQuota.Value,
-                    PoolQuota = batchAccount.PoolQuota
+                    PoolQuota = batchAccount.PoolQuota,
+
                 };
             }
             catch (Exception ex)
@@ -655,20 +658,28 @@ namespace TesApi.Web
             }
         }
 
-        private IEnumerable<VmPrice> ExtractVmPricesFromRateCardResponse(string pricingContent)
+        private IEnumerable<VmPrice> ExtractVmPricesFromRateCardResponse(List<(string VmSize, string FamilyName, string MeterName, string MeterSubCategory)> supportedVmSizes, string pricingContent)
         {
-            return JObject.Parse(pricingContent)["Meters"]
+            var rateCardMeters = JObject.Parse(pricingContent)["Meters"]
                 .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
-                .Select(m => new { MeterNames = m["MeterName"].ToString(), MeterSubCategories = m["MeterSubCategory"].ToString().Replace(" Series", ""), PricePerHour = decimal.Parse(m["MeterRates"]["0"].ToString()) })
-                .Where(m => !m.MeterSubCategories.Contains("Windows"))
-                .Select(m => new { MeterNames = m.MeterNames.Replace(" Low Priority", ""), m.MeterSubCategories, m.PricePerHour, LowPriority = m.MeterNames.Contains(" Low Priority") })
-                .Select(m => new VmPrice
-                {
-                    VmSizes = m.MeterNames.Split(new char[] { '/' }).Select(x => ((m.MeterSubCategories.Contains("Basic") ? "Basic_" : "Standard_") + x).Replace(" ", "_") + (m.MeterSubCategories.Contains("Promo") ? "_Promo" : "")).ToArray(),
-                    VmSeries = m.MeterSubCategories.Replace(" Promo", "").Replace(" Basic", "").Split(new char[] { '/' }),
-                    PricePerHour = m.PricePerHour,
-                    LowPriority = m.LowPriority
-                });
+                .Select(m => new { MeterName = m["MeterName"].ToString(), MeterSubCategory = m["MeterSubCategory"].ToString(), MeterRate = m["MeterRates"]["0"].ToString() })
+                .Where(m => !m.MeterSubCategory.Contains("Windows"))
+                .Select(m => new { 
+                    MeterName = m.MeterName.Replace(" Low Priority", "", StringComparison.OrdinalIgnoreCase),
+                    m.MeterSubCategory,
+                    MeterRate = decimal.Parse(m.MeterRate), 
+                    IsLowPriority = m.MeterName.Contains(" Low Priority", StringComparison.OrdinalIgnoreCase) })
+                .ToList();
+
+            return supportedVmSizes
+                .Select(v => new {
+                    v.VmSize,
+                    RateCardMeters = rateCardMeters.Where(m => m.MeterName.Equals(v.MeterName, StringComparison.OrdinalIgnoreCase) && m.MeterSubCategory.Equals(v.MeterSubCategory, StringComparison.OrdinalIgnoreCase)) })
+                .Select(v => new VmPrice {
+                    VmSize = v.VmSize,
+                    PricePerHourDedicated = v.RateCardMeters.FirstOrDefault(m => !m.IsLowPriority)?.MeterRate,
+                    PricePerHourLowPriority = v.RateCardMeters.FirstOrDefault(m => m.IsLowPriority)?.MeterRate })
+                .Where(v => v.PricePerHourDedicated != null);
         }
 
         /// <summary>
@@ -677,20 +688,19 @@ namespace TesApi.Web
         /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
         private async Task<IEnumerable<VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
         {
-            const double mbToGbRatio = 0.001;
-            const double mibToGbRatio = 0.001048576;
-
-            static double ConvertMBOrMiBToGB(int value) =>  Math.Round(value * (value % 1024 == 0 ? mibToGbRatio : mbToGbRatio), 3);
+            static double ConvertMiBToGiB(int value) => Math.Round(value / 1024.0, 2);
 
             var azureClient = await GetAzureManagementClientAsync();
             var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).VirtualMachines.Sizes.ListByRegionAsync(location)).ToList();
 
             IEnumerable<VmPrice> vmPrices;
 
+            var supportedVmSizes = AzureBillingUtils.GetVmSizesSupportedByBatch().ToList();
+
             try
             {
                 var pricingContent = await GetPricingContentJsonAsync();
-                vmPrices = ExtractVmPricesFromRateCardResponse(pricingContent);
+                vmPrices = ExtractVmPricesFromRateCardResponse(supportedVmSizes, pricingContent);
             }
             catch
             {
@@ -700,31 +710,44 @@ namespace TesApi.Web
 
             var vmInfos = new List<VirtualMachineInfo>();
 
-            foreach (var vmPrice in vmPrices)
+            foreach (var supportedVmSize in supportedVmSizes)
             {
-                for (var i = 0; i < vmPrice.VmSizes.Length; i++)
-                {
-                    var vmSize = vmSizesAvailableAtLocation.SingleOrDefault(x => x.Name == vmPrice.VmSizes[i]);
+                var vmSpecification = vmSizesAvailableAtLocation.SingleOrDefault(x => x.Name.Equals(supportedVmSize.VmSize, StringComparison.OrdinalIgnoreCase));
+                var vmPrice = vmPrices.SingleOrDefault(x => x.VmSize.Equals(supportedVmSize.VmSize, StringComparison.OrdinalIgnoreCase));
 
-                    if (vmSize != null)
+                if (vmSpecification != null && vmPrice != null)
+                {
+                    vmInfos.Add(new VirtualMachineInfo
+                    {
+                        VmSize = supportedVmSize.VmSize,
+                        MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
+                        NumberOfCores = vmSpecification.NumberOfCores,
+                        ResourceDiskSizeInGB = ConvertMiBToGiB(vmSpecification.ResourceDiskSizeInMB),
+                        MaxDataDiskCount = vmSpecification.MaxDataDiskCount,
+                        VmFamily = supportedVmSize.FamilyName,
+                        LowPriority = false,
+                        PricePerHour = vmPrice.PricePerHourDedicated
+                    });
+
+                    if(vmPrice.LowPriorityAvailable)
                     {
                         vmInfos.Add(new VirtualMachineInfo
                         {
-                            VmSize = vmPrice.VmSizes[i],
-                            MemoryInGB = ConvertMBOrMiBToGB(vmSize.MemoryInMB),
-                            NumberOfCores = vmSize.NumberOfCores,
-                            ResourceDiskSizeInGB = ConvertMBOrMiBToGB(vmSize.ResourceDiskSizeInMB),
-                            MaxDataDiskCount = vmSize.MaxDataDiskCount,
-                            VmSeries = vmPrice.VmSeries[i],
-                            LowPriority = vmPrice.LowPriority,
-                            PricePerHour = vmPrice.PricePerHour
+                            VmSize = supportedVmSize.VmSize,
+                            MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
+                            NumberOfCores = vmSpecification.NumberOfCores,
+                            ResourceDiskSizeInGB = ConvertMiBToGiB(vmSpecification.ResourceDiskSizeInMB),
+                            MaxDataDiskCount = vmSpecification.MaxDataDiskCount,
+                            VmFamily = supportedVmSize.FamilyName,
+                            LowPriority = true,
+                            PricePerHour = vmPrice.PricePerHourLowPriority
                         });
                     }
                 }
             }
 
             // TODO: Check if pricing API did not return the list and vmInfos is null
-            return vmInfos.Where(vm => GetVmSizesSupportedByBatch().Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase));
+            return vmInfos;
         }
 
         private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
@@ -770,250 +793,6 @@ namespace TesApi.Web
             throw new Exception($"Batch account '{batchAccountName}' does not exist or the TES app service does not have Contributor role on the account.");
         }
 
-        // TODO: Batch will provide an API for this in a future release of the client library
-        private static IEnumerable<string> GetVmSizesSupportedByBatch()
-        {
-            return new List<string> {
-                "Standard_A1",
-                "Standard_A1_v2",
-                "Standard_A2",
-                "Standard_A2_v2",
-                "Standard_A2m_v2",
-                "Standard_A3",
-                "Standard_A4",
-                "Standard_A4_v2",
-                "Standard_A4m_v2",
-                "Standard_A5",
-                "Standard_A6",
-                "Standard_A7",
-                "Standard_A8_v2",
-                "Standard_A8m_v2",
-                "Standard_D1",
-                "Standard_D1_v2",
-                "Standard_D11",
-                "Standard_D11_v2",
-                "Standard_D12",
-                "Standard_D12_v2",
-                "Standard_D13",
-                "Standard_D13_v2",
-                "Standard_D14",
-                "Standard_D14_v2",
-                "Standard_D16_v3",
-                "Standard_D16a_v4",
-                "Standard_D16as_v4",
-                "Standard_D16d_v4",
-                "Standard_D16ds_v4",
-                "Standard_D16s_v3",
-                "Standard_D2",
-                "Standard_D2_v2",
-                "Standard_D2_v3",
-                "Standard_D2a_v4",
-                "Standard_D2as_v4",
-                "Standard_D2d_v4",
-                "Standard_D2ds_v4",
-                "Standard_D2s_v3",
-                "Standard_D3",
-                "Standard_D3_v2",
-                "Standard_D32_v3",
-                "Standard_D32a_v4",
-                "Standard_D32as_v4",
-                "Standard_D32d_v4",
-                "Standard_D32ds_v4",
-                "Standard_D32s_v3",
-                "Standard_D4",
-                "Standard_D4_v2",
-                "Standard_D4_v3",
-                "Standard_D48_v3",
-                "Standard_D48a_v4",
-                "Standard_D48as_v4",
-                "Standard_D48d_v4",
-                "Standard_D48ds_v4",
-                "Standard_D48s_v3",
-                "Standard_D4a_v4",
-                "Standard_D4as_v4",
-                "Standard_D4d_v4",
-                "Standard_D4ds_v4",
-                "Standard_D4s_v3",
-                "Standard_D5_v2",
-                "Standard_D64_v3",
-                "Standard_D64a_v4",
-                "Standard_D64as_v4",
-                "Standard_D64d_v4",
-                "Standard_D64ds_v4",
-                "Standard_D64s_v3",
-                "Standard_D8_v3",
-                "Standard_D8a_v4",
-                "Standard_D8as_v4",
-                "Standard_D8d_v4",
-                "Standard_D8ds_v4",
-                "Standard_D8s_v3",
-                "Standard_D96a_v4",
-                "Standard_D96as_v4",
-                "Standard_DS1",
-                "Standard_DS1_v2",
-                "Standard_DS11",
-                "Standard_DS11_v2",
-                "Standard_DS12",
-                "Standard_DS12_v2",
-                "Standard_DS13",
-                "Standard_DS13_v2",
-                "Standard_DS14",
-                "Standard_DS14_v2",
-                "Standard_DS2",
-                "Standard_DS2_v2",
-                "Standard_DS3",
-                "Standard_DS3_v2",
-                "Standard_DS4",
-                "Standard_DS4_v2",
-                "Standard_DS5_v2",
-                "Standard_E16_v3",
-                "Standard_E16a_v4",
-                "Standard_E16as_v4",
-                "Standard_E16d_v4",
-                "Standard_E16ds_v4",
-                "Standard_E16s_v3",
-                "Standard_E2_v3",
-                "Standard_E2a_v4",
-                "Standard_E2as_v4",
-                "Standard_E2d_v4",
-                "Standard_E2ds_v4",
-                "Standard_E2s_v3",
-                "Standard_E32_v3",
-                "Standard_E32a_v4",
-                "Standard_E32as_v4",
-                "Standard_E32d_v4",
-                "Standard_E32ds_v4",
-                "Standard_E32s_v3",
-                "Standard_E4_v3",
-                "Standard_E48_v3",
-                "Standard_E48a_v4",
-                "Standard_E48as_v4",
-                "Standard_E48d_v4",
-                "Standard_E48ds_v4",
-                "Standard_E48s_v3",
-                "Standard_E4a_v4",
-                "Standard_E4as_v4",
-                "Standard_E4d_v4",
-                "Standard_E4ds_v4",
-                "Standard_E4s_v3",
-                "Standard_E64_v3",
-                "Standard_E64a_v4",
-                "Standard_E64as_v4",
-                "Standard_E64d_v4",
-                "Standard_E64ds_v4",
-                "Standard_E64i_v3",
-                "Standard_E64s_v3",
-                "Standard_E8_v3",
-                "Standard_E80ids_v4",
-                "Standard_E8a_v4",
-                "Standard_E8as_v4",
-                "Standard_E8d_v4",
-                "Standard_E8ds_v4",
-                "Standard_E8s_v3",
-                "Standard_E96a_v4",
-                "Standard_E96as_v4",
-                "Standard_F1",
-                "Standard_F16",
-                "Standard_F16s",
-                "Standard_F16s_v2",
-                "Standard_F1s",
-                "Standard_F2",
-                "Standard_F2s",
-                "Standard_F2s_v2",
-                "Standard_F32s_v2",
-                "Standard_F4",
-                "Standard_F48s_v2",
-                "Standard_F4s",
-                "Standard_F4s_v2",
-                "Standard_F64s_v2",
-                "Standard_F72s_v2",
-                "Standard_F8",
-                "Standard_F8s",
-                "Standard_F8s_v2",
-                "Standard_G1",
-                "Standard_G2",
-                "Standard_G3",
-                "Standard_G4",
-                "Standard_G5",
-                "Standard_GS1",
-                "Standard_GS2",
-                "Standard_GS3",
-                "Standard_GS4",
-                "Standard_GS5",
-                "Standard_H16",
-                "Standard_H16m",
-                "Standard_H16mr",
-                "Standard_H16r",
-                "Standard_H8",
-                "Standard_H8m",
-                "Standard_HB120-16rs_v3",
-                "Standard_HB120-32rs_v3",
-                "Standard_HB120-64rs_v3",
-                "Standard_HB120-96rs_v3",
-                "Standard_HB120rs_v2",
-                "Standard_HB120rs_v3",
-                "Standard_HB60rs",
-                "Standard_HC44rs",
-                "Standard_L16s",
-                "Standard_L16s_v2",
-                "Standard_L32s",
-                "Standard_L32s_v2",
-                "Standard_L48s_v2",
-                "Standard_L4s",
-                "Standard_L64s_v2",
-                "Standard_L80s_v2",
-                "Standard_L8s",
-                "Standard_L8s_v2",
-                "Standard_M128",
-                "Standard_M128m",
-                "Standard_M128ms",
-                "Standard_M128s",
-                "Standard_M16ms",
-                "Standard_M32ls",
-                "Standard_M32ms",
-                "Standard_M32ts",
-                "Standard_M64",
-                "Standard_M64ls",
-                "Standard_M64m",
-                "Standard_M64ms",
-                "Standard_M64s",
-                "Standard_M8ms",
-                "Standard_NC12",
-                "Standard_NC12s_v2",
-                "Standard_NC12s_v3",
-                "Standard_NC16as_T4_v3",
-                "Standard_NC24",
-                "Standard_NC24r",
-                "Standard_NC24rs_v2",
-                "Standard_NC24rs_v3",
-                "Standard_NC24s_v2",
-                "Standard_NC24s_v3",
-                "Standard_NC4as_T4_v3",
-                "Standard_NC6",
-                "Standard_NC64as_T4_v3",
-                "Standard_NC6s_v2",
-                "Standard_NC6s_v3",
-                "Standard_NC8as_T4_v3",
-                "Standard_ND12s",
-                "Standard_ND24rs",
-                "Standard_ND24s",
-                "Standard_ND6s",
-                "Standard_NP10s",
-                "Standard_NP20s",
-                "Standard_NP40s",
-                "Standard_NV12",
-                "Standard_NV12s_v3",
-                "Standard_NV16as_v4",
-                "Standard_NV24",
-                "Standard_NV24s_v3",
-                "Standard_NV32as_v4",
-                "Standard_NV48s_v3",
-                "Standard_NV4as_v4",
-                "Standard_NV6",
-                "Standard_NV8as_v4"
-            };
-        }
-
         /// <inheritdoc/>
         public async Task<ContainerRegistryInfo> GetContainerRegistryInfoAsync(string imageName)
         {
@@ -1030,10 +809,12 @@ namespace TesApi.Web
 
         private class VmPrice
         {
-            public string[] VmSizes { get; set; }
-            public string[] VmSeries { get; set; }
-            public decimal PricePerHour { get; set; }
-            public bool LowPriority { get; set; }
+            public string VmSize { get; set; }
+            public decimal? PricePerHourDedicated { get; set; }
+            public decimal? PricePerHourLowPriority { get; set; }
+
+            [JsonIgnore]
+            public bool LowPriorityAvailable => PricePerHourLowPriority != null;
         }
     }
 }
