@@ -8,7 +8,7 @@ using System.Linq;
 namespace TesApi.Web
 {
     /// <summary>
-    /// Utility class to work with Azure Region names
+    /// Utility class that provides mapping between VM names and billing meters
     /// </summary>
     public static class AzureBillingUtils
     {
@@ -22,12 +22,6 @@ namespace TesApi.Web
         }
 
         private static IEnumerable<(string VmSize, string FamilyName, string MeterName, string MeterSubCategory)> VmSizesFamiliesAndMeters => new[] {
-            ("Basic_A1", "basicAFamily", "A1", "A Series Basic"),
-            ("Basic_A2", "basicAFamily", "A2", "A Series Basic"),
-            ("Basic_A3", "basicAFamily", "A3", "A Series Basic"),
-            ("Basic_A4", "basicAFamily", "A4", "A Series Basic"),
-            ("Standard_A1", "standardA0_A7Family", "A1", "A Series"),
-            ("Standard_A1_v2", "standardAv2Family", "A1 v2", "Av2 Series"),
             ("Standard_A10", "standardA8_A11Family", "A10", "A Series"),
             ("Standard_A11", "standardA8_A11Family", "A11", "A Series"),
             ("Standard_A2", "standardA0_A7Family", "A2", "A Series"),
@@ -44,8 +38,6 @@ namespace TesApi.Web
             ("Standard_A8_v2", "standardAv2Family", "A8 v2", "Av2 Series"),
             ("Standard_A8m_v2", "standardAv2Family", "A8m v2", "Av2 Series"),
             ("Standard_A9", "standardA8_A11Family", "A9", "A Series"),
-            ("Standard_D1", "standardDFamily", "D1/DS1", "D/DS Series"),
-            ("Standard_D1_v2", "standardDv2Family", "D1 v2/DS1 v2", "Dv2/DSv2 Series"),
             ("Standard_D11", "standardDFamily", "D11/DS11", "D/DS Series"),
             ("Standard_D11_v2", "standardDv2Family", "D11 v2/DS11 v2", "Dv2/DSv2 Series"),
             ("Standard_D12", "standardDFamily", "D12/DS12", "D/DS Series"),
@@ -109,8 +101,6 @@ namespace TesApi.Web
             ("Standard_DC1s_v2", "standardDCSv2Family", "DC1s v2", "DCSv2 Series"),
             ("Standard_DC2s_v2", "standardDCSv2Family", "DC2s v2", "DCSv2 Series"),
             ("Standard_DC4s_v2", "standardDCSv2Family", "DC4s v2", "DCSv2 Series"),
-            ("Standard_DS1", "standardDSFamily", "D1/DS1", "D/DS Series"),
-            ("Standard_DS1_v2", "standardDSv2Family", "D1 v2/DS1 v2", "Dv2/DSv2 Series"),
             ("Standard_DS11", "standardDSFamily", "D11/DS11", "D/DS Series"),
             ("Standard_DS11_v2", "standardDSv2Family", "D11 v2/DS11 v2", "Dv2/DSv2 Series"),
             ("Standard_DS12", "standardDSFamily", "D12/DS12", "D/DS Series"),
@@ -174,11 +164,9 @@ namespace TesApi.Web
             ("Standard_E8s_v3", "standardESv3Family", "E8 v3/E8s v3", "Ev3/ESv3 Series"),
             ("Standard_E96a_v4", "standardEAv4Family", "E96a v4/E96as v4", "Eav4/Easv4 Series"),
             ("Standard_E96as_v4", "standardEASv4Family", "E96a v4/E96as v4", "Eav4/Easv4 Series"),
-            ("Standard_F1", "standardFFamily", "F1/F1s", "F/FS Series"),
             ("Standard_F16", "standardFFamily", "F16/F16s", "F/FS Series"),
             ("Standard_F16s", "standardFSFamily", "F16/F16s", "F/FS Series"),
             ("Standard_F16s_v2", "standardFSv2Family", "F16s v2", "FSv2 Series"),
-            ("Standard_F1s", "standardFSFamily", "F1/F1s", "F/FS Series"),
             ("Standard_F2", "standardFFamily", "F2/F2s", "F/FS Series"),
             ("Standard_F2s", "standardFSFamily", "F2/F2s", "F/FS Series"),
             ("Standard_F2s_v2", "standardFSv2Family", "F2s v2", "FSv2 Series"),
