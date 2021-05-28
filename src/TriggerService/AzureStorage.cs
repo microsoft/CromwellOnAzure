@@ -9,7 +9,7 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
-using Microsoft.Azure.Management.Fluent;
+using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Services.AppAuthentication;
@@ -85,31 +85,6 @@ namespace TriggerService
                 return false;
             }
         }
-
-        public async Task MutateStateAsync(string container, string blobName, WorkflowState newState)
-        {
-            var newStateText = $"{newState.ToString().ToLowerInvariant()}";
-            var containerReference = blobClient.GetContainerReference(container);
-            var blob = containerReference.GetBlockBlobReference(blobName);
-            var oldStateText = blobName.Substring(0, blobName.IndexOf('/'));
-            logger.LogInformation($"Mutating state from '{oldStateText}' to '{newStateText}' for {blob.Uri.AbsoluteUri}");
-            var newBlobName = blobName.Replace(oldStateText, $"{newState.ToString().ToLowerInvariant()}");
-            var data = await blob.DownloadTextAsync();
-            await UploadFileTextAsync(data, container, newBlobName);
-            await blob.DeleteIfExistsAsync();
-        }
-
-        public async Task SetStateToInProgressAsync(string container, string blobName, string id)
-        {
-            var containerReference = blobClient.GetContainerReference(container);
-            var blob = containerReference.GetBlockBlobReference(blobName);
-            var data = await blob.DownloadTextAsync();
-            var newBlobName = blobName.Replace("new/", $"{AzureStorage.WorkflowState.InProgress.ToString().ToLowerInvariant()}/");
-            newBlobName = newBlobName.Replace(".json", $".{id}.json");
-            await UploadFileTextAsync(data, container, newBlobName);
-            await blob.DeleteIfExistsAsync();
-        }
-
 
         /// <summary>
         /// Return all blobs for a given state, except readme files
@@ -203,6 +178,65 @@ namespace TriggerService
             return await httpClient.GetByteArrayAsync(url);
         }
 
+        /// <summary>
+        /// Return all blobs for a given state, except readme files
+        /// </summary>
+        /// <param name="state">Workflow state to query for</param>
+        /// <returns></returns>
+        public async Task<IEnumerable<CloudBlockBlob>> GetBlobsByStateAsync(WorkflowState state)
+        {
+            var containerReference = blobClient.GetContainerReference(WorkflowsContainerName);
+            var lowercaseState = state.ToString().ToLowerInvariant();
+            var blobs = await GetBlobsWithPrefixAsync(containerReference, lowercaseState);
+            var readmeBlobName = $"{lowercaseState}/readme.txt";
+            return blobs.Where(blob => !blob.Name.Equals(readmeBlobName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// Return all blobs for a WorkflowState.Abort state.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<IEnumerable<CloudBlockBlob>> GetWorkflowBlobsToAbortAsync()
+        {
+            return (await GetBlobsByStateAsync(WorkflowState.Abort));
+        }
+
+        /// <summary>
+        /// Return all blobs for a given state LastModified in the past 1 minute, except readme files 
+        /// </summary>
+        /// <param name="state">Workflow state to query for</param>
+        /// <returns></returns>
+        public async Task<IEnumerable<CloudBlockBlob>> GetRecentlyUpdatedInProgressWorkflowBlobsAsync()
+        {
+            return (await GetBlobsByStateAsync(WorkflowState.InProgress)).Where(blob => DateTime.UtcNow - blob.Properties.LastModified.Value < new TimeSpan(1, 0, 0));
+        }
+
+        /// <summary>
+        /// Asynchronously download blob text 
+        /// </summary>
+        /// <param name="container"></param>
+        /// <param name="blobName"></param>
+        /// <returns></returns>
+        public async Task<string> DownloadBlobTextAsync(string container, string blobName)
+        {
+            var containerReference = blobClient.GetContainerReference(container);
+            var blob = containerReference.GetBlockBlobReference(blobName);
+            return await blob.DownloadTextAsync();
+        }
+
+        /// <summary>
+        /// Asynchronously deleted blob identified by parameters if it exists
+        /// </summary>
+        /// <param name="container"></param>
+        /// <param name="blobName"></param>
+        /// <returns></returns>
+        public async Task DeleteBlobIfExistsAsync(string container, string blobName)
+        {
+            var containerReference = blobClient.GetContainerReference(container);
+            var blob = containerReference.GetBlockBlobReference(blobName);
+            await blob.DeleteIfExistsAsync();
+        }
+
         public enum WorkflowState { New, InProgress, Succeeded, Failed, Abort };
 
         public class StorageAccountInfo
@@ -213,11 +247,11 @@ namespace TriggerService
             public string SubscriptionId { get; set; }
         }
 
-        private static async Task<Azure.IAuthenticated> GetAzureManagementClientAsync()
+        private static async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync()
         {
             var accessToken = await GetAzureAccessTokenAsync();
             var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, AzureEnvironment.AzureGlobalCloud);
-            var azureClient = Azure.Authenticate(azureCredentials);
+            var azureClient = FluentAzure.Authenticate(azureCredentials);
 
             return azureClient;
         }
