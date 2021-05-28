@@ -55,6 +55,7 @@ namespace CromwellOnAzureDeployer
         private const string ConfigurationContainerName = "configuration";
         private const string CromwellConfigurationFileName = "cromwell-application.conf";
         private const string ContainersToMountFileName = "containers-to-mount";
+        private const string AllowedVmSizesFileName = "allowed-vm-sizes";
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
         private const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
@@ -909,6 +910,7 @@ namespace CromwellOnAzureDeployer
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountFileContent);
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, GetFileContent("scripts", CromwellConfigurationFileName));
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, GetFileContent("scripts", AllowedVmSizesFileName));
                 });
         }
 
