@@ -1,0 +1,12 @@
+﻿# Use this file to constraint the Azure VM sizes used for Cromwell task execution on Azure Batch
+# If no VM sizes are listed here, then all supported VM sizes will be eligible
+# VM size names should be placed one per line
+# Lines starting with # (comments) are ignored
+# Comments in the same line as the VM size are not allowed
+# For the full list of VM sizes and their features, see file "supported-vm-sizes" in this container
+# After making changes to this file, restart your Cromwell on Azure host VM
+
+# Examples:
+# Standard_D1
+# Standard_D2
+# Standard_D3_v2

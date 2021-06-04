@@ -166,6 +166,35 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
+        public async Task TesTaskGetsScheduledToAllowedVmSizeOnly()
+        {
+            static async Task RunTest(string allowedVmSizes, TesState expectedTaskState, string expectedSelectedVmSize = null)
+            {
+                var tesTask = GetTesTask();
+                tesTask.Resources.Preemptible = true;
+
+                var config = GetMockConfig();
+                config["AllowedVmSizes"] = allowedVmSizes;
+
+                (_, _, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, config, GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+                Assert.AreEqual(expectedTaskState, tesTask.State);
+
+                if (expectedSelectedVmSize != null)
+                {
+                    Assert.AreEqual(expectedSelectedVmSize, poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineSize);
+                }
+            }
+
+            await RunTest(null, TesState.INITIALIZINGEnum, "VmSizeLowPri1");
+            await RunTest("", TesState.INITIALIZINGEnum, "VmSizeLowPri1");
+            await RunTest("VmSizeLowPri1", TesState.INITIALIZINGEnum, "VmSizeLowPri1");
+            await RunTest("VmSizeLowPri1,VmSizeLowPri2", TesState.INITIALIZINGEnum, "VmSizeLowPri1");
+            await RunTest("VmSizeLowPri2", TesState.INITIALIZINGEnum, "VmSizeLowPri2");
+            await RunTest("VmSizeLowPriNonExistent", TesState.SYSTEMERROREnum);
+            await RunTest("VmSizeLowPriNonExistent,VmSizeLowPri1", TesState.INITIALIZINGEnum, "VmSizeLowPri1");
+        }
+
+        [TestMethod]
         public async Task TaskStateTransitionsFromRunningState()
         {
             Assert.AreEqual(TesState.RUNNINGEnum, await GetNewTesTaskStateAsync(TesState.RUNNINGEnum, BatchJobAndTaskStates.TaskActive));

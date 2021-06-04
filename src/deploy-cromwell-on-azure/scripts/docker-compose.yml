@@ -73,6 +73,7 @@ services:
     image: "$TriggerServiceImageName"
     environment:
       - DefaultStorageAccountName=$DefaultStorageAccountName
+      - CosmosDbAccountName=$CosmosDbAccountName
       - ApplicationInsightsAccountName=$ApplicationInsightsAccountName
       - AzureServicesAuthConnectionString=RunAs=App;AppId=$ManagedIdentityClientId
     depends_on:

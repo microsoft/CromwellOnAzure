@@ -38,6 +38,7 @@ namespace TesApi.Web
         private readonly ILogger logger;
         private readonly IAzureProxy azureProxy;
         private readonly IStorageAccessProvider storageAccessProvider;
+        private readonly IEnumerable<string> allowedVmSizes;
         private readonly List<TesTaskStateTransition> tesTaskStateTransitions;
         private readonly bool usePreemptibleVmsOnly;
 
@@ -54,7 +55,9 @@ namespace TesApi.Web
             this.azureProxy = azureProxy;
             this.storageAccessProvider = storageAccessProvider;
 
-            usePreemptibleVmsOnly = configuration.GetValue("UsePreemptibleVmsOnly", false);
+            this.allowedVmSizes = configuration.GetValue<string>("AllowedVmSizes", null)?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            this.usePreemptibleVmsOnly = configuration.GetValue("UsePreemptibleVmsOnly", false);
+
             logger.LogInformation($"usePreemptibleVmsOnly: {usePreemptibleVmsOnly}");
 
             static bool tesTaskIsQueuedInitializingOrRunning(TesTask tesTask) => tesTask.State == TesState.QUEUEDEnum || tesTask.State == TesState.INITIALIZINGEnum || tesTask.State == TesState.RUNNINGEnum;
@@ -194,14 +197,14 @@ namespace TesApi.Web
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
-                await CheckBatchAccountQuotas(virtualMachineInfo.NumberOfCores.Value, virtualMachineInfo.LowPriority ?? false);
+                await CheckBatchAccountQuotas(virtualMachineInfo.NumberOfCores.Value, virtualMachineInfo.LowPriority);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
 
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var dockerImage = tesTask.Executors.First().Image;
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask);
-                var poolInformation = await CreatePoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority ?? false);
+                var poolInformation = await CreatePoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority);
 
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
 
@@ -776,44 +779,48 @@ namespace TesApi.Web
 
             var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
 
-            var selectedVm = virtualMachineInfoList
+            var eligibleVms = virtualMachineInfoList
                 .Where(vm =>
                     vm.LowPriority == preemptible
                     && vm.NumberOfCores >= requiredNumberOfCores
                     && vm.MemoryInGB >= requiredMemoryInGB
                     && vm.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
-                .Where(vm => previouslyFailedVmSizes == null || !previouslyFailedVmSizes.Contains(vm.VmSize))
+                .ToList();
+
+            var selectedVm = eligibleVms
+                .Where(vm => allowedVmSizes == null || !allowedVmSizes.Any() || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
+                .Where(vm => previouslyFailedVmSizes == null || !previouslyFailedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
                 .OrderBy(x => x.PricePerHour)
                 .FirstOrDefault();
 
-            if (selectedVm == null)
+            if (selectedVm != null)
             {
-                var alternateVm = virtualMachineInfoList
-                    .Where(x =>
-                        x.LowPriority == !preemptible
-                        && x.NumberOfCores >= requiredNumberOfCores
-                        && x.MemoryInGB >= requiredMemoryInGB
-                        && x.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
-                    .Where(vm => previouslyFailedVmSizes == null || !previouslyFailedVmSizes.Contains(vm.VmSize))
-                    .OrderBy(x => x.PricePerHour)
-                    .FirstOrDefault();
-
-                var noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}";
-
-                if (alternateVm != null)
-                {
-                    noVmFoundMessage += $" Please note that a VM with LowPriority={!preemptible} WAS found however.";
-                }
-
-                if (previouslyFailedVmSizes != null)
-                {
-                    noVmFoundMessage += $"The following VmSizes were excluded from consideration because of {BatchTaskState.NodeAllocationFailed} error(s) on previous attempts: {string.Join(", ", previouslyFailedVmSizes)}";
-                }
-
-                throw new AzureBatchVirtualMachineAvailabilityException(noVmFoundMessage);
+                return selectedVm;
             }
 
-            return selectedVm;
+            var noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}.";
+
+            if(!eligibleVms.Any())
+            {
+                noVmFoundMessage += $" There are no VM sizes that match the requirements. Review the task resources.";
+            }
+
+            if (previouslyFailedVmSizes != null)
+            {
+                noVmFoundMessage += $" The following VM sizes were excluded from consideration because of {BatchTaskState.NodeAllocationFailed} error(s) on previous attempts: {string.Join(", ", previouslyFailedVmSizes)}";
+            }
+
+            if (allowedVmSizes != null && allowedVmSizes.Any())
+            {
+                var vmsExcludedByTheAllowedVmsConfiguration = eligibleVms.Where(vm => allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase));
+
+                if (vmsExcludedByTheAllowedVmsConfiguration.Any())
+                {
+                    noVmFoundMessage += $" {vmsExcludedByTheAllowedVmsConfiguration.Count()} VM(s) were excluded by the allowed-vm-sizes configuration. Consider expanding the list of allowed VM sizes.";
+                }
+            }
+
+            throw new AzureBatchVirtualMachineAvailabilityException(noVmFoundMessage);
         }
 
         private async Task<(BatchNodeMetrics BatchNodeMetrics, DateTimeOffset? TaskStartTime, DateTimeOffset? TaskEndTime, int? CromwellRcCode)> GetBatchNodeMetricsAndCromwellResultCodeAsync(TesTask tesTask)
