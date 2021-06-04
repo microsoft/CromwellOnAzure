@@ -15,16 +15,16 @@ namespace Tes.Models
         public string VmSize { get; set; }
 
         /// <summary>
-        /// VM Series
+        /// VM Family
         /// </summary>
-        [TesTaskLogMetadataKey("vm_series")]
-        public string VmSeries { get; set; }
+        [TesTaskLogMetadataKey("vm_family")]
+        public string VmFamily { get; set; }
 
         /// <summary>
         /// True if this is a low-pri VM, otherwise false
         /// </summary>
         [TesTaskLogMetadataKey("vm_low_priority")]
-        public bool? LowPriority { get; set; }
+        public bool LowPriority { get; set; }
 
         /// <summary>
         /// VM price per hour

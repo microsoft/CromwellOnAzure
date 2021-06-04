@@ -38,6 +38,7 @@ namespace TesApi.Web
         private readonly ILogger logger;
         private readonly IAzureProxy azureProxy;
         private readonly IStorageAccessProvider storageAccessProvider;
+        private readonly IEnumerable<string> allowedVmSizes;
         private readonly List<TesTaskStateTransition> tesTaskStateTransitions;
         private readonly bool usePreemptibleVmsOnly;
 
@@ -54,7 +55,9 @@ namespace TesApi.Web
             this.azureProxy = azureProxy;
             this.storageAccessProvider = storageAccessProvider;
 
-            usePreemptibleVmsOnly = configuration.GetValue("UsePreemptibleVmsOnly", false);
+            this.allowedVmSizes = configuration.GetValue<string>("AllowedVmSizes", null)?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            this.usePreemptibleVmsOnly = configuration.GetValue("UsePreemptibleVmsOnly", false);
+
             logger.LogInformation($"usePreemptibleVmsOnly: {usePreemptibleVmsOnly}");
 
             static bool tesTaskIsQueuedInitializingOrRunning(TesTask tesTask) => tesTask.State == TesState.QUEUEDEnum || tesTask.State == TesState.INITIALIZINGEnum || tesTask.State == TesState.RUNNINGEnum;
@@ -94,7 +97,7 @@ namespace TesApi.Web
             Task DeleteBatchJobAndSetTaskSystemErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.SYSTEMERROREnum, batchInfo);
 
             Task DeleteBatchJobAndRequeueTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => ++tesTask.ErrorCount > 3
-                ? DeleteBatchJobAndSetTaskExecutorErrorAsync(tesTask, batchInfo) 
+                ? DeleteBatchJobAndSetTaskExecutorErrorAsync(tesTask, batchInfo)
                 : DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.QUEUEDEnum, batchInfo);
 
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) { await this.azureProxy.DeleteBatchJobAsync(tesTask.Id); tesTask.IsCancelRequested = false; }
@@ -194,14 +197,14 @@ namespace TesApi.Web
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
-                await CheckBatchAccountQuotas(virtualMachineInfo.NumberOfCores.Value, virtualMachineInfo.LowPriority ?? false);
+                await CheckBatchAccountQuotas(virtualMachineInfo.NumberOfCores.Value, virtualMachineInfo.LowPriority);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
 
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var dockerImage = tesTask.Executors.First().Image;
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask);
-                var poolInformation = await CreatePoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority ?? false);
+                var poolInformation = await CreatePoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority);
 
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
 
@@ -456,7 +459,7 @@ namespace TesApi.Web
             const string incrementTotalBytesTransferred = "total_bytes=$(( $total_bytes + `stat -c %s \"$path\"` ))";
 
             // Using --include and not using --no-recursive as a workaround for https://github.com/Azure/blobxfer/issues/123
-            var downloadFilesScriptContent = "total_bytes=0 && " 
+            var downloadFilesScriptContent = "total_bytes=0 && "
                 + string.Join(" && ", filesToDownload.Select(f => {
                     var setVariables = $"path='{f.Path}' && url='{f.Url}'";
 
@@ -464,7 +467,7 @@ namespace TesApi.Web
                         ? $"blobxfer download --storage-url \"$url\" --local-path \"$path\" --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
                         : "mkdir -p $(dirname \"$path\") && wget -O \"$path\" \"$url\"";
 
-                    return $"{setVariables} && {downloadSingleFile} && {exitIfDownloadedFileIsNotFound} && {incrementTotalBytesTransferred}"; })) 
+                    return $"{setVariables} && {downloadSingleFile} && {exitIfDownloadedFileIsNotFound} && {incrementTotalBytesTransferred}"; }))
                 + $" && echo FileDownloadSizeInBytes=$total_bytes >> {metricsPath}";
 
             var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
@@ -513,9 +516,9 @@ namespace TesApi.Web
                 // Private executor images are pulled via pool ContainerConfiguration
                 sb.AppendLine($"write_ts ExecutorPullStart && docker pull --quiet {executor.Image} && write_ts ExecutorPullEnd && \\");
             }
-            
+
             // The remainder of the script downloads the inputs, runs the main executor container, and uploads the outputs, including the metrics.txt file
-            // After task completion, metrics file is downloaded and used to populate the BatchNodeMetrics object 
+            // After task completion, metrics file is downloaded and used to populate the BatchNodeMetrics object
             sb.AppendLine($"write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \\\"Size\\\" | grep - Po '(?i)\\\"Size\\\":\\K([^,]*)') && \\");
             sb.AppendLine($"write_ts DownloadStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {downloadFilesScriptPath} && \\");
@@ -528,6 +531,7 @@ namespace TesApi.Web
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \\");
             sb.AppendLine($"write_ts UploadEnd && \\");
             sb.AppendLine($"/bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKiB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKiB=${{disk[2]}} >> /mnt{metricsPath}' && \\");
+            sb.AppendLine($"write_kv VmCpuModelName \"$(cat /proc/cpuinfo | grep -m1 name | cut -f 2 -d ':' | xargs)\" && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url \"{metricsUrl}\" --local-path \"{metricsPath}\" --rename --no-recursive");
 
             var batchScriptPath = $"{batchExecutionDirectoryPath}/{BatchScriptFileName}";
@@ -775,44 +779,48 @@ namespace TesApi.Web
 
             var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
 
-            var selectedVm = virtualMachineInfoList
+            var eligibleVms = virtualMachineInfoList
                 .Where(vm =>
                     vm.LowPriority == preemptible
                     && vm.NumberOfCores >= requiredNumberOfCores
                     && vm.MemoryInGB >= requiredMemoryInGB
                     && vm.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
-                .Where(vm => previouslyFailedVmSizes == null || !previouslyFailedVmSizes.Contains(vm.VmSize))
+                .ToList();
+
+            var selectedVm = eligibleVms
+                .Where(vm => allowedVmSizes == null || !allowedVmSizes.Any() || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
+                .Where(vm => previouslyFailedVmSizes == null || !previouslyFailedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
                 .OrderBy(x => x.PricePerHour)
                 .FirstOrDefault();
 
-            if (selectedVm == null)
+            if (selectedVm != null)
             {
-                var alternateVm = virtualMachineInfoList
-                    .Where(x =>
-                        x.LowPriority == !preemptible
-                        && x.NumberOfCores >= requiredNumberOfCores
-                        && x.MemoryInGB >= requiredMemoryInGB
-                        && x.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
-                    .Where(vm => previouslyFailedVmSizes == null || !previouslyFailedVmSizes.Contains(vm.VmSize))
-                    .OrderBy(x => x.PricePerHour)
-                    .FirstOrDefault();
-
-                var noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}";
-
-                if (alternateVm != null)
-                {
-                    noVmFoundMessage += $" Please note that a VM with LowPriority={!preemptible} WAS found however.";
-                }
-
-                if (previouslyFailedVmSizes != null)
-                {
-                    noVmFoundMessage += $"The following VmSizes were excluded from consideration because of {BatchTaskState.NodeAllocationFailed} error(s) on previous attempts: {string.Join(", ", previouslyFailedVmSizes)}";
-                }
-
-                throw new AzureBatchVirtualMachineAvailabilityException(noVmFoundMessage);
+                return selectedVm;
             }
 
-            return selectedVm;
+            var noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}.";
+
+            if(!eligibleVms.Any())
+            {
+                noVmFoundMessage += $" There are no VM sizes that match the requirements. Review the task resources.";
+            }
+
+            if (previouslyFailedVmSizes != null)
+            {
+                noVmFoundMessage += $" The following VM sizes were excluded from consideration because of {BatchTaskState.NodeAllocationFailed} error(s) on previous attempts: {string.Join(", ", previouslyFailedVmSizes)}";
+            }
+
+            if (allowedVmSizes != null && allowedVmSizes.Any())
+            {
+                var vmsExcludedByTheAllowedVmsConfiguration = eligibleVms.Where(vm => allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase));
+
+                if (vmsExcludedByTheAllowedVmsConfiguration.Any())
+                {
+                    noVmFoundMessage += $" {vmsExcludedByTheAllowedVmsConfiguration.Count()} VM(s) were excluded by the allowed-vm-sizes configuration. Consider expanding the list of allowed VM sizes.";
+                }
+            }
+
+            throw new AzureBatchVirtualMachineAvailabilityException(noVmFoundMessage);
         }
 
         private async Task<(BatchNodeMetrics BatchNodeMetrics, DateTimeOffset? TaskStartTime, DateTimeOffset? TaskEndTime, int? CromwellRcCode)> GetBatchNodeMetricsAndCromwellResultCodeAsync(TesTask tesTask)
@@ -860,7 +868,7 @@ namespace TesApi.Web
                     try
                     {
                         var metrics = DelimitedTextToDictionary(metricsContent.Trim());
-                         
+
                         var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKiB", out var diskSizeInKiB)  ? diskSizeInKiB / kiBInGB : (double?)null;
                         var diskUsedInGB = TryGetValueAsDouble(metrics, "DiskUsedInKiB", out var diskUsedInKiB) ? diskUsedInKiB / kiBInGB : (double?)null;
 
@@ -875,7 +883,8 @@ namespace TesApi.Web
                             FileUploadDurationInSeconds = GetDurationInSeconds(metrics, "UploadStart", "UploadEnd"),
                             FileUploadSizeInGB = TryGetValueAsDouble(metrics, "FileUploadSizeInBytes", out var fileUploadSizeInBytes) ? fileUploadSizeInBytes / bytesInGB : (double?)null,
                             DiskUsedInGB = diskUsedInGB,
-                            DiskUsedPercent = diskUsedInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsedInGB / diskSizeInGB * 100 ) : null
+                            DiskUsedPercent = diskUsedInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsedInGB / diskSizeInGB * 100 ) : null,
+                            VmCpuModelName = metrics.GetValueOrDefault("VmCpuModelName")
                         };
 
                         taskStartTime = TryGetValueAsDateTimeOffset(metrics, "BlobXferPullStart", out var startTime) ? (DateTimeOffset?)startTime : null;
