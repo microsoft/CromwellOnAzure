@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
     <ProjectReference Include="..\CromwellApiClient\CromwellApiClient.csproj" />
+    <ProjectReference Include="..\Tes\Tes.csproj" />
   </ItemGroup>
 
 </Project>
