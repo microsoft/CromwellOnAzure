@@ -10,6 +10,7 @@ services:
       - CosmosDbAccountName=$CosmosDbAccountName
       - BatchAccountName=$BatchAccountName
       - ApplicationInsightsAccountName=$ApplicationInsightsAccountName
+      - AzureServicesAuthConnectionString=RunAs=App;AppId=$ManagedIdentityClientId
       - UsePreemptibleVmsOnly=$UsePreemptibleVmsOnly
       - AzureOfferDurableId=$AzureOfferDurableId
       - CromwellOnAzureVersion=$CromwellOnAzureVersion
@@ -74,6 +75,7 @@ services:
       - DefaultStorageAccountName=$DefaultStorageAccountName
       - CosmosDbAccountName=$CosmosDbAccountName
       - ApplicationInsightsAccountName=$ApplicationInsightsAccountName
+      - AzureServicesAuthConnectionString=RunAs=App;AppId=$ManagedIdentityClientId
     depends_on:
       - "cromwell"
     restart: unless-stopped

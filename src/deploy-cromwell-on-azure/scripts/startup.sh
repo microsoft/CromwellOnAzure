@@ -45,13 +45,14 @@ kv["TriggerServiceImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 
 storage_account_name=${kv["DefaultStorageAccountName"]}
+managed_identity_client_id=${kv["ManagedIdentityClientId"]}
 
 write_log "Checking account access (this could take awhile due to role assignment propagation delay)..."
 
 while :
 do
     write_log "Getting management token..."
-    IFS='~' read content http_status <<< $(curl -s -H Metadata:true --write-out '~%{http_code}' "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com")
+    IFS='~' read content http_status <<< $(curl -s -H Metadata:true --write-out '~%{http_code}' "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com&client_id=$managed_identity_client_id")
 
     if [ "$http_status" == "200" ]; then
         mgmt_token=$(grep -Po '"access_token":"\K([^"]*)' <<< $content)
@@ -84,7 +85,7 @@ do
                 && grep -q "${kv["ApplicationInsightsAccountName"]}" <<< "${resource_ids[@]}"; then
 
                 write_log "Getting storage token..."
-                IFS='~' read content http_status <<< $(curl -s -H Metadata:true --write-out '~%{http_code}' "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://$storage_account_name.blob.core.windows.net")
+                IFS='~' read content http_status <<< $(curl -s -H Metadata:true --write-out '~%{http_code}' "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://$storage_account_name.blob.core.windows.net&client_id=$managed_identity_client_id")
 
                 if [ "$http_status" == "200" ]; then
                     storage_token=$(grep -Po '"access_token":"\K([^"]*)' <<< $content)
@@ -115,7 +116,7 @@ write_log "Account access OK"
 write_log
 
 write_log "Mounting containers (default storage account = $storage_account_name)"
-./mount_containers.sh -a $storage_account_name
+./mount_containers.sh -a $storage_account_name -c $managed_identity_client_id
 write_log
 
 write_log "Mounted containers:"
