@@ -1,10 +1,8 @@
-namespace Common
+﻿namespace Common
 {
     public static class Constants
     {
         public const string CromwellSystemName = "Cromwell";
-
-        public static string CromwellIsAvailableMessage = "Cromwell is available.";
 
         public static string CosmosDbDatabaseId = "TES";
 
