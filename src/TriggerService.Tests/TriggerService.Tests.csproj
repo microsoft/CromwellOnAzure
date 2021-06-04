@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj" />
     <ProjectReference Include="..\TriggerService\TriggerService.csproj" />
   </ItemGroup>
 </Project>

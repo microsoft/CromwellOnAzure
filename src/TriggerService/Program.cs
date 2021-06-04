@@ -58,15 +58,15 @@ namespace TriggerService
             (var cosmosDbEndpoint, var cosmosDbKey) = await GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
 
             var environment = new CromwellOnAzureEnvironment(
-                            serviceProvider.GetRequiredService<ILoggerFactory>(),
-                            new AzureStorage(serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<AzureStorage>(), cloudStorageAccount, new System.Net.Http.HttpClient()),
-                            new CromwellApiClient.CromwellApiClient(cromwellUrl),
-                            new CosmosDbRepository<TesTask>(
-                                cosmosDbEndpoint,
-                                cosmosDbKey,
-                                Constants.CosmosDbDatabaseId,
-                                Constants.CosmosDbContainerId,
-                                Constants.CosmosDbPartitionId));
+                serviceProvider.GetRequiredService<ILoggerFactory>(),
+                new AzureStorage(cloudStorageAccount, new System.Net.Http.HttpClient()),
+                new CromwellApiClient.CromwellApiClient(cromwellUrl),
+                new CosmosDbRepository<TesTask>(
+                    cosmosDbEndpoint, 
+                    cosmosDbKey, 
+                    Constants.CosmosDbDatabaseId, 
+                    Constants.CosmosDbContainerId, 
+                    Constants.CosmosDbPartitionId));
 
             serviceCollection.AddSingleton(s => new TriggerEngine(s.GetRequiredService<ILoggerFactory>(), environment));
             serviceProvider = serviceCollection.BuildServiceProvider();
@@ -74,11 +74,6 @@ namespace TriggerService
             await engine.RunAsync();
         }
 
-        /// <summary>
-        /// Asynchronously Get CosmosDbEndpoint And Key
-        /// </summary>
-        /// <param name="cosmosDbAccountName"></param>
-        /// <returns></returns>
         private static async Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName)
         {
             if (string.IsNullOrWhiteSpace(cosmosDbAccountName))
@@ -116,11 +111,6 @@ namespace TriggerService
             return azureClient;
         }
 
-        /// <summary>
-        ///  Asynchronously Get Azure Access Token
-        /// </summary>
-        /// <param name="resource"></param>
-        /// <returns></returns>
         private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
         {
             return new AzureServiceTokenProvider().GetAccessTokenAsync(resource);

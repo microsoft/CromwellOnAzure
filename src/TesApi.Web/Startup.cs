@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Common;
 using LazyCache;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -26,10 +27,7 @@ namespace TesApi.Web
     /// </summary>
     public class Startup
     {
-        private const string CosmosDbDatabaseId = "TES";
-        private const string CosmosDbContainerId = "Tasks";
-        private const string CosmosDbPartitionId = "01";
-        private const string defaultAzureOfferDurableId = "MS-AZR-0003p";
+        private const string DefaultAzureOfferDurableId = "MS-AZR-0003p";
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -45,7 +43,7 @@ namespace TesApi.Web
             this.hostingEnvironment = hostingEnvironment;
             logger = loggerFactory.CreateLogger<Startup>();
             this.loggerFactory = loggerFactory;
-            azureOfferDurableId = Configuration.GetValue("AzureOfferDurableId", defaultAzureOfferDurableId);
+            azureOfferDurableId = Configuration.GetValue("AzureOfferDurableId", DefaultAzureOfferDurableId);
         }
 
         /// <summary>
@@ -81,8 +79,7 @@ namespace TesApi.Web
                 });
 
             (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
-
-            var cosmosDbRepository = new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, CosmosDbDatabaseId, CosmosDbContainerId, CosmosDbPartitionId);
+            var cosmosDbRepository = new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId);
             var repository = new CachingWithRetriesRepository<TesTask>(cosmosDbRepository);
 
             services.AddSingleton<IRepository<TesTask>>(repository);

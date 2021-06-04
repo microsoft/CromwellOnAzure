@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -22,6 +21,8 @@ namespace TriggerService
 {
     public class CromwellOnAzureEnvironment
     {
+        private static readonly TimeSpan inProgressWorkflowInvisibilityPeriod = TimeSpan.FromMinutes(1);
+        private static readonly Regex workflowStateRegex = new Regex("^[^/]*");
         private static readonly Regex blobNameRegex = new Regex("^(?:https?://|/)?[^/]+/[^/]+/([^?.]+)");  // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs in the trigger file.
         private IAzureStorage storage { get; set; }
         internal ICromwellApiClient cromwellApiClient { get; set; }
@@ -34,7 +35,6 @@ namespace TriggerService
             this.cromwellApiClient = cromwellApiClient;
             this.logger = loggerFactory.CreateLogger<AzureStorage>();
             this.tesTaskRepository = tesTaskRepository;
-
             logger.LogInformation($"Cromwell URL: {cromwellApiClient.GetUrl()}");
         }
 
@@ -86,40 +86,34 @@ namespace TriggerService
 
         public async Task ExecuteNewWorkflowsAsync()
         {
-            var blobTriggers = await storage.GetBlobsByStateAsync(AzureStorage.WorkflowState.New);
+            var blobTriggers = await storage.GetWorkflowsByStateAsync(WorkflowState.New);
 
             foreach (var blobTrigger in blobTriggers)
             {
                 try
                 {
-                    logger.LogInformation($"Processing new workflow trigger: {blobTrigger.Uri.AbsoluteUri}");
-                    var blobTriggerJson = await blobTrigger.DownloadTextAsync();
+                    logger.LogInformation($"Processing new workflow trigger: {blobTrigger.Uri}");
+                    var blobTriggerJson = await storage.DownloadBlobTextAsync(blobTrigger.ContainerName, blobTrigger.Name);
                     var processedTriggerInfo = await ProcessBlobTrigger(blobTriggerJson);
 
                     var response = await cromwellApiClient.PostWorkflowAsync(
-                                        processedTriggerInfo.WorkflowSource.Filename, processedTriggerInfo.WorkflowSource.Data,
-                                        processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
-                                        processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
-                                        processedTriggerInfo.WorkflowOptions.Filename, processedTriggerInfo.WorkflowOptions.Data,
-                                        processedTriggerInfo.WorkflowDependencies.Filename, processedTriggerInfo.WorkflowDependencies.Data);
+                        processedTriggerInfo.WorkflowSource.Filename, processedTriggerInfo.WorkflowSource.Data,
+                        processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
+                        processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
+                        processedTriggerInfo.WorkflowOptions.Filename, processedTriggerInfo.WorkflowOptions.Data,
+                        processedTriggerInfo.WorkflowDependencies.Filename, processedTriggerInfo.WorkflowDependencies.Data);
 
-                    await SetStateToInProgressAsync(blobTrigger.Container.Name, blobTrigger.Name, response.Id.ToString());
+                    await SetStateToInProgressAsync(blobTrigger.ContainerName, blobTrigger.Name, response.Id.ToString());
                 }
-                catch (Exception exc)
+                catch (Exception e)
                 {
-                    logger.LogError(exc, $"Exception in ExecuteNewWorkflowsAsync for {blobTrigger.Uri.AbsoluteUri}");
-
+                    logger.LogError(e, $"Exception in ExecuteNewWorkflowsAsync for {blobTrigger.Uri}");
+                    
                     await MutateStateAsync(
-                        blobTrigger.Container.Name,
+                        blobTrigger.ContainerName,
                         blobTrigger.Name,
-                        AzureStorage.WorkflowState.Failed,
-                        (w) => {
-                            w.WorkflowFailureDetails = new WorkflowFailureInfo
-                            {
-                                WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell",
-                                WorkflowFailureReasonDetail = exc.Message
-                            };
-                        });
+                        WorkflowState.Failed,
+                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo { WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell", WorkflowFailureReasonDetail = e.Message });
                 }
             }
         }
@@ -158,24 +152,23 @@ namespace TriggerService
             var workflowDependencies = await GetBlobFileNameAndData(triggerInfo.WorkflowDependenciesUrl);
 
             return new ProcessedTriggerInfo(workflowSource, workflowInputs, workflowOptions, workflowDependencies);
-
         }
 
-        public async Task<ConcurrentBag<Workflow>> UpdateWorkflowStatusesAsync()
+        public async Task UpdateWorkflowStatusesAsync()
         {
-            var wfWithUpdatedStatuses = new ConcurrentBag<Workflow>();
-            var blobTriggers = await storage.GetRecentlyUpdatedInProgressWorkflowBlobsAsync();
-
+            var blobTriggers = (await storage.GetWorkflowsByStateAsync(WorkflowState.InProgress))
+                .Where(blob => DateTimeOffset.UtcNow.Subtract(blob.LastModified) > inProgressWorkflowInvisibilityPeriod);
+            
             foreach (var blobTrigger in blobTriggers)
-            {                
+            {
                 var id = Guid.Empty;
 
                 try
                 {
-                    id = ExtractWorkflowId(blobTrigger.Name, AzureStorage.WorkflowState.InProgress);
-                    var sampleName = ExtractSampleName(blobTrigger.Name, AzureStorage.WorkflowState.InProgress);
-                    var statusResponse = await cromwellApiClient.GetStatusAsync(id);
-
+                    id = ExtractWorkflowId(blobTrigger.Name, WorkflowState.InProgress);
+                    var sampleName = ExtractSampleName(blobTrigger.Name, WorkflowState.InProgress);
+                    var statusResponse = await cromwellApiClient.GetStatusAsync(id);                  
+                    
                     switch (statusResponse.Status)
                     {
                         case WorkflowStatus.Running:
@@ -185,149 +178,99 @@ namespace TriggerService
                             }
                         case WorkflowStatus.Aborted:
                             {
-                                logger.LogInformation($"Setting to failed Id: {id}");
+                                logger.LogInformation($"Setting to failed (aborted) Id: {id}");
 
-                                await UploadOutputsAsync(id, sampleName);
-                                await UploadTimingAsync(id, sampleName);
-
-                                var mutatedBlobName = await MutateStateAsync(
-                                    blobTrigger.Container.Name,
-                                    blobTrigger.Name,
-                                    AzureStorage.WorkflowState.Failed,
-                                    wf => wf.WorkflowFailureDetails = new WorkflowFailureInfo
-                                    {
-                                        WorkflowFailureReason = "Aborted"
-                                    });
-
-                                wfWithUpdatedStatuses.Add(JsonConvert
-                                    .DeserializeObject<Workflow>(await storage
-                                    .DownloadBlobTextAsync(blobTrigger.Container.Name,
-                                    mutatedBlobName)));
-
-                                break;
-                            }
-                        case WorkflowStatus.Failed:
-                            {
-                                logger.LogInformation($"Setting to failed Id: {id}");
-
-                                await UploadOutputsAsync(id, sampleName);
-                                await UploadTimingAsync(id, sampleName);
-
-                                var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id);
-
-                                var mutatedBlobName = await MutateStateAsync(
-                                blobTrigger.Container.Name,
-                                blobTrigger.Name,
-                                AzureStorage.WorkflowState.Failed,
-                                wf => wf.WorkflowFailureDetails = workflowFailureInfo);
-
-                                logger.LogInformation($"Mutated Workflow to : {mutatedBlobName}");
-
-                                wfWithUpdatedStatuses.Add(JsonConvert
-                                    .DeserializeObject<Workflow>(await storage
-                                    .DownloadBlobTextAsync(blobTrigger.Container.Name,
-                                    mutatedBlobName)));
-
-                                break;
-                            }
-                        case WorkflowStatus.Succeeded:
-                            {
                                 await UploadOutputsAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
                                 await MutateStateAsync(
-                                blobTrigger.Container.Name,
-                                blobTrigger.Name,
-                                AzureStorage.WorkflowState.Succeeded);
+                                    blobTrigger.ContainerName,
+                                    blobTrigger.Name,
+                                    WorkflowState.Failed,
+                                    wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo { WorkflowFailureReason = "Aborted" });
 
+                                break;
+                            }
+                        case WorkflowStatus.Failed:
+                            {                                
+                                logger.LogInformation($"Setting to failed Id: {id}");                                
+                                
+                                await UploadOutputsAsync(id, sampleName);
+                                await UploadTimingAsync(id, sampleName);
+                                
+                                var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id);
+
+                                await MutateStateAsync(
+                                    blobTrigger.ContainerName, 
+                                    blobTrigger.Name,
+                                    WorkflowState.Failed,
+                                    wf => wf.WorkflowFailureInfo = workflowFailureInfo);
+
+                                break;
+                            }
+                        case WorkflowStatus.Succeeded:
+                            {                                
+                                await UploadOutputsAsync(id, sampleName);
+                                await UploadTimingAsync(id, sampleName);
+                                
+                                await MutateStateAsync(
+                                    blobTrigger.ContainerName, 
+                                    blobTrigger.Name, 
+                                    WorkflowState.Succeeded);
+                                
                                 break;
                             }
                     }
                 }
                 catch (CromwellApiException cromwellException) when (cromwellException?.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    logger.LogError(cromwellException, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.StorageUri.PrimaryUri.AbsoluteUri}.  Id: {id}  Cromwell reported workflow as NotFound (404).  Mutating state to Failed.");
+                    logger.LogError(cromwellException, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.Uri}.  Id: {id}  Cromwell reported workflow as NotFound (404).  Mutating state to Failed.");
 
-                    var mutatedBlobName = await MutateStateAsync(
-                        blobTrigger.Container.Name,
-                        blobTrigger.Name,
-                        AzureStorage.WorkflowState.Failed,
-                        (w) => {
-                            w.WorkflowFailureDetails = new WorkflowFailureInfo
-                            {
-                                WorkflowFailureReason = "CromwellApiException",
-                                WorkflowFailureReasonDetail = "Cromwell reported workflow as NotFound (404)"
-                            };
-                        });
-
-                    wfWithUpdatedStatuses.Add(JsonConvert
-                        .DeserializeObject<Workflow>(await storage
-                        .DownloadBlobTextAsync(blobTrigger.Container.Name,
-                        mutatedBlobName)));
+                    await MutateStateAsync(
+                        blobTrigger.ContainerName, 
+                        blobTrigger.Name, 
+                        WorkflowState.Failed, 
+                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo { WorkflowFailureReason = "WorkflowNotFoundInCromwell" });
 
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.StorageUri.PrimaryUri.AbsoluteUri}.  Id: {id}");
+                    logger.LogError(exception, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.Uri}.  Id: {id}");
                 }
             }
-            return wfWithUpdatedStatuses;
         }
 
-        public async Task<ConcurrentBag<Workflow>> AbortWorkflowsAsync()
+        public async Task AbortWorkflowsAsync()
         {
-            var wfWithUpdatedStatuses = new ConcurrentBag<Workflow>();
-            var blobTriggers = await storage.GetWorkflowBlobsToAbortAsync();
-
+            var blobTriggers = await storage.GetWorkflowsByStateAsync(WorkflowState.Abort);
+            
             foreach (var blobTrigger in blobTriggers)
             {
                 var id = Guid.Empty;
 
                 try
                 {
-                    id = ExtractWorkflowId(blobTrigger.Name, AzureStorage.WorkflowState.Abort);
-                    logger.LogInformation($"Aborting workflow ID: {id} Url: {blobTrigger.Uri.AbsoluteUri}");
+                    id = ExtractWorkflowId(blobTrigger.Name, WorkflowState.Abort);
+                    logger.LogInformation($"Aborting workflow ID: {id} Url: {blobTrigger.Uri}");
                     await cromwellApiClient.PostAbortAsync(id);
 
-                    var mutatedBlobName = await MutateStateAsync(
-                        blobTrigger.Container.Name,
-                        blobTrigger.Name,
-                        AzureStorage.WorkflowState.Failed,
-                        (w) => {
-                            w.WorkflowFailureDetails = new WorkflowFailureInfo
-                            {
-                                WorkflowFailureReason = "Aborted"
-                            };
-                        });
-
-                    wfWithUpdatedStatuses.Add(JsonConvert
-                                    .DeserializeObject<Workflow>(await storage
-                                    .DownloadBlobTextAsync(blobTrigger.Container.Name,
-                                    mutatedBlobName)));
-
+                    await MutateStateAsync(
+                        blobTrigger.ContainerName, 
+                        blobTrigger.Name, 
+                        WorkflowState.Failed,
+                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo{ WorkflowFailureReason = "AbortRequested" });
                 }
-                catch (Exception exc)
+                catch (Exception e)
                 {
-                    logger.LogError(exc, $"Exception in AbortWorkflowsAsync for {blobTrigger}.  Id: {id}");
+                    logger.LogError(e, $"Exception in AbortWorkflowsAsync for {blobTrigger}.  Id: {id}");
 
-                    var mutatedBlobName = await MutateStateAsync(
-                        blobTrigger.Container.Name,
-                        blobTrigger.Name,
-                        AzureStorage.WorkflowState.Failed,
-                        (w) => {
-                            w.WorkflowFailureDetails = new WorkflowFailureInfo
-                            {
-                                WorkflowFailureReason = "Aborted"
-                            };
-                        });
-
-                    wfWithUpdatedStatuses.Add(JsonConvert
-                                    .DeserializeObject<Workflow>(await storage
-                                    .DownloadBlobTextAsync(blobTrigger.Container.Name,
-                                    mutatedBlobName)));
+                    await MutateStateAsync(
+                        blobTrigger.ContainerName, 
+                        blobTrigger.Name, 
+                        WorkflowState.Failed,
+                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo { WorkflowFailureReason = "ErrorOccuredWhileAbortingWorkflow", WorkflowFailureReasonDetail = e.Message });
                 }
             }
-            return wfWithUpdatedStatuses;
         }
 
         public async Task<ProcessedWorkflowItem> GetBlobFileNameAndData(string url)
@@ -338,9 +281,10 @@ namespace TriggerService
             }
 
             var blobName = GetBlobName(url);
+
             if (string.IsNullOrEmpty(blobName))
             {
-                throw new ArgumentException(@"url object submitted ({url}) is not valid URL");
+                throw new ArgumentException($"url object submitted ({url}) is not valid URL");
             }
 
             byte[] data;
@@ -362,58 +306,39 @@ namespace TriggerService
             return new ProcessedWorkflowItem(blobName, data);
         }
 
-        public async Task<string> MutateStateAsync(string container, string blobAbsolutePath, AzureStorage.WorkflowState newState, Action<Workflow> action = null)
+        public async Task MutateStateAsync(
+            string container, 
+            string blobName, 
+            WorkflowState newState, 
+            Action<Workflow> workflowContentAction = null, 
+            Func<string, string> workflowNameAction = null)
         {
-            var blobName = DeriveWorkflowBlobName(blobAbsolutePath);
-            var newStateText = $"{newState.ToString().ToLowerInvariant()}";
-            var oldStateText = GetWorkflowOldStateText(blobAbsolutePath);
-            var newBlobName = DeriveWorkflowBlobNameAfterMutation(blobAbsolutePath, newState);
+            var oldStateText = workflowStateRegex.Match(blobName).Value;
+            var newStateText = newState.ToString().ToLowerInvariant();
+            var newBlobName = workflowStateRegex.Replace(blobName, newStateText);
 
-            logger.LogInformation($"Mutating state from '{oldStateText}' to '{newStateText}' for {blobName}");
+            if (workflowNameAction != null)
+            {
+                newBlobName = workflowNameAction(newBlobName);
+            }
+
+            logger.LogInformation($"Mutating state from '{oldStateText}' to '{newStateText}' for blob {storage.AccountName}/{container}/{blobName}");
 
             var workflow = JsonConvert.DeserializeObject<Workflow>(await storage.DownloadBlobTextAsync(container, blobName));
-
-            action?.Invoke(workflow);
-
-            await storage.UploadFileTextAsync(
-                JsonConvert.SerializeObject(workflow, Formatting.Indented),
-                container,
-                newBlobName);
-
-            await storage.DeleteBlobIfExistsAsync(container, blobName);
-
-            return newBlobName;
-        }
-
-        public async Task SetStateToInProgressAsync(string container, string blobNameOrAbsolutePath, string id)
-        {
-            //Test cases pass AbsolutePath where as the application passes blobName
-            var blobName = DeriveWorkflowBlobName(blobNameOrAbsolutePath);
-            var data = await storage.DownloadBlobTextAsync(container, blobName);
-            var newBlobName = blobName.Replace("new/", $"{AzureStorage.WorkflowState.InProgress.ToString().ToLowerInvariant()}/");
-            newBlobName = newBlobName.Replace(".json", $".{id}.json");
-            await storage.UploadFileTextAsync(data, container, newBlobName);
+            var jsonSerializerSettings = workflow == null ? new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore } : null;
+            workflow = workflow ?? new Workflow();
+            workflowContentAction?.Invoke(workflow);
+            await storage.UploadFileTextAsync(JsonConvert.SerializeObject(workflow, Formatting.Indented, jsonSerializerSettings), container, newBlobName);
             await storage.DeleteBlobIfExistsAsync(container, blobName);
         }
 
-        private static string GetWorkflowOldStateText(string blobNameOrAbsolutePath)
+        public Task SetStateToInProgressAsync(string container, string blobName, string workflowId)
         {
-            var blobNameDetailsArray = blobNameOrAbsolutePath.Split('/');
-            return blobNameDetailsArray[blobNameDetailsArray.Length - 2].ToLowerInvariant();
-        }
-
-        private static string DeriveWorkflowBlobNameAfterMutation(string blobNameOrAbsolutePath, AzureStorage.WorkflowState newState)
-        {
-            var blobNameDetailsArray = blobNameOrAbsolutePath.Split('/');
-            blobNameDetailsArray[(blobNameDetailsArray.Length - 2)] = newState.ToString().ToLowerInvariant();
-            return string.Join('/', blobNameDetailsArray);
-        }
-
-        private static string DeriveWorkflowBlobName(string blobNameOrAbsolutePath)
-        {
-            var blobNameDetailsArray = blobNameOrAbsolutePath.Split('/');
-            var detailsArrayLength = blobNameDetailsArray.Length;
-            return $"{blobNameDetailsArray[detailsArrayLength - 2]}/{blobNameDetailsArray[detailsArrayLength - 1]}";
+            return MutateStateAsync(
+                container, 
+                blobName, 
+                WorkflowState.InProgress, 
+                workflowNameAction: name => name.Replace(".json", $".{workflowId}.json"));
         }
 
         private static string GetParentPath(string path)
@@ -428,53 +353,47 @@ namespace TriggerService
             return string.Join('/', pathComponents.Take(pathComponents.Length - 1));
         }
 
-        private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowid)
-        {
-            var tesTasks = await tesTaskRepository.GetItemsAsync(
-                        predicate: t => t.WorkflowId == workflowid.ToString());
 
+
+        private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId)
+        {
+		    const string BatchExecutionDirectoryName = "__batch";
+			
+            var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
+
+            // Select the last attempt of each Cromwell task, and then select only the failed ones
+            // If CromwellResultCode is > 0, point to Cromwell stderr/out. Otherwise, if batch exit code > 0, point to Batch stderr/out
             var failedTesTasks = tesTasks
                 .GroupBy(t => new { t.CromwellTaskInstanceName, t.CromwellShard })
                 .Select(grp => grp.OrderBy(t => t.CromwellAttempt).Last())
-                .Where(t => t.FailureReason != null);
+                .Where(t => t.FailureReason != null || t.CromwellResultCode.GetValueOrDefault() != 0)
+                .Select(t => {
+                    var cromwellScriptFailed = t.CromwellResultCode.GetValueOrDefault() != 0;
+                    var batchTaskFailed = (t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode).GetValueOrDefault() != 0;
+                    var executor = t.Executors?.LastOrDefault();
+                    var executionDirectoryPath = GetParentPath(executor?.Stdout);
+                    var batchExecutionDirectoryPath = executionDirectoryPath != null ? $"{executionDirectoryPath}/{BatchExecutionDirectoryName}" : null;
+                    var batchStdOut = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stdout.txt" : null;
+                    var batchStdErr = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stderr.txt" : null;
 
-            logger.LogInformation($"Surfacing {failedTesTasks.Count()} failed task details to trigger file");
-
-            return new WorkflowFailureInfo
-            {
-                FailedTaskDetails = failedTesTasks.Select(t => {
-
-                    const string BatchExecutionDirectoryName = "__batch";
-
-                    var cromwellFailed = t.CromwellResultCode.GetValueOrDefault() != 0;
-                    var batchFailed = (t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode).GetValueOrDefault() != 0;
-
-                    var executor = batchFailed ? t.Executors?.LastOrDefault() : t.Executors?.FirstOrDefault();
-                    var executionDirectoryPath = batchFailed ? GetParentPath(executor?.Stdout) : null;
-                    var batchExecutionDirectoryPath = batchFailed ? $"{executionDirectoryPath}/{BatchExecutionDirectoryName}" : null;
-
-                    var batchStdout = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stdout.txt" : null;
-                    var batchStderr = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stderr.txt" : null;
-
-                    return new FailedTaskInfo
-                    {
-                        CromwellResultCode = t.CromwellResultCode,
-                        FailureReason = t.FailureReason,
+                    return new FailedTaskInfo {
                         TaskId = t.Id,
-                        StdErr = cromwellFailed ? executor?.Stderr : batchFailed ? batchStderr : null,
-                        StdOut = cromwellFailed ? executor?.Stdout : batchFailed ? batchStdout : null,
-                        SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs?.Where(log =>
-                        !log.Equals(t.FailureReason)).ToList()
-                    };
-                }).ToList(),
+                        FailureReason = cromwellScriptFailed ? "CromwellScriptFailed" : t.FailureReason,
+                        SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs?.Where(log => !log.Equals(t.FailureReason)).ToList(),
+                        StdOut = cromwellScriptFailed ? executor?.Stdout : batchTaskFailed ? batchStdOut : null,
+                        StdErr = cromwellScriptFailed ? executor?.Stderr : batchTaskFailed ? batchStdErr : null,
+                        CromwellResultCode = t.CromwellResultCode }; })
+                .ToList();
 
-                WorkflowFailureReason = failedTesTasks.Any(t =>
-                    (t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode).GetValueOrDefault() != 0) ?
-                    "BatchFailed" : failedTesTasks.Any() ? "OneOrMoreTasksFailed" : "CromwellFailed"
+            logger.LogInformation($"Surfacing {failedTesTasks.Count} failed task details to trigger file for workflow {workflowId}");
+
+            return new WorkflowFailureInfo {
+                FailedTasks = failedTesTasks,
+                WorkflowFailureReason = failedTesTasks.Any() ? "OneOrMoreTasksFailed": "CromwellFailed"
             };
-        }
 
-        private static Guid ExtractWorkflowId(string blobTriggerName, AzureStorage.WorkflowState currentState)
+        }
+        private static Guid ExtractWorkflowId(string blobTriggerName, WorkflowState currentState)
         {
             var blobName = blobTriggerName.Substring(currentState.ToString().Length + 1);
             var withoutExtension = Path.GetFileNameWithoutExtension(blobName);
@@ -482,7 +401,7 @@ namespace TriggerService
             return Guid.Parse(textId);
         }
 
-        private static string ExtractSampleName(string blobTriggerName, AzureStorage.WorkflowState currentState)
+        private static string ExtractSampleName(string blobTriggerName, WorkflowState currentState)
         {
             var blobName = blobTriggerName.Substring(currentState.ToString().Length + 1);
             var withoutExtension = Path.GetFileNameWithoutExtension(blobName);
@@ -492,7 +411,7 @@ namespace TriggerService
         private static string GetBlobName(string url)
         {
             return blobNameRegex.Match(url)?.Groups[1].Value.Replace("/", "_");
-        }        
+        }
 
         private async Task UploadOutputsAsync(Guid id, string sampleName)
         {
@@ -501,12 +420,14 @@ namespace TriggerService
             try
             {
                 var outputsResponse = await cromwellApiClient.GetOutputsAsync(id);
+
                 await storage.UploadFileTextAsync(
                     outputsResponse.Json,
                     outputsContainer,
                     $"{sampleName}.{id}.outputs.json");
 
                 var metadataResponse = await cromwellApiClient.GetMetadataAsync(id);
+
                 await storage.UploadFileTextAsync(
                     metadataResponse.Json,
                     outputsContainer,
@@ -525,6 +446,7 @@ namespace TriggerService
             try
             {
                 var timingResponse = await cromwellApiClient.GetTimingAsync(id);
+
                 await storage.UploadFileTextAsync(
                     timingResponse.Html,
                     outputsContainer,
