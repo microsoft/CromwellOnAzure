@@ -219,6 +219,8 @@ Run Broad Institute of MIT and Harvard's Best Practices Pipelines on Cromwell on
 
 [Somatic short variant discovery (SNVs + Indels)](https://github.com/microsoft/gatk4-somatic-snvs-indels-azure)<br/>
 
+[RNAseq short variant discovery (SNPs + Indels)](https://github.com/microsoft/gatk4-rnaseq-germline-snps-indels-azure)<br/>
+
 [Variant-filtering with Convolutional Neural Networks](https://github.com/microsoft/gatk4-cnn-variant-filter-azure)<br/>
 
 [Sequence data format conversion](https://github.com/microsoft/seq-format-conversion-azure)<br/>
