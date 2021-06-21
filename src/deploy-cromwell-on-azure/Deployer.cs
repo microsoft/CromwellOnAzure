@@ -32,7 +32,6 @@ using Microsoft.Azure.Storage;
 using Microsoft.Azure.Storage.Auth;
 using Microsoft.Azure.Storage.Blob;
 using Microsoft.Rest;
-using Microsoft.Rest.Azure;
 using Microsoft.Rest.Azure.OData;
 using Newtonsoft.Json;
 using Polly;
@@ -971,7 +970,7 @@ namespace CromwellOnAzureDeployer
                             .WithSubscriptionScope(configuration.SubscriptionId)
                             .CreateAsync(cts.Token)));
             }
-            catch (CloudException)
+            catch (Microsoft.Rest.Azure.CloudException)
             {
                 DisplayBillingReaderInsufficientAccessLevelWarning();
                 return Task.CompletedTask;
