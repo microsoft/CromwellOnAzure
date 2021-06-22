@@ -377,16 +377,16 @@ namespace CromwellOnAzureDeployer
                             .Unwrap())
                     });
 
-                    if (!SkipBillingReaderRoleAssignment)
-                    {
-                        await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
-                    }
-
                     await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
                     await AssignVmAsContributorToCosmosDb(managedIdentity, cosmosDb);
                     await AssignVmAsContributorToBatchAccountAsync(managedIdentity, batchAccount);
                     await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
                     await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
+
+                    if (!SkipBillingReaderRoleAssignment)
+                    {
+                        await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
+                    }
                 }
 
                 await WriteCoaVersionToVmAsync(sshConnectionInfo);
@@ -970,8 +970,11 @@ namespace CromwellOnAzureDeployer
                             .WithSubscriptionScope(configuration.SubscriptionId)
                             .CreateAsync(cts.Token)));
             }
-            catch (Microsoft.Rest.Azure.CloudException)
+            catch (Exception)
             {
+                // Since this code runs late in the deployment process,
+                // it can be assumed that an exception is most likely caused
+                // the known access level issue with this operation
                 DisplayBillingReaderInsufficientAccessLevelWarning();
                 return Task.CompletedTask;
             }
