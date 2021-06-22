@@ -970,11 +970,8 @@ namespace CromwellOnAzureDeployer
                             .WithSubscriptionScope(configuration.SubscriptionId)
                             .CreateAsync(cts.Token)));
             }
-            catch (Exception)
+            catch (Microsoft.Rest.Azure.CloudException)
             {
-                // Since this code runs late in the deployment process,
-                // it can be assumed that an exception is most likely caused
-                // the known access level issue with this operation
                 DisplayBillingReaderInsufficientAccessLevelWarning();
                 return Task.CompletedTask;
             }
