@@ -68,7 +68,7 @@ namespace TriggerService
                     Constants.CosmosDbContainerId, 
                     Constants.CosmosDbPartitionId));
 
-            serviceCollection.AddSingleton(s => new TriggerEngine(s.GetRequiredService<ILoggerFactory>(), environment));
+            serviceCollection.AddSingleton(s => new TriggerEngine(s.GetRequiredService<ILoggerFactory>(), environment, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(30)));
             serviceProvider = serviceCollection.BuildServiceProvider();
             var engine = serviceProvider.GetService<TriggerEngine>();
             await engine.RunAsync();

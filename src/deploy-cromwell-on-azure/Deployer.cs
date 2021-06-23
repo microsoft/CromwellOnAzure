@@ -377,16 +377,16 @@ namespace CromwellOnAzureDeployer
                             .Unwrap())
                     });
 
-                    if (!SkipBillingReaderRoleAssignment)
-                    {
-                        await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
-                    }
-
                     await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
                     await AssignVmAsContributorToCosmosDb(managedIdentity, cosmosDb);
                     await AssignVmAsContributorToBatchAccountAsync(managedIdentity, batchAccount);
                     await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
                     await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
+
+                    if (!SkipBillingReaderRoleAssignment)
+                    {
+                        await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
+                    }
                 }
 
                 await WriteCoaVersionToVmAsync(sshConnectionInfo);
@@ -535,7 +535,7 @@ namespace CromwellOnAzureDeployer
                 {
                     while (!cts.IsCancellationRequested)
                     {
-                        var (isCromwellAvailable, _, _) = await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"[ $(sudo docker logs cromwellazure_triggerservice_1 | grep -c '{Constants.CromwellIsAvailableMessage}') -gt 0 ] && echo 1 || echo 0");
+                        var (isCromwellAvailable, _, _) = await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"[ $(sudo docker logs cromwellazure_triggerservice_1 | grep -c '{AvailabilityTracker.GetAvailabilityMessage(Constants.CromwellSystemName)}') -gt 0 ] && echo 1 || echo 0");
 
                         if (isCromwellAvailable == "1")
                         {
@@ -958,15 +958,23 @@ namespace CromwellOnAzureDeployer
 
         private Task AssignVmAsBillingReaderToSubscriptionAsync(IIdentity managedIdentity)
         {
-            return Execute(
-                $"Assigning {BuiltInRole.BillingReader} role for VM to Subscription scope...",
-                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                    () => azureSubscriptionClient.AccessManagement.RoleAssignments
-                        .Define(Guid.NewGuid().ToString())
-                        .ForObjectId(managedIdentity.PrincipalId)
-                        .WithBuiltInRole(BuiltInRole.BillingReader)
-                        .WithSubscriptionScope(configuration.SubscriptionId)
-                        .CreateAsync(cts.Token)));
+            try
+            {
+                return Execute(
+                    $"Assigning {BuiltInRole.BillingReader} role for VM to Subscription scope...",
+                    () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
+                        () => azureSubscriptionClient.AccessManagement.RoleAssignments
+                            .Define(Guid.NewGuid().ToString())
+                            .ForObjectId(managedIdentity.PrincipalId)
+                            .WithBuiltInRole(BuiltInRole.BillingReader)
+                            .WithSubscriptionScope(configuration.SubscriptionId)
+                            .CreateAsync(cts.Token)));
+            }
+            catch (Microsoft.Rest.Azure.CloudException)
+            {
+                DisplayBillingReaderInsufficientAccessLevelWarning();
+                return Task.CompletedTask;
+            }
         }
 
         private Task AssignVmAsContributorToAppInsightsAsync(IIdentity managedIdentity, IResource appInsights)
@@ -1372,13 +1380,7 @@ namespace CromwellOnAzureDeployer
 
                 SkipBillingReaderRoleAssignment = true;
 
-                RefreshableConsole.WriteLine("Warning: insufficient subscription access level to assign the Billing Reader", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("role for the VM to your Azure Subscription.", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("Deployment will continue, but only default VM prices will be used for your workflows,", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("since the Billing Reader role is required to access RateCard API pricing data.", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("To resolve this in the future, have your Azure subscription Owner or Contributor", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("assign the Billing Reader role for the VM's managed identity to your Azure Subscription scope.", ConsoleColor.Yellow);
-                RefreshableConsole.WriteLine("More info: https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access", ConsoleColor.Yellow);
+                DisplayBillingReaderInsufficientAccessLevelWarning();
             }
         }
 
@@ -1572,6 +1574,17 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
+        }
+
+        private static void DisplayBillingReaderInsufficientAccessLevelWarning()
+        {
+            RefreshableConsole.WriteLine("Warning: insufficient subscription access level to assign the Billing Reader", ConsoleColor.Yellow);
+            RefreshableConsole.WriteLine("role for the VM to your Azure Subscription.", ConsoleColor.Yellow);
+            RefreshableConsole.WriteLine("Deployment will continue, but only default VM prices will be used for your workflows,", ConsoleColor.Yellow);
+            RefreshableConsole.WriteLine("since the Billing Reader role is required to access RateCard API pricing data.", ConsoleColor.Yellow);
+            RefreshableConsole.WriteLine("To resolve this in the future, have your Azure subscription Owner or Contributor", ConsoleColor.Yellow);
+            RefreshableConsole.WriteLine("assign the Billing Reader role for the VM's managed identity to your Azure Subscription scope.", ConsoleColor.Yellow);
+            RefreshableConsole.WriteLine("More info: https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access", ConsoleColor.Yellow);
         }
 
         private static void DisplayValidationExceptionAndExit(ValidationException validationException)

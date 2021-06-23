@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Common;
 using CromwellApiClient;
@@ -19,7 +20,7 @@ using Tes.Repository;
 [assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace TriggerService
 {
-    public class CromwellOnAzureEnvironment
+    public class CromwellOnAzureEnvironment : ICromwellOnAzureEnvironment
     {
         private static readonly TimeSpan inProgressWorkflowInvisibilityPeriod = TimeSpan.FromMinutes(1);
         private static readonly Regex workflowStateRegex = new Regex("^[^/]*");
@@ -289,7 +290,7 @@ namespace TriggerService
 
             byte[] data;
 
-            if ((Uri.TryCreate(url, UriKind.Absolute, out var uri) 
+            if ((Uri.TryCreate(url, UriKind.Absolute, out var uri)
                 && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase)
                 && uri.ParseQueryString().Get("sig") == null)
                 || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase))
