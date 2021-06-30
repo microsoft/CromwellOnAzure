@@ -1,6 +1,6 @@
 [Unit]
 Description=CromwellOnAzure
-RequiresMountsFor=/data /mnt
+RequiresMountsFor=/data
 
 [Service]
 ExecStart=/bin/bash /data/cromwellazure/startup.sh
