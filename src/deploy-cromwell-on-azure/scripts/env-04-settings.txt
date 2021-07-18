@@ -1,3 +1,0 @@
-﻿UsePreemptibleVmsOnly=false
-DisableBatchScheduling=false
-AzureOfferDurableId=MS-AZR-0003p
