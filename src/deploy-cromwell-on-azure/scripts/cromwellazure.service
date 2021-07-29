@@ -1,6 +1,7 @@
 [Unit]
 Description=CromwellOnAzure
-RequiresMountsFor=/data /mnt
+RequiresMountsFor=/data
+After=local-fs.target remote-fs.target
 
 [Service]
 ExecStart=/bin/bash /data/cromwellazure/startup.sh

@@ -26,6 +26,9 @@ sas_token=$(echo $3 | grep -Po '(?i)sas_token=\K([^,]*)' || :)
 ps -C blobfuse --format "cmd" | [[ $(grep -c " $1 ") -eq 1 ]] && mountpoint -q $1 && exit 0
 [[ $(grep -c " $1 " /etc/mtab) -eq 1 ]] && { umount -f $1 || write_log "umount error code: $?"; }
 
+# Exit if /mnt is not mounted or mount point is not created (this is the case during startup after VM resize)
+mountpoint -q /mnt && [ -d "$1" ] || exit 0
+
 tmp_dir="/mnt/blobfusetmp/$account_name/$container_name"
 rm -rf $tmp_dir
 mkdir -p $tmp_dir
