@@ -372,6 +372,10 @@ You can also use the [Pricing Calculator](https://azure.microsoft.com/en-us/pric
 ### How Cromwell on Azure selects batch VMs to run tasks in a workflow
 VM price data is used to select the cheapest per hour VM for a task's runtime requirements, and is also stored in the TES database to allow calculation of total workflow cost.  VM price data is obtained from the [Azure RateCard API](https://docs.microsoft.com/en-us/previous-versions/azure/reference/mt219005(v=azure.100)).  Accessing the Azure RateCard API requires the VM's [Billing Reader](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#billing-reader) role to be assigned to your Azure subscription scope.  If you don't have [Owner](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#owner), or both [Contributor](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#contributor) and [User Access Administrator](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#user-access-administrator) roles assigned to your Azure subscription, the deployer will not be able to complete this on your behalf - you will need to contact your Azure subscription administrator(s) to complete this for you.  You will see a warning in the TES logs indicating that default VM prices are being used until this is resolved.
 
+By default, all VM sizes supported by Azure Batch are considered for task execution. 
+
+You can constraint the Azure VM sizes considered for task execution by modifying file "allowed-vm-sizes" in the "configuration" storage container and restarting the host VM. For the full list of VM sizes and their features, see file "supported-vm-sizes" in the same container. Note that over-constraining the allowed VM sizes may result in task failures when no suitable VM is found, as well as higher execution costs. Any errors in the "allowed-vm-sizes" will be surfaced in the same file upon host VM restart.
+
 ### Optimize my WDLs
 This section is COMING SOON.
 
