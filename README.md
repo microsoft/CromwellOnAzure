@@ -1,9 +1,9 @@
 # Welcome to Cromwell on Azure
 ### Latest release
- * [Release 2.3.0](https://github.com/microsoft/CromwellOnAzure/releases/tag/2.3.0)<br/>
- [Release notes for version 2.3.0](docs/release-notes/2.3.0.md)
+ * [Release 2.4.0](https://github.com/microsoft/CromwellOnAzure/releases/tag/2.4.0)<br/>
+ [Release notes for version 2.4.0](docs/release-notes/2.4.0.md)
  
-Check the "Update Instructions" section in the version 2.3.0 [release notes](docs/release-notes/2.3.0.md/#update-instructions) to learn how to update an existing Cromwell on Azure deployment to version 2.3.0. You can customize some parameters when updating. Please [see these customization instructions](docs/troubleshooting-guide.md/#Customize-your-Cromwell-on-Azure-deployment), specifically the "Used by update" and "Comment" columns in the table.<br/>
+Check the "Update Instructions" section in the version 2.4.0 [release notes](docs/release-notes/2.4.0.md/#update-instructions) to learn how to update an existing Cromwell on Azure deployment to version 2.4.0. You can customize some parameters when updating. Please [see these customization instructions](docs/troubleshooting-guide.md/#Customize-your-Cromwell-on-Azure-deployment), specifically the "Used by update" and "Comment" columns in the table.<br/>
 
 #### Getting started
  * What is [Cromwell on Azure?](#Cromwell-on-Azure) <br/>
