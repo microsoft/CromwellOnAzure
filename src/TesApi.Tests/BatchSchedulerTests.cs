@@ -207,6 +207,7 @@ namespace TesApi.Tests
             Assert.AreEqual(TesState.SYSTEMERROREnum, await GetNewTesTaskStateAsync(TesState.RUNNINGEnum, BatchJobAndTaskStates.MoreThanOneJobFound));
             Assert.AreEqual(TesState.EXECUTORERROREnum, await GetNewTesTaskStateAsync(TesState.RUNNINGEnum, BatchJobAndTaskStates.NodeDiskFull));
             Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(TesState.RUNNINGEnum, BatchJobAndTaskStates.ActiveJobWithMissingAutoPool));
+            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(TesState.RUNNINGEnum, BatchJobAndTaskStates.NodePreempted));
         }
 
         [TestMethod]
@@ -224,6 +225,7 @@ namespace TesApi.Tests
             Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(TesState.INITIALIZINGEnum, BatchJobAndTaskStates.NodeAllocationFailed));
             Assert.AreEqual(TesState.EXECUTORERROREnum, await GetNewTesTaskStateAsync(TesState.INITIALIZINGEnum, BatchJobAndTaskStates.ImageDownloadFailed));
             Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(TesState.INITIALIZINGEnum, BatchJobAndTaskStates.ActiveJobWithMissingAutoPool));
+            Assert.AreEqual(TesState.QUEUEDEnum, await GetNewTesTaskStateAsync(TesState.INITIALIZINGEnum, BatchJobAndTaskStates.NodePreempted));
         }
 
         [TestMethod]
@@ -799,6 +801,7 @@ namespace TesApi.Tests
             public static AzureBatchJobAndTaskState TaskNotFound => new AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = null };
             public static AzureBatchJobAndTaskState MoreThanOneJobFound => new AzureBatchJobAndTaskState { MoreThanOneActiveJobFound = true };
             public static AzureBatchJobAndTaskState NodeAllocationFailed => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeAllocationFailed = true };
+            public static AzureBatchJobAndTaskState NodePreempted => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeState = ComputeNodeState.Preempted };
             public static AzureBatchJobAndTaskState NodeDiskFull => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeErrorCode = "DiskFull" };
             public static AzureBatchJobAndTaskState ActiveJobWithMissingAutoPool => new AzureBatchJobAndTaskState { ActiveJobWithMissingAutoPool = true };
             public static AzureBatchJobAndTaskState ImageDownloadFailed => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeErrorCode = "ContainerInvalidImage" };

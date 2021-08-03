@@ -118,7 +118,7 @@ namespace TesApi.Web
                 new TesTaskStateTransition(tesTaskIsQueuedInitializingOrRunning, BatchTaskState.NodeUnusable, DeleteBatchJobAndSetTaskExecutorErrorAsync),
                 new TesTaskStateTransition(tesTaskIsInitializingOrRunning, BatchTaskState.JobNotFound, SetTaskSystemError),
                 new TesTaskStateTransition(tesTaskIsInitializingOrRunning, BatchTaskState.MissingBatchTask, DeleteBatchJobAndSetTaskSystemErrorAsync),
-                new TesTaskStateTransition(tesTaskIsInitializingOrRunning, BatchTaskState.NodePreempted, DeleteBatchJobAndRequeueTaskAsync) // TODO: Implement preemption detection
+                new TesTaskStateTransition(tesTaskIsInitializingOrRunning, BatchTaskState.NodePreempted, DeleteBatchJobAndRequeueTaskAsync)
             };
         }
 
@@ -246,7 +246,6 @@ namespace TesApi.Web
             }
         }
 
-        // TODO: Detect batch node preemption and return BatchTaskState.NodePreempted
         /// <summary>
         /// Gets the current state of the Azure Batch task
         /// </summary>
@@ -300,6 +299,11 @@ namespace TesApi.Web
                         if (azureBatchJobAndTaskState.NodeState == ComputeNodeState.Unusable)
                         {
                             return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeUnusable, FailureReason = BatchTaskState.NodeUnusable.ToString(), SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState) };
+                        }
+
+                        if (azureBatchJobAndTaskState.NodeState == ComputeNodeState.Preempted)
+                        {
+                            return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodePreempted, FailureReason = BatchTaskState.NodePreempted.ToString(), SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState) };
                         }
 
                         if (azureBatchJobAndTaskState.NodeErrorCode != null)

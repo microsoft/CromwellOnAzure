@@ -106,6 +106,7 @@ namespace TesApi.Web
 
             services.AddHostedService<Scheduler>();
             services.AddHostedService<DeleteCompletedBatchJobsHostedService>();
+            services.AddHostedService<DeleteOrphanedBatchJobsHostedService>();
             services.AddHostedService<DeleteOrphanedAutoPoolsHostedService>();
             services.AddHostedService<RefreshVMSizesAndPricesHostedService>();
 

@@ -136,6 +136,9 @@ namespace TesApi.Web
         public Task<IEnumerable<string>> ListOldJobsToDeleteAsync(TimeSpan oldestJobAge) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListOldJobsToDeleteAsync(oldestJobAge));
 
         /// <inheritdoc/>
+        public Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListOrphanedJobsToDeleteAsync(minJobAge));
+
+        /// <inheritdoc/>
         public Task UploadBlobAsync(Uri blobAbsoluteUri, string content) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.UploadBlobAsync(blobAbsoluteUri, content));
 
         /// <inheritdoc/>

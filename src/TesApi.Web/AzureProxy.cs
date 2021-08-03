@@ -423,6 +423,27 @@ namespace TesApi.Web
         }
 
         /// <summary>
+        /// Gets the ids of orphaned Batch jobs older than the specified timespan
+        /// These jobs are active for prolonged period of time, have auto pool, NoAction termination option, and no tasks
+        /// </summary>
+        /// <returns>List of Batch job ids</returns>
+        public async Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge)
+        {
+            var filter = new ODATADetailLevel
+            {
+                FilterClause = $"state eq 'active' and creationTime lt DateTime'{DateTime.UtcNow.Subtract(minJobAge):yyyy-MM-ddTHH:mm:ssZ}'",
+                SelectClause = "id,poolInfo,onAllTasksComplete"
+            };
+
+            var noActionTesjobs = (await batchClient.JobOperations.ListJobs(filter).ToListAsync())
+                .Where(j => j.PoolInformation?.AutoPoolSpecification?.AutoPoolIdPrefix == "TES" && j.OnAllTasksComplete == OnAllTasksComplete.NoAction);
+
+            var noActionTesjobsWithNoTasks = await noActionTesjobs.ToAsyncEnumerable().WhereAwait(async j => !(await j.ListTasks().ToListAsync()).Any()).ToListAsync();
+
+            return noActionTesjobsWithNoTasks.Select(j => j.Id);
+        }
+
+        /// <summary>
         /// Gets the list of active pool ids matching the prefix and with creation time older than the minAge
         /// </summary>
         /// <returns>Active pool ids</returns>
