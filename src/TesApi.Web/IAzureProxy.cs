@@ -138,6 +138,12 @@ namespace TesApi.Web
         Task<IEnumerable<string>> ListOldJobsToDeleteAsync(TimeSpan oldestJobAge);
 
         /// <summary>
+        /// Gets the ids of orphaned Batch jobs older than specified timespan
+        /// </summary>
+        /// <returns>List of Batch job ids</returns>
+        Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge);
+
+        /// <summary>
         /// Gets the list of active pool ids matching the prefix and with creation time older than the minAge
         /// </summary>
         /// <returns>Active pool ids</returns>
