@@ -13,7 +13,7 @@ namespace TesApi.Web
     /// </summary>
     public class DeleteOrphanedBatchJobsHostedService : BackgroundService
     {
-        private static readonly TimeSpan runInterval = TimeSpan.FromHours(4);
+        private static readonly TimeSpan runInterval = TimeSpan.FromHours(1);
         private static readonly TimeSpan minJobAge = TimeSpan.FromHours(1);
 
         private readonly IRepository<TesTask> repository;
