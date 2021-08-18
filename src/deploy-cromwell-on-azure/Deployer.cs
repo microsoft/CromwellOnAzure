@@ -1319,10 +1319,9 @@ namespace CromwellOnAzureDeployer
             return reader.ReadToEnd().Replace("\r\n", "\n");
         }
 
-        private static void ValidateRegionName(string regionName)
+        private void ValidateRegionName(string regionName)
         {
-            var invalidRegionsRegex = new Regex("^(germany|china|usgov|usdod)");
-            var validRegionNames = Region.Values.Select(r => r.Name).Where(rn => !invalidRegionsRegex.IsMatch(rn));
+            var validRegionNames = azureSubscriptionClient.GetCurrentSubscription().ListLocations().Select(loc => loc.Region.Name);
 
             if (!validRegionNames.Contains(regionName, StringComparer.OrdinalIgnoreCase))
             {
