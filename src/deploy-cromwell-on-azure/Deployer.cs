@@ -1003,7 +1003,7 @@ namespace CromwellOnAzureDeployer
                 .WithPrimaryPrivateIPAddressDynamic();
 
             var vmDefinitionPart2 = (configuration.PrivateNetworking.GetValueOrDefault() ? vmDefinitionPart1.WithoutPrimaryPublicIPAddress() : vmDefinitionPart1.WithNewPrimaryPublicIPAddress(configuration.VmName))
-                .WithLatestLinuxImage("Canonical", "UbuntuServer", configuration.VmOsVersion)
+                .WithLatestLinuxImage(configuration.VmOsProvider, configuration.VmOsName, configuration.VmOsVersion)
                 .WithRootUsername(configuration.VmUsername)
                 .WithRootPassword(configuration.VmPassword)
                 .WithNewDataDisk(dataDiskSizeGiB, dataDiskLun, CachingTypes.None)

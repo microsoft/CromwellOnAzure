@@ -211,6 +211,8 @@ Configuration   parameter | Has default | Validated | Used by update | Comment
 string   SubscriptionId | N | Y | Y | Azure Subscription Id - Always required
 string   RegionName | N | Y | N | Azure region name to deploy to - Required for new install
 string   MainIdentifierPrefix = "coa" | Y | Y | N | Prefix for all resources to be deployed - Required to deploy but defaults to "coa"
+string   VmOsProvider = "Canonical" | Y | N | N | OS Provider VM to use as the host - Not required and defaults to Ubuntu
+string   VmOsName = "UbuntuServer" | Y | N | N | OS Name of the VM to use as the host - Not required and defaults to UbuntuServer
 string   VmOsVersion = "18.04-LTS" | Y | N | N | OS Version of the Linux Ubuntu VM to use as the host - Not required and defaults to Ubuntu 18.04 LTS
 string   VmSize   = "Standard_D3_v2" | Y | N | N | VM size of the Linux Ubuntu VM to use as the host - Not required and defaults to [Standard_D3_v2](https://docs.microsoft.com/en-us/azure/cloud-services/cloud-services-sizes-specs#dv2-series)
 string   VmUsername = "vmadmin"; | Y | N | Y | Username created on Cromwell on Azure Linux host - Not required and defaults to "vmadmin"
