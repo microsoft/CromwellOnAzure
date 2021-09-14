@@ -11,6 +11,7 @@ using LazyCache;
 using LazyCache.Providers;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
+using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -152,6 +153,32 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
+        public async Task PreemptibleTesTaskGetsScheduledToLowPriorityVm_PerVMFamilyEnforced()
+        {
+            var tesTask = GetTesTask();
+            tesTask.Resources.Preemptible = true;
+
+            (_, _, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.DefaultsPerVMFamilyEnforced));
+
+            Assert.AreEqual("VmSizeLowPri1", poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineSize);
+            Assert.AreEqual(1, poolInformation.AutoPoolSpecification.PoolSpecification.TargetLowPriorityComputeNodes);
+            Assert.AreEqual(0, poolInformation.AutoPoolSpecification.PoolSpecification.TargetDedicatedComputeNodes);
+        }
+
+        [TestMethod]
+        public async Task NonPreemptibleTesTaskGetsScheduledToDedicatedVm_PerVMFamilyEnforced()
+        {
+            var tesTask = GetTesTask();
+            tesTask.Resources.Preemptible = false;
+
+            (_, _, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.DefaultsPerVMFamilyEnforced));
+
+            Assert.AreEqual("VmSizeDedicated1", poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineSize);
+            Assert.AreEqual(1, poolInformation.AutoPoolSpecification.PoolSpecification.TargetDedicatedComputeNodes);
+            Assert.AreEqual(0, poolInformation.AutoPoolSpecification.PoolSpecification.TargetLowPriorityComputeNodes);
+        }
+
+        [TestMethod]
         public async Task TesTaskGetsScheduledToLowPriorityVmIfSettingUsePreemptibleVmsOnlyIsSet()
         {
             var tesTask = GetTesTask();
@@ -286,6 +313,43 @@ namespace TesApi.Tests
 
             Assert.AreEqual(TesState.SYSTEMERROREnum, tesTask.State);
             Assert.AreEqual("NoVmSizeAvailable", tesTask.FailureReason);
+        }
+
+        [TestMethod]
+        public async Task TaskFailsWhenVMFamilyHasZeroQuota()
+        {
+            var tesTask = GetTesTask();
+            tesTask.Resources.CpuCores = 2;
+
+            _ = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.DefaultsPerVMFamilyEnforced));
+
+            Assert.AreEqual(TesState.SYSTEMERROREnum, tesTask.State);
+            Assert.AreEqual("InsufficientBatchQuota", tesTask.FailureReason);
+        }
+
+        [TestMethod]
+        public async Task TaskGetsScheduledToNextEligibleVMWhenVMFamilyHasZeroQuota()
+        {
+            var tesTask = GetTesTask();
+            tesTask.Resources.CpuCores = 2;
+
+            _ = await GetNewTesTaskStateAsync(tesTask, AzureProxyReturnValues.DefaultsPerVMFamilyEnforced);
+
+            Assert.AreEqual(TesState.SYSTEMERROREnum, tesTask.State);
+            Assert.AreEqual("InsufficientBatchQuota", tesTask.FailureReason);
+
+            var proxy = AzureProxyReturnValues.DefaultsPerVMFamilyEnforced;
+            proxy.BatchJobAndTaskState = BatchJobAndTaskStates.NodeAllocationFailed;
+            tesTask.Logs[0].FailureReason = nameof(BatchJobAndTaskStates.NodeAllocationFailed);
+            tesTask.Logs[0].VirtualMachineInfo = proxy
+                .VmSizesAndPrices.OrderBy(vm => vm.PricePerHour).FirstOrDefault(vm =>
+                     !vm.LowPriority && proxy.BatchQuotas.DedicatedCoreQuotaPerVMFamily.First(v => 0 == v.CoreQuota).Name.Equals(vm.VmFamily, StringComparison.InvariantCultureIgnoreCase));
+            tesTask.State = TesState.INITIALIZINGEnum;
+            _ = await GetNewTesTaskStateAsync(tesTask, proxy);
+
+            _ = await GetNewTesTaskStateAsync(tesTask, AzureProxyReturnValues.DefaultsPerVMFamilyEnforced);
+
+            Assert.AreEqual("VmSize3", tesTask.Logs[1].VirtualMachineInfo.VmSize);
         }
 
         [TestMethod]
@@ -830,10 +894,10 @@ namespace TesApi.Tests
                 },
                 ContainerRegistryInfo = new ContainerRegistryInfo { RegistryServer = "registryServer1", Username = "default", Password = "placeholder" },
                 VmSizesAndPrices = new List<VirtualMachineInfo> {
-                    new VirtualMachineInfo { VmSize = "VmSizeLowPri1", LowPriority = true, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 1 },
-                    new VirtualMachineInfo { VmSize = "VmSizeLowPri2", LowPriority = true, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 2 },
-                    new VirtualMachineInfo { VmSize = "VmSizeDedicated1", LowPriority = false, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 11 },
-                    new VirtualMachineInfo { VmSize = "VmSizeDedicated2", LowPriority = false, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 22 }
+                    new VirtualMachineInfo { VmSize = "VmSizeLowPri1", VmFamily = "VmFamily1", LowPriority = true, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 1 },
+                    new VirtualMachineInfo { VmSize = "VmSizeLowPri2", VmFamily = "VmFamily2", LowPriority = true, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 2 },
+                    new VirtualMachineInfo { VmSize = "VmSizeDedicated1", VmFamily = "VmFamily1", LowPriority = false, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 11 },
+                    new VirtualMachineInfo { VmSize = "VmSizeDedicated2", VmFamily = "VmFamily2", LowPriority = false, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 22 }
                 },
                 BatchQuotas = new AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 5, LowPriorityCoreQuota = 10 },
                 ActiveNodeCountByVmSize = new List<AzureBatchNodeCount>(),
@@ -845,6 +909,24 @@ namespace TesApi.Tests
                 DownloadedBlobContent = "",
                 LocalFileExists = true
             };
+
+            public static AzureProxyReturnValues DefaultsPerVMFamilyEnforced => DefaultsPerVMFamilyEnforcedImpl();
+
+            private static AzureProxyReturnValues DefaultsPerVMFamilyEnforcedImpl()
+            {
+                var proxy = Defaults;
+                proxy.VmSizesAndPrices.Add(new VirtualMachineInfo { VmSize = "VmSize3", VmFamily = "VmFamily3", LowPriority = false, NumberOfCores = 8, MemoryInGB = 12, ResourceDiskSizeInGB = 80, PricePerHour = 33 });
+                proxy.BatchQuotas = new AzureBatchAccountQuotas()
+                {
+                    DedicatedCoreQuotaPerVMFamilyEnforced = true,
+                    DedicatedCoreQuota = 0,
+                    DedicatedCoreQuotaPerVMFamily = new[] { new VirtualMachineFamilyCoreQuota("VmFamily1", proxy.BatchQuotas.DedicatedCoreQuota), new VirtualMachineFamilyCoreQuota("VmFamily2", 0), new VirtualMachineFamilyCoreQuota("VmFamily3", 8) },
+                    ActiveJobAndJobScheduleQuota = proxy.BatchQuotas.ActiveJobAndJobScheduleQuota,
+                    LowPriorityCoreQuota = proxy.BatchQuotas.LowPriorityCoreQuota,
+                    PoolQuota = proxy.BatchQuotas.PoolQuota
+                };
+                return proxy;
+            }
         }
 
         private class FileToDownload

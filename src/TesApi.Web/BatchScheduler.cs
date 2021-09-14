@@ -197,7 +197,7 @@ namespace TesApi.Web
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
-                await CheckBatchAccountQuotas(virtualMachineInfo.NumberOfCores.Value, virtualMachineInfo.LowPriority);
+                await CheckBatchAccountQuotas(virtualMachineInfo.NumberOfCores.Value, virtualMachineInfo.LowPriority, virtualMachineInfo.VmFamily);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
 
@@ -217,7 +217,7 @@ namespace TesApi.Web
             }
             catch (AzureBatchQuotaMaxedOutException exception)
             {
-                logger.LogInformation($"Not enough quota available for task Id {tesTask.Id}. Reason: {exception.Message}. Task will remain in queue.");
+                logger.LogTrace($"Not enough quota available for task Id {tesTask.Id}. Reason: {exception.Message}. Task will remain in queue.");
             }
             catch (AzureBatchLowQuotaException exception)
             {
@@ -723,10 +723,17 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="workflowCoresRequirement">The core requirements of the current <see cref="TesTask"/>.</param>
         /// <param name="preemptible">True if preemptible cores are required.</param>
-        private async Task CheckBatchAccountQuotas(int workflowCoresRequirement, bool preemptible)
+        /// <param name="vmFamily">Dedicated Virtual Machine family name</param>
+        private async Task CheckBatchAccountQuotas(int workflowCoresRequirement, bool preemptible, string vmFamily)
         {
             var batchQuotas = await azureProxy.GetBatchAccountQuotasAsync();
-            var coreQuota = preemptible ? batchQuotas.LowPriorityCoreQuota : batchQuotas.DedicatedCoreQuota;
+
+            var coreQuota = preemptible
+                ? batchQuotas.LowPriorityCoreQuota
+                : batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced
+                    ? batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(qbf => qbf.Name.Equals(vmFamily, StringComparison.OrdinalIgnoreCase))?.CoreQuota ?? 0
+                    : batchQuotas.DedicatedCoreQuota;
+
             var poolQuota = batchQuotas.PoolQuota;
             var activeJobAndJobScheduleQuota = batchQuotas.ActiveJobAndJobScheduleQuota;
 
@@ -742,7 +749,10 @@ namespace TesApi.Web
             {
                 // Here, the workflow task requires more cores than the total Batch account's cores quota - FAIL
                 const string azureSupportUrl = "https://portal.azure.com/#blade/Microsoft_Azure_Support/HelpAndSupportBlade/newsupportrequest";
-                throw new AzureBatchLowQuotaException($"Azure Batch Account does not have enough {(preemptible ? "low priority" : "dedicated")} cores quota to run a workflow with cpu core requirement of {workflowCoresRequirement}. Please submit an Azure Support request to increase your quota: {azureSupportUrl}");
+                var preCoresQuota = preemptible ? "low priority" : "dedicated";
+                var postCoresQuota = preemptible || !batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? string.Empty : $" on {vmFamily} virtual machines";
+                var preSupport = preemptible || !batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? string.Empty : $" for {vmFamily} virtual machines";
+                throw new AzureBatchLowQuotaException($"Azure Batch Account does not have enough {preCoresQuota} cores quota{postCoresQuota} to run a workflow with cpu core requirement of {workflowCoresRequirement}. Please submit an Azure Support request to increase your quota{preSupport}: {azureSupportUrl}");
             }
 
             if (activeJobsCount + 1 > activeJobAndJobScheduleQuota)

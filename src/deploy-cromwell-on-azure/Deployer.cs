@@ -407,7 +407,10 @@ namespace CromwellOnAzureDeployer
                 await WaitForDockerComposeAsync(sshConnectionInfo);
                 await WaitForCromwellAsync(sshConnectionInfo);
 
-                var isBatchQuotaAvailable = batchAccount.LowPriorityCoreQuota > 0 || batchAccount.DedicatedCoreQuota > 0;
+                var isBatchQuotaAvailable = batchAccount.LowPriorityCoreQuota > 0 ||
+                    (batchAccount.DedicatedCoreQuotaPerVMFamilyEnforced
+                        ? batchAccount.DedicatedCoreQuotaPerVMFamily.Max(vm => vm.CoreQuota)
+                        : batchAccount.DedicatedCoreQuota) > 0;
 
                 int exitCode;
 
