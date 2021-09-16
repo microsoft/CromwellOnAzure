@@ -51,6 +51,19 @@ namespace Tes.Extensions
         }
 
         /// <summary>
+        /// Sets the warning for <see cref="TesTask"/> and optionally adds additional system log items
+        /// </summary>
+        /// <param name="tesTask"><see cref="TesTask"/></param>
+        /// <param name="warning">Warning code</param>
+        /// <param name="additionalSystemLogItems">Additional system log entries</param>
+        public static void SetWarning(this TesTask tesTask, string warning, params string[] additionalSystemLogItems)
+        {
+            tesTask.GetOrAddTesTaskLog().Warning = warning;
+            tesTask.AddToSystemLog(new[] { warning });
+            tesTask.AddToSystemLog(additionalSystemLogItems.Where(i => !string.IsNullOrEmpty(i)));
+        }
+
+        /// <summary>
         /// Returns the last <see cref="TesTaskLog"/>. Adds it if none exist.
         /// </summary>
         /// <param name="tesTask"><see cref="TesTask"/></param>
