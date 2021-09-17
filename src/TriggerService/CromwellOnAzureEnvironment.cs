@@ -198,14 +198,17 @@ namespace TriggerService
                                 
                                 await UploadOutputsAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
-                                
+
+                                var taskWarnings = await GetWorkflowTaskWarningsAsync(id);
                                 var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id);
 
                                 await MutateStateAsync(
                                     blobTrigger.ContainerName, 
                                     blobTrigger.Name,
                                     WorkflowState.Failed,
-                                    wf => wf.WorkflowFailureInfo = workflowFailureInfo);
+                                    wf => { 
+                                        wf.TaskWarnings = taskWarnings; 
+                                        wf.WorkflowFailureInfo = workflowFailureInfo; });
 
                                 break;
                             }
@@ -213,12 +216,15 @@ namespace TriggerService
                             {                                
                                 await UploadOutputsAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
-                                
+
+                                var taskWarnings = await GetWorkflowTaskWarningsAsync(id);
+
                                 await MutateStateAsync(
                                     blobTrigger.ContainerName, 
                                     blobTrigger.Name, 
-                                    WorkflowState.Succeeded);
-                                
+                                    WorkflowState.Succeeded,
+                                    wf => wf.TaskWarnings = taskWarnings);
+
                                 break;
                             }
                     }
@@ -354,8 +360,6 @@ namespace TriggerService
             return string.Join('/', pathComponents.Take(pathComponents.Length - 1));
         }
 
-
-
         private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId)
         {
 		    const string BatchExecutionDirectoryName = "__batch";
@@ -379,6 +383,7 @@ namespace TriggerService
 
                     return new FailedTaskInfo {
                         TaskId = t.Id,
+                        TaskName = t.Name,
                         FailureReason = cromwellScriptFailed ? "CromwellScriptFailed" : t.FailureReason,
                         SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs?.Where(log => !log.Equals(t.FailureReason)).ToList(),
                         StdOut = cromwellScriptFailed ? executor?.Stdout : batchTaskFailed ? batchStdOut : null,
@@ -386,14 +391,35 @@ namespace TriggerService
                         CromwellResultCode = t.CromwellResultCode }; })
                 .ToList();
 
-            logger.LogInformation($"Surfacing {failedTesTasks.Count} failed task details to trigger file for workflow {workflowId}");
+            logger.LogInformation($"Adding {failedTesTasks.Count} failed task details to trigger file for workflow {workflowId}");
 
             return new WorkflowFailureInfo {
                 FailedTasks = failedTesTasks,
                 WorkflowFailureReason = failedTesTasks.Any() ? "OneOrMoreTasksFailed": "CromwellFailed"
             };
-
         }
+
+        private async Task<List<TaskWarning>> GetWorkflowTaskWarningsAsync(Guid workflowId)
+        {
+            var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
+
+            // Select the last attempt of each Cromwell task, and then select only those that have a warning
+            var taskWarnings = tesTasks
+                .GroupBy(t => new { t.CromwellTaskInstanceName, t.CromwellShard })
+                .Select(grp => grp.OrderBy(t => t.CromwellAttempt).Last())
+                .Where(t => t.Warning != null)
+                .Select(t => new TaskWarning {
+                    TaskId = t.Id,
+                    TaskName = t.Name,
+                    Warning = t.Warning,
+                    WarningDetails = t.Logs?.LastOrDefault()?.SystemLogs?.Where(log => !log.Equals(t.Warning)).ToList() })
+                .ToList();
+
+            logger.LogInformation($"Adding {taskWarnings.Count} task warnings to trigger file for workflow {workflowId}");
+
+            return taskWarnings;
+        }
+
         private static Guid ExtractWorkflowId(string blobTriggerName, WorkflowState currentState)
         {
             var blobName = blobTriggerName.Substring(currentState.ToString().Length + 1);
