@@ -13,7 +13,9 @@ namespace Common
         public string WorkflowOptionsUrl { get; set; }
         public string WorkflowDependenciesUrl { get; set; }
         public WorkflowFailureInfo WorkflowFailureInfo { get; set; }
+        public List<TaskWarning> TaskWarnings { get; set; }
 
         public bool ShouldSerializeWorkflowFailureInfo() => WorkflowFailureInfo is object;
+        public bool ShouldSerializeTaskWarnings() => TaskWarnings?.Count > 0;
     }
 }

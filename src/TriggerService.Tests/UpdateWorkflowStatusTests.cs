@@ -238,6 +238,48 @@ namespace TriggerService.Tests
             Assert.AreEqual("WorkflowNotFoundInCromwell", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReason);
         }
 
+        [TestMethod]
+        public async Task TaskWarningsAreAddedToSuccessfulWorkflow()
+        {
+            var workflowId = Guid.NewGuid().ToString();
+
+            var tesTasks = new[] { GetTesTask(workflowId, shard: 1, attempt: 1, TesTaskLogForSuccessfulTaskWithWarning) };
+
+            var (newTriggerName, newTriggerContent) = await UpdateWorkflowStatusAsync(workflowId, tesTasks, WorkflowStatus.Succeeded);
+
+            Assert.IsTrue(newTriggerName.StartsWith("succeeded/"));
+            Assert.AreEqual(1, newTriggerContent?.TaskWarnings?.Count);
+
+            var taskWarning = newTriggerContent?.TaskWarnings?.FirstOrDefault();
+            Assert.AreEqual("Warning1", taskWarning?.Warning);
+            Assert.AreEqual(1, taskWarning?.WarningDetails.Count);
+            Assert.AreEqual("Warning1Details", taskWarning?.WarningDetails.FirstOrDefault());
+        }
+
+        [TestMethod]
+        public async Task TaskWarningsAreAddedToFailedWorkflow()
+        {
+            var workflowId = Guid.NewGuid().ToString();
+
+            var tesTasks = new[] { 
+                GetTesTask(workflowId, shard: 1, attempt: 1, TesTaskLogForSuccessfulTaskWithWarning),
+                GetTesTask(workflowId, shard: 2, attempt: 1, TesTaskLogForBatchTaskFailure) };
+
+            var (newTriggerName, newTriggerContent) = await UpdateWorkflowStatusAsync(workflowId, tesTasks, WorkflowStatus.Failed);
+
+            Assert.IsTrue(newTriggerName.StartsWith("failed/"));
+            Assert.AreEqual(1, newTriggerContent?.TaskWarnings?.Count);
+
+            var taskWarning = newTriggerContent?.TaskWarnings?.FirstOrDefault();
+            Assert.AreEqual("Warning1", taskWarning?.Warning);
+            Assert.AreEqual(1, taskWarning?.WarningDetails.Count);
+            Assert.AreEqual("Warning1Details", taskWarning?.WarningDetails.FirstOrDefault());
+
+            var workflowFailureInfo = newTriggerContent?.WorkflowFailureInfo;
+            Assert.AreEqual("OneOrMoreTasksFailed", workflowFailureInfo?.WorkflowFailureReason);
+            Assert.AreEqual(1, workflowFailureInfo?.FailedTasks.Count);
+        }
+
         private static TesTask GetTesTask(string workflowId, int shard, int attempt, params TesTaskLog[] tesTaskLogs)
         {
             return new TesTask
@@ -274,6 +316,13 @@ namespace TriggerService.Tests
             Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
             FailureReason = null,
             CromwellResultCode = 0
+        };
+
+        private static TesTaskLog TesTaskLogForSuccessfulTaskWithWarning => new TesTaskLog
+        {
+            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
+            SystemLogs = new List<string> { "Warning1", "Warning1Details" },
+            Warning = "Warning1"
         };
 
         private Task<(string newTriggerName, Workflow newTriggerContent)> UpdateWorkflowStatusAsync(string workflowId, IEnumerable<TesTask> tesTasks, WorkflowStatus cromwellWorkflowStatus)

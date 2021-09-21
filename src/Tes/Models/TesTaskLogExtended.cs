@@ -46,6 +46,13 @@ namespace Tes.Models
         public string FailureReason { get; set; }
 
         /// <summary>
+        /// Warning that gets populated if task encounters an issue that needs user's attention.
+        /// </summary>
+        [JsonIgnore]
+        [TesTaskLogMetadataKey("warning")]
+        public string Warning { get; set; }
+
+        /// <summary>
         /// Cromwell-specific result code, populated when Batch task execution ends in COMPLETED, containing the exit code of the inner Cromwell script.
         /// </summary>
         [JsonIgnore]
