@@ -47,6 +47,12 @@ namespace Tes.Models
         public string FailureReason => this.Logs?.LastOrDefault()?.FailureReason;
 
         /// <summary>
+        /// Warning that gets populated if task encounters an issue that needs user's attention.
+        /// </summary>
+        [IgnoreDataMember]
+        public string Warning => this.Logs?.LastOrDefault()?.Warning;
+
+        /// <summary>
         /// Cromwell-specific result code, populated when Batch task execution ends in COMPLETED, containing the exit code of the inner Cromwell script.
         /// </summary>
         [IgnoreDataMember]

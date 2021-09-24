@@ -8,6 +8,7 @@ namespace Common
     public class FailedTaskInfo
     {
         public string TaskId { get; set; }
+        public string TaskName { get; set; }
         public string FailureReason { get; set; }
         public List<string> SystemLogs { get; set; }
         public string StdOut { get; set; }
