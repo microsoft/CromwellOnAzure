@@ -672,6 +672,41 @@ namespace TesApi.Tests
             azureProxy.Verify(i => i.UploadBlobFromFileAsync(It.Is<Uri>(uri => uri.AbsoluteUri.StartsWith("https://defaultstorageaccount.blob.core.windows.net/cromwell-executions/workflowpath/inputs/blob1?sv=")), "/cromwell-tmp/tmp12345/blob1"));
         }
 
+        [TestMethod]
+        public async Task PoolIsCreatedInSubnetWhenBatchNodesSubnetIdIsSet()
+        {
+            var config = GetMockConfig();
+            config["BatchNodesSubnetId"] = "subnet1";
+
+            var tesTask = GetTesTask();
+            var azureProxy = GetMockAzureProxy(AzureProxyReturnValues.Defaults);
+
+            (_, _, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, config, azureProxy);
+
+            var poolNetworkConfiguration = poolInformation.AutoPoolSpecification.PoolSpecification.NetworkConfiguration;
+
+            Assert.AreEqual(IPAddressProvisioningType.BatchManaged, poolNetworkConfiguration?.PublicIPAddressConfiguration?.Provision);
+            Assert.AreEqual("subnet1", poolNetworkConfiguration?.SubnetId);
+        }
+
+        [TestMethod]
+        public async Task PoolIsCreatedWithoutPublicIpWhenSubnetAndDisableBatchNodesPublicIpAddressAreSet()
+        {
+            var config = GetMockConfig();
+            config["BatchNodesSubnetId"] = "subnet1";
+            config["DisableBatchNodesPublicIpAddress"] = "true";
+
+            var tesTask = GetTesTask();
+            var azureProxy = GetMockAzureProxy(AzureProxyReturnValues.Defaults);
+
+            (_, _, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, config, azureProxy);
+
+            var poolNetworkConfiguration = poolInformation.AutoPoolSpecification.PoolSpecification.NetworkConfiguration;
+
+            Assert.AreEqual(IPAddressProvisioningType.NoPublicIPAddresses, poolNetworkConfiguration?.PublicIPAddressConfiguration?.Provision);
+            Assert.AreEqual("subnet1", poolNetworkConfiguration?.SubnetId);
+        }
+
         private static async Task<(string FailureReason, string[] SystemLog)> ProcessTesTaskAndGetFailureReasonAndSystemLogAsync(TesTask tesTask, AzureBatchJobAndTaskState? azureBatchJobAndTaskState = null)
         {
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;

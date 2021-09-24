@@ -23,6 +23,10 @@ services:
       - TesImageSha=$TesImageSha
       - TriggerServiceImageSha=$TriggerServiceImageSha
       - DisableBatchScheduling=$DisableBatchScheduling
+      - BatchNodesSubnetId=$BatchNodesSubnetId
+      - DockerInDockerImageName=$DockerInDockerImageName
+      - BlobxferImageName=$BlobxferImageName
+      - DisableBatchNodesPublicIpAddress=$DisableBatchNodesPublicIpAddress
     expose:
       - "80"
     volumes:

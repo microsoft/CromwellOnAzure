@@ -682,6 +682,7 @@ namespace CromwellOnAzureDeployer
             await WriteNonPersonalizedFilesToVmAsync(sshConnectionInfo);
             await RunInstallationScriptAsync(sshConnectionInfo);
             await HandleCustomImagesAsync(sshConnectionInfo);
+            await HandleConfigurationPropertiesAsync(sshConnectionInfo);
 
             if (!configuration.Update)
             {
@@ -806,6 +807,38 @@ namespace CromwellOnAzureDeployer
                 await CopyCustomDockerImageAsync(customImagePath);
                 var loadedImageName = await LoadCustomDockerImageAsync(customImagePath);
                 await UploadFilesToVirtualMachineAsync(sshConnectionInfo, ($"{envFileKey}={loadedImageName}", $"{CromwellAzureRootDir}/{envFileName}", false));
+            }
+        }
+
+        private async Task HandleConfigurationPropertiesAsync(ConnectionInfo sshConnectionInfo)
+        {
+            await HandleConfigurationPropertyAsync(sshConnectionInfo, "BatchNodesSubnetId", configuration.BatchNodesSubnetId, "env-08-batch-nodes-subnet-id.txt");
+            await HandleConfigurationPropertyAsync(sshConnectionInfo, "DockerInDockerImageName", configuration.DockerInDockerImageName, "env-09-docker-in-docker-image-name.txt");
+            await HandleConfigurationPropertyAsync(sshConnectionInfo, "BlobxferImageName", configuration.BlobxferImageName, "env-10-blobxfer-image-name.txt");
+            await HandleConfigurationPropertyAsync(sshConnectionInfo, "DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress, "env-11-disable-batch-nodes-public-ip-address.txt");
+        }
+
+        private async Task HandleConfigurationPropertyAsync(ConnectionInfo sshConnectionInfo, string key, string value, string envFileName)
+        {
+            // If the value is provided and empty, remove the property from the VM
+            // If the value is not empty, create/update the property on the VM
+            // If the value is not provided, don't do anything, the property may or may not exist on the VM
+            // Properties are kept in env-* files, aggregated to .env file at VM startup, and used in docker-compose.yml as environment variables
+            if (value != null && value.Equals(string.Empty))
+            {
+                await DeleteFileFromVirtualMachineAsync(sshConnectionInfo, $"{CromwellAzureRootDir}/{envFileName}");
+            }
+            else if (!string.IsNullOrEmpty(value))
+            {
+                await UploadFilesToVirtualMachineAsync(sshConnectionInfo, ($"{key}={value}", $"{CromwellAzureRootDir}/{envFileName}", false));
+            }
+        }
+
+        private async Task HandleConfigurationPropertyAsync(ConnectionInfo sshConnectionInfo, string key, bool? value, string envFileName)
+        {
+            if (value.HasValue)
+            {
+                await UploadFilesToVirtualMachineAsync(sshConnectionInfo, ($"{key}={value.Value}", $"{CromwellAzureRootDir}/{envFileName}", false));
             }
         }
 
