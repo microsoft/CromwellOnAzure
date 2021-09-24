@@ -255,7 +255,7 @@ namespace CromwellOnAzureDeployer
 
                     if (installedVersion == null || installedVersion < new Version(2, 5))
                     {
-                        await MitigateChaosDB(cosmosDb);
+                        await MitigateChaosDbV250Async(cosmosDb);
                     }
                 }
 
@@ -861,12 +861,6 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(cts.Token)));
         }
 
-        private async Task MitigateChaosDB(ICosmosDBAccount cosmosDb)
-        {
-            await Execute("#ChaosDB remedition (regenerating Storage Account primary key)",
-                () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
-        }
-
         private Task<IStorageAccount> CreateStorageAccountAsync()
         {
             return Execute(
@@ -1282,13 +1276,19 @@ namespace CromwellOnAzureDeployer
                 });
         }
 
+        private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
+        {
+            await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)",
+                () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
+        }
+
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
             var tesDb = await cosmosDb.GetSqlDatabaseAsync("TES");
             var taskContainer = await tesDb.GetSqlContainerAsync("Tasks");
-            var requestThroughput1 = await taskContainer.GetThroughputSettingsAsync();
+            var requestThroughput = await taskContainer.GetThroughputSettingsAsync();
 
-            if (requestThroughput1 != null && requestThroughput1.Throughput != null && requestThroughput1.AutopilotSettings?.MaxThroughput == null)
+            if (requestThroughput != null && requestThroughput.Throughput != null && requestThroughput.AutopilotSettings?.MaxThroughput == null)
             {
                 var key = (await cosmosDb.ListKeysAsync()).PrimaryMasterKey;
                 var cosmosClient = new CosmosRestClient(cosmosDb.DocumentEndpoint, key);
