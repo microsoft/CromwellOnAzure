@@ -17,6 +17,7 @@ using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
 using Microsoft.Azure.Management.Compute.Fluent.Models;
 using Microsoft.Azure.Management.CosmosDB.Fluent;
+using Microsoft.Azure.Management.CosmosDB.Fluent.Models;
 using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent.Models;
@@ -250,6 +251,11 @@ namespace CromwellOnAzureDeployer
                     {
                         await PatchContainersToMountFileV240Async(storageAccount);
                         await PatchAccountNamesFileV240Async(sshConnectionInfo, managedIdentity);
+                    }
+
+                    if (installedVersion == null || installedVersion < new Version(2, 5))
+                    {
+                        await MitigateChaosDbV250Async(cosmosDb);
                     }
                 }
 
@@ -1271,14 +1277,23 @@ namespace CromwellOnAzureDeployer
                 });
         }
 
+        private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
+        {
+            await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)",
+                () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
+        }
+
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
-            var key = (await cosmosDb.ListKeysAsync()).PrimaryMasterKey;
-            var cosmosClient = new CosmosRestClient(cosmosDb.DocumentEndpoint, key);
-            var requestThroughput = await cosmosClient.GetContainerRequestThroughputAsync("TES", "Tasks");
+            var tesDb = await cosmosDb.GetSqlDatabaseAsync("TES");
+            var taskContainer = await tesDb.GetSqlContainerAsync("Tasks");
+            var requestThroughput = await taskContainer.GetThroughputSettingsAsync();
 
-            if (requestThroughput != null && requestThroughput.Throughput != null && requestThroughput.AutoscaleMaxThroughput == null)
+            if (requestThroughput != null && requestThroughput.Throughput != null && requestThroughput.AutopilotSettings?.MaxThroughput == null)
             {
+                var key = (await cosmosDb.ListKeysAsync()).PrimaryMasterKey;
+                var cosmosClient = new CosmosRestClient(cosmosDb.DocumentEndpoint, key);
+
                 // If the container has request throughput setting configured, and it is currently manual, set it to auto
                 await Execute(
                     $"Switching the throughput setting for CosmosDb container 'Tasks' in database 'TES' from Manual to Autoscale...",
