@@ -56,7 +56,7 @@ get_accessible_storage_containers () {
         echo_with_ts "Getting access key for storage account $account_name"
         account_key=$(curl -s -X POST "https://management.azure.com/$account_id/listKeys?api-version=2016-12-01" -H "Authorization: Bearer $mgmt_token" -d '' | grep -Po '"key1","value":"\K([^"]*)' )
         echo_with_ts "Getting list of containers for storage account $account_name"
-        container_names=$(curl -s -X GET "https://$account_name.blob.core.windows.net/?comp=list" -H "Authorization: Bearer $storage_token" -H "x-ms-version: 2018-03-28" -d '' | grep -Po '<Name>\K([^<]*)' )
+        container_names=$(curl -s -X GET "https://$account_name.blob.core.windows.net/?comp=list" -H "Authorization: Bearer $storage_token" -H "x-ms-version: 2018-03-28" -d '' | grep -Po '<Name>\K([^<]*)' || test $? = 1 )
 
         for container_name in $container_names; do
           result["$account_name/$container_name"]=$account_key

@@ -23,6 +23,7 @@ namespace TesApi.Web
     /// </summary>
     public class BatchScheduler : IBatchScheduler
     {
+        private const string AzureSupportUrl = "https://portal.azure.com/#blade/Microsoft_Azure_Support/HelpAndSupportBlade/newsupportrequest";
         private const int DefaultCoreCount = 1;
         private const int DefaultMemoryGb = 2;
         private const int DefaultDiskGb = 10;
@@ -203,7 +204,7 @@ namespace TesApi.Web
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
-                await CheckBatchAccountQuotas(virtualMachineInfo.NumberOfCores.Value, virtualMachineInfo.LowPriority);
+                await CheckBatchAccountQuotas(virtualMachineInfo);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
 
@@ -223,7 +224,7 @@ namespace TesApi.Web
             }
             catch (AzureBatchQuotaMaxedOutException exception)
             {
-                logger.LogInformation($"Not enough quota available for task Id {tesTask.Id}. Reason: {exception.Message}. Task will remain in queue.");
+                logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {exception.Message}. Task will remain in queue.");
             }
             catch (AzureBatchLowQuotaException exception)
             {
@@ -776,28 +777,41 @@ namespace TesApi.Web
         /// <summary>
         /// Check quotas for available active jobs, pool and CPU cores.
         /// </summary>
-        /// <param name="workflowCoresRequirement">The core requirements of the current <see cref="TesTask"/>.</param>
-        /// <param name="preemptible">True if preemptible cores are required.</param>
-        private async Task CheckBatchAccountQuotas(int workflowCoresRequirement, bool preemptible)
+        /// <param name="vmInfo">Dedicated virtual machine information.</param>
+        private async Task CheckBatchAccountQuotas(VirtualMachineInfo vmInfo)
         {
+            var workflowCoresRequirement = vmInfo.NumberOfCores.Value;
+            var preemptible = vmInfo.LowPriority;
+            var vmFamily = vmInfo.VmFamily;
+
             var batchQuotas = await azureProxy.GetBatchAccountQuotasAsync();
             var coreQuota = preemptible ? batchQuotas.LowPriorityCoreQuota : batchQuotas.DedicatedCoreQuota;
+            var vmFamQuota = preemptible || !batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? workflowCoresRequirement : batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(q => vmFamily.Equals(q.Name, StringComparison.OrdinalIgnoreCase))?.CoreQuota ?? 0;
             var poolQuota = batchQuotas.PoolQuota;
             var activeJobAndJobScheduleQuota = batchQuotas.ActiveJobAndJobScheduleQuota;
 
             var activeJobsCount = azureProxy.GetBatchActiveJobCount();
             var activePoolsCount = azureProxy.GetBatchActivePoolCount();
-            var activeNodeCountByVmSize = azureProxy.GetBatchActiveNodeCountByVmSize();
+            var activeNodeCountByVmSize = azureProxy.GetBatchActiveNodeCountByVmSize().ToList();
             var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
 
             var totalCoresInUse = activeNodeCountByVmSize
                 .Sum(x => virtualMachineInfoList.FirstOrDefault(vm => vm.VmSize.Equals(x.VirtualMachineSize, StringComparison.OrdinalIgnoreCase)).NumberOfCores * (preemptible ? x.LowPriorityNodeCount : x.DedicatedNodeCount));
 
+            var totalCoresInUseByVmFam = preemptible ? 0 : activeNodeCountByVmSize
+                .Where(x => vmInfo.VmSize.Equals(x.VirtualMachineSize, StringComparison.OrdinalIgnoreCase))
+                .Sum(x => x.DedicatedNodeCount * workflowCoresRequirement);
+
             if (workflowCoresRequirement > coreQuota)
             {
                 // Here, the workflow task requires more cores than the total Batch account's cores quota - FAIL
-                const string azureSupportUrl = "https://portal.azure.com/#blade/Microsoft_Azure_Support/HelpAndSupportBlade/newsupportrequest";
-                throw new AzureBatchLowQuotaException($"Azure Batch Account does not have enough {(preemptible ? "low priority" : "dedicated")} cores quota to run a workflow with cpu core requirement of {workflowCoresRequirement}. Please submit an Azure Support request to increase your quota: {azureSupportUrl}");
+                throw new AzureBatchLowQuotaException($"Azure Batch Account does not have enough {(preemptible ? "low priority" : "dedicated")} cores quota to run a workflow with cpu core requirement of {workflowCoresRequirement}. Please submit an Azure Support request to increase your quota: {AzureSupportUrl}");
+            }
+
+            if (workflowCoresRequirement > vmFamQuota)
+            {
+                // Here, the workflow task requires more cores than the total Batch account's dedicated family quota - FAIL
+                throw new AzureBatchLowQuotaException($"Azure Batch Account does not have enough dedicated {vmFamily} cores quota to run a workflow with cpu core requirement of {workflowCoresRequirement}. Please submit an Azure Support request to increase your quota: {AzureSupportUrl}");
             }
 
             if (activeJobsCount + 1 > activeJobAndJobScheduleQuota)
@@ -814,21 +828,27 @@ namespace TesApi.Web
             {
                 throw new AzureBatchQuotaMaxedOutException($"Not enough core quota remaining to schedule task requiring {workflowCoresRequirement} {(preemptible ? "low priority" : "dedicated")} cores. There are {totalCoresInUse} cores in use out of {coreQuota}.");
             }
+
+            if ((totalCoresInUseByVmFam + workflowCoresRequirement) > vmFamQuota)
+            {
+                throw new AzureBatchQuotaMaxedOutException($"Not enough core quota remaining to schedule task requiring {workflowCoresRequirement} dedicated {vmFamily} cores. There are {totalCoresInUseByVmFam} cores in use out of {vmFamQuota}.");
+            }
         }
 
         /// <summary>
         /// Gets the cheapest available VM size that satisfies the <see cref="TesTask"/> execution requirements
         /// </summary>
         /// <param name="tesTask"><see cref="TesTask"/></param>
+        /// <param name="forcePreemptibleVmsOnly">Force consideration of preemptible virtual machines only.</param>
         /// <returns>The virtual machine info</returns>
-        private async Task<VirtualMachineInfo> GetVmSizeAsync(TesTask tesTask)
+        private async Task<VirtualMachineInfo> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
         {
             var tesResources = tesTask.Resources;
 
             var requiredNumberOfCores = tesResources.CpuCores.GetValueOrDefault(DefaultCoreCount);
             var requiredMemoryInGB = tesResources.RamGb.GetValueOrDefault(DefaultMemoryGb);
             var requiredDiskSizeInGB = tesResources.DiskGb.GetValueOrDefault(DefaultDiskGb);
-            var preemptible = usePreemptibleVmsOnly || tesResources.Preemptible.GetValueOrDefault(true);
+            var preemptible = forcePreemptibleVmsOnly || usePreemptibleVmsOnly || tesResources.Preemptible.GetValueOrDefault(true);
 
             var previouslyFailedVmSizes = tesTask.Logs?
                 .Where(log => log.FailureReason == BatchTaskState.NodeAllocationFailed.ToString() && log.VirtualMachineInfo?.VmSize != null)
@@ -846,11 +866,36 @@ namespace TesApi.Web
                     && vm.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
                 .ToList();
 
+            var batchQuotas = await azureProxy.GetBatchAccountQuotasAsync();
+
             var selectedVm = eligibleVms
-                .Where(vm => allowedVmSizes == null || !allowedVmSizes.Any() || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
-                .Where(vm => previouslyFailedVmSizes == null || !previouslyFailedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
+                .Where(vm => !(allowedVmSizes?.Any() ?? false) || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
+                .Where(vm => !(previouslyFailedVmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? false))
+                .Where(vm => preemptible
+                    ? batchQuotas.LowPriorityCoreQuota >= vm.NumberOfCores
+                    : batchQuotas.DedicatedCoreQuota >= vm.NumberOfCores && (batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced
+                        ? batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(x => vm.VmFamily.Equals(x.Name, StringComparison.OrdinalIgnoreCase))?.CoreQuota >= vm.NumberOfCores
+                        : true))
                 .OrderBy(x => x.PricePerHour)
                 .FirstOrDefault();
+
+            if (!preemptible && !(selectedVm is null))
+            {
+                var idealVm = eligibleVms
+                    .Where(vm => !(allowedVmSizes?.Any() ?? false) || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
+                    .Where(vm => !(previouslyFailedVmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? false))
+                    .OrderBy(x => x.PricePerHour)
+                    .FirstOrDefault();
+
+                if (selectedVm.PricePerHour >= idealVm.PricePerHour * 2)
+                {
+                    tesTask.SetWarning("UsedLowPriorityInsteadOfDedicatedVm",
+                        $"This task ran on low priority machine because dedicated quota was not available for VM Series '{idealVm.VmFamily}'.",
+                        $"Increase the quota for VM Series '{idealVm.VmFamily}' to run this task on a dedicated VM. Please submit an Azure Support request to increase your quota: {AzureSupportUrl}");
+
+                    return await GetVmSizeAsync(tesTask, true);
+                }
+            }
 
             if (selectedVm != null)
             {
@@ -869,7 +914,7 @@ namespace TesApi.Web
                 noVmFoundMessage += $" The following VM sizes were excluded from consideration because of {BatchTaskState.NodeAllocationFailed} error(s) on previous attempts: {string.Join(", ", previouslyFailedVmSizes)}";
             }
 
-            if (allowedVmSizes != null && allowedVmSizes.Any())
+            if (allowedVmSizes?.Any() ?? false)
             {
                 var vmsExcludedByTheAllowedVmsConfiguration = eligibleVms.Where(vm => allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase));
 
