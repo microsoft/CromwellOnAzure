@@ -33,15 +33,17 @@ namespace TesApi.Web
         private const string BatchScriptFileName = "batch_script";
         private const string UploadFilesScriptFileName = "upload_files_script";
         private const string DownloadFilesScriptFileName = "download_files_script";
-        private const string DockerInDockerImageName = "docker";
-        private const string BlobxferImageName = "mcr.microsoft.com/blobxfer";
         private static readonly Regex queryStringRegex = new Regex(@"[^\?.]*(\?.*)");
+        private readonly string dockerInDockerImageName;
+        private readonly string blobxferImageName;
         private readonly ILogger logger;
         private readonly IAzureProxy azureProxy;
         private readonly IStorageAccessProvider storageAccessProvider;
         private readonly IEnumerable<string> allowedVmSizes;
         private readonly List<TesTaskStateTransition> tesTaskStateTransitions;
         private readonly bool usePreemptibleVmsOnly;
+        private readonly string batchNodesSubnetId;
+        private readonly bool disableBatchNodesPublicIpAddress;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -56,8 +58,15 @@ namespace TesApi.Web
             this.azureProxy = azureProxy;
             this.storageAccessProvider = storageAccessProvider;
 
-            this.allowedVmSizes = configuration.GetValue<string>("AllowedVmSizes", null)?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
-            this.usePreemptibleVmsOnly = configuration.GetValue("UsePreemptibleVmsOnly", false);
+            static bool GetBoolValue(IConfiguration configuration, string key, bool defaultValue) => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : bool.Parse(configuration[key]);
+            static string GetStringValue(IConfiguration configuration, string key, string defaultValue) => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : configuration[key];
+
+            this.allowedVmSizes = GetStringValue(configuration, "AllowedVmSizes", null)?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            this.usePreemptibleVmsOnly = GetBoolValue(configuration, "UsePreemptibleVmsOnly", false);
+            this.batchNodesSubnetId = GetStringValue(configuration, "BatchNodesSubnetId", string.Empty);
+            this.dockerInDockerImageName = GetStringValue(configuration, "DockerInDockerImageName", "docker");
+            this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
+            this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
 
             logger.LogInformation($"usePreemptibleVmsOnly: {usePreemptibleVmsOnly}");
 
@@ -238,6 +247,12 @@ namespace TesApi.Web
                 tesTask.State = TesState.SYSTEMERROREnum;
                 tesTask.SetFailureReason(exc);
                 logger.LogError(exc, exc.Message);
+            }
+            catch (BatchClientException exc)
+            {
+                tesTask.State = TesState.SYSTEMERROREnum;
+                tesTask.SetFailureReason("BatchClientException", string.Join(",", exc.Data.Values), exc.Message, exc.StackTrace);
+                logger.LogError(exc, exc.Message + ", " + string.Join(",", exc.Data.Values));
             }
             catch (Exception exc)
             {
@@ -505,16 +520,26 @@ namespace TesApi.Web
             var volumeMountsOption = $"-v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash}";
 
             var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) == null;
+            var dockerInDockerImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName)) == null;
+            var blobXferImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(blobxferImageName)) == null;
 
             var sb = new StringBuilder();
 
             sb.AppendLine($"write_kv() {{ echo \"$1=$2\" >> /mnt{metricsPath}; }} && \\");  // Function that appends key=value pair to metrics.txt file
             sb.AppendLine($"write_ts() {{ write_kv $1 $(date -Iseconds); }} && \\");    // Function that appends key=<current datetime> to metrics.txt file
             sb.AppendLine($"mkdir -p /mnt{batchExecutionDirectoryPath} && \\");
-            sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");  // Install bash if running on alpine (will be the case if running inside "docker" image)
-            sb.AppendLine($"write_ts BlobXferPullStart && \\");
-            sb.AppendLine($"docker pull --quiet {BlobxferImageName} && \\");
-            sb.AppendLine($"write_ts BlobXferPullEnd && \\");
+
+            if (dockerInDockerImageIsPublic)
+            {
+                sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");  // Install bash if running on alpine (will be the case if running inside "docker" image)
+            }
+
+            if (blobXferImageIsPublic)
+            {
+                sb.AppendLine($"write_ts BlobXferPullStart && \\");
+                sb.AppendLine($"docker pull --quiet {blobxferImageName} && \\");
+                sb.AppendLine($"write_ts BlobXferPullEnd && \\");
+            }
 
             if (executorImageIsPublic)
             {
@@ -526,18 +551,18 @@ namespace TesApi.Web
             // After task completion, metrics file is downloaded and used to populate the BatchNodeMetrics object
             sb.AppendLine($"write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \\\"Size\\\" | grep - Po '(?i)\\\"Size\\\":\\K([^,]*)') && \\");
             sb.AppendLine($"write_ts DownloadStart && \\");
-            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {downloadFilesScriptPath} && \\");
+            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} {downloadFilesScriptPath} && \\");
             sb.AppendLine($"write_ts DownloadEnd && \\");
             sb.AppendLine($"chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \\");
             sb.AppendLine($"write_ts ExecutorStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{ string.Join(" && ", executor.Command.Skip(1))}\" && \\");
             sb.AppendLine($"write_ts ExecutorEnd && \\");
             sb.AppendLine($"write_ts UploadStart && \\");
-            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {BlobxferImageName} {uploadFilesScriptPath} && \\");
+            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} {uploadFilesScriptPath} && \\");
             sb.AppendLine($"write_ts UploadEnd && \\");
             sb.AppendLine($"/bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKiB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKiB=${{disk[2]}} >> /mnt{metricsPath}' && \\");
             sb.AppendLine($"write_kv VmCpuModelName \"$(cat /proc/cpuinfo | grep -m1 name | cut -f 2 -d ':' | xargs)\" && \\");
-            sb.AppendLine($"docker run --rm {volumeMountsOption} {BlobxferImageName} upload --storage-url \"{metricsUrl}\" --local-path \"{metricsPath}\" --rename --no-recursive");
+            sb.AppendLine($"docker run --rm {volumeMountsOption} {blobxferImageName} upload --storage-url \"{metricsUrl}\" --local-path \"{metricsPath}\" --rename --no-recursive");
 
             var batchScriptPath = $"{batchExecutionDirectoryPath}/{BatchScriptFileName}";
             await this.storageAccessProvider.UploadBlobAsync(batchScriptPath, sb.ToString());
@@ -564,7 +589,7 @@ namespace TesApi.Web
                 // If the executor image is public, there is no need for pool ContainerConfiguration and task can run normally, without being wrapped in a docker container.
                 // Volume mapping for docker.sock below allows the docker client in the container to access host's docker daemon.
                 var containerRunOptions = $"--rm -v /var/run/docker.sock:/var/run/docker.sock -v /mnt:/mnt ";
-                cloudTask.ContainerSettings = new TaskContainerSettings(DockerInDockerImageName, containerRunOptions);
+                cloudTask.ContainerSettings = new TaskContainerSettings(dockerInDockerImageName, containerRunOptions);
             }
 
             return cloudTask;
@@ -645,17 +670,17 @@ namespace TesApi.Web
         /// <summary>
         /// Constructs an Azure Batch PoolInformation instance
         /// </summary>
-        /// <param name="image">The image name for the current <see cref="TesTask"/></param>
+        /// <param name="executorImage">The image name for the current <see cref="TesTask"/></param>
         /// <param name="vmSize">The Azure VM sku</param>
         /// <param name="preemptible">True if preemptible machine should be used</param>
         /// <returns></returns>
-        private async Task<PoolInformation> CreatePoolInformation(string image, string vmSize, bool preemptible)
+        private async Task<PoolInformation> CreatePoolInformation(string executorImage, string vmSize, bool preemptible)
         {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference("ubuntu-server-container", "microsoft-azure-batch", "16-04-lts", "latest"),
                 nodeAgentSkuId: "batch.node.ubuntu 16.04");
 
-            var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(image);
+            var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
 
             if (containerRegistryInfo != null)
             {
@@ -668,9 +693,33 @@ namespace TesApi.Web
                 // Doing this also requires that the main task runs inside a container, hence downloading the "docker" image (contains docker client) as well.
                 vmConfig.ContainerConfiguration = new ContainerConfiguration
                 {
-                    ContainerImageNames = new List<string> { image, DockerInDockerImageName },
+                    ContainerImageNames = new List<string> { executorImage, dockerInDockerImageName, blobxferImageName },
                     ContainerRegistries = new List<ContainerRegistry> { containerRegistry }
                 };
+
+                var containerRegistryInfoForDockerInDocker = await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName);
+
+                if(containerRegistryInfoForDockerInDocker != null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
+                {
+                    var containerRegistryForDockerInDocker = new ContainerRegistry(
+                        userName: containerRegistryInfoForDockerInDocker.Username,
+                        registryServer: containerRegistryInfoForDockerInDocker.RegistryServer,
+                        password: containerRegistryInfoForDockerInDocker.Password);
+
+                    vmConfig.ContainerConfiguration.ContainerRegistries.Add(containerRegistryForDockerInDocker);
+                }
+
+                var containerRegistryInfoForBlobXfer = await azureProxy.GetContainerRegistryInfoAsync(blobxferImageName);
+
+                if (containerRegistryInfoForBlobXfer != null && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfo.RegistryServer && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfoForDockerInDocker.RegistryServer)
+                {
+                    var containerRegistryForBlobXfer = new ContainerRegistry(
+                        userName: containerRegistryInfoForBlobXfer.Username,
+                        registryServer: containerRegistryInfoForBlobXfer.RegistryServer,
+                        password: containerRegistryInfoForBlobXfer.Password);
+
+                    vmConfig.ContainerConfiguration.ContainerRegistries.Add(containerRegistryForBlobXfer);
+                }
             }
 
             var poolSpecification = new PoolSpecification
@@ -681,6 +730,15 @@ namespace TesApi.Web
                 TargetLowPriorityComputeNodes = preemptible ? 1 : 0,
                 TargetDedicatedComputeNodes = preemptible ? 0 : 1
             };
+
+            if (!string.IsNullOrEmpty(this.batchNodesSubnetId))
+            {
+                poolSpecification.NetworkConfiguration = new NetworkConfiguration
+                {
+                    PublicIPAddressConfiguration = new PublicIPAddressConfiguration(this.disableBatchNodesPublicIpAddress ? IPAddressProvisioningType.NoPublicIPAddresses : IPAddressProvisioningType.BatchManaged),
+                    SubnetId = this.batchNodesSubnetId
+                };
+            }
 
             var poolInformation = new PoolInformation
             {
