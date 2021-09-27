@@ -58,12 +58,15 @@ namespace TesApi.Web
             this.azureProxy = azureProxy;
             this.storageAccessProvider = storageAccessProvider;
 
-            this.allowedVmSizes = configuration.GetValue<string>("AllowedVmSizes", null)?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
-            this.usePreemptibleVmsOnly = configuration.GetValue("UsePreemptibleVmsOnly", false);
-            this.batchNodesSubnetId = configuration.GetValue("BatchNodesSubnetId", string.Empty);
-            this.dockerInDockerImageName = configuration.GetValue("DockerInDockerImageName", "docker");
-            this.blobxferImageName = configuration.GetValue("BlobxferImageName", "mcr.microsoft.com/blobxfer");
-            this.disableBatchNodesPublicIpAddress = configuration.GetValue("DisableBatchNodesPublicIpAddress", false);
+            static bool GetBoolValue(IConfiguration configuration, string key, bool defaultValue) => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : bool.Parse(configuration[key]);
+            static string GetStringValue(IConfiguration configuration, string key, string defaultValue) => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : configuration[key];
+
+            this.allowedVmSizes = GetStringValue(configuration, "AllowedVmSizes", null)?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            this.usePreemptibleVmsOnly = GetBoolValue(configuration, "UsePreemptibleVmsOnly", false);
+            this.batchNodesSubnetId = GetStringValue(configuration, "BatchNodesSubnetId", string.Empty);
+            this.dockerInDockerImageName = GetStringValue(configuration, "DockerInDockerImageName", "docker");
+            this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
+            this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
 
             logger.LogInformation($"usePreemptibleVmsOnly: {usePreemptibleVmsOnly}");
 
