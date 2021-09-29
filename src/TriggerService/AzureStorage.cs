@@ -199,11 +199,11 @@ namespace TriggerService
             return blobList;
         }
 
-        public static async Task<(IEnumerable<IAzureStorage>, IAzureStorage)> GetStorageAccountsUsingMsiAsync(string defaultName)
+        public static async Task<(IEnumerable<IAzureStorage>, IAzureStorage)> GetStorageAccountsUsingMsiAsync(string accountName)
         {
             IAzureStorage defaultAzureStorage = default;
-            (var accounts, var defaultAccount) = await GetCloudStorageAccountsUsingMsiAsync(defaultName);
-            return (accounts.Select(GetAzureStorage), defaultAzureStorage);
+            (var accounts, var defaultAccount) = await GetCloudStorageAccountsUsingMsiAsync(accountName);
+            return (accounts.Select(GetAzureStorage).ToList(), defaultAzureStorage ?? throw new Exception($"Azure Storage account with name: {accountName} not found in list of {accounts.Count} storage accounts."));
 
             IAzureStorage GetAzureStorage(CloudStorageAccount cloudStorage)
             {
@@ -216,18 +216,18 @@ namespace TriggerService
             }
         }
 
-        private static async Task<(IEnumerable<CloudStorageAccount>, CloudStorageAccount)> GetCloudStorageAccountsUsingMsiAsync(string defaultName)
+        private static async Task<(IList<CloudStorageAccount>, CloudStorageAccount)> GetCloudStorageAccountsUsingMsiAsync(string accountName)
         {
             CloudStorageAccount defaultAccount = default;
             var accounts = await GetAccessibleStorageAccountsAsync();
-            return (await Task.WhenAll(accounts.Select(GetCloudAccountFromStorageAccountInfo)), defaultAccount ?? throw new Exception($"Azure Storage account with name: {defaultName} not found in list of {accounts.Count} storage accounts."));
+            return (await Task.WhenAll(accounts.Select(GetCloudAccountFromStorageAccountInfo)), defaultAccount ?? throw new Exception($"Azure Storage account with name: {accountName} not found in list of {accounts.Count} storage accounts."));
 
             async Task<CloudStorageAccount> GetCloudAccountFromStorageAccountInfo(StorageAccountInfo account)
             {
                 var key = await GetStorageAccountKeyAsync(account);
                 var storageCredentials = new Microsoft.WindowsAzure.Storage.Auth.StorageCredentials(account.Name, key);
                 var storageAccount = new CloudStorageAccount(storageCredentials, true);
-                if (account.Name == defaultName)
+                if (account.Name == accountName)
                 {
                     defaultAccount = storageAccount;
                 }
