@@ -43,6 +43,10 @@ namespace CromwellOnAzureDeployer
         public string SubnetName { get; set; }
         public bool? PrivateNetworking { get; set; } = null;
         public string Tags { get; set; } = null;
+        public string BatchNodesSubnetId { get; set; } = null;
+        public string DockerInDockerImageName { get; set; } = null;
+        public string BlobxferImageName { get; set; } = null;
+        public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
 
         public static Configuration BuildConfiguration(string[] args)
         {
