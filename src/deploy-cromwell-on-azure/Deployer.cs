@@ -61,8 +61,6 @@ namespace CromwellOnAzureDeployer
         private const string CromwellAzureRootDir = "/data/cromwellazure";
         private const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
 
-        private const string SshNsgRuleName = "SSH";
-
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
 
         private readonly List<string> requiredResourceProviders = new List<string>
@@ -122,256 +120,239 @@ namespace CromwellOnAzureDeployer
                 IIdentity managedIdentity = null;
                 ConnectionInfo sshConnectionInfo = null;
 
-                try
+                if (configuration.Update)
                 {
-                    if (configuration.Update)
+                    resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
+
+                    var targetVersion = DelimitedTextToDictionary(GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
+
+                    RefreshableConsole.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
+
+                    var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
+
+                    if (!existingVms.Any())
                     {
-                        resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
-
-                        var targetVersion = DelimitedTextToDictionary(GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
-
-                        RefreshableConsole.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
-
-                        var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
-
-                        if (!existingVms.Any())
-                        {
-                            throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any virtual machines.");
-                        }
-
-                        if (existingVms.Count() > 1 && string.IsNullOrWhiteSpace(configuration.VmName))
-                        {
-                            throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. {nameof(configuration.VmName)} must be provided.");
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(configuration.VmName))
-                        {
-                            linuxVm = existingVms.FirstOrDefault(vm => vm.Name.Equals(configuration.VmName, StringComparison.OrdinalIgnoreCase));
-
-                            if (linuxVm == null)
-                            {
-                                throw new ValidationException($"Virtual machine {configuration.VmName} does not exist in resource group {configuration.ResourceGroupName}.");
-                            }
-                        }
-                        else
-                        {
-                            linuxVm = existingVms.Single();
-                        }
-
-                        configuration.VmName = linuxVm.Name;
-                        configuration.RegionName = linuxVm.RegionName;
-                        configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() == null;
-
-                        networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault();
-
-                        if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup == null)
-                        {
-                            if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
-                            {
-                                configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
-                            }
-
-                            networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
-                            await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
-                        }
-
-                        await EnableSsh(networkSecurityGroup);
-
-                        sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
-
-                        await WaitForSshConnectivityAsync(sshConnectionInfo);
-
-                        bool? retrievedKeepSshPortOpen = null;
-                        try
-                        {
-                            if (!configuration.KeepSshPortOpen.HasValue)
-                            {
-                                retrievedKeepSshPortOpen = await GetInstalledKeepSshPortOpenAsync(sshConnectionInfo);
-                            }
-
-                            var existingUserManagedIdentityId = linuxVm.UserAssignedManagedServiceIdentityIds.FirstOrDefault();
-
-                            if (existingUserManagedIdentityId == null)
-                            {
-                                managedIdentity = await ReplaceSystemManagedIdentityWithUserManagedIdentityAsync(resourceGroup, linuxVm);
-                            }
-                            else
-                            {
-                                managedIdentity = await azureSubscriptionClient.Identities.GetByIdAsync(existingUserManagedIdentityId);
-                            }
-
-                            await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
-                        }
-                        finally
-                        {
-                            configuration.KeepSshPortOpen ??= retrievedKeepSshPortOpen;
-                        }
-
-                        var accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
-
-                        if (!accountNames.Any())
-                        {
-                            throw new ValidationException($"Could not retrieve account names from virtual machine {configuration.VmName}.");
-                        }
-
-                        if (!accountNames.TryGetValue("BatchAccountName", out var batchAccountName))
-                        {
-                            throw new ValidationException($"Could not retrieve the Batch account name from virtual machine {configuration.VmName}.");
-                        }
-
-                        batchAccount = await GetExistingBatchAccountAsync(batchAccountName)
-                            ?? throw new ValidationException($"Batch account {batchAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
-
-                        configuration.BatchAccountName = batchAccountName;
-
-                        if (!accountNames.TryGetValue("DefaultStorageAccountName", out var storageAccountName))
-                        {
-                            throw new ValidationException($"Could not retrieve the default storage account name from virtual machine {configuration.VmName}.");
-                        }
-
-                        storageAccount = await GetExistingStorageAccountAsync(storageAccountName)
-                            ?? throw new ValidationException($"Storage account {storageAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
-
-                        configuration.StorageAccountName = storageAccountName;
-
-                        if (!accountNames.TryGetValue("CosmosDbAccountName", out var cosmosDbAccountName))
-                        {
-                            throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
-                        }
-
-                        cosmosDb = (await azureSubscriptionClient.CosmosDBAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName))
-                            .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase))
-                                ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
-
-                        configuration.CosmosDbAccountName = cosmosDbAccountName;
-
-                        await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
-
-                        var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
-
-                        if (installedVersion == null)
-                        {
-                            // If upgrading from pre-2.1 version, patch the installed Cromwell configuration file (disable call caching and default to preemptible)
-                            await PatchCromwellConfigurationFileV200Async(storageAccount);
-                            await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
-                        }
-
-                        if (installedVersion == null || installedVersion < new Version(2, 1))
-                        {
-                            await PatchContainersToMountFileV210Async(storageAccount, managedIdentity.Name);
-                        }
-
-                        if (installedVersion == null || installedVersion < new Version(2, 2))
-                        {
-                            await PatchContainersToMountFileV220Async(storageAccount);
-                        }
-
-                        if (installedVersion == null || installedVersion < new Version(2, 4))
-                        {
-                            await PatchContainersToMountFileV240Async(storageAccount);
-                            await PatchAccountNamesFileV240Async(sshConnectionInfo, managedIdentity);
-                        }
-
-                        if (installedVersion == null || installedVersion < new Version(2, 5))
-                        {
-                            await MitigateChaosDbV250Async(cosmosDb);
-                        }
+                        throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any virtual machines.");
                     }
 
-                    if (!configuration.Update)
+                    if (existingVms.Count() > 1 && string.IsNullOrWhiteSpace(configuration.VmName))
                     {
-                        ValidateRegionName(configuration.RegionName);
-                        ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
-                        storageAccount = await ValidateAndGetExistingStorageAccountAsync();
-                        batchAccount = await ValidateAndGetExistingBatchAccountAsync();
+                        throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. {nameof(configuration.VmName)} must be provided.");
+                    }
 
-                        if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
+                    if (!string.IsNullOrWhiteSpace(configuration.VmName))
+                    {
+                        linuxVm = existingVms.FirstOrDefault(vm => vm.Name.Equals(configuration.VmName, StringComparison.OrdinalIgnoreCase));
+
+                        if (linuxVm == null)
                         {
-                            configuration.BatchAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                            throw new ValidationException($"Virtual machine {configuration.VmName} does not exist in resource group {configuration.ResourceGroupName}.");
                         }
+                    }
+                    else
+                    {
+                        linuxVm = existingVms.Single();
+                    }
 
-                        if (string.IsNullOrWhiteSpace(configuration.StorageAccountName))
-                        {
-                            configuration.StorageAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 24);
-                        }
+                    configuration.VmName = linuxVm.Name;
+                    configuration.RegionName = linuxVm.RegionName;
+                    configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() == null;
 
+                    sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
+
+                    await WaitForSshConnectivityAsync(sshConnectionInfo);
+
+                    var existingUserManagedIdentityId = linuxVm.UserAssignedManagedServiceIdentityIds.FirstOrDefault();
+
+                    if (existingUserManagedIdentityId == null)
+                    {
+                        managedIdentity = await ReplaceSystemManagedIdentityWithUserManagedIdentityAsync(resourceGroup, linuxVm);
+                    }
+                    else
+                    {
+                        managedIdentity = await azureSubscriptionClient.Identities.GetByIdAsync(existingUserManagedIdentityId);
+                    }
+
+                    networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault();
+
+                    if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup == null)
+                    {
                         if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
                         {
                             configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
                         }
 
-                        if (string.IsNullOrWhiteSpace(configuration.CosmosDbAccountName))
-                        {
-                            configuration.CosmosDbAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                        }
+                        networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
+                        await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
+                    }
 
-                        if (string.IsNullOrWhiteSpace(configuration.ApplicationInsightsAccountName))
-                        {
-                            configuration.ApplicationInsightsAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                        }
+                    await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
 
-                        if (string.IsNullOrWhiteSpace(configuration.VmName))
-                        {
-                            configuration.VmName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 25);
-                        }
+                    var accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
 
-                        if (string.IsNullOrWhiteSpace(configuration.VmPassword))
-                        {
-                            configuration.VmPassword = Utility.GeneratePassword();
-                        }
+                    if (!accountNames.Any())
+                    {
+                        throw new ValidationException($"Could not retrieve account names from virtual machine {configuration.VmName}.");
+                    }
 
-                        await RegisterResourceProvidersAsync();
-                        await ValidateVmAsync();
+                    if (!accountNames.TryGetValue("BatchAccountName", out var batchAccountName))
+                    {
+                        throw new ValidationException($"Could not retrieve the Batch account name from virtual machine {configuration.VmName}.");
+                    }
 
-                        if (batchAccount == null)
-                        {
-                            await ValidateBatchAccountQuotaAsync();
-                        }
+                    batchAccount = await GetExistingBatchAccountAsync(batchAccountName)
+                        ?? throw new ValidationException($"Batch account {batchAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
-                        var vnetAndSubnet = await ValidateAndGetExistingVirtualNetworkAsync();
+                    configuration.BatchAccountName = batchAccountName;
 
-                        RefreshableConsole.WriteLine();
-                        RefreshableConsole.WriteLine($"VM host: {configuration.VmName}.{configuration.RegionName}.cloudapp.azure.com");
-                        RefreshableConsole.WriteLine($"VM username: {configuration.VmUsername}");
-                        RefreshableConsole.WriteLine($"VM password: {configuration.VmPassword}");
-                        RefreshableConsole.WriteLine();
+                    if (!accountNames.TryGetValue("DefaultStorageAccountName", out var storageAccountName))
+                    {
+                        throw new ValidationException($"Could not retrieve the default storage account name from virtual machine {configuration.VmName}.");
+                    }
 
-                        if (string.IsNullOrWhiteSpace(configuration.ResourceGroupName))
-                        {
-                            configuration.ResourceGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                            resourceGroup = await CreateResourceGroupAsync();
-                            isResourceGroupCreated = true;
-                        }
-                        else
-                        {
-                            resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
-                        }
+                    storageAccount = await GetExistingStorageAccountAsync(storageAccountName)
+                        ?? throw new ValidationException($"Storage account {storageAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
-                        managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
+                    configuration.StorageAccountName = storageAccountName;
 
-                        if (vnetAndSubnet != null)
-                        {
-                            RefreshableConsole.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.subnetName}");
-                        }
+                    if (!accountNames.TryGetValue("CosmosDbAccountName", out var cosmosDbAccountName))
+                    {
+                        throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
+                    }
 
-                        if (storageAccount != null)
-                        {
-                            RefreshableConsole.WriteLine($"Using existing Storage Account {storageAccount.Name}");
-                        }
+                    cosmosDb = (await azureSubscriptionClient.CosmosDBAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName))
+                        .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase))
+                            ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
 
-                        if (batchAccount != null)
-                        {
-                            RefreshableConsole.WriteLine($"Using existing Batch Account {batchAccount.Name}");
-                        }
+                    configuration.CosmosDbAccountName = cosmosDbAccountName;
 
-                        if (vnetAndSubnet == null)
-                        {
-                            configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                            vnetAndSubnet = await CreateVnetAsync(resourceGroup, configuration.VnetName, configuration.VnetAddressSpace);
-                        }
+                    await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
 
-                        await Task.WhenAll(new Task[]
-                        {
+                    var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
+
+                    if (installedVersion == null)
+                    {
+                        // If upgrading from pre-2.1 version, patch the installed Cromwell configuration file (disable call caching and default to preemptible)
+                        await PatchCromwellConfigurationFileV200Async(storageAccount);
+                        await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
+                    }
+
+                    if (installedVersion == null || installedVersion < new Version(2, 1))
+                    {
+                        await PatchContainersToMountFileV210Async(storageAccount, managedIdentity.Name);
+                    }
+
+                    if (installedVersion == null || installedVersion < new Version(2, 2))
+                    {
+                        await PatchContainersToMountFileV220Async(storageAccount);
+                    }
+
+                    if (installedVersion == null || installedVersion < new Version(2, 4))
+                    {
+                        await PatchContainersToMountFileV240Async(storageAccount);
+                        await PatchAccountNamesFileV240Async(sshConnectionInfo, managedIdentity);
+                    }
+
+                    if (installedVersion == null || installedVersion < new Version(2, 5))
+                    {
+                        await MitigateChaosDbV250Async(cosmosDb);
+                    }
+                }
+
+                if (!configuration.Update)
+                {
+                    ValidateRegionName(configuration.RegionName);
+                    ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
+                    storageAccount = await ValidateAndGetExistingStorageAccountAsync();
+                    batchAccount = await ValidateAndGetExistingBatchAccountAsync();
+
+                    if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
+                    {
+                        configuration.BatchAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(configuration.StorageAccountName))
+                    {
+                        configuration.StorageAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 24);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
+                    {
+                        configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(configuration.CosmosDbAccountName))
+                    {
+                        configuration.CosmosDbAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(configuration.ApplicationInsightsAccountName))
+                    {
+                        configuration.ApplicationInsightsAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(configuration.VmName))
+                    {
+                        configuration.VmName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 25);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(configuration.VmPassword))
+                    {
+                        configuration.VmPassword = Utility.GeneratePassword();
+                    }
+
+                    await RegisterResourceProvidersAsync();
+                    await ValidateVmAsync();
+
+                    if (batchAccount == null)
+                    {
+                        await ValidateBatchAccountQuotaAsync();
+                    }
+
+                    var vnetAndSubnet = await ValidateAndGetExistingVirtualNetworkAsync();
+
+                    RefreshableConsole.WriteLine();
+                    RefreshableConsole.WriteLine($"VM host: {configuration.VmName}.{configuration.RegionName}.cloudapp.azure.com");
+                    RefreshableConsole.WriteLine($"VM username: {configuration.VmUsername}");
+                    RefreshableConsole.WriteLine($"VM password: {configuration.VmPassword}");
+                    RefreshableConsole.WriteLine();
+
+                    if (string.IsNullOrWhiteSpace(configuration.ResourceGroupName))
+                    {
+                        configuration.ResourceGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                        resourceGroup = await CreateResourceGroupAsync();
+                        isResourceGroupCreated = true;
+                    }
+                    else
+                    {
+                        resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
+                    }
+
+                    managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
+
+                    if (vnetAndSubnet != null)
+                    {
+                        RefreshableConsole.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.subnetName}");
+                    }
+
+                    if (storageAccount != null)
+                    {
+                        RefreshableConsole.WriteLine($"Using existing Storage Account {storageAccount.Name}");
+                    }
+
+                    if (batchAccount != null)
+                    {
+                        RefreshableConsole.WriteLine($"Using existing Batch Account {batchAccount.Name}");
+                    }
+
+                    if (vnetAndSubnet == null)
+                    {
+                        configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                        vnetAndSubnet = await CreateVnetAsync(resourceGroup, configuration.VnetName, configuration.VnetAddressSpace);
+                    }
+
+                    await Task.WhenAll(new Task[]
+                    {
                         Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync()),
                         Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync()),
                         Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
@@ -400,45 +381,37 @@ namespace CromwellOnAzureDeployer
                                 },
                                 TaskContinuationOptions.OnlyOnRanToCompletion)
                             .Unwrap())
-                        });
+                    });
 
-                        await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
-                        await AssignVmAsContributorToCosmosDb(managedIdentity, cosmosDb);
-                        await AssignVmAsContributorToBatchAccountAsync(managedIdentity, batchAccount);
-                        await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
-                        await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
+                    await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
+                    await AssignVmAsContributorToCosmosDb(managedIdentity, cosmosDb);
+                    await AssignVmAsContributorToBatchAccountAsync(managedIdentity, batchAccount);
+                    await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
+                    await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
 
-                        if (!SkipBillingReaderRoleAssignment)
-                        {
-                            await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
-                        }
-                    }
-
-                    await WriteCoaVersionToVmAsync(sshConnectionInfo);
-                    await RebootVmAsync(sshConnectionInfo);
-                    await WaitForSshConnectivityAsync(sshConnectionInfo);
-
-                    if (!await IsStartupSuccessfulAsync(sshConnectionInfo))
+                    if (!SkipBillingReaderRoleAssignment)
                     {
-                        RefreshableConsole.WriteLine($"Startup script on the VM failed. Check {CromwellAzureRootDir}/startup.log for details", ConsoleColor.Red);
-                        return 1;
+                        await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
                     }
-
-                    if (await MountWarningsExistAsync(sshConnectionInfo))
-                    {
-                        RefreshableConsole.WriteLine($"Found warnings in {CromwellAzureRootDir}/mount.blobfuse.log. Some storage containers may have failed to mount on the VM. Check the file for details.", ConsoleColor.Yellow);
-                    }
-
-                    await WaitForDockerComposeAsync(sshConnectionInfo);
-                    await WaitForCromwellAsync(sshConnectionInfo);
                 }
-                finally
+
+                await WriteCoaVersionToVmAsync(sshConnectionInfo);
+                await RebootVmAsync(sshConnectionInfo);
+                await WaitForSshConnectivityAsync(sshConnectionInfo);
+
+                if (!await IsStartupSuccessfulAsync(sshConnectionInfo))
                 {
-                    if (networkSecurityGroup is not null && true != configuration.KeepSshPortOpen)
-                    {
-                        await DisableSsh(networkSecurityGroup);
-                    }
+                    RefreshableConsole.WriteLine($"Startup script on the VM failed. Check {CromwellAzureRootDir}/startup.log for details", ConsoleColor.Red);
+                    return 1;
                 }
+
+                if (await MountWarningsExistAsync(sshConnectionInfo))
+                {
+                    RefreshableConsole.WriteLine($"Found warnings in {CromwellAzureRootDir}/mount.blobfuse.log. Some storage containers may have failed to mount on the VM. Check the file for details.", ConsoleColor.Yellow);
+                }
+
+                await WaitForDockerComposeAsync(sshConnectionInfo);
+                await WaitForCromwellAsync(sshConnectionInfo);
 
                 var maxPerFamilyQuota = batchAccount.DedicatedCoreQuotaPerVMFamilyEnforced ? Enumerable.Empty<int>() : batchAccount.DedicatedCoreQuotaPerVMFamily.Select(q => q.CoreQuota).Where(q => 0 != q);
                 var isBatchQuotaAvailable = batchAccount.LowPriorityCoreQuota > 0 || (batchAccount.DedicatedCoreQuota > 0 && maxPerFamilyQuota.Append(0).Max() > 0);
@@ -731,13 +704,6 @@ namespace CromwellOnAzureDeployer
             return !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
         }
 
-        private async Task<bool?> GetInstalledKeepSshPortOpenAsync(ConnectionInfo sshConnectionInfo)
-        {
-            var boolString = (await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $@"grep -sPo 'KeepSshPortOpen=\K(.*)$' {CromwellAzureRootDir}/env-12-keep-ssh-port-open.txt || :")).Output;
-
-            return !string.IsNullOrEmpty(boolString) && bool.TryParse(boolString, out var keepPortOpen) ? keepPortOpen : null;
-        }
-
         private Task MountDataDiskOnTheVirtualMachineAsync(ConnectionInfo sshConnectionInfo)
         {
             return Execute(
@@ -857,7 +823,6 @@ namespace CromwellOnAzureDeployer
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "DockerInDockerImageName", configuration.DockerInDockerImageName, "env-09-docker-in-docker-image-name.txt");
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "BlobxferImageName", configuration.BlobxferImageName, "env-10-blobxfer-image-name.txt");
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress, "env-11-disable-batch-nodes-public-ip-address.txt");
-            await HandleConfigurationPropertyAsync(sshConnectionInfo, "KeepSshPortOpen", configuration.KeepSshPortOpen, "env-12-keep-ssh-port-open.txt");
         }
 
         private async Task HandleConfigurationPropertyAsync(ConnectionInfo sshConnectionInfo, string key, string value, string envFileName)
@@ -1108,41 +1073,27 @@ namespace CromwellOnAzureDeployer
 
         private Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync(IResourceGroup resourceGroup, string networkSecurityGroupName)
         {
-            const int SshAllowedPort = 22;
-            const int SshDefaultPriority = 300;
+            const string ruleName = "SSH";
+            const int allowedPort = 22;
+            const int defaultPriority = 300;
 
             return Execute(
                 $"Creating Network Security Group: {networkSecurityGroupName}...",
                 () => azureSubscriptionClient.NetworkSecurityGroups.Define(networkSecurityGroupName)
                     .WithRegion(configuration.RegionName)
                     .WithExistingResourceGroup(resourceGroup)
-                    .DefineRule(SshNsgRuleName)
+                    .DefineRule(ruleName)
                     .AllowInbound()
                     .FromAnyAddress()
                     .FromAnyPort()
                     .ToAnyAddress()
-                    .ToPort(SshAllowedPort)
+                    .ToPort(allowedPort)
                     .WithProtocol(SecurityRuleProtocol.Tcp)
-                    .WithPriority(SshDefaultPriority)
+                    .WithPriority(defaultPriority)
                     .Attach()
                     .CreateAsync(cts.Token)
             );
         }
-
-        private Task EnableSsh(INetworkSecurityGroup networkSecurityGroup)
-            => networkSecurityGroup.SecurityRules[SshNsgRuleName].Access switch
-            {
-                var x when SecurityRuleAccess.Allow.Equals(x) => Task.FromResult(false),
-                _ => Execute(
-                    "Enabling SSH on VM...",
-                    () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).AllowInbound().Parent().ApplyAsync()),
-            };
-
-        private Task DisableSsh(INetworkSecurityGroup networkSecurityGroup)
-            => Execute(
-                "Disabling SSH on VM...",
-                () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).DenyInbound().Parent().ApplyAsync()
-            );
 
         private Task<INetworkInterface> AssociateNicWithNetworkSecurityGroupAsync(INetworkInterface networkInterface, INetworkSecurityGroup networkSecurityGroup)
         {
