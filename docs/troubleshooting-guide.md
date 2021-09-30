@@ -189,6 +189,10 @@ To get logs from all the Docker containers or to use the Cromwell REST API endpo
 
 ![Reset password](/docs/screenshots/resetpassword.PNG)
 
+Starting with Release 2.5, unless you used the `--KeepSshPortOpen=true` deployer option, in order to connect you can either
+1. Enable and use the Azure-provided `just-in-time` feature (if that option is available to you in your subscription and for the host VM) OR
+2. Change the `Action` of the `SSH` inbound security rule on the network security group in the VM's resource group from `Deny` to `Allow`. Be sure to switch it back to `Deny` when you have logged out.
+
 To connect to your host VM, you can either
 1. Construct your ssh connection string if you have the VM name `ssh vmadmin@<hostname>` OR
 2. Navigate to the Connect button on the Overview blade of your Azure VM instance, then copy the ssh connection string. 
@@ -228,7 +232,8 @@ string   VmName | Y | N | Y | Name of the VM host that is part of the Cromwell o
 string   CromwellVersion | Y | N | Y | Cromwell version to use
 bool     SkipTestWorkflow = false; | Y | Y | Y | Set to true to skip running the default [test workflow](../README.md/#Hello-World-WDL-test)
 bool     Update =   false; | Y | Y | Y | Set to true if you want to update your existing Cromwell on Azure deployment to the latest version. Required for update
-bool     PrivateNetworking = false; | Y | Y | N | Available starting version 2.2. Set to true to create the host VM without public IP address. If set, VnetResourceGroupName, VnetName and SubnetName must be provided (and already exist). The deployment must be initiated from a machine that has access to that subnet. 
+bool     PrivateNetworking = false; | Y | Y | N | Available starting version 2.2. Set to true to create the host VM without public IP address. If set, VnetResourceGroupName, VnetName and SubnetName must be provided (and already exist). The deployment must be initiated from a machine that has access to that subnet.
+bool     KeepSshPortOpen =   false; | Y | N | Y | Available starting version 2.5. Set to true if you need to keep the SSH port accessible on the host VM while deployer is not running (not recommended). 
 
 ### Use a specific Cromwell version
 #### Before deploying Cromwell on Azure
