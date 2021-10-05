@@ -51,28 +51,17 @@ write_log "Checking account access (this could take awhile due to role assignmen
 
 while :
 do
-    write_log "Getting management token..."
-    IFS='~' read content http_status <<< $(curl -s -H Metadata:true --write-out '~%{http_code}' "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com&client_id=$managed_identity_client_id")
-
-    if [ "$http_status" == "200" ]; then
-        mgmt_token=$(grep -Po '"access_token":"\K([^"]*)' <<< $content)
-
+    write_log "Logging in with management identity..."
+    if az login --identity --username $managed_identity_client_id > /dev/null; then
         write_log "Getting list of accessible subscriptions..."
-        IFS='~' read content http_status <<< $(curl -s -X GET --write-out '~%{http_code}' "https://management.azure.com/subscriptions?api-version=2019-05-10" -H "Authorization: Bearer $mgmt_token" -d '')
-
-        if [ "$http_status" == "200" ]; then
-            subscription_ids=( $(grep -Po '"id":"/subscriptions/\K([^"]*)' <<< $content) )
-
+        if subscription_ids=$(az account list --query [].id -o tsv); then
             write_log "Getting list of accessible resources..."
             # Initializing array with single empty string to avoid unbound variable error in bash version < 4.4
             resource_ids=("")
 
-            for subscription_id in "${subscription_ids[@]}"
+            for subscription_id in $subscription_ids
             do
-                IFS='~' read content http_status <<< $(curl -s -X GET --write-out '~%{http_code}' "https://management.azure.com/subscriptions/$subscription_id/resources?api-version=2019-05-10" -H "Authorization: Bearer $mgmt_token" -d '')
-
-                if [ "$http_status" == "200" ]; then
-                    resource_ids_in_single_sub=( $(grep -Po '"id":"\K([^"]*)' <<< $content) )
+                if resource_ids_in_single_sub=$(az resource list --subscription $subscription_id --query [].id -o tsv); then
                     resource_ids=("${resource_ids[@]}" "${resource_ids_in_single_sub[@]}")
                 fi
             done
@@ -84,29 +73,23 @@ do
                 && grep -q "${kv["BatchAccountName"]}" <<< "${resource_ids[@]}" \
                 && grep -q "${kv["ApplicationInsightsAccountName"]}" <<< "${resource_ids[@]}"; then
 
-                write_log "Getting storage token..."
-                IFS='~' read content http_status <<< $(curl -s -H Metadata:true --write-out '~%{http_code}' "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://$storage_account_name.blob.core.windows.net&client_id=$managed_identity_client_id")
-
-                if [ "$http_status" == "200" ]; then
-                    storage_token=$(grep -Po '"access_token":"\K([^"]*)' <<< $content)
-
+                write_log "Getting storage key..."
+                if storage_key=$(az storage account keys list --account-name $storage_account_name --query "[?keyName=='key1'].value" -o tsv); then
                     write_log "Checking access to containers-to-mount file..."
-                    http_status=$(curl -o /dev/null -I -L -s -w "%{http_code}" -H "Authorization: Bearer $storage_token" -H "x-ms-version: 2018-03-28" "https://$storage_account_name.blob.core.windows.net/configuration/containers-to-mount")
-
-                    if [ "$http_status" == "200" ]; then
+                    if az storage blob exists --account-name $storage_account_name --account-key $storage_key --container-name configuration --name containers-to-mount > /dev/null; then
                         break
                     else
-                        write_log "containers-to-mount file is not accessible (status $http_status), retrying..."
+                        write_log "containers-to-mount file is not accessible (exit code $?), retrying..."
                     fi
                 fi
             else
                 write_log "Not all accounts are accessible, retrying..."
             fi
         else
-            write_log "Subscriptions query failed with $http_status, $content, retrying..."
+            write_log "Subscriptions query failed with exit code $?, retrying..."
         fi
     else
-        write_log "Management token request failed with $http_status, $content, retrying..."
+        write_log "Management login request failed with exit code $?, retrying..."
     fi
 
     sleep 10
@@ -116,7 +99,7 @@ write_log "Account access OK"
 write_log
 
 write_log "Mounting containers (default storage account = $storage_account_name)"
-./mount_containers.sh -a $storage_account_name -c $managed_identity_client_id
+./mount_containers.sh -a $storage_account_name
 write_log
 
 write_log "Mounted containers:"
