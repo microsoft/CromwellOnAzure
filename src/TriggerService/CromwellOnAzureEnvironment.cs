@@ -341,11 +341,35 @@ namespace TriggerService
 
             logger.LogInformation($"Mutating state from '{oldStateText}' to '{newStateText}' for blob {storage.AccountName}/{container}/{blobName}");
 
-            var workflow = JsonConvert.DeserializeObject<Workflow>(await storage.DownloadBlobTextAsync(container, blobName));
-            var jsonSerializerSettings = workflow == null ? new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore } : null;
-            workflow = workflow ?? new Workflow();
-            workflowContentAction?.Invoke(workflow);
-            await storage.UploadFileTextAsync(JsonConvert.SerializeObject(workflow, Formatting.Indented, jsonSerializerSettings), container, newBlobName);
+            Exception error = default;
+            var newBlobText = await storage.DownloadBlobTextAsync(container, blobName);
+            var workflow = JsonConvert.DeserializeObject<Workflow>(newBlobText, new JsonSerializerSettings() { Error = (o, a) =>
+            {
+                error = error switch
+                {
+                    AggregateException ex => new AggregateException(ex.InnerExceptions.Append(a.ErrorContext.Error)),
+                    Exception ex => new AggregateException(Enumerable.Empty<Exception>().Append(ex).Append(a.ErrorContext.Error)),
+                    _ => a.ErrorContext.Error ?? new InvalidOperationException("Unknown error."),
+                };
+                a.ErrorContext.Handled = true;
+            }});
+            if (error is not null)
+            {
+                newBlobText += "\nError(s): " + error switch
+                {
+                    AggregateException ex => string.Join(", ", Enumerable.Empty<Exception>().Append(ex).Concat(ex.InnerExceptions).Select(e => e.Message)),
+                    Exception ex => ex.Message,
+                    _ => "Unknown error.",
+                };
+            }
+            else
+            {
+                var jsonSerializerSettings = workflow == null ? new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore } : null;
+                workflow ??= new Workflow();
+                workflowContentAction?.Invoke(workflow);
+                newBlobText = JsonConvert.SerializeObject(workflow, Formatting.Indented, jsonSerializerSettings);
+            }
+            await storage.UploadFileTextAsync(newBlobText, container, newBlobName);
             await storage.DeleteBlobIfExistsAsync(container, blobName);
         }
 
