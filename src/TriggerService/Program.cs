@@ -53,20 +53,21 @@ namespace TriggerService
 
             var serviceProvider = serviceCollection.BuildServiceProvider();
 
-            var cloudStorageAccount = await AzureStorage.GetCloudStorageAccountUsingMsiAsync(defaultStorageAccountName);
+            (var storageAccounts, var storageAccount) = await AzureStorage.GetStorageAccountsUsingMsiAsync(defaultStorageAccountName);
 
             (var cosmosDbEndpoint, var cosmosDbKey) = await GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
 
             var environment = new CromwellOnAzureEnvironment(
                 serviceProvider.GetRequiredService<ILoggerFactory>(),
-                new AzureStorage(cloudStorageAccount, new System.Net.Http.HttpClient()),
+                storageAccount,
                 new CromwellApiClient.CromwellApiClient(cromwellUrl),
                 new CosmosDbRepository<TesTask>(
                     cosmosDbEndpoint, 
                     cosmosDbKey, 
                     Constants.CosmosDbDatabaseId, 
                     Constants.CosmosDbContainerId, 
-                    Constants.CosmosDbPartitionId));
+                    Constants.CosmosDbPartitionId),
+                storageAccounts);
 
             serviceCollection.AddSingleton(s => new TriggerEngine(s.GetRequiredService<ILoggerFactory>(), environment, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(30)));
             serviceProvider = serviceCollection.BuildServiceProvider();
