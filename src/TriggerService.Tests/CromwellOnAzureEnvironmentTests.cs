@@ -52,7 +52,27 @@ namespace TriggerService.Tests
             var accountAuthority = "fake";
             var url = $"/{accountAuthority}/test/test.wdl";
 
-            var processedWorkflowItem  = await GetBlobFileNameAndDataUsingMocksAsync(url, accountAuthority);
+            var processedWorkflowItem = await GetBlobFileNameAndDataUsingMocksAsync(url, accountAuthority);
+
+            Assert.AreEqual(azureName, processedWorkflowItem.Filename, "azureName compared with Filename");
+            Assert.IsNotNull(processedWorkflowItem.Data, "data");
+            Assert.AreEqual(blobData.Length, processedWorkflowItem.Data.Length, "unexpected length of Data");
+            for (var i = 0; i < blobData.Length; i++)
+            {
+                Assert.AreEqual(blobData[i], processedWorkflowItem.Data[i], $"unexpected value of Data[{i}]");
+            }
+        }
+
+        [TestMethod]
+        public async Task GetBlobFileNameAndDataWithDifferentStorageAccountUsingLocalPath()
+        {
+            var defaultAuthority = "fake";
+            var accountAuthority = "alternate";
+            var url = $"/{accountAuthority}/test/test.wdl";
+
+            var storages = Enumerable.Repeat(MockAzureStorage(defaultAuthority), 1).Append(MockAzureStorage(accountAuthority));
+
+            var processedWorkflowItem  = await GetBlobFileNameAndDataUsingMocksAsync(url, defaultAuthority, storages);
 
             Assert.AreEqual(azureName, processedWorkflowItem.Filename, "azureName compared with Filename");
             Assert.IsNotNull(processedWorkflowItem.Data, "data");
@@ -77,26 +97,17 @@ namespace TriggerService.Tests
             {
                 Assert.AreEqual(httpClientData[i], processedWorkflowItem.Data[i], $"unexpected value of Data[{i}]");
             }
-
-
         }
 
-        private async Task<ProcessedWorkflowItem> GetBlobFileNameAndDataUsingMocksAsync(string url, string accountAuthority)
+        private async Task<ProcessedWorkflowItem> GetBlobFileNameAndDataUsingMocksAsync(string url, string accountAuthority, IEnumerable<IAzureStorage> azureStorages = default)
         {
-            var environment = SetCromwellOnAzureEnvironment(accountAuthority);
+            var environment = SetCromwellOnAzureEnvironment(accountAuthority, azureStorages);
             return await environment.GetBlobFileNameAndData(url);
         }
 
-        private CromwellOnAzureEnvironment SetCromwellOnAzureEnvironment(string accountAuthority)
+        private IAzureStorage MockAzureStorage(string accountAuthority)
         {
-            var serviceCollection = new ServiceCollection()
-                .AddLogging(loggingBuilder => loggingBuilder.AddConsole());
-
-            var serviceProvider = serviceCollection.BuildServiceProvider();
-
             var azStorageMock = new Mock<IAzureStorage>();
-
-            var cosmosdbRepositoryMock = new Mock<IRepository<TesTask>>();
 
 
             azStorageMock.Setup(az => az
@@ -119,11 +130,29 @@ namespace TriggerService.Tests
 
             azStorageMock.SetupGet(az => az.AccountName).Returns(accountName);
 
+            return azStorageMock.Object;
+        }
+
+        private CromwellOnAzureEnvironment SetCromwellOnAzureEnvironment(string accountAuthority, IEnumerable<IAzureStorage> azureStorages = default)
+        {
+            var serviceCollection = new ServiceCollection()
+                .AddLogging(loggingBuilder => loggingBuilder.AddConsole());
+
+            var serviceProvider = serviceCollection.BuildServiceProvider();
+
+            var cosmosdbRepositoryMock = new Mock<IRepository<TesTask>>();
+
+            if (azureStorages is null)
+            {
+                azureStorages = Enumerable.Repeat(MockAzureStorage(accountAuthority), 1);
+            }
+
             var environment = new CromwellOnAzureEnvironment(
                 serviceProvider.GetRequiredService<ILoggerFactory>(),
-                azStorageMock.Object,
+                azureStorages.First(),
                 new CromwellApiClient.CromwellApiClient("http://cromwell:8000"),
-                cosmosdbRepositoryMock.Object);
+                cosmosdbRepositoryMock.Object,
+                azureStorages);
 
             return environment;
         }

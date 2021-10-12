@@ -27,12 +27,14 @@ namespace TriggerService
         private static readonly Regex blobNameRegex = new Regex("^(?:https?://|/)?[^/]+/[^/]+/([^?.]+)");  // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs in the trigger file.
         private IAzureStorage storage { get; set; }
         internal ICromwellApiClient cromwellApiClient { get; set; }
+        private readonly List<IAzureStorage> storageAccounts;
         private readonly ILogger<AzureStorage> logger;
         private readonly IRepository<TesTask> tesTaskRepository;
 
-        public CromwellOnAzureEnvironment(ILoggerFactory loggerFactory, IAzureStorage storage, ICromwellApiClient cromwellApiClient, IRepository<TesTask> tesTaskRepository)
+        public CromwellOnAzureEnvironment(ILoggerFactory loggerFactory, IAzureStorage storage, ICromwellApiClient cromwellApiClient, IRepository<TesTask> tesTaskRepository, IEnumerable<IAzureStorage> storages)
         {
             this.storage = storage;
+            this.storageAccounts = storages.ToList();
             this.cromwellApiClient = cromwellApiClient;
             this.logger = loggerFactory.CreateLogger<AzureStorage>();
             this.tesTaskRepository = tesTaskRepository;
@@ -296,14 +298,9 @@ namespace TriggerService
 
             byte[] data;
 
-            if ((Uri.TryCreate(url, UriKind.Absolute, out var uri)
-                && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase)
-                && uri.ParseQueryString().Get("sig") == null)
-                || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase))
+            if (GetBlockBlobStorage(url, storageAccounts) is IAzureStorage aStorage)
             {
-                // If a URL is specified, and it uses the default storage account, and it doesn't use a SAS
-                // OR if it's specified as a local path to the default storage account
-                data = await storage.DownloadBlockBlobAsync(url);
+                data = await aStorage.DownloadBlockBlobAsync(url);
             }
             else
             {
@@ -311,6 +308,19 @@ namespace TriggerService
             }
 
             return new ProcessedWorkflowItem(blobName, data);
+
+            static IAzureStorage GetBlockBlobStorage(string url, IEnumerable<IAzureStorage> storages)
+            {
+                // If a URL is specified, and it uses a known storage account, and it doesn't use a SAS
+                // OR, if it's specified as a local path to a known storage account
+                return storages.FirstOrDefault(IsBlockBlobUrl);
+
+                bool IsBlockBlobUrl(IAzureStorage storage)
+                    => (Uri.TryCreate(url, UriKind.Absolute, out var uri)
+                    && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase)
+                    && uri.ParseQueryString().Get("sig") == null)
+                    || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         public async Task MutateStateAsync(
