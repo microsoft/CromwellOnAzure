@@ -58,6 +58,9 @@ sudo dpkg -i packages-microsoft-prod.deb
 sudo apt update
 sudo apt install -y --allow-downgrades blobfuse=1.2.4 fuse
 
+write_log "Installing az cli"
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
 write_log "Applying security patches"
 sudo unattended-upgrades -v
 
