@@ -123,9 +123,11 @@ namespace CromwellOnAzureDeployer
                 {
                     resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
 
-                    var targetVersion = DelimitedTextToDictionary(GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
+                    var targetVersionData = DelimitedTextToDictionary(GetFileContent("scripts", "env-00-coa-version.txt"));
 
-                    RefreshableConsole.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
+                    var targetVersion = GetVersion(targetVersionData.GetValueOrDefault("CromwellOnAzureVersion"), targetVersionData.GetValueOrDefault("CoAPatch"));
+
+                    RefreshableConsole.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion.ToString(3)}...");
 
                     var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
 
@@ -693,8 +695,14 @@ namespace CromwellOnAzureDeployer
         {
             var versionString = (await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $@"grep -sPo 'CromwellOnAzureVersion=\K(.*)$' {CromwellAzureRootDir}/env-00-coa-version.txt || :")).Output;
 
-            return !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
+            return !string.IsNullOrEmpty(versionString) ? GetVersion(versionString, (await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $@"grep -sPo 'CoAPatch=\K(.*)$' {CromwellAzureRootDir}/env-00-coa-version.txt || :")).Output) : null;
         }
+
+        private static Version GetVersion(string coaVersion, string coaPatch)
+            => Version.TryParse(coaVersion, out var mmVersion) ? new Version(mmVersion.Major, mmVersion.Minor, ParseCoAPatch(coaPatch)) : default ;
+
+        private static int ParseCoAPatch(string coaPatch)
+            => string.IsNullOrWhiteSpace(coaPatch) ? 0 : int.TryParse(coaPatch ?? "0", out var patch) ? patch : 0;
 
         private Task MountDataDiskOnTheVirtualMachineAsync(ConnectionInfo sshConnectionInfo)
         {
