@@ -1090,6 +1090,8 @@ namespace CromwellOnAzureDeployer
 
         private Task<(INetwork virtualNetwork, string subnetName)> CreateVnetAsync(IResourceGroup resourceGroup, string name, string addressSpace)
         {
+            const string subnet = "subnet1";
+
             return Execute(
                 $"Creating virtual network: {name}...",
                 async () =>
@@ -1099,10 +1101,10 @@ namespace CromwellOnAzureDeployer
                         .WithRegion(configuration.RegionName)
                         .WithExistingResourceGroup(resourceGroup)
                         .WithAddressSpace(addressSpace)
-                        .DefineSubnet("subnet1").WithAddressPrefix(addressSpace).Attach()
+                        .DefineSubnet(subnet).WithAddressPrefix(addressSpace).Attach()
                         .CreateAsync();
 
-                    return (vnet, "subnet1");
+                    return (vnet, subnet);
                 });
         }
 
@@ -1130,18 +1132,22 @@ namespace CromwellOnAzureDeployer
         }
 
         private Task EnableSsh(INetworkSecurityGroup networkSecurityGroup)
-            => networkSecurityGroup.SecurityRules[SshNsgRuleName].Access switch
-            {
-                var x when SecurityRuleAccess.Allow.Equals(x) => Task.FromResult(false),
-                _ => Execute(
-                    "Enabling SSH on VM...",
-                    () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).AllowInbound().Parent().ApplyAsync()),
-            };
+            => networkSecurityGroup is null
+                ? Task.FromResult(false)
+                : networkSecurityGroup.SecurityRules[SshNsgRuleName].Access switch
+                {
+                    var x when SecurityRuleAccess.Allow.Equals(x) => Task.FromResult(false),
+                    _ => Execute(
+                        "Enabling SSH on VM...",
+                        () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).AllowInbound().Parent().ApplyAsync()),
+                };
 
         private Task DisableSsh(INetworkSecurityGroup networkSecurityGroup)
-            => Execute(
-                "Disabling SSH on VM...",
-                () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).DenyInbound().Parent().ApplyAsync()
+            => networkSecurityGroup is null
+                ? Task.FromResult(false)
+                : Execute(
+                    "Disabling SSH on VM...",
+                    () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).DenyInbound().Parent().ApplyAsync()
             );
 
         private Task<INetworkInterface> AssociateNicWithNetworkSecurityGroupAsync(INetworkInterface networkInterface, INetworkSecurityGroup networkSecurityGroup)
