@@ -677,8 +677,8 @@ namespace TesApi.Web
         private async Task<PoolInformation> CreatePoolInformation(string executorImage, string vmSize, bool preemptible)
         {
             var vmConfig = new VirtualMachineConfiguration(
-                imageReference: new ImageReference("ubuntu-server-container", "microsoft-azure-batch", "16-04-lts", "latest"),
-                nodeAgentSkuId: "batch.node.ubuntu 16.04");
+                imageReference: new ImageReference("ubuntu-server-container", "microsoft-azure-batch", "18-04-lts", "latest"),
+                nodeAgentSkuId: "batch.node.ubuntu 18.04");
 
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
 
