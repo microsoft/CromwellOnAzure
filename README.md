@@ -54,22 +54,23 @@ Note: Build instructions only provided for the latest release.
 
 #### Linux
 *Preqrequisites*:<br/>
-.NET Core 3.1 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
+.NET 5 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
 
 For example, instructions for *Ubuntu 18.04* are available [here](https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu#1804-) and below for convenience:
 
 ```
 wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
 sudo dpkg -i packages-microsoft-prod.deb
+rm packages-microsoft-prod.deb
 sudo apt-get update && \
 sudo apt-get install -y apt-transport-https && \
 sudo apt-get update && \
-sudo apt-get install -y dotnet-sdk-3.1
+sudo apt-get install -y dotnet-sdk-5.0
 ```
 
 #### Windows
 *Preqrequisites*:<br/>
-.NET Core 3.1 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
+.NET 5 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
 
 *Recommended*:<br/>
 VS 2019
