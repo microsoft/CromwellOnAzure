@@ -42,7 +42,7 @@ namespace TesApi.Tests
             var expectedBasicJsonResult = JObject.Parse(File.ReadAllText("expectedBasicJsonResult.json"));
 
             // Act
-            var jsonResult = JsonConvert.SerializeObject(tesTask, new JsonSerializerSettings { ContractResolver = BasicTesTaskContractResolver.Instance });
+            var jsonResult = JsonConvert.SerializeObject(tesTask, new JsonSerializerSettings { ContractResolver = BasicTesTaskContractResolver.Instance, NullValueHandling = NullValueHandling.Ignore });
             var jsonObjectResult = JObject.Parse(jsonResult);
 
             // Assert
@@ -57,7 +57,7 @@ namespace TesApi.Tests
             tesTask.Inputs[0].Content = "test content";
 
             // Act
-            var jsonResult = JsonConvert.SerializeObject(tesTask, new JsonSerializerSettings { ContractResolver = BasicTesTaskContractResolver.Instance });
+            var jsonResult = JsonConvert.SerializeObject(tesTask, new JsonSerializerSettings { ContractResolver = BasicTesTaskContractResolver.Instance, NullValueHandling = NullValueHandling.Ignore });
             var jsonObjectResult = JObject.Parse(jsonResult);
 
             // Assert
@@ -71,7 +71,7 @@ namespace TesApi.Tests
             var expectedFullJsonResult = JObject.Parse(File.ReadAllText("expectedFullJsonResult.json"));
 
             // Act
-            var jsonResult = JsonConvert.SerializeObject(tesTask, new JsonSerializerSettings { ContractResolver = FullTesTaskContractResolver.Instance });
+            var jsonResult = JsonConvert.SerializeObject(tesTask, new JsonSerializerSettings { ContractResolver = FullTesTaskContractResolver.Instance, NullValueHandling = NullValueHandling.Ignore });
             var jsonObjectResult = JObject.Parse(jsonResult);
 
             // Assert

@@ -48,6 +48,12 @@ namespace Tes.Models
         public List<string> Storage { get; set; }
 
         /// <summary>
+        /// List keys supported in TesResources.backend_parameters
+        /// </summary>
+        [DataMember(Name = "tesResources_backend_parameters")]
+        public List<string> TesResourcesSupportedBackendParameters { get; set; }
+
+        /// <summary>
         /// Returns the string presentation of the object
         /// </summary>
         /// <returns>String presentation of the object</returns>
@@ -57,7 +63,22 @@ namespace Tes.Models
             sb.Append("class TesServiceInfo {\n");
             sb.Append("  Name: ").Append(Name).Append("\n");
             sb.Append("  Doc: ").Append(Doc).Append("\n");
-            sb.Append("  Storage: ").Append(Storage).Append("\n");
+            sb.Append("  Storage: ");
+
+            if (Storage?.Count > 0)
+            {
+                sb.Append(string.Join(",", Storage));
+            }
+
+            sb.Append("\n");
+            sb.Append("  TesResourcesSupportedBackendParameters: ");
+
+            if (TesResourcesSupportedBackendParameters?.Count > 0)
+            {
+                sb.Append(string.Join(",", TesResources.SupportedBackendParameters));
+            }
+
+            sb.Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -123,6 +144,11 @@ namespace Tes.Models
                     Storage == other.Storage ||
                     Storage != null &&
                     Storage.SequenceEqual(other.Storage)
+                ) &&
+                (
+                    TesResourcesSupportedBackendParameters == other.TesResourcesSupportedBackendParameters ||
+                    TesResourcesSupportedBackendParameters != null &&
+                    TesResourcesSupportedBackendParameters.SequenceEqual(other.TesResourcesSupportedBackendParameters)
                 );
         }
 
@@ -149,6 +175,11 @@ namespace Tes.Models
                 if (Storage != null)
                 {
                     hashCode = hashCode * 59 + Storage.GetHashCode();
+                }
+
+                if (TesResourcesSupportedBackendParameters != null)
+                {
+                    hashCode = hashCode * 59 + TesResourcesSupportedBackendParameters.GetHashCode();
                 }
 
                 return hashCode;

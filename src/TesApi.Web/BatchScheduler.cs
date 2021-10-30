@@ -848,11 +848,6 @@ namespace TesApi.Web
         {
             var tesResources = tesTask.Resources;
 
-            var requiredNumberOfCores = tesResources.CpuCores.GetValueOrDefault(DefaultCoreCount);
-            var requiredMemoryInGB = tesResources.RamGb.GetValueOrDefault(DefaultMemoryGb);
-            var requiredDiskSizeInGB = tesResources.DiskGb.GetValueOrDefault(DefaultDiskGb);
-            var preemptible = forcePreemptibleVmsOnly || usePreemptibleVmsOnly || tesResources.Preemptible.GetValueOrDefault(true);
-
             var previouslyFailedVmSizes = tesTask.Logs?
                 .Where(log => log.FailureReason == BatchTaskState.NodeAllocationFailed.ToString() && log.VirtualMachineInfo?.VmSize != null)
                 .Select(log => log.VirtualMachineInfo.VmSize)
@@ -860,14 +855,38 @@ namespace TesApi.Web
                 .ToList();
 
             var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
+            var preemptible = forcePreemptibleVmsOnly || usePreemptibleVmsOnly || tesResources.Preemptible.GetValueOrDefault(true);
 
-            var eligibleVms = virtualMachineInfoList
-                .Where(vm =>
-                    vm.LowPriority == preemptible
-                    && vm.NumberOfCores >= requiredNumberOfCores
-                    && vm.MemoryInGB >= requiredMemoryInGB
-                    && vm.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
-                .ToList();
+            var vmSize = tesResources?.BackendParameters?.Keys.FirstOrDefault(key => key.ToLowerInvariant() == "vmsize");
+            var eligibleVms = new List<VirtualMachineInfo>();
+            string noVmFoundMessage = string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(vmSize))
+            {
+                eligibleVms = virtualMachineInfoList
+                    .Where(vm =>
+                        vm.LowPriority == preemptible
+                        && vm.VmSize == vmSize)
+                    .ToList();
+
+                noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (vmsize: {vmSize}, preemptible: {preemptible}) for task id {tesTask.Id}.";
+            }
+            else
+            {
+                var requiredNumberOfCores = tesResources.CpuCores.GetValueOrDefault(DefaultCoreCount);
+                var requiredMemoryInGB = tesResources.RamGb.GetValueOrDefault(DefaultMemoryGb);
+                var requiredDiskSizeInGB = tesResources.DiskGb.GetValueOrDefault(DefaultDiskGb);
+
+                eligibleVms = virtualMachineInfoList
+                    .Where(vm =>
+                        vm.LowPriority == preemptible
+                        && vm.NumberOfCores >= requiredNumberOfCores
+                        && vm.MemoryInGB >= requiredMemoryInGB
+                        && vm.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
+                    .ToList();
+
+                noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}.";
+            }
 
             var batchQuotas = await azureProxy.GetBatchAccountQuotasAsync();
 
@@ -904,10 +923,8 @@ namespace TesApi.Web
             {
                 return selectedVm;
             }
-
-            var noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}.";
-
-            if(!eligibleVms.Any())
+           
+            if (!eligibleVms.Any())
             {
                 noVmFoundMessage += $" There are no VM sizes that match the requirements. Review the task resources.";
             }
