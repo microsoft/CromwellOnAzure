@@ -158,14 +158,18 @@ namespace TesApi.Controllers
             {
                 var keys = tesTask.Resources.BackendParameters.Keys.Select(k => k.ToLowerInvariant()).ToList();
 
-                if (keys.Distinct().Count() != keys.Count)
+                if (keys.Count > 1 && keys.Distinct().Count() != keys.Count)
                 {
                     return BadRequest("Duplicate backend_parameters were specified");
                 }
 
                 // Backends shall log system warnings if a key is passed that is unsupported.
                 var unsupportedKeys = keys.Except(TesResources.SupportedBackendParameters).ToList();
-                logger.LogWarning($"Unsupported keys were passed to TesResources.backend_parameters: {string.Join(",", unsupportedKeys)}");
+
+                if (unsupportedKeys.Count > 0)
+                {
+                    logger.LogWarning($"Unsupported keys were passed to TesResources.backend_parameters: {string.Join(",", unsupportedKeys)}");
+                }
 
                 // If backend_parameters_strict equals true, backends should fail the task if any key / values are unsupported
                 if (tesTask.Resources.BackendParametersStrict == true)
