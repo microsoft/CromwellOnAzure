@@ -1,9 +1,9 @@
 # Welcome to Cromwell on Azure
 ### Latest release
- * [Release 2.4.0](https://github.com/microsoft/CromwellOnAzure/releases/tag/2.4.0)<br/>
- [Release notes for version 2.4.0](docs/release-notes/2.4.0.md)
+ * [Release 2.5.0](https://github.com/microsoft/CromwellOnAzure/releases/tag/2.5.0)<br/>
+ [Release notes for version 2.5.0](docs/release-notes/2.5.0.md)
  
-Check the "Update Instructions" section in the version 2.4.0 [release notes](docs/release-notes/2.4.0.md/#update-instructions) to learn how to update an existing Cromwell on Azure deployment to version 2.4.0. You can customize some parameters when updating. Please [see these customization instructions](docs/troubleshooting-guide.md/#Customize-your-Cromwell-on-Azure-deployment), specifically the "Used by update" and "Comment" columns in the table.<br/>
+Check the "Update Instructions" section in the version 2.5.0 [release notes](docs/release-notes/2.5.0.md/#update-instructions) to learn how to update an existing Cromwell on Azure deployment to version 2.5.0. You can customize some parameters when updating. Please [see these customization instructions](docs/troubleshooting-guide.md/#Customize-your-Cromwell-on-Azure-deployment), specifically the "Used by update" and "Comment" columns in the table.<br/>
 
 #### Getting started
  * What is [Cromwell on Azure?](#Cromwell-on-Azure) <br/>
@@ -54,22 +54,23 @@ Note: Build instructions only provided for the latest release.
 
 #### Linux
 *Preqrequisites*:<br/>
-.NET Core 3.1 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
+.NET 5 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
 
 For example, instructions for *Ubuntu 18.04* are available [here](https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu#1804-) and below for convenience:
 
 ```
 wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
 sudo dpkg -i packages-microsoft-prod.deb
+rm packages-microsoft-prod.deb
 sudo apt-get update && \
 sudo apt-get install -y apt-transport-https && \
 sudo apt-get update && \
-sudo apt-get install -y dotnet-sdk-3.1
+sudo apt-get install -y dotnet-sdk-5.0
 ```
 
 #### Windows
 *Preqrequisites*:<br/>
-.NET Core 3.1 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
+.NET 5 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
 
 *Recommended*:<br/>
 VS 2019
