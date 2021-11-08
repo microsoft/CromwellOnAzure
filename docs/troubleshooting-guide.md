@@ -83,6 +83,12 @@ To mitigate, log on to the host VM and execute the following and then restart th
 sudo docker exec -it cromwellazure_mysqldb_1 bash -c 'mysql -ucromwell -Dcromwell_db -pcromwell -e"SELECT * FROM DATABASECHANGELOGLOCK;UPDATE DATABASECHANGELOGLOCK SET LOCKED=0, LOCKGRANTED=null, LOCKEDBY=null where ID=1;SELECT * FROM DATABASECHANGELOGLOCK;"'
 ```
 
+### Azure service key rotations
+If you ever find you need to rotate the keys to any of the Azure services your Cromwell on Azure was setup with, you will want to know the following when attempting to follow the relevant guidelines from Azure:
+* Generally, Cromwell on Azure grabs only the `Primary Read-write Key` during the Host Linux VM startup. That key generally continues to work while that key is being regenerated, so you will likely need to reboot the host vm as soon as that key regeneration has completed (don't reboot before the regeneration completes or you may get errors).
+* After regenerating the keys, use the features in the Azure Portal to navigate or query the data held in the relevant service. If the data is inaccessible, click on the `Diagnose and solve problems` (or similar) option and follow any wizard presented. Try again to access the data contained in that service. If it is now accessible, reboot the host VM again. Otherwise, raise a ticket with Azure.
+* When you update any Cromwell on Azure version 2.4 or earlier with a 2.5 or later deployer, your Azure Cosmos DB primary read-write key is regenerated for you, as a `#ChaosDB` mitigation.
+
 ## Setup
 ### Setup Cromwell on Azure for multiple users in the same Azure subscription
 Cromwell on Azure is designed to be flexible for single and multiple user scenarios. Here we have envisioned 4 general scenarios and demonstrated how they relate to your Azure account, Azure Batch service, Subscription ID, and Resource Groups, each depicted below.
