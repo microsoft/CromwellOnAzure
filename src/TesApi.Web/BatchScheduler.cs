@@ -44,6 +44,7 @@ namespace TesApi.Web
         private readonly bool usePreemptibleVmsOnly;
         private readonly string batchNodesSubnetId;
         private readonly bool disableBatchNodesPublicIpAddress;
+        private readonly BatchNodeInfo batchNodeInfo;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -67,6 +68,15 @@ namespace TesApi.Web
             this.dockerInDockerImageName = GetStringValue(configuration, "DockerInDockerImageName", "docker");
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
+
+            this.batchNodeInfo = new BatchNodeInfo
+            {
+                BatchImageOffer = GetStringValue(configuration, "BatchImageOffer", "ubuntu-server-container"),
+                BatchImagePublisher = GetStringValue(configuration, "BatchImagePublisher", "microsoft-azure-batch"),
+                BatchImageSku = GetStringValue(configuration, "BatchImageSku", "20-04-lts"),
+                BatchImageVersion = GetStringValue(configuration, "BatchImageVersion", "latest"),
+                BatchNodeAgentSkuId = GetStringValue(configuration, "BatchNodeAgentSkuId", "batch.node.ubuntu 20.04")
+            };
 
             logger.LogInformation($"usePreemptibleVmsOnly: {usePreemptibleVmsOnly}");
 
@@ -218,8 +228,10 @@ namespace TesApi.Web
 
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
 
+                var userAssignedManagedIdentityResourceId = GetUserAssignedManagedIdentityResourceId(tesTask);
+
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
-                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
+                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, userAssignedManagedIdentityResourceId);
 
                 tesTaskLog.StartTime = DateTimeOffset.UtcNow;
 
@@ -260,6 +272,20 @@ namespace TesApi.Web
                 tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
                 logger.LogError(exc, exc.Message);
             }
+        }
+
+        private static string GetUserAssignedManagedIdentityResourceId(TesTask tesTask)
+        {
+            string userAssignedManagedIdentityResourceId = null;
+
+            var identityKey = tesTask?.Resources?.BackendParameters?.Keys?.FirstOrDefault(k => k.Equals("identity", StringComparison.OrdinalIgnoreCase));
+
+            if (identityKey != null)
+            {
+                userAssignedManagedIdentityResourceId = tesTask.Resources.BackendParameters[identityKey];
+            }
+
+            return userAssignedManagedIdentityResourceId;
         }
 
         /// <summary>
@@ -677,8 +703,12 @@ namespace TesApi.Web
         private async Task<PoolInformation> CreatePoolInformation(string executorImage, string vmSize, bool preemptible)
         {
             var vmConfig = new VirtualMachineConfiguration(
-                imageReference: new ImageReference("ubuntu-server-container", "microsoft-azure-batch", "20-04-lts", "latest"),
-                nodeAgentSkuId: "batch.node.ubuntu 20.04");
+                imageReference: new ImageReference(
+                    batchNodeInfo.BatchImageOffer, 
+                    batchNodeInfo.BatchImagePublisher, 
+                    batchNodeInfo.BatchImageSku,
+                    batchNodeInfo.BatchImageVersion),
+                nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
 
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
 

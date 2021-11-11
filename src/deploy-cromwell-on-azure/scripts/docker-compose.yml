@@ -27,6 +27,11 @@ services:
       - DockerInDockerImageName=$DockerInDockerImageName
       - BlobxferImageName=$BlobxferImageName
       - DisableBatchNodesPublicIpAddress=$DisableBatchNodesPublicIpAddress
+      - BatchImageOffer=$BatchImageOffer
+      - BatchImagePublisher=$BatchImagePublisher
+      - BatchImageSku=$BatchImageSku
+      - BatchImageVersion=$BatchImageVersion
+      - BatchNodeAgentSkuId=$BatchNodeAgentSkuId
     expose:
       - "80"
     volumes:
