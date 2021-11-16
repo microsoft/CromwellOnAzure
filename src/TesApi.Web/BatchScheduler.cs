@@ -228,10 +228,8 @@ namespace TesApi.Web
 
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
 
-                var userAssignedManagedIdentityResourceId = GetUserAssignedManagedIdentityResourceId(tesTask);
-
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
-                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, userAssignedManagedIdentityResourceId);
+                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
                 tesTaskLog.StartTime = DateTimeOffset.UtcNow;
 
@@ -272,20 +270,6 @@ namespace TesApi.Web
                 tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
                 logger.LogError(exc, exc.Message);
             }
-        }
-
-        private static string GetUserAssignedManagedIdentityResourceId(TesTask tesTask)
-        {
-            string userAssignedManagedIdentityResourceId = null;
-
-            var identityKey = tesTask?.Resources?.BackendParameters?.Keys?.FirstOrDefault(k => k.Equals("identity", StringComparison.OrdinalIgnoreCase));
-
-            if (identityKey != null)
-            {
-                userAssignedManagedIdentityResourceId = tesTask.Resources.BackendParameters[identityKey];
-            }
-
-            return userAssignedManagedIdentityResourceId;
         }
 
         /// <summary>
