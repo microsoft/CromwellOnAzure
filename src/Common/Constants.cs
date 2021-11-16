@@ -1,13 +1,16 @@
-﻿namespace Common
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+namespace Common
 {
     public static class Constants
     {
         public const string CromwellSystemName = "Cromwell";
 
-        public static string CosmosDbDatabaseId = "TES";
+        public const string CosmosDbDatabaseId = "TES";
 
-        public static string CosmosDbContainerId = "Tasks";
+        public const string CosmosDbContainerId = "Tasks";
 
-        public static string CosmosDbPartitionId = "01";
+        public const string CosmosDbPartitionId = "01";
     }
 }
