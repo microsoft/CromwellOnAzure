@@ -73,6 +73,11 @@ namespace TesApi.Web
                     {
                         await azureProxy.DeleteBatchJobAsync(tesTaskId);
                         logger.LogInformation($"Deleted orphaned Batch Job '{jobId}'");
+
+                        if (tesTask.ContainsTaskExecutionIdentity())
+                        {
+                            await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
+                        }
                     }
                     else
                     {

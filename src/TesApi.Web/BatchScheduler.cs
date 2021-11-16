@@ -36,6 +36,7 @@ namespace TesApi.Web
         private static readonly Regex queryStringRegex = new Regex(@"[^\?.]*(\?.*)");
         private readonly string dockerInDockerImageName;
         private readonly string blobxferImageName;
+        private readonly string cromwellDrsLocalizerImageName;
         private readonly ILogger logger;
         private readonly IAzureProxy azureProxy;
         private readonly IStorageAccessProvider storageAccessProvider;
@@ -67,6 +68,7 @@ namespace TesApi.Web
             this.batchNodesSubnetId = GetStringValue(configuration, "BatchNodesSubnetId", string.Empty);
             this.dockerInDockerImageName = GetStringValue(configuration, "DockerInDockerImageName", "docker");
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
+            this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "cromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
 
             this.batchNodeInfo = new BatchNodeInfo
@@ -112,7 +114,17 @@ namespace TesApi.Web
             static void SetTaskExecutorError(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => SetTaskStateAndLog(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             static void SetTaskSystemError(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => SetTaskStateAndLog(tesTask, TesState.SYSTEMERROREnum, batchInfo);
 
-            async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo) { await this.azureProxy.DeleteBatchJobAsync(tesTask.Id); SetTaskStateAndLog(tesTask, newTaskState, batchInfo); }
+            async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
+            { 
+                await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
+
+                if (tesTask.ContainsTaskExecutionIdentity())
+                {
+                    await this.azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
+                }
+
+                SetTaskStateAndLog(tesTask, newTaskState, batchInfo); 
+            }
             Task DeleteBatchJobAndSetTaskExecutorErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             Task DeleteBatchJobAndSetTaskSystemErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.SYSTEMERROREnum, batchInfo);
 
@@ -120,7 +132,17 @@ namespace TesApi.Web
                 ? DeleteBatchJobAndSetTaskExecutorErrorAsync(tesTask, batchInfo)
                 : DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.QUEUEDEnum, batchInfo);
 
-            async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) { await this.azureProxy.DeleteBatchJobAsync(tesTask.Id); tesTask.IsCancelRequested = false; }
+            async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
+            { 
+                await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
+
+                if (tesTask.ContainsTaskExecutionIdentity())
+                {
+                    await this.azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
+                }
+
+                tesTask.IsCancelRequested = false; 
+            }
 
             tesTaskStateTransitions = new List<TesTaskStateTransition>()
             {
@@ -220,21 +242,43 @@ namespace TesApi.Web
                 await CheckBatchAccountQuotas(virtualMachineInfo);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
-
+                tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var dockerImage = tesTask.Executors.First().Image;
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask);
-                var poolInformation = await CreatePoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority);
 
-                tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
+                PoolInformation poolInformation = null;
 
-                var userAssignedManagedIdentityResourceId = GetUserAssignedManagedIdentityResourceId(tesTask);
+                if (tesTask?.Resources?.BackendParameters?.TryGetValue(TesResources.BackendParameters_TaskExecutionIdentityKey, out string identityResourceId) == true
+                    && !string.IsNullOrWhiteSpace(identityResourceId))
+                {
+                    string poolName = jobId;
+
+                    // Only create manual pool if an identity was specified
+                    await azureProxy.CreateManualBatchPoolAsync(
+                        poolName: poolName,
+                        vmSize: virtualMachineInfo.VmSize,
+                        isLowPriority: virtualMachineInfo.LowPriority,
+                        executorImage: dockerImage,
+                        nodeInfo: batchNodeInfo,
+                        dockerInDockerImageName: dockerInDockerImageName,
+                        blobxferImageName: blobxferImageName,
+                        identityResourceId: identityResourceId,
+                        disableBatchNodesPublicIpAddress: disableBatchNodesPublicIpAddress,
+                        batchNodesSubnetId: batchNodesSubnetId
+                    );
+                        
+                    poolInformation = new PoolInformation { PoolId = jobId };
+                }
+                else
+                {
+                    poolInformation = await CreateAutoPoolPoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority);
+                }
 
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
-                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, userAssignedManagedIdentityResourceId);
+                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
                 tesTaskLog.StartTime = DateTimeOffset.UtcNow;
-
                 tesTask.State = TesState.INITIALIZINGEnum;
             }
             catch (AzureBatchQuotaMaxedOutException exception)
@@ -272,20 +316,6 @@ namespace TesApi.Web
                 tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
                 logger.LogError(exc, exc.Message);
             }
-        }
-
-        private static string GetUserAssignedManagedIdentityResourceId(TesTask tesTask)
-        {
-            string userAssignedManagedIdentityResourceId = null;
-
-            var identityKey = tesTask?.Resources?.BackendParameters?.Keys?.FirstOrDefault(k => k.Equals("identity", StringComparison.OrdinalIgnoreCase));
-
-            if (identityKey != null)
-            {
-                userAssignedManagedIdentityResourceId = tesTask.Resources.BackendParameters[identityKey];
-            }
-
-            return userAssignedManagedIdentityResourceId;
         }
 
         /// <summary>
@@ -475,6 +505,22 @@ namespace TesApi.Web
                 .ToList();
 
             var inputFiles = task.Inputs.Distinct();
+
+            var drsInputFiles = inputFiles.Where(f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) == true).ToList();
+
+            if (drsInputFiles.Count > 0)
+            {
+                // resolve DRS input files
+                // don't attempt anything else with them
+                // don't save SAS token back to test task
+
+
+            }
+
+
+
+
+
             var cromwellExecutionDirectoryPath = GetCromwellExecutionDirectoryPath(task);
 
             if (cromwellExecutionDirectoryPath == null)
@@ -560,6 +606,13 @@ namespace TesApi.Web
                 sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");  // Install bash if running on alpine (will be the case if running inside "docker" image)
             }
 
+            if (task.ContainsTaskExecutionIdentity())
+            {
+                sb.AppendLine($"write_ts CromwellDrsLocalizerPullStart && \\");
+                sb.AppendLine($"docker pull --quiet {cromwellDrsLocalizerImageName} && \\");
+                sb.AppendLine($"write_ts CromwellDrsLocalizerPullEnd && \\");
+            }
+
             if (blobXferImageIsPublic)
             {
                 sb.AppendLine($"write_ts BlobXferPullStart && \\");
@@ -576,6 +629,31 @@ namespace TesApi.Web
             // The remainder of the script downloads the inputs, runs the main executor container, and uploads the outputs, including the metrics.txt file
             // After task completion, metrics file is downloaded and used to populate the BatchNodeMetrics object
             sb.AppendLine($"write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \\\"Size\\\" | grep - Po '(?i)\\\"Size\\\":\\K([^,]*)') && \\");
+
+            if (drsInputFiles.Count > 0)
+            {
+                // resolve DRS input files
+                // don't attempt anything else with them
+                // don't save SAS token back to test task
+                string marthaUrl = "";
+                string keyVaultName = "";
+                string secretName = "";
+                string identityClientId = "";
+
+                sb.AppendLine($"write_ts DrsLocalizationStart && \\");
+
+                foreach (var drsInputFile in drsInputFiles)
+                {
+                    // TODO - modify to complete in parallel
+                    string drsUrl = drsInputFile.Url;
+                    string localizedFilePath = drsInputFile.Path;
+                    sb.AppendLine($"docker run --rm {volumeMountsOption} -e MARTHA_URL=\"{marthaUrl}\" --entrypoint=/bin/sh {cromwellDrsLocalizerImageName} {drsUrl} {localizedFilePath} --access-token-strategy azure --vault-name {keyVaultName} --secret-name {secretName} --identity-client-id {identityClientId} && \\");
+                }
+
+                sb.AppendLine($"write_ts DrsLocalizationEnd && \\");
+            }
+
+
             sb.AppendLine($"write_ts DownloadStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} {downloadFilesScriptPath} && \\");
             sb.AppendLine($"write_ts DownloadEnd && \\");
@@ -700,12 +778,12 @@ namespace TesApi.Web
         /// <param name="vmSize">The Azure VM sku</param>
         /// <param name="preemptible">True if preemptible machine should be used</param>
         /// <returns></returns>
-        private async Task<PoolInformation> CreatePoolInformation(string executorImage, string vmSize, bool preemptible)
+        private async Task<PoolInformation> CreateAutoPoolPoolInformation(string executorImage, string vmSize, bool preemptible, bool useAutoPool = true)
         {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
-                    batchNodeInfo.BatchImageOffer, 
-                    batchNodeInfo.BatchImagePublisher, 
+                    batchNodeInfo.BatchImageOffer,
+                    batchNodeInfo.BatchImagePublisher,
                     batchNodeInfo.BatchImageSku,
                     batchNodeInfo.BatchImageVersion),
                 nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
@@ -729,7 +807,7 @@ namespace TesApi.Web
 
                 var containerRegistryInfoForDockerInDocker = await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName);
 
-                if(containerRegistryInfoForDockerInDocker != null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
+                if (containerRegistryInfoForDockerInDocker != null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
                 {
                     var containerRegistryForDockerInDocker = new ContainerRegistry(
                         userName: containerRegistryInfoForDockerInDocker.Username,
@@ -780,7 +858,7 @@ namespace TesApi.Web
                     KeepAlive = false
                 }
             };
-
+            
             return poolInformation;
         }
 
@@ -887,16 +965,16 @@ namespace TesApi.Web
             var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
             var preemptible = forcePreemptibleVmsOnly || usePreemptibleVmsOnly || tesResources.Preemptible.GetValueOrDefault(true);
 
-            var vmSize = tesResources?.BackendParameters?.Keys.FirstOrDefault(key => key.ToLowerInvariant() == "vmsize");
             var eligibleVms = new List<VirtualMachineInfo>();
             string noVmFoundMessage = string.Empty;
 
-            if (!string.IsNullOrWhiteSpace(vmSize))
+            if (tesResources?.BackendParameters.TryGetValue(TesResources.BackendParameters_VmSizeKey, out string vmSize) == true 
+                && !string.IsNullOrWhiteSpace(vmSize))
             {
                 eligibleVms = virtualMachineInfoList
                     .Where(vm =>
                         vm.LowPriority == preemptible
-                        && vm.VmSize == vmSize)
+                        && vm.VmSize.Equals(vmSize, StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
                 noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (vmsize: {vmSize}, preemptible: {preemptible}) for task id {tesTask.Id}.";

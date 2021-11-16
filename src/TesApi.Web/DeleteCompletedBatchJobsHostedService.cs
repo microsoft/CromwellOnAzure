@@ -114,6 +114,11 @@ namespace TesApi.Web
                         tesTask.State == TesState.UNKNOWNEnum)
                     {
                         await azureProxy.DeleteBatchJobAsync(tesTaskId);
+
+                        if (tesTask.ContainsTaskExecutionIdentity())
+                        {
+                            await this.azureProxy.DeleteBatchPoolAsync(tesTask.Id);
+                        }
                     }
                 }
             }
