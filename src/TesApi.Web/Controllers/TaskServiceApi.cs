@@ -156,7 +156,11 @@ namespace TesApi.Controllers
 
             if (tesTask?.Resources?.BackendParameters != null)
             {
-                var keys = tesTask.Resources.BackendParameters.Keys.Select(k => k.ToLowerInvariant()).ToList();
+                // Force all keys to be lowercase
+                tesTask.Resources.BackendParameters = new Dictionary<string, string>(
+                    tesTask.Resources.BackendParameters.Select(k => new KeyValuePair<string, string> (k.Key?.ToLowerInvariant(), k.Value)));
+
+                var keys = tesTask.Resources.BackendParameters.Keys.Select(k => k).ToList();
 
                 if (keys.Count > 1 && keys.Distinct().Count() != keys.Count)
                 {
@@ -172,19 +176,16 @@ namespace TesApi.Controllers
                 }
 
                 // If backend_parameters_strict equals true, backends should fail the task if any key / values are unsupported
-                if (tesTask.Resources.BackendParametersStrict == true)
+                if (tesTask.Resources.BackendParametersStrict == true 
+                    && unsupportedKeys.Count > 0)
                 {
-                    if (unsupportedKeys.Count > 0)
-                    {
-                        return BadRequest($"backend_parameters_strict is set to true and unsupported backend_parameters were specified: {string.Join(",", unsupportedKeys)}");
-                    }
+                    return BadRequest($"backend_parameters_strict is set to true and unsupported backend_parameters were specified: {string.Join(",", unsupportedKeys)}");                   
                 }
 
                 // Backends shall not store or return unsupported keys if included in a task.
                 foreach (var key in unsupportedKeys)
                 {
-                    var caseSensitiveKey = tesTask.Resources.BackendParameters.Keys.First(k => k.ToLowerInvariant() == key.ToLowerInvariant());
-                    tesTask.Resources.BackendParameters.Remove(caseSensitiveKey);
+                    tesTask.Resources.BackendParameters.Remove(key);
                 }
             }
 
@@ -208,7 +209,7 @@ namespace TesApi.Controllers
                 Name = "Microsoft Genomics Task Execution Service",
                 Doc = "",
                 Storage = new List<string>(),
-                TesResourcesSupportedBackendParameters = new List<string> { "VmSize", "Identity" }
+                TesResourcesSupportedBackendParameters = TesResources.SupportedBackendParameters
             };
 
             logger.LogInformation($"Name: {serviceInfo.Name} Doc: {serviceInfo.Doc} Storage: {serviceInfo.Storage} TesResourcesSupportedBackendParameters: {string.Join(",",serviceInfo.TesResourcesSupportedBackendParameters)}");
