@@ -262,8 +262,15 @@ namespace TesApi.Web
             {
                 var batchError = JsonConvert.SerializeObject((ex as BatchException)?.RequestInformation?.BatchError);
                 logger.LogError(ex, $"Deleting {job.Id} because adding task to it failed. Batch error: {batchError}");
+
                 await batchClient.JobOperations.DeleteJobAsync(job.Id);
-                // TODO delete manual pool?
+
+                if (!string.IsNullOrWhiteSpace(poolInformation?.PoolId))
+                {
+                    // With manual pools, the PoolId property is set
+                    await DeleteBatchPoolIfExistsAsync(poolInformation.PoolId);
+                }
+
                 throw;
             }
         }
@@ -485,18 +492,26 @@ namespace TesApi.Web
         /// </summary>
         public async Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default)
         {
-            var poolFilter = new ODATADetailLevel
+            try
             {
-                FilterClause = $"startswith(id,'{poolId}') and state ne 'deleting'",
-                SelectClause = "id"
-            };
+                var poolFilter = new ODATADetailLevel
+                {
+                    FilterClause = $"startswith(id,'{poolId}') and state ne 'deleting'",
+                    SelectClause = "id"
+                };
 
-            var poolsToDelete = await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync();
+                var poolsToDelete = await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync();
 
-            foreach (var job in poolsToDelete)
+                foreach (var pool in poolsToDelete)
+                {
+                    logger.LogInformation($"Deleting pool {pool.Id}");
+                    await batchClient.PoolOperations.DeletePoolAsync(pool.Id, cancellationToken: cancellationToken);
+                }
+            }
+            catch (Exception exc)
             {
-                logger.LogInformation($"Deleting pool {poolId}");
-                await batchClient.PoolOperations.DeletePoolAsync(poolId, cancellationToken: cancellationToken);
+                logger.LogError(exc, $"Exception while attempting to delete pool starting with ID: {poolId}");
+                throw;
             }
         }
 
@@ -888,6 +903,7 @@ namespace TesApi.Web
                             TargetDedicatedNodes = isLowPriority ? 0 : 1,
                             TargetLowPriorityNodes = isLowPriority ? 1 : 0,
                             ResizeTimeout = TimeSpan.FromMinutes(30), 
+                            // TODO does this do anything with fixed scale settings?
                             NodeDeallocationOption = Microsoft.Azure.Management.Batch.Models.ComputeNodeDeallocationOption.TaskCompletion
                         }
                     },

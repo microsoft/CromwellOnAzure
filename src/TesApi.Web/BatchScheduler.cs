@@ -110,19 +110,28 @@ namespace TesApi.Web
                 }
             }
 
-            static void SetTaskCompleted(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => SetTaskStateAndLog(tesTask, TesState.COMPLETEEnum, batchInfo);
-            static void SetTaskExecutorError(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => SetTaskStateAndLog(tesTask, TesState.EXECUTORERROREnum, batchInfo);
-            static void SetTaskSystemError(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => SetTaskStateAndLog(tesTask, TesState.SYSTEMERROREnum, batchInfo);
+            async Task SetTaskCompleted(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
+            {
+                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                SetTaskStateAndLog(tesTask, TesState.COMPLETEEnum, batchInfo);
+            }
+
+            async Task SetTaskExecutorError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
+            {
+                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                SetTaskStateAndLog(tesTask, TesState.EXECUTORERROREnum, batchInfo);
+            }
+
+            async Task SetTaskSystemError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
+            {
+                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                SetTaskStateAndLog(tesTask, TesState.SYSTEMERROREnum, batchInfo);
+            }
 
             async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
             { 
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-
-                if (tesTask.ContainsTaskExecutionIdentity())
-                {
-                    await this.azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
-                }
-
+                await DeleteManualBatchPoolIfExistsAsync(tesTask);
                 SetTaskStateAndLog(tesTask, newTaskState, batchInfo); 
             }
             Task DeleteBatchJobAndSetTaskExecutorErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.EXECUTORERROREnum, batchInfo);
@@ -135,12 +144,7 @@ namespace TesApi.Web
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             { 
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-
-                if (tesTask.ContainsTaskExecutionIdentity())
-                {
-                    await this.azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
-                }
-
+                await DeleteManualBatchPoolIfExistsAsync(tesTask);
                 tesTask.IsCancelRequested = false; 
             }
 
@@ -174,6 +178,14 @@ namespace TesApi.Web
             var combinedBatchTaskInfo = await GetBatchTaskStateAsync(tesTask);
             var tesTaskChanged = await HandleTesTaskTransitionAsync(tesTask, combinedBatchTaskInfo);
             return tesTaskChanged;
+        }
+
+        private async Task DeleteManualBatchPoolIfExistsAsync(TesTask tesTask)
+        {
+            if (tesTask.ContainsTaskExecutionIdentity())
+            {
+                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
+            }
         }
 
         private static string GetCromwellExecutionDirectoryPath(TesTask task)
@@ -249,12 +261,14 @@ namespace TesApi.Web
 
                 PoolInformation poolInformation = null;
 
-                if (tesTask?.Resources?.BackendParameters?.TryGetValue(TesResources.BackendParameters_TaskExecutionIdentityKey, out string identityResourceId) == true
-                    && !string.IsNullOrWhiteSpace(identityResourceId))
+                if (tesTask.ContainsTaskExecutionIdentity())
                 {
-                    string poolName = jobId;
-
                     // Only create manual pool if an identity was specified
+
+                    // By default, the pool will have the same name/ID as the job
+                    string poolName = jobId;
+                    string identityResourceId = tesTask.GetTaskExecutionIdentity();
+
                     await azureProxy.CreateManualBatchPoolAsync(
                         poolName: poolName,
                         vmSize: virtualMachineInfo.VmSize,
@@ -268,7 +282,7 @@ namespace TesApi.Web
                         batchNodesSubnetId: batchNodesSubnetId
                     );
                         
-                    poolInformation = new PoolInformation { PoolId = jobId };
+                    poolInformation = new PoolInformation { PoolId = poolName };
                 }
                 else
                 {

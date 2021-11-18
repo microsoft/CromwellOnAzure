@@ -115,9 +115,18 @@ namespace TesApi.Web
                     {
                         await azureProxy.DeleteBatchJobAsync(tesTaskId);
 
-                        if (tesTask.ContainsTaskExecutionIdentity())
+                        try
                         {
-                            await this.azureProxy.DeleteBatchPoolAsync(tesTask.Id);
+                            if (tesTask.ContainsTaskExecutionIdentity())
+                            {
+                                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTaskId);
+                            }
+                        }
+                        catch (Exception exc)
+                        {
+                            logger.LogError(exc, $"Exception in DeleteOldBatchJobs when attempting to delete the manual batch pool {tesTaskId}")
+
+                            // Do not rethrow
                         }
                     }
                 }

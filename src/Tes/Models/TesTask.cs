@@ -107,16 +107,27 @@ namespace Tes.Models
         public DateTimeOffset? CreationTime { get; set; }
 
         /// <summary>
+        /// Get the task execution identity
+        /// </summary>
+        /// <returns>The value if it exists; null otherwise</returns>
+        public string GetTaskExecutionIdentity()
+        {
+            string identityResourceId = null;
+
+            this?.Resources
+                ?.BackendParameters
+                ?.TryGetValue(TesResources.BackendParameters_TaskExecutionIdentityKey, out identityResourceId);
+
+            return identityResourceId;
+        }
+
+        /// <summary>
         /// Checks if a task execution identity was specified
         /// </summary>
-        /// <returns>True if a task execution identity key and value were specified; false otherwise</returns>
+        /// <returns>True if a task execution identity key and value were specified are not null or whitespace; false otherwise</returns>
         public bool ContainsTaskExecutionIdentity()
         {
-            return this
-                ?.Resources
-                ?.BackendParameters
-                ?.TryGetValue(TesResources.BackendParameters_TaskExecutionIdentityKey, out string identityResourceId) == true
-                && !string.IsNullOrWhiteSpace(identityResourceId);
+            return !string.IsNullOrWhiteSpace(GetTaskExecutionIdentity());
         }
 
         /// <summary>
