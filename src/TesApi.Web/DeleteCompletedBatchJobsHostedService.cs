@@ -124,8 +124,7 @@ namespace TesApi.Web
                         }
                         catch (Exception exc)
                         {
-                            logger.LogError(exc, $"Exception in DeleteOldBatchJobs when attempting to delete the manual batch pool {tesTaskId}")
-
+                            logger.LogError(exc, $"Exception in DeleteOldBatchJobs when attempting to delete the manual batch pool {tesTaskId}");
                             // Do not rethrow
                         }
                     }
