@@ -76,7 +76,7 @@ sudo mkdir -p /data/mysql
 if [ -d "/cromwellazure" ] && [ ! -L "/cromwellazure" ]; then
     write_log "Previous /cromwellazure exists, using it to create /data/cromwellazure/env-01-account-names.txt and env-04-settings.txt"
     egrep -o 'DefaultStorageAccountName.*|CosmosDbAccountName.*|BatchAccountName.*|ApplicationInsightsAccountName.*' /cromwellazure/docker-compose.yml | sort -u > /data/cromwellazure/env-01-account-names.txt
-    egrep -o 'DisableBatchScheduling.*|AzureOfferDurableId.*|BatchImageOffer.*|BatchImagePublisher.*|BatchImageSku.*|BatchImageVersion.*|BatchNodeAgentSkuId.*' /cromwellazure/docker-compose.yml | sort -u > /data/cromwellazure/env-04-settings.txt
+    egrep -o 'DisableBatchScheduling.*|AzureOfferDurableId.*' /cromwellazure/docker-compose.yml | sort -u > /data/cromwellazure/env-04-settings.txt
     echo "UsePreemptibleVmsOnly=false" >> /data/cromwellazure/env-04-settings.txt
     grep -q 'DisableBatchScheduling' /data/cromwellazure/env-04-settings.txt || echo "DisableBatchScheduling=false" >> /data/cromwellazure/env-04-settings.txt
     write_log "Moving previous /cromwellazure to /cromwellazure-backup"
