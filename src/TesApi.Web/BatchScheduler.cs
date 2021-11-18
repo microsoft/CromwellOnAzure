@@ -46,6 +46,9 @@ namespace TesApi.Web
         private readonly string batchNodesSubnetId;
         private readonly bool disableBatchNodesPublicIpAddress;
         private readonly BatchNodeInfo batchNodeInfo;
+        private readonly string marthaUrl;
+        private readonly string marthaKeyVaultName;
+        private readonly string marthaSecretName;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -68,8 +71,12 @@ namespace TesApi.Web
             this.batchNodesSubnetId = GetStringValue(configuration, "BatchNodesSubnetId", string.Empty);
             this.dockerInDockerImageName = GetStringValue(configuration, "DockerInDockerImageName", "docker");
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
-            this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "cromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
+            this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
+
+            this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
+            this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
+            this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
 
             this.batchNodeInfo = new BatchNodeInfo
             {
@@ -520,20 +527,9 @@ namespace TesApi.Web
 
             var inputFiles = task.Inputs.Distinct();
 
-            var drsInputFiles = inputFiles.Where(f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) == true).ToList();
-
-            if (drsInputFiles.Count > 0)
-            {
-                // resolve DRS input files
-                // don't attempt anything else with them
-                // don't save SAS token back to test task
-
-
-            }
-
-
-
-
+            var drsInputFiles = inputFiles
+                .Where(f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) == true)
+                .ToList();
 
             var cromwellExecutionDirectoryPath = GetCromwellExecutionDirectoryPath(task);
 
@@ -559,7 +555,12 @@ namespace TesApi.Web
             var executionDirectoryUri = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync(cromwellExecutionDirectoryPath, getContainerSas: true));
             var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.Contains($"/{BatchExecutionDirectoryName}/"));
             var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
-            var filesToDownload = await Task.WhenAll(inputFiles.Union(additionalInputFiles).Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
+            
+            var filesToDownload = await Task.WhenAll(
+                inputFiles
+                .Where(f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) != true) // do not attempt to download DRS input files since the cromwell-drs-localizer will
+                .Union(additionalInputFiles)
+                .Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
 
             const string exitIfDownloadedFileIsNotFound = "{ [ -f \"$path\" ] && : || { echo \"Failed to download file $url\" 1>&2 && exit 1; } }";
             const string incrementTotalBytesTransferred = "total_bytes=$(( $total_bytes + `stat -c %s \"$path\"` ))";
@@ -620,7 +621,7 @@ namespace TesApi.Web
                 sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");  // Install bash if running on alpine (will be the case if running inside "docker" image)
             }
 
-            if (task.ContainsTaskExecutionIdentity())
+            if (drsInputFiles.Count > 0 && task.ContainsTaskExecutionIdentity())
             {
                 sb.AppendLine($"write_ts CromwellDrsLocalizerPullStart && \\");
                 sb.AppendLine($"docker pull --quiet {cromwellDrsLocalizerImageName} && \\");
@@ -646,27 +647,19 @@ namespace TesApi.Web
 
             if (drsInputFiles.Count > 0)
             {
-                // resolve DRS input files
-                // don't attempt anything else with them
-                // don't save SAS token back to test task
-                string marthaUrl = "";
-                string keyVaultName = "";
-                string secretName = "";
-                string identityClientId = "";
-
+                // resolve DRS input files with Cromwell DRS Localizer Docker image
                 sb.AppendLine($"write_ts DrsLocalizationStart && \\");
 
                 foreach (var drsInputFile in drsInputFiles)
                 {
-                    // TODO - modify to complete in parallel
                     string drsUrl = drsInputFile.Url;
                     string localizedFilePath = drsInputFile.Path;
-                    sb.AppendLine($"docker run --rm {volumeMountsOption} -e MARTHA_URL=\"{marthaUrl}\" --entrypoint=/bin/sh {cromwellDrsLocalizerImageName} {drsUrl} {localizedFilePath} --access-token-strategy azure --vault-name {keyVaultName} --secret-name {secretName} --identity-client-id {identityClientId} && \\");
+                    string drsLocalizationCommand = $"docker run --rm {volumeMountsOption} -e MARTHA_URL=\"{marthaUrl}\" --entrypoint=/bin/sh {cromwellDrsLocalizerImageName} {drsUrl} {localizedFilePath} --access-token-strategy azure{(!string.IsNullOrWhiteSpace(marthaKeyVaultName) ? " --vault-name " + marthaKeyVaultName : "")}{(!string.IsNullOrWhiteSpace(marthaSecretName) ? " --secret-name " + marthaSecretName : "")} && \\";
+                    sb.AppendLine(drsLocalizationCommand);
                 }
 
                 sb.AppendLine($"write_ts DrsLocalizationEnd && \\");
             }
-
 
             sb.AppendLine($"write_ts DownloadStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} {downloadFilesScriptPath} && \\");

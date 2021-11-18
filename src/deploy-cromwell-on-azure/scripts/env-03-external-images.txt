@@ -1,2 +1,3 @@
 CromwellImageName=broadinstitute/cromwell:70
 MySqlImageName=mysql:latest
+CromwellDrsLocalizerImageName=broadinstitute/cromwell-drs-localizer:develop

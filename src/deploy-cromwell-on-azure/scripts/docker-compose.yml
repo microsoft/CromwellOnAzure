@@ -32,6 +32,10 @@ services:
       - BatchImageSku=$BatchImageSku
       - BatchImageVersion=$BatchImageVersion
       - BatchNodeAgentSkuId=$BatchNodeAgentSkuId
+      - CromwellDrsLocalizerImageName=$CromwellDrsLocalizerImageName
+      - MarthaUrl=$MarthaUrl
+      - MarthaKeyVaultName=$MarthaKeyVaultName
+      - MarthaSecretName=$MarthaSecretName
     expose:
       - "80"
     volumes:
