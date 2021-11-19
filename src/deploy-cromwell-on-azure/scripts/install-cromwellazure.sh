@@ -56,7 +56,7 @@ ubuntuVersion=$(lsb_release -ar 2>/dev/null | grep -i release | cut -s -f2)
 sudo wget https://packages.microsoft.com/config/ubuntu/$ubuntuVersion/packages-microsoft-prod.deb
 sudo dpkg -i packages-microsoft-prod.deb
 sudo apt update
-sudo apt install -y --allow-downgrades blobfuse=1.2.4 fuse
+sudo apt install -y --allow-downgrades blobfuse=1.4.1 fuse
 
 write_log "Installing az cli"
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
