@@ -1365,6 +1365,37 @@ namespace CromwellOnAzureDeployer
                 () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
         }
 
+        private Task PatchCromwellConfigurationFileV300Async(IStorageAccount storageAccount)
+        {
+            return Execute(
+                $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName);
+
+                    if (cromwellConfigText == null)
+                    {
+                        cromwellConfigText = GetFileContent("scripts", CromwellConfigurationFileName);
+                    }
+                    else
+                    {
+                        // TODO implement changes to cromwell-application.conf
+                        // TODO see PatchCromwellConfigurationFileV200Async() above
+                        
+                        // 1.  Add: filesystems.drs.global.config.martha.url = "https://us-central1-broad-dsde-dev.cloudfunctions.net/martha_v3"
+                        /* 2.  Add           drs {
+                                              enabled = true
+                                              auth = "azure"
+                                              azure - keyvault - name = "INSERT_YOUR_KEYVAULT_NAME_HERE"
+                                              azure - token - secret = "INSERT_YOUR_SECRET_NAME_HERE"
+                                             }
+                        */
+                    }
+
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
+                });
+        }
+
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
             var tesDb = await cosmosDb.GetSqlDatabaseAsync("TES");
