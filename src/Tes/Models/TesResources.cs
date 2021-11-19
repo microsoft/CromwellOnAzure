@@ -205,7 +205,7 @@ namespace Tes.Models
                     BackendParameters.SequenceEqual(other.BackendParameters)
                 ) &&
                 (
-                    BackendParametersStrict == other.BackendParametersStrict
+                    BackendParametersStrict == other?.BackendParametersStrict
                 );
         }
 

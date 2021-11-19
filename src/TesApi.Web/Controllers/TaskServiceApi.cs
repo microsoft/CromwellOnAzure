@@ -176,7 +176,7 @@ namespace TesApi.Controllers
                 }
 
                 // If backend_parameters_strict equals true, backends should fail the task if any key / values are unsupported
-                if (tesTask.Resources.BackendParametersStrict == true 
+                if (tesTask.Resources?.BackendParametersStrict == true 
                     && unsupportedKeys.Count > 0)
                 {
                     return BadRequest($"backend_parameters_strict is set to true and unsupported backend_parameters were specified: {string.Join(",", unsupportedKeys)}");                   
