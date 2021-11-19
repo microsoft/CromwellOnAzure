@@ -1329,7 +1329,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task UpgradeBlobfuseTo141V300Async(ConnectionInfo sshConnectionInfo)
             => await Execute("Upgrading blobfuse to 1.4.1...",
-                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo apt-get update ; sudo apt-get --only-upgrade install blobfuse=1.4.1 ; sudo apt-get install blobfuse=1.4.1"));
+                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo apt-get update ; sudo apt-get --only-upgrade install blobfuse=1.4.1"));
 
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
