@@ -117,21 +117,30 @@ namespace TesApi.Web
                 }
             }
 
+            async Task DeleteManualJobAndPoolIfExistsAsync(TesTask tesTask)
+            {
+                if (tesTask.ContainsTaskExecutionIdentity())
+                {
+                    await azureProxy.DeleteBatchJobAsync(tesTask.Id);
+                    await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                }
+            }
+
             async Task SetTaskCompleted(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await DeleteManualJobAndPoolIfExistsAsync(tesTask);
                 SetTaskStateAndLog(tesTask, TesState.COMPLETEEnum, batchInfo);
             }
 
             async Task SetTaskExecutorError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await DeleteManualJobAndPoolIfExistsAsync(tesTask);
                 SetTaskStateAndLog(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             }
 
             async Task SetTaskSystemError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await DeleteManualJobAndPoolIfExistsAsync(tesTask);
                 SetTaskStateAndLog(tesTask, TesState.SYSTEMERROREnum, batchInfo);
             }
 
