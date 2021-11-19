@@ -975,7 +975,9 @@ namespace TesApi.Web
             var eligibleVms = new List<VirtualMachineInfo>();
             string noVmFoundMessage = string.Empty;
 
-            if (tesResources?.BackendParameters?.TryGetValue(TesResources.BackendParameters_VmSizeKey, out string vmSize) == true 
+            string vmSize = null;
+
+            if (tesResources?.BackendParameters?.TryGetValue(TesResources.BackendParameters_VmSizeKey, out vmSize) == true 
                 && !string.IsNullOrWhiteSpace(vmSize))
             {
                 eligibleVms = virtualMachineInfoList
