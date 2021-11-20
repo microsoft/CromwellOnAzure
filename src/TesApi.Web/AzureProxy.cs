@@ -403,9 +403,8 @@ namespace TesApi.Web
             };
 
             var batchJobsToDelete = await batchClient.JobOperations.ListJobs(jobFilter).ToListAsync();
-            var count = batchJobsToDelete.Count();
 
-            if (count > 1)
+            if (batchJobsToDelete.Count > 1)
             {
                 logger.LogWarning($"Found more than one active job for TES task {tesTaskId}");
             }

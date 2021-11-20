@@ -117,30 +117,21 @@ namespace TesApi.Web
                 }
             }
 
-            async Task DeleteManualJobAndPoolIfExistsAsync(TesTask tesTask)
-            {
-                if (tesTask.ContainsTaskExecutionIdentity())
-                {
-                    await azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                    await DeleteManualBatchPoolIfExistsAsync(tesTask);
-                }
-            }
-
             async Task SetTaskCompleted(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteManualJobAndPoolIfExistsAsync(tesTask);
+                await DeleteBatchJobAndPoolIfExists(azureProxy, tesTask);
                 SetTaskStateAndLog(tesTask, TesState.COMPLETEEnum, batchInfo);
             }
 
             async Task SetTaskExecutorError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteManualJobAndPoolIfExistsAsync(tesTask);
+                await DeleteBatchJobAndPoolIfExists(azureProxy, tesTask);
                 SetTaskStateAndLog(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             }
 
             async Task SetTaskSystemError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteManualJobAndPoolIfExistsAsync(tesTask);
+                await DeleteBatchJobAndPoolIfExists(azureProxy, tesTask);
                 SetTaskStateAndLog(tesTask, TesState.SYSTEMERROREnum, batchInfo);
             }
 
@@ -182,6 +173,12 @@ namespace TesApi.Web
                 new TesTaskStateTransition(tesTaskIsInitializingOrRunning, BatchTaskState.MissingBatchTask, DeleteBatchJobAndSetTaskSystemErrorAsync),
                 new TesTaskStateTransition(tesTaskIsInitializingOrRunning, BatchTaskState.NodePreempted, DeleteBatchJobAndRequeueTaskAsync)
             };
+        }
+
+        private async Task DeleteBatchJobAndPoolIfExists(IAzureProxy azureProxy, TesTask tesTask)
+        {
+            await azureProxy.DeleteBatchJobAsync(tesTask.Id);
+            await DeleteManualBatchPoolIfExistsAsync(tesTask);
         }
 
         /// <summary>
