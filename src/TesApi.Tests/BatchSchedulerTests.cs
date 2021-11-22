@@ -30,6 +30,68 @@ namespace TesApi.Tests
         private static readonly Regex downloadFilesBlobxferRegex = new Regex(@"path='([^']*)' && url='([^']*)' && blobxfer download");
         private static readonly Regex downloadFilesWgetRegex = new Regex(@"path='([^']*)' && url='([^']*)' && mkdir .* wget");
 
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task BackendParametersVmSizeShallOverrideVmSelection()
+        {
+            // "vmsize" is not case sensitive
+            // If vmsize is specified, (numberofcores, memoryingb, resourcedisksizeingb) are ignored
+
+            var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
+
+            azureProxyReturnValues.VmSizesAndPrices = new List<VirtualMachineInfo> {
+                new VirtualMachineInfo { VmSize = "VmSize1", LowPriority = true, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 1 },
+                new VirtualMachineInfo { VmSize = "VmSize2", LowPriority = true, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 2 }};
+
+            var backendParameters = new Dictionary<string, string>();
+            backendParameters.Add("vmsize", "VmSize1");
+            var state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = backendParameters }, azureProxyReturnValues);
+            Assert.AreEqual(TesState.INITIALIZINGEnum, state);
+
+            backendParameters = new Dictionary<string, string>();
+            backendParameters.Add("vmsize", "VMSIZE1");
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = backendParameters }, azureProxyReturnValues);
+            Assert.AreEqual(TesState.INITIALIZINGEnum, state);
+
+            backendParameters = new Dictionary<string, string>();
+            backendParameters.Add("vmsize", "VmSize1");
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = backendParameters, CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
+            Assert.AreEqual(TesState.INITIALIZINGEnum, state);
+
+            backendParameters = new Dictionary<string, string>();
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = backendParameters, CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
+            Assert.AreEqual(TesState.SYSTEMERROREnum, state);
+
+            backendParameters = new Dictionary<string, string>();
+            backendParameters.Add("vmsize", "VmSize1");
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = false, BackendParameters = backendParameters }, azureProxyReturnValues);
+            Assert.AreEqual(TesState.SYSTEMERROREnum, state);
+
+            backendParameters = new Dictionary<string, string>();
+            backendParameters.Add("vmsize", "VmSize3");
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = backendParameters }, azureProxyReturnValues);
+            Assert.AreEqual(TesState.SYSTEMERROREnum, state);
+        }
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task BackendParametersWorkflowExecutionIdentityRequiresManualPool()
+        {
+            var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
+            azureProxyReturnValues.BatchJobAndTaskState = new AzureBatchJobAndTaskState { JobState = null };
+
+            var backendParameters = new Dictionary<string, string>();
+            backendParameters.Add("workflow_execution_identity", "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/coa/providers/Microsoft.ManagedIdentity/userAssignedIdentities/coa-test-uami");
+            
+            var task = GetTesTask();
+            task.Resources.BackendParameters = backendParameters;
+
+            (_, _, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(task, GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+
+            Assert.IsNull(poolInformation.AutoPoolSpecification);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(poolInformation.PoolId));
+        }
+
         [TestMethod]
         public async Task TesTaskFailsWithSystemErrorWhenNoSuitableVmExists()
         {
