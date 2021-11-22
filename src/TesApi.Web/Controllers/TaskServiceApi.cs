@@ -51,6 +51,7 @@ namespace TesApi.Controllers
         /// </summary>
         /// <param name="repository">The main <see cref="TesTask"/> database repository</param>
         /// <param name="logger">The logger instance</param>
+        /// <param name="azureProxy">The Azure Proxy instance</param>
         public TaskServiceApiController(IRepository<TesTask> repository, ILogger<TaskServiceApiController> logger, IAzureProxy azureProxy)
         {
             this.repository = repository;

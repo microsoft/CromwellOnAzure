@@ -826,6 +826,20 @@ namespace TesApi.Web
             return azureClient;
         }
 
+        /// <summary>
+        /// Creates an Azure Batch pool that's lifecycle must be manually managed
+        /// </summary>
+        /// <param name="poolName">The name of the pool. This becomes the Pool.Id</param>
+        /// <param name="vmSize">The Azure SKU for the VM of the pool</param>
+        /// <param name="isLowPriority">True if a low-priority VM should be used; false for a dedicated</param>
+        /// <param name="executorImage">The image required by the TesTask</param>
+        /// <param name="nodeInfo">Information about the pool to be created</param>
+        /// <param name="dockerInDockerImageName">Image that contains Docker to download private images</param>
+        /// <param name="blobxferImageName">Image name for blobxfer, the Azure storage transfer tool</param>
+        /// <param name="identityResourceId">The resource ID of a user-assigned managed identity to assign to the pool</param>
+        /// <param name="disableBatchNodesPublicIpAddress">True to remove the public IP address of the Batch node</param>
+        /// <param name="batchNodesSubnetId">The subnet ID of the Batch VM in the pool</param>
+        /// <returns></returns>
         public async Task CreateManualBatchPoolAsync(
             string poolName, 
             string vmSize, 

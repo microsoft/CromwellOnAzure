@@ -157,6 +157,7 @@ namespace TesApi.Web
         public Task CreateManualBatchPoolAsync(string poolName, string vmSize, bool isLowPriority, string executorImage, BatchNodeInfo nodeInfo, string dockerInDockerImageName, string blobxferImageName, string identityResourceId, bool disableBatchNodesPublicIpAddress, string batchNodesSubnetId)
             => azureProxy.CreateManualBatchPoolAsync(poolName, vmSize, isLowPriority, executorImage, nodeInfo, dockerInDockerImageName, blobxferImageName, identityResourceId, disableBatchNodesPublicIpAddress, batchNodesSubnetId);
 
+        /// <inheritdoc/>
         public Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default)
             => azureProxy.DeleteBatchPoolIfExistsAsync(poolId, cancellationToken);
     }

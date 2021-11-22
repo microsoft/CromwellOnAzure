@@ -177,8 +177,33 @@ namespace TesApi.Web
 
         private async Task DeleteBatchJobAndPoolIfExists(IAzureProxy azureProxy, TesTask tesTask)
         {
-            await azureProxy.DeleteBatchJobAsync(tesTask.Id);
-            await DeleteManualBatchPoolIfExistsAsync(tesTask);
+            var deletionException = new BatchDeletionException();
+
+            try
+            {
+                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
+            }
+            catch (Exception exc)
+            {
+                logger.LogError(exc, $"Exception deleting batch job with tesTask.Id: {tesTask?.Id}");
+                deletionException.JobDeletionException = exc;
+            }
+
+            try
+            {
+                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+            }
+            catch (Exception exc)
+            {
+                logger.LogError(exc, $"Exception deleting batch pool with tesTask.Id: {tesTask?.Id}");
+                deletionException.PoolDeletionException = exc;
+            }
+
+            if (deletionException.JobDeletionException != null
+                || deletionException.PoolDeletionException != null)
+            {
+                throw deletionException;
+            }
         }
 
         /// <summary>
@@ -790,6 +815,7 @@ namespace TesApi.Web
         /// <param name="executorImage">The image name for the current <see cref="TesTask"/></param>
         /// <param name="vmSize">The Azure VM sku</param>
         /// <param name="preemptible">True if preemptible machine should be used</param>
+        /// <param name="useAutoPool">True if an Azure Batch AutoPool should be used</param>
         /// <returns></returns>
         private async Task<PoolInformation> CreateAutoPoolPoolInformation(string executorImage, string vmSize, bool preemptible, bool useAutoPool = true)
         {
