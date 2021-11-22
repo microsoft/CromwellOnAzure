@@ -22,10 +22,9 @@ namespace TesApi.Tests
     {
         [TestCategory("TES 1.1")]
         [TestMethod]
-        public async Task CreateTaskAsync_ReturnsTesCreateTaskResponseWithBackendParameters()
+        public async Task TES_Supports_BackendParameter_vmsize()
         {
             const string backend_parameter_key = "vmsize";
-
 
             var backendParameters = new Dictionary<string, string>();
             backendParameters.Add(backend_parameter_key, "VmSize1");
@@ -33,7 +32,7 @@ namespace TesApi.Tests
             var tesTask = new TesTask
             {
                 Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
-                Resources = new TesResources { BackendParameters = backendParameters }
+                Resources = new TesResources { BackendParameters = backendParameters, BackendParametersStrict = true }
             };
 
             var repository = new Mock<IRepository<TesTask>>();
@@ -47,7 +46,34 @@ namespace TesApi.Tests
             Assert.AreEqual(TesState.QUEUEDEnum, tesTask.State);
             Assert.IsTrue(tesTask.Resources.BackendParameters.ContainsKey(backend_parameter_key));
             Assert.AreEqual(200, result.StatusCode);
+        }
 
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task TES_Supports_BackendParameter_workflow_execution_identity()
+        {
+            const string backend_parameter_key = "workflow_execution_identity";
+
+            var backendParameters = new Dictionary<string, string>();
+            backendParameters.Add(backend_parameter_key, "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/coa/providers/Microsoft.ManagedIdentity/userAssignedIdentities/coa-test-uami");
+
+            var tesTask = new TesTask
+            {
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Resources = new TesResources { BackendParameters = backendParameters, BackendParametersStrict = true }
+            };
+
+            var repository = new Mock<IRepository<TesTask>>();
+            var controller = this.GetTaskServiceApiController(repository.Object);
+
+            var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
+
+            Assert.IsNotNull(result);
+            repository.Verify(x => x.CreateItemAsync(tesTask));
+            Assert.AreEqual(32, tesTask.Id.Length);
+            Assert.AreEqual(TesState.QUEUEDEnum, tesTask.State);
+            Assert.IsTrue(tesTask.Resources.BackendParameters.ContainsKey(backend_parameter_key));
+            Assert.AreEqual(200, result.StatusCode);
         }
 
         [TestCategory("TES 1.1")]
@@ -79,7 +105,6 @@ namespace TesApi.Tests
             Assert.IsFalse(tesTask?.Resources?.BackendParameters?.ContainsKey(unsupportedKey));
             Assert.AreEqual(200, result.StatusCode);
         }
-
 
         [TestCategory("TES 1.1")]
         [TestMethod]
