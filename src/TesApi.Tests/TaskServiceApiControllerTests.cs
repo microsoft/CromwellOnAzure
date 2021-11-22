@@ -20,6 +20,120 @@ namespace TesApi.Tests
     [TestClass]
     public class TaskServiceApiControllerTests
     {
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task CreateTaskAsync_ReturnsTesCreateTaskResponseWithBackendParameters()
+        {
+            const string backend_parameter_key = "vmsize";
+
+
+            var backendParameters = new Dictionary<string, string>();
+            backendParameters.Add(backend_parameter_key, "VmSize1");
+
+            var tesTask = new TesTask
+            {
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Resources = new TesResources { BackendParameters = backendParameters }
+            };
+
+            var repository = new Mock<IRepository<TesTask>>();
+            var controller = this.GetTaskServiceApiController(repository.Object);
+
+            var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
+
+            Assert.IsNotNull(result);
+            repository.Verify(x => x.CreateItemAsync(tesTask));
+            Assert.AreEqual(32, tesTask.Id.Length);
+            Assert.AreEqual(TesState.QUEUEDEnum, tesTask.State);
+            Assert.IsTrue(tesTask.Resources.BackendParameters.ContainsKey(backend_parameter_key));
+            Assert.AreEqual(200, result.StatusCode);
+
+        }
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task CreateTaskAsync_ReturnsTesCreateTaskResponseWithBackendParameters_UnsupportedKey()
+        {
+            const string unsupportedKey = "unsupported_key_2021";
+
+            var backendParameters = new Dictionary<string, string>();
+            backendParameters.Add(unsupportedKey, Guid.NewGuid().ToString());
+
+            var tesTask = new TesTask
+            {
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Resources = new TesResources { BackendParameters = backendParameters }
+            };
+
+            var repository = new Mock<IRepository<TesTask>>();
+            var controller = this.GetTaskServiceApiController(repository.Object);
+
+            var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
+
+            Assert.IsNotNull(result);
+            repository.Verify(x => x.CreateItemAsync(tesTask));
+            Assert.AreEqual(32, tesTask.Id.Length);
+            Assert.AreEqual(TesState.QUEUEDEnum, tesTask.State);
+
+            // Unsupported keys should not be persisted
+            Assert.IsFalse(tesTask?.Resources?.BackendParameters?.ContainsKey(unsupportedKey));
+            Assert.AreEqual(200, result.StatusCode);
+        }
+
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task CreateTaskAsync_ReturnsBadRequest_ForBackendParametersStrict_UnsupportedKey()
+        {
+            const string unsupportedKey = "unsupported_key_2021";
+
+            var backendParameters = new Dictionary<string, string>();
+            backendParameters.Add(unsupportedKey, Guid.NewGuid().ToString());
+
+            var tesTask = new TesTask
+            {
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Resources = new TesResources { BackendParameters = backendParameters, BackendParametersStrict = true }
+            };
+
+            var controller = this.GetTaskServiceApiController();
+
+            var result = await controller.CreateTaskAsync(tesTask) as BadRequestObjectResult;
+
+            Assert.IsNotNull(result);
+
+            // Unsupported keys should cause a bad request when BackendParametersStrict = true
+            Assert.AreEqual(400, result.StatusCode);
+
+            // Unsupported keys should be returned in the warning message
+            Assert.IsTrue(result.Value.ToString().Contains(unsupportedKey));
+        }
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task CreateTaskAsync_ReturnsBadRequest_ForBackendParametersStrict_DuplicateKeys()
+        {
+            const string backend_parameter_key = "vmsize";
+
+            var backendParameters = new Dictionary<string, string>();
+            backendParameters.Add(backend_parameter_key, Guid.NewGuid().ToString());
+            backendParameters.Add("VmSize", Guid.NewGuid().ToString());
+
+            var tesTask = new TesTask
+            {
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Resources = new TesResources { BackendParameters = backendParameters, BackendParametersStrict = true }
+            };
+
+            var controller = this.GetTaskServiceApiController();
+
+            var result = await controller.CreateTaskAsync(tesTask) as BadRequestObjectResult;
+
+            Assert.IsNotNull(result);
+
+            Assert.AreEqual(400, result.StatusCode);
+        }
+
         [TestMethod]
         public async Task CreateTaskAsync_ReturnsBadRequest_ForInvalidId()
         {

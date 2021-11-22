@@ -157,19 +157,19 @@ namespace TesApi.Controllers
 
             if (tesTask?.Resources?.BackendParameters != null)
             {
-                // Force all keys to be lowercase
-                tesTask.Resources.BackendParameters = new Dictionary<string, string>(
-                    tesTask.Resources.BackendParameters.Select(k => new KeyValuePair<string, string> (k.Key?.ToLowerInvariant(), k.Value)));
-
                 var keys = tesTask.Resources.BackendParameters.Keys.Select(k => k).ToList();
 
-                if (keys.Count > 1 && keys.Distinct().Count() != keys.Count)
+                if (keys.Count > 1 && keys.Select(k => k?.ToLowerInvariant()).Distinct().Count() != keys.Count)
                 {
                     return BadRequest("Duplicate backend_parameters were specified");
                 }
 
+                // Force all keys to be lowercase
+                tesTask.Resources.BackendParameters = new Dictionary<string, string>(
+                    tesTask.Resources.BackendParameters.Select(k => new KeyValuePair<string, string> (k.Key?.ToLowerInvariant(), k.Value)));
+
                 // Backends shall log system warnings if a key is passed that is unsupported.
-                var unsupportedKeys = keys.Except(TesResources.SupportedBackendParameters).ToList();
+                var unsupportedKeys = keys.Except(TesResources.SupportedBackendParameters.Select(k => k?.ToLowerInvariant())).ToList();
 
                 if (unsupportedKeys.Count > 0)
                 {
