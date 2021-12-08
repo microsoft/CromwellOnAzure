@@ -24,7 +24,7 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task TES_Supports_BackendParameter_vmsize()
         {
-            const string backend_parameter_key = "vmsize";
+            const string backend_parameter_key = "vm_size";
 
             var backendParameters = new Dictionary<string, string>();
             backendParameters.Add(backend_parameter_key, "VmSize1");

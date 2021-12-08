@@ -168,8 +168,10 @@ namespace TesApi.Controllers
                 tesTask.Resources.BackendParameters = new Dictionary<string, string>(
                     tesTask.Resources.BackendParameters.Select(k => new KeyValuePair<string, string> (k.Key?.ToLowerInvariant(), k.Value)));
 
+                keys = tesTask.Resources.BackendParameters.Keys.Select(k => k).ToList();
+
                 // Backends shall log system warnings if a key is passed that is unsupported.
-                var unsupportedKeys = keys.Except(TesResources.SupportedBackendParameters.Select(k => k?.ToLowerInvariant())).ToList();
+                var unsupportedKeys = keys.Except(Enum.GetNames(typeof(TesResources.SupportedBackendParameters))).ToList();
 
                 if (unsupportedKeys.Count > 0)
                 {
@@ -210,7 +212,7 @@ namespace TesApi.Controllers
                 Name = "Microsoft Genomics Task Execution Service",
                 Doc = "",
                 Storage = new List<string>(),
-                TesResourcesSupportedBackendParameters = TesResources.SupportedBackendParameters
+                TesResourcesSupportedBackendParameters = Enum.GetNames(typeof(TesResources.SupportedBackendParameters)).ToList()
             };
 
             logger.LogInformation($"Name: {serviceInfo.Name} Doc: {serviceInfo.Doc} Storage: {serviceInfo.Storage} TesResourcesSupportedBackendParameters: {string.Join(",",serviceInfo.TesResourcesSupportedBackendParameters)}");

@@ -46,9 +46,11 @@ namespace TesApi.Web
         private readonly string batchNodesSubnetId;
         private readonly bool disableBatchNodesPublicIpAddress;
         private readonly BatchNodeInfo batchNodeInfo;
+        private readonly BatchNodeInfo xilinxFpgaBatchNodeInfo;
         private readonly string marthaUrl;
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
+        private readonly string[] xilinxFpgaVmSizePrefixes;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -64,7 +66,7 @@ namespace TesApi.Web
             this.storageAccessProvider = storageAccessProvider;
 
             static bool GetBoolValue(IConfiguration configuration, string key, bool defaultValue) => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : bool.Parse(configuration[key]);
-            static string GetStringValue(IConfiguration configuration, string key, string defaultValue) => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : configuration[key];
+            static string GetStringValue(IConfiguration configuration, string key, string defaultValue = "") => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : configuration[key];
 
             this.allowedVmSizes = GetStringValue(configuration, "AllowedVmSizes", null)?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
             this.usePreemptibleVmsOnly = GetBoolValue(configuration, "UsePreemptibleVmsOnly", false);
@@ -80,12 +82,23 @@ namespace TesApi.Web
 
             this.batchNodeInfo = new BatchNodeInfo
             {
-                BatchImageOffer = GetStringValue(configuration, "BatchImageOffer", "ubuntu-server-container"),
-                BatchImagePublisher = GetStringValue(configuration, "BatchImagePublisher", "microsoft-azure-batch"),
-                BatchImageSku = GetStringValue(configuration, "BatchImageSku", "20-04-lts"),
-                BatchImageVersion = GetStringValue(configuration, "BatchImageVersion", "latest"),
-                BatchNodeAgentSkuId = GetStringValue(configuration, "BatchNodeAgentSkuId", "batch.node.ubuntu 20.04")
+                BatchImageOffer = GetStringValue(configuration, "BatchImageOffer"),
+                BatchImagePublisher = GetStringValue(configuration, "BatchImagePublisher"),
+                BatchImageSku = GetStringValue(configuration, "BatchImageSku"),
+                BatchImageVersion = GetStringValue(configuration, "BatchImageVersion"),
+                BatchNodeAgentSkuId = GetStringValue(configuration, "BatchNodeAgentSkuId")
             };
+
+            this.xilinxFpgaBatchNodeInfo = new BatchNodeInfo
+            {
+                BatchImageOffer = GetStringValue(configuration, "XilinxFpgaBatchImageOffer"),
+                BatchImagePublisher = GetStringValue(configuration, "XilinxFpgaBatchImagePublisher"),
+                BatchImageSku = GetStringValue(configuration, "XilinxFpgaBatchImageSku"),
+                BatchImageVersion = GetStringValue(configuration, "XilinxFpgaBatchImageVersion"),
+                BatchNodeAgentSkuId = GetStringValue(configuration, "XilinxFpgaBatchNodeAgentSkuId")
+            };
+
+            this.xilinxFpgaVmSizePrefixes = GetStringValue(configuration, "XilinxFpgaVmSizePrefixes")?.Split(',', StringSplitOptions.RemoveEmptyEntries);
 
             logger.LogInformation($"usePreemptibleVmsOnly: {usePreemptibleVmsOnly}");
 
@@ -220,7 +233,7 @@ namespace TesApi.Web
 
         private async Task DeleteManualBatchPoolIfExistsAsync(TesTask tesTask)
         {
-            if (tesTask.ContainsTaskExecutionIdentity())
+            if (tesTask.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity))
             {
                 await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
             }
@@ -299,13 +312,13 @@ namespace TesApi.Web
 
                 PoolInformation poolInformation = null;
 
-                if (tesTask.ContainsTaskExecutionIdentity())
+                if (tesTask.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity))
                 {
                     // Only create manual pool if an identity was specified
 
                     // By default, the pool will have the same name/ID as the job
                     string poolName = jobId;
-                    string identityResourceId = tesTask.GetTaskExecutionIdentity();
+                    string identityResourceId = tesTask.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
 
                     await azureProxy.CreateManualBatchPoolAsync(
                         poolName: poolName,
@@ -317,7 +330,9 @@ namespace TesApi.Web
                         blobxferImageName: blobxferImageName,
                         identityResourceId: identityResourceId,
                         disableBatchNodesPublicIpAddress: disableBatchNodesPublicIpAddress,
-                        batchNodesSubnetId: batchNodesSubnetId
+                        batchNodesSubnetId: batchNodesSubnetId,
+                        xilinxFpgaBatchNodeInfo: xilinxFpgaBatchNodeInfo,
+                        xilinxFpgaVmSizePrefixes: xilinxFpgaVmSizePrefixes
                     );
                         
                     poolInformation = new PoolInformation { PoolId = poolName };
@@ -652,7 +667,26 @@ namespace TesApi.Web
                 sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");  // Install bash if running on alpine (will be the case if running inside "docker" image)
             }
 
-            if (drsInputFiles.Count > 0 && task.ContainsTaskExecutionIdentity())
+            var vmSize = task.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size);
+
+            if (!string.IsNullOrWhiteSpace(vmSize)
+                && xilinxFpgaVmSizePrefixes?.Any(prefix => vmSize.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) == true)
+            {
+                // Install Docker for Xilinx image since it's not installed by default
+                // TODO support Alpine for Docker installation?
+
+                sb.AppendLine($"write_ts DockerInstallationStart && \\");
+                sb.AppendLine("sudo apt update && \\");
+                sb.AppendLine("sudo apt install -y apt-transport-https ca-certificates curl software-properties-common && \\");
+                sb.AppendLine("sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - && \\");
+                sb.AppendLine("sudo add-apt-repository -y \"deb[arch = amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable\" && \\");
+                sb.AppendLine("sudo apt update && \\");
+                sb.AppendLine("sudo apt-cache policy docker-ce && \\");
+                sb.AppendLine("sudo apt install -y docker-ce && \\");
+                sb.AppendLine($"write_ts DockerInstallationEnd && \\");
+            }
+
+            if (drsInputFiles.Count > 0 && task.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity))
             {
                 sb.AppendLine($"write_ts CromwellDrsLocalizerPullStart && \\");
                 sb.AppendLine($"docker pull --quiet {cromwellDrsLocalizerImageName} && \\");
@@ -826,6 +860,17 @@ namespace TesApi.Web
                     batchNodeInfo.BatchImageSku,
                     batchNodeInfo.BatchImageVersion),
                 nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
+
+            if (xilinxFpgaVmSizePrefixes?.Any(prefix => vmSize.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) == true)
+            {
+                vmConfig = new VirtualMachineConfiguration(
+                imageReference: new ImageReference(
+                    xilinxFpgaBatchNodeInfo.BatchImageOffer,
+                    xilinxFpgaBatchNodeInfo.BatchImagePublisher,
+                    xilinxFpgaBatchNodeInfo.BatchImageSku,
+                    xilinxFpgaBatchNodeInfo.BatchImageVersion),
+                nodeAgentSkuId: xilinxFpgaBatchNodeInfo.BatchNodeAgentSkuId);
+            }
 
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
 
@@ -1007,10 +1052,9 @@ namespace TesApi.Web
             var eligibleVms = new List<VirtualMachineInfo>();
             string noVmFoundMessage = string.Empty;
 
-            string vmSize = null;
+            string vmSize = tesTask.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size);
 
-            if (tesResources?.BackendParameters?.TryGetValue(TesResources.BackendParameters_VmSizeKey, out vmSize) == true 
-                && !string.IsNullOrWhiteSpace(vmSize))
+            if (!string.IsNullOrWhiteSpace(vmSize))
             {
                 eligibleVms = virtualMachineInfoList
                     .Where(vm =>

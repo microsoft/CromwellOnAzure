@@ -26,17 +26,7 @@ namespace Tes.Models
     [DataContract]
     public partial class TesResources : IEquatable<TesResources>
     {
-        [IgnoreDataMember]
-        public const string BackendParameters_VmSizeKey = "vmsize";
-
-        [IgnoreDataMember]
-        public const string BackendParameters_TaskExecutionIdentityKey = "workflow_execution_identity";
-
-        /// <summary>
-        /// List of support TesResources.BackendParameters
-        /// </summary>
-        [IgnoreDataMember]
-        public static readonly List<string> SupportedBackendParameters = new List<string> { BackendParameters_VmSizeKey, BackendParameters_TaskExecutionIdentityKey };
+        public enum SupportedBackendParameters { vm_size, workflow_execution_identity };
 
         /// <summary>
         /// Requested number of CPUs

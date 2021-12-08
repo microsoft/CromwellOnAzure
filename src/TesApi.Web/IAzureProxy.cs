@@ -64,7 +64,9 @@ namespace TesApi.Web
             string blobxferImageName,
             string identityResourceId,
             bool disableBatchNodesPublicIpAddress,
-            string batchNodesSubnetId);
+            string batchNodesSubnetId,
+            BatchNodeInfo xilinxFpgaBatchNodeInfo,
+            string[] xilinxFpgaVmSizePrefixes);
 
 
         /// <summary>

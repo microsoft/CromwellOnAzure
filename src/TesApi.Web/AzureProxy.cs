@@ -839,6 +839,8 @@ namespace TesApi.Web
         /// <param name="identityResourceId">The resource ID of a user-assigned managed identity to assign to the pool</param>
         /// <param name="disableBatchNodesPublicIpAddress">True to remove the public IP address of the Batch node</param>
         /// <param name="batchNodesSubnetId">The subnet ID of the Batch VM in the pool</param>
+        /// <param name="xilinxFpgaBatchNodeInfo">Information about the pool to be created for Xilinx FPGA skus</param>
+        /// <param name="xilinxFpgaVmSizePrefixes">Prefixes of VM sizes for Xilinx FPGAs</param>
         /// <returns></returns>
         public async Task CreateManualBatchPoolAsync(
             string poolName, 
@@ -850,7 +852,10 @@ namespace TesApi.Web
             string blobxferImageName, 
             string identityResourceId, 
             bool disableBatchNodesPublicIpAddress, 
-            string batchNodesSubnetId)
+            string batchNodesSubnetId,
+            BatchNodeInfo xilinxFpgaBatchNodeInfo,
+            string [] xilinxFpgaVmSizePrefixes
+            )
         {
             try
             {
@@ -863,6 +868,17 @@ namespace TesApi.Web
                     nodeInfo.BatchImageSku,
                     nodeInfo.BatchImageVersion),
                     nodeInfo.BatchNodeAgentSkuId);
+
+                if (xilinxFpgaVmSizePrefixes?.Any(prefix => vmSize.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) == true)
+                {
+                    vmConfigManagement = new Microsoft.Azure.Management.Batch.Models.VirtualMachineConfiguration(
+                    imageReference: new Microsoft.Azure.Management.Batch.Models.ImageReference(
+                        xilinxFpgaBatchNodeInfo.BatchImageOffer,
+                        xilinxFpgaBatchNodeInfo.BatchImagePublisher,
+                        xilinxFpgaBatchNodeInfo.BatchImageSku,
+                        xilinxFpgaBatchNodeInfo.BatchImageVersion),
+                    nodeAgentSkuId: xilinxFpgaBatchNodeInfo.BatchNodeAgentSkuId);
+                }
 
                 var containerRegistryInfo = await GetContainerRegistryInfoAsync(executorImage);
 
