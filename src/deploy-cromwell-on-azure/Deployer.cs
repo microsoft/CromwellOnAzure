@@ -1364,19 +1364,22 @@ namespace CromwellOnAzureDeployer
                 });
         }
 
-        private async Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
+        private Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
         {
-            var commandResult = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
-            var newFileContent = Utility.UpdateExistingSettingsFileContentV300(commandResult.Output.Trim());
+            return Execute(
+                $"Adding new settings to 'env-04-settings.txt' file on the VM...",
+                async () =>
+                {
+                    var commandResult = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
+                    var newFileContent = Utility.UpdateExistingSettingsFileContentV300(commandResult.Output.Trim());
 
-            await UploadFilesToVirtualMachineAsync(
-                sshConnectionInfo,
-                new[] {
-                    (newFileContent, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                    await UploadFilesToVirtualMachineAsync(
+                        sshConnectionInfo,
+                        new[] {
+                            (newFileContent, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                        });
                 });
         }
-
-
 
         private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
         {
