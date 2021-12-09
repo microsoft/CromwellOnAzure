@@ -128,7 +128,7 @@ namespace CromwellOnAzureDeployer
                     {
                         resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
 
-                        var targetVersion = DelimitedTextToDictionary(GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
+                        var targetVersion = DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
 
                         RefreshableConsole.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
@@ -275,6 +275,11 @@ namespace CromwellOnAzureDeployer
                         if (installedVersion == null || installedVersion < new Version(2, 5))
                         {
                             await MitigateChaosDbV250Async(cosmosDb);
+                        }
+
+                        if (installedVersion == null || installedVersion < new Version(3, 0))
+                        {
+                            await AddNewSettingsV300Async(sshConnectionInfo);
                         }
                     }
 
@@ -744,7 +749,7 @@ namespace CromwellOnAzureDeployer
                 $"Mounting data disk to the VM...",
                 async () =>
                 {
-                    await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (GetFileContent("scripts", "mount-data-disk.sh"), $"/tmp/mount-data-disk.sh", true));
+                    await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.GetFileContent("scripts", "mount-data-disk.sh"), $"/tmp/mount-data-disk.sh", true));
                     await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"/tmp/mount-data-disk.sh");
                 });
         }
@@ -756,17 +761,17 @@ namespace CromwellOnAzureDeployer
                 () => UploadFilesToVirtualMachineAsync(
                     sshConnectionInfo,
                     new[] {
-                        (GetFileContent("scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true),
-                        (GetFileContent("scripts", "wait-for-it.sh"), $"{CromwellAzureRootDir}/wait-for-it/wait-for-it.sh", true),
-                        (GetFileContent("scripts", "install-cromwellazure.sh"), $"{CromwellAzureRootDir}/install-cromwellazure.sh", true),
-                        (GetFileContent("scripts", "mount_containers.sh"), $"{CromwellAzureRootDir}/mount_containers.sh", true),
-                        (GetFileContent("scripts", "env-02-internal-images.txt"), $"{CromwellAzureRootDir}/env-02-internal-images.txt", false),
-                        (GetFileContent("scripts", "env-03-external-images.txt"), $"{CromwellAzureRootDir}/env-03-external-images.txt", false),
-                        (GetFileContent("scripts", "docker-compose.yml"), $"{CromwellAzureRootDir}/docker-compose.yml", false),
-                        (GetFileContent("scripts", "cromwellazure.service"), "/lib/systemd/system/cromwellazure.service", false),
-                        (GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true),
-                        (GetFileContent("scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
-                        (GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
+                        (Utility.GetFileContent("scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true),
+                        (Utility.GetFileContent("scripts", "wait-for-it.sh"), $"{CromwellAzureRootDir}/wait-for-it/wait-for-it.sh", true),
+                        (Utility.GetFileContent("scripts", "install-cromwellazure.sh"), $"{CromwellAzureRootDir}/install-cromwellazure.sh", true),
+                        (Utility.GetFileContent("scripts", "mount_containers.sh"), $"{CromwellAzureRootDir}/mount_containers.sh", true),
+                        (Utility.GetFileContent("scripts", "env-02-internal-images.txt"), $"{CromwellAzureRootDir}/env-02-internal-images.txt", false),
+                        (Utility.GetFileContent("scripts", "env-03-external-images.txt"), $"{CromwellAzureRootDir}/env-03-external-images.txt", false),
+                        (Utility.GetFileContent("scripts", "docker-compose.yml"), $"{CromwellAzureRootDir}/docker-compose.yml", false),
+                        (Utility.GetFileContent("scripts", "cromwellazure.service"), "/lib/systemd/system/cromwellazure.service", false),
+                        (Utility.GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true),
+                        (Utility.GetFileContent("scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
+                        (Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
                     }));
         }
 
@@ -774,7 +779,7 @@ namespace CromwellOnAzureDeployer
         {
             return Execute(
                 $"Writing CoA version file to the VM...",
-                () => UploadFilesToVirtualMachineAsync(sshConnectionInfo, (GetFileContent("scripts", "env-00-coa-version.txt"), $"{CromwellAzureRootDir}/env-00-coa-version.txt", false)));
+                () => UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.GetFileContent("scripts", "env-00-coa-version.txt"), $"{CromwellAzureRootDir}/env-00-coa-version.txt", false)));
         }
 
         private Task RunInstallationScriptAsync(ConnectionInfo sshConnectionInfo)
@@ -790,7 +795,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
         {
-            var accountsFileContent = GetFileContent("scripts", "env-01-account-names.txt")
+            var accountsFileContent = Utility.GetFileContent("scripts", "env-01-account-names.txt")
                 .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
                 .Replace("{CosmosDbAccountName}", configuration.CosmosDbAccountName)
                 .Replace("{BatchAccountName}", configuration.BatchAccountName)
@@ -801,7 +806,7 @@ namespace CromwellOnAzureDeployer
                 sshConnectionInfo,
                 new[] {
                     (accountsFileContent, $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
-                    (GetFileContent("scripts", "env-04-settings.txt"), $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                    (Utility.GetFileContent("scripts", "env-04-settings.txt"), $"{CromwellAzureRootDir}/env-04-settings.txt", false)
                 });
         }
 
@@ -981,13 +986,13 @@ namespace CromwellOnAzureDeployer
                 $"Writing {ContainersToMountFileName} and {CromwellConfigurationFileName} files to '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var containersToMountFileContent = GetFileContent("scripts", ContainersToMountFileName)
+                    var containersToMountFileContent = Utility.GetFileContent("scripts", ContainersToMountFileName)
                         .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
                         .Replace("{ManagedIdentityName}", managedIdentityName);
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountFileContent);
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, GetFileContent("scripts", CromwellConfigurationFileName));
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, GetFileContent("scripts", AllowedVmSizesFileName));
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.GetFileContent("scripts", CromwellConfigurationFileName));
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
         }
 
@@ -1266,7 +1271,7 @@ namespace CromwellOnAzureDeployer
 
                     if (cromwellConfigText == null)
                     {
-                        cromwellConfigText = GetFileContent("scripts", CromwellConfigurationFileName);
+                        cromwellConfigText = Utility.GetFileContent("scripts", CromwellConfigurationFileName);
                     }
                     else
                     {
@@ -1359,41 +1364,24 @@ namespace CromwellOnAzureDeployer
                 });
         }
 
+        private async Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
+        {
+            var commandResult = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
+            var newFileContent = Utility.UpdateExistingSettingsFileContentV300(commandResult.Output.Trim());
+
+            await UploadFilesToVirtualMachineAsync(
+                sshConnectionInfo,
+                new[] {
+                    (newFileContent, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                });
+        }
+
+
+
         private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
         {
             await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)",
                 () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
-        }
-
-        private Task PatchCromwellConfigurationFileV300Async(IStorageAccount storageAccount)
-        {
-            return Execute(
-                $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
-                async () =>
-                {
-                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName);
-
-                    if (cromwellConfigText == null)
-                    {
-                        cromwellConfigText = GetFileContent("scripts", CromwellConfigurationFileName);
-                    }
-                    else
-                    {
-                        // TODO implement changes to cromwell-application.conf
-                        // TODO see PatchCromwellConfigurationFileV200Async() above
-                        
-                        // 1.  Add: filesystems.drs.global.config.martha.url = "https://us-central1-broad-dsde-dev.cloudfunctions.net/martha_v3"
-                        /* 2.  Add           drs {
-                                              enabled = true
-                                              auth = "azure"
-                                              azure - keyvault - name = "INSERT_YOUR_KEYVAULT_NAME_HERE"
-                                              azure - token - secret = "INSERT_YOUR_SECRET_NAME_HERE"
-                                             }
-                        */
-                    }
-
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
-                });
         }
 
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
@@ -1437,15 +1425,6 @@ namespace CromwellOnAzureDeployer
             {
                 throw new ValidationException($"MainIdentifierPrefix too long - must be {maxLength} characters or less.");
             }
-        }
-
-        private static string GetFileContent(params string[] pathComponentsRelativeToAppBase)
-        {
-            var embeddedResourceName = $"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}";
-            var embeddedResourceStream = typeof(Deployer).Assembly.GetManifestResourceStream(embeddedResourceName);
-
-            using var reader = new StreamReader(embeddedResourceStream);
-            return reader.ReadToEnd().Replace("\r\n", "\n");
         }
 
         private void ValidateRegionName(string regionName)
@@ -1791,8 +1770,8 @@ namespace CromwellOnAzureDeployer
             const string inputFileContent = "Hello from inputFile.txt!";
 
             var id = Guid.NewGuid();
-            var wdlFileContent = GetFileContent(wdlFileName);
-            var workflowInputsFileContent = GetFileContent(workflowInputsFileName).Replace("{InputFilePath}", $"/{storageAccount.Name}/{InputsContainerName}/{testDirectoryName}/{inputFileName}");
+            var wdlFileContent = Utility.GetFileContent(wdlFileName);
+            var workflowInputsFileContent = Utility.GetFileContent(workflowInputsFileName).Replace("{InputFilePath}", $"/{storageAccount.Name}/{InputsContainerName}/{testDirectoryName}/{inputFileName}");
 
             if (!usePreemptibleVm)
             {
