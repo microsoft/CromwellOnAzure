@@ -18,17 +18,17 @@ namespace TesApi.Web
     {
         private static readonly TimeSpan listRefreshInterval = TimeSpan.FromDays(1);
 
-        private readonly AzureProxy azureProxy;
+        private readonly IAzureProxy azureProxy;
         private readonly IAppCache cache;
         private readonly ILogger<RefreshVMSizesAndPricesHostedService> logger;
 
         /// <summary>
         /// Default constructor
         /// </summary>
-        /// <param name="azureProxy"><see cref="AzureProxy"/></param>
+        /// <param name="azureProxy"><see cref="IAzureProxy"/></param>
         /// <param name="cache">Lazy cache using <see cref="IAppCache"/></param>
         /// <param name="logger"><see cref="ILogger"/> instance</param>
-        public RefreshVMSizesAndPricesHostedService(AzureProxy azureProxy, IAppCache cache, ILogger<RefreshVMSizesAndPricesHostedService> logger)
+        public RefreshVMSizesAndPricesHostedService(IAzureProxy azureProxy, IAppCache cache, ILogger<RefreshVMSizesAndPricesHostedService> logger)
         {
             this.azureProxy = azureProxy;
             this.cache = cache;

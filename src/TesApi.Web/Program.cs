@@ -29,8 +29,7 @@ namespace TesApi.Web
         /// <param name="args"></param>
         /// <returns><see cref="IWebHostBuilder"/></returns>
         public static IWebHostBuilder CreateWebHostBuilder(string[] args)
-            => WebHost.CreateDefaultBuilder(args)
-                .UseStartup<Startup>()
+            => WebHost.CreateDefaultBuilder<Startup>(args)
                 .UseUrls("http://0.0.0.0:80/")
                 .ConfigureAppConfiguration((context, config) =>
                 {
