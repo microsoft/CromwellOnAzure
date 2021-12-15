@@ -33,7 +33,7 @@ namespace TesApi.Web
         private const string BatchScriptFileName = "batch_script";
         private const string UploadFilesScriptFileName = "upload_files_script";
         private const string DownloadFilesScriptFileName = "download_files_script";
-        private static readonly Regex queryStringRegex = new Regex(@"[^\?.]*(\?.*)");
+        private static readonly Regex queryStringRegex = new(@"[^\?.]*(\?.*)");
         private readonly string dockerInDockerImageName;
         private readonly string blobxferImageName;
         private readonly ILogger logger;
@@ -145,14 +145,10 @@ namespace TesApi.Web
         }
 
         private static string GetCromwellExecutionDirectoryPath(TesTask task)
-        {
-            return GetParentPath(task.Inputs?.FirstOrDefault(IsCromwellCommandScript)?.Path);
-        }
+            => GetParentPath(task.Inputs?.FirstOrDefault(IsCromwellCommandScript)?.Path);
 
         private static string GetBatchExecutionDirectoryPath(TesTask task)
-        {
-            return $"{GetCromwellExecutionDirectoryPath(task)}/{BatchExecutionDirectoryName}";
-        }
+            => $"{GetCromwellExecutionDirectoryPath(task)}/{BatchExecutionDirectoryName}";
 
         /// <summary>
         /// Get the parent path of the given path
@@ -177,9 +173,7 @@ namespace TesApi.Web
         /// <param name="inputFile"><see cref="TesInput"/> file</param>
         /// <returns>True if the file is a Cromwell command script</returns>
         private static bool IsCromwellCommandScript(TesInput inputFile)
-        {
-            return inputFile.Name.Equals("commandScript");
-        }
+            => inputFile.Name.Equals("commandScript");
 
         /// <summary>
         /// Verifies existence and translates local file URLs to absolute paths (e.g. file:///tmp/cwl_temp_dir_8026387118450035757/args.py becomes /tmp/cwl_temp_dir_8026387118450035757/args.py)
@@ -876,9 +870,8 @@ namespace TesApi.Web
                 .Where(vm => !(previouslyFailedVmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? false))
                 .Where(vm => preemptible
                     ? batchQuotas.LowPriorityCoreQuota >= vm.NumberOfCores
-                    : batchQuotas.DedicatedCoreQuota >= vm.NumberOfCores && (batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced
-                        ? batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(x => vm.VmFamily.Equals(x.Name, StringComparison.OrdinalIgnoreCase))?.CoreQuota >= vm.NumberOfCores
-                        : true))
+                    : batchQuotas.DedicatedCoreQuota >= vm.NumberOfCores
+                        && (!batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced || batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(x => vm.VmFamily.Equals(x.Name, StringComparison.OrdinalIgnoreCase))?.CoreQuota >= vm.NumberOfCores))
                 .OrderBy(x => x.PricePerHour)
                 .FirstOrDefault();
 
@@ -1012,11 +1005,9 @@ namespace TesApi.Web
         }
 
         private static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
-        {
-            return text.Split(rowDelimiter)
+            => text.Split(rowDelimiter)
                 .Select(line => { var parts = line.Split(fieldDelimiter); return new KeyValuePair<string, string>(parts[0], parts[1]); })
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
-        }
 
         /// <summary>
         /// Class that captures how <see cref="TesTask"/> transitions from current state to the new state, given the current Batch task state and optional condition. 

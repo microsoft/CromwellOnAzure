@@ -31,7 +31,7 @@ namespace CromwellOnAzureDeployer
         public static CloudErrorType ToCloudErrorType(this CloudException cloudException)
         {
             var code = cloudException.ToCloudError()?.Code;
-            Enum.TryParse(code, out CloudErrorType cloudErrorType);
+            _ = Enum.TryParse(code, out CloudErrorType cloudErrorType);
             return cloudErrorType;
         }
     }

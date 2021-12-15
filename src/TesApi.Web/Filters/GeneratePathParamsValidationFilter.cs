@@ -29,7 +29,7 @@ namespace TesApi.Filters
 
                 var attributes = ((ControllerParameterDescriptor)par.ParameterDescriptor).ParameterInfo.CustomAttributes;
 
-                if (attributes != null && attributes.Count() > 0 && swaggerParam != null)
+                if (attributes != null && attributes.Any() && swaggerParam != null)
                 {
                     // Required - [Required]
                     var requiredAttr = attributes.FirstOrDefault(p => p.AttributeType == typeof(RequiredAttribute));
@@ -42,11 +42,7 @@ namespace TesApi.Filters
                     var regexAttr = attributes.FirstOrDefault(p => p.AttributeType == typeof(RegularExpressionAttribute));
                     if (regexAttr != null)
                     {
-                        var regex = (string)regexAttr.ConstructorArguments[0].Value;
-                        if (swaggerParam is OpenApiParameter)
-                        {
-                            ((OpenApiParameter)swaggerParam).Schema.Pattern = regex;
-                        }
+                        swaggerParam.Schema.Pattern = (string)regexAttr.ConstructorArguments[0].Value;
                     }
 
                     // String Length [StringLength]
@@ -73,24 +69,15 @@ namespace TesApi.Filters
                         maxLength = (int)maxLengthAttr.ConstructorArguments[0].Value;
                     }
 
-                    if (swaggerParam is OpenApiParameter)
-                    {
-                        ((OpenApiParameter)swaggerParam).Schema.MinLength = minLenght;
-                        ((OpenApiParameter)swaggerParam).Schema.MaxLength = maxLength;
-                    }
+                    swaggerParam.Schema.MinLength = minLenght;
+                    swaggerParam.Schema.MaxLength = maxLength;
 
                     // Range [Range]
                     var rangeAttr = attributes.FirstOrDefault(p => p.AttributeType == typeof(RangeAttribute));
                     if (rangeAttr != null)
                     {
-                        var rangeMin = (int)rangeAttr.ConstructorArguments[0].Value;
-                        var rangeMax = (int)rangeAttr.ConstructorArguments[1].Value;
-
-                        if (swaggerParam is OpenApiParameter)
-                        {
-                            ((OpenApiParameter)swaggerParam).Schema.Minimum = rangeMin;
-                            ((OpenApiParameter)swaggerParam).Schema.Maximum = rangeMax;
-                        }
+                        swaggerParam.Schema.Minimum = (int)rangeAttr.ConstructorArguments[0].Value;
+                        swaggerParam.Schema.Maximum = (int)rangeAttr.ConstructorArguments[1].Value;
                     }
                 }
             }

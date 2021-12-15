@@ -64,26 +64,22 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("class TesExecutorLog {\n");
-            sb.Append("  StartTime: ").Append(StartTime).Append("\n");
-            sb.Append("  EndTime: ").Append(EndTime).Append("\n");
-            sb.Append("  Stdout: ").Append(Stdout).Append("\n");
-            sb.Append("  Stderr: ").Append(Stderr).Append("\n");
-            sb.Append("  ExitCode: ").Append(ExitCode).Append("\n");
-            sb.Append("}\n");
-            return sb.ToString();
-        }
+            => new StringBuilder()
+                .Append("class TesExecutorLog {\n")
+                .Append("  StartTime: ").Append(StartTime).Append('\n')
+                .Append("  EndTime: ").Append(EndTime).Append('\n')
+                .Append("  Stdout: ").Append(Stdout).Append('\n')
+                .Append("  Stderr: ").Append(Stderr).Append('\n')
+                .Append("  ExitCode: ").Append(ExitCode).Append('\n')
+                .Append("}\n")
+                .ToString();
 
         /// <summary>
         /// Returns the JSON string presentation of the object
         /// </summary>
         /// <returns>JSON string presentation of the object</returns>
         public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
+            => JsonConvert.SerializeObject(this, Formatting.Indented);
 
         /// <summary>
         /// Returns true if objects are equal
@@ -91,19 +87,12 @@ namespace Tes.Models
         /// <param name="obj">Object to be compared</param>
         /// <returns>Boolean</returns>
         public override bool Equals(object obj)
-        {
-            if (obj is null)
+            => obj switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-
-            return obj.GetType() == GetType() && Equals((TesExecutorLog)obj);
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ => obj.GetType() == GetType() && Equals((TesExecutorLog)obj),
+            };
 
         /// <summary>
         /// Returns true if TesExecutorLog instances are equal
@@ -111,18 +100,11 @@ namespace Tes.Models
         /// <param name="other">Instance of TesExecutorLog to be compared</param>
         /// <returns>Boolean</returns>
         public bool Equals(TesExecutorLog other)
-        {
-            if (other is null)
+            => other switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, other))
-            {
-                return true;
-            }
-
-            return
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ =>
                 (
                     StartTime == other.StartTime ||
                     StartTime != null &&
@@ -147,8 +129,8 @@ namespace Tes.Models
                     ExitCode == other.ExitCode ||
                     ExitCode != null &&
                     ExitCode.Equals(other.ExitCode)
-                );
-        }
+                ),
+            };
 
         /// <summary>
         /// Gets the hash code
@@ -193,14 +175,10 @@ namespace Tes.Models
 #pragma warning disable 1591
 
         public static bool operator ==(TesExecutorLog left, TesExecutorLog right)
-        {
-            return Equals(left, right);
-        }
+            => Equals(left, right);
 
         public static bool operator !=(TesExecutorLog left, TesExecutorLog right)
-        {
-            return !Equals(left, right);
-        }
+            => !Equals(left, right);
 
 #pragma warning restore 1591
         #endregion Operators

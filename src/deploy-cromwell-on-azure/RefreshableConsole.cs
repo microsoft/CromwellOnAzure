@@ -10,19 +10,15 @@ namespace CromwellOnAzureDeployer
     internal static class RefreshableConsole
     {
         private static readonly int initialCursorTop = Console.CursorTop;
-        private static readonly List<Line> lines = new List<Line>();
-        private static readonly object lockObj = new object();
+        private static readonly List<Line> lines = new();
+        private static readonly object lockObj = new();
         private static int cursorTopAdjustment = 0;
 
         public static Line WriteLine(string value = "", ConsoleColor? color = null)
-        {
-            return AddLine(value, color, true);
-        }
+            => AddLine(value, color, true);
 
         public static Line Write(string value = "", ConsoleColor? color = null)
-        {
-            return AddLine(value, color, false);
-        }
+            => AddLine(value, color, false);
 
         public static string ReadLine()
         {
@@ -65,12 +61,10 @@ namespace CromwellOnAzureDeployer
         internal class Line
         {
             private readonly bool hasNewLine;
-            private readonly List<Action> lineParts = new List<Action>();
+            private readonly List<Action> lineParts = new();
 
             public Line(bool hasNewLine)
-            {
-                this.hasNewLine = hasNewLine;
-            }
+                => this.hasNewLine = hasNewLine;
 
             public void Write(string value, ConsoleColor? color = null)
             {

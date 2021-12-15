@@ -111,33 +111,30 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("class TesTask {\n");
-            sb.Append("  Id: ").Append(Id).Append("\n");
-            sb.Append("  State: ").Append(State).Append("\n");
-            sb.Append("  Name: ").Append(Name).Append("\n");
-            sb.Append("  Description: ").Append(Description).Append("\n");
-            sb.Append("  Inputs: ").Append(Inputs).Append("\n");
-            sb.Append("  Outputs: ").Append(Outputs).Append("\n");
-            sb.Append("  Resources: ").Append(Resources).Append("\n");
-            sb.Append("  Executors: ").Append(Executors).Append("\n");
-            sb.Append("  Volumes: ").Append(Volumes).Append("\n");
-            sb.Append("  Tags: ").Append(Tags).Append("\n");
-            sb.Append("  Logs: ").Append(Logs).Append("\n");
-            sb.Append("  CreationTime: ").Append(CreationTime).Append("\n");
-            sb.Append("}\n");
-            return sb.ToString();
-        }
+
+            =>  new StringBuilder()
+                .Append("class TesTask {\n")
+                .Append("  Id: ").Append(Id).Append('\n')
+                .Append("  State: ").Append(State).Append('\n')
+                .Append("  Name: ").Append(Name).Append('\n')
+                .Append("  Description: ").Append(Description).Append('\n')
+                .Append("  Inputs: ").Append(Inputs).Append('\n')
+                .Append("  Outputs: ").Append(Outputs).Append('\n')
+                .Append("  Resources: ").Append(Resources).Append('\n')
+                .Append("  Executors: ").Append(Executors).Append('\n')
+                .Append("  Volumes: ").Append(Volumes).Append('\n')
+                .Append("  Tags: ").Append(Tags).Append('\n')
+                .Append("  Logs: ").Append(Logs).Append('\n')
+                .Append("  CreationTime: ").Append(CreationTime).Append('\n')
+                .Append("}\n")
+                .ToString();
 
         /// <summary>
         /// Returns the JSON string presentation of the object
         /// </summary>
         /// <returns>JSON string presentation of the object</returns>
         public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
+            => JsonConvert.SerializeObject(this, Formatting.Indented);
 
         /// <summary>
         /// Returns true if objects are equal
@@ -145,19 +142,12 @@ namespace Tes.Models
         /// <param name="obj">Object to be compared</param>
         /// <returns>Boolean</returns>
         public override bool Equals(object obj)
-        {
-            if (obj is null)
+            => obj switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-
-            return obj.GetType() == GetType() && Equals((TesTask)obj);
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ => obj.GetType() == GetType() && Equals((TesTask)obj),
+            };
 
         /// <summary>
         /// Returns true if TesTask instances are equal
@@ -165,18 +155,11 @@ namespace Tes.Models
         /// <param name="other">Instance of TesTask to be compared</param>
         /// <returns>Boolean</returns>
         public bool Equals(TesTask other)
-        {
-            if (other is null)
+            => other switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, other))
-            {
-                return true;
-            }
-
-            return
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ =>
                 (
                     Id == other.Id ||
                     Id != null &&
@@ -235,8 +218,8 @@ namespace Tes.Models
                     CreationTime == other.CreationTime ||
                     CreationTime != null &&
                     CreationTime.Equals(other.CreationTime)
-                );
-        }
+                ),
+            };
 
         /// <summary>
         /// Gets the hash code
@@ -312,14 +295,10 @@ namespace Tes.Models
 #pragma warning disable 1591
 
         public static bool operator ==(TesTask left, TesTask right)
-        {
-            return Equals(left, right);
-        }
+            => Equals(left, right);
 
         public static bool operator !=(TesTask left, TesTask right)
-        {
-            return !Equals(left, right);
-        }
+            => !Equals(left, right);
 
 #pragma warning restore 1591
         #endregion Operators

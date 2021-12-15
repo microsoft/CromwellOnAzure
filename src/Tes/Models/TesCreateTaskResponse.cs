@@ -36,22 +36,18 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("class TesCreateTaskResponse {\n");
-            sb.Append("  Id: ").Append(Id).Append("\n");
-            sb.Append("}\n");
-            return sb.ToString();
-        }
+            => new StringBuilder()
+                .Append("class TesCreateTaskResponse {\n")
+                .Append("  Id: ").Append(Id).Append('\n')
+                .Append("}\n")
+                .ToString();
 
         /// <summary>
         /// Returns the JSON string presentation of the object
         /// </summary>
         /// <returns>JSON string presentation of the object</returns>
         public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
+            => JsonConvert.SerializeObject(this, Formatting.Indented);
 
         /// <summary>
         /// Returns true if objects are equal
@@ -59,19 +55,12 @@ namespace Tes.Models
         /// <param name="obj">Object to be compared</param>
         /// <returns>Boolean</returns>
         public override bool Equals(object obj)
-        {
-            if (obj is null)
+            => obj switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-
-            return obj.GetType() == GetType() && Equals((TesCreateTaskResponse)obj);
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ => obj.GetType() == GetType() && Equals((TesCreateTaskResponse)obj),
+            };
 
         /// <summary>
         /// Returns true if TesCreateTaskResponse instances are equal
@@ -79,24 +68,17 @@ namespace Tes.Models
         /// <param name="other">Instance of TesCreateTaskResponse to be compared</param>
         /// <returns>Boolean</returns>
         public bool Equals(TesCreateTaskResponse other)
-        {
-            if (other is null)
+            => other switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, other))
-            {
-                return true;
-            }
-
-            return
-                (
-                    Id == other.Id ||
-                    Id != null &&
-                    Id.Equals(other.Id)
-                );
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ =>
+                    (
+                        Id == other.Id ||
+                        Id != null &&
+                        Id.Equals(other.Id)
+                    ),
+            };
 
         /// <summary>
         /// Gets the hash code
@@ -121,14 +103,10 @@ namespace Tes.Models
 #pragma warning disable 1591
 
         public static bool operator ==(TesCreateTaskResponse left, TesCreateTaskResponse right)
-        {
-            return Equals(left, right);
-        }
+            => Equals(left, right);
 
         public static bool operator !=(TesCreateTaskResponse left, TesCreateTaskResponse right)
-        {
-            return !Equals(left, right);
-        }
+            => !Equals(left, right);
 
 #pragma warning restore 1591
         #endregion Operators

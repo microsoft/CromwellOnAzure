@@ -12,14 +12,13 @@ namespace TesApi.Web
     /// <summary>
     /// Background service to delete Batch jobs older than seven days for completed tasks
     /// </summary>
-    public class DeleteCompletedBatchJobsHostedService : IHostedService
+    public class DeleteCompletedBatchJobsHostedService : BackgroundService
     {
         private static readonly TimeSpan oldestJobAge = TimeSpan.FromDays(7);
         private readonly IRepository<TesTask> repository;
         private readonly IAzureProxy azureProxy;
         private readonly ILogger<DeleteCompletedBatchJobsHostedService> logger;
-        private readonly CancellationTokenSource jobCleanupService = new CancellationTokenSource();
-        private bool isStopped;
+        private readonly bool isDisabled;
 
         /// <summary>
         /// Default constructor
@@ -33,66 +32,70 @@ namespace TesApi.Web
             this.repository = repository;
             this.azureProxy = azureProxy;
             this.logger = logger;
-            isStopped = configuration.GetValue("DisableBatchJobCleanup", false);
+            isDisabled = configuration.GetValue("DisableBatchJobCleanup", false);
         }
+
 
         /// <summary>
         /// Start the service
         /// </summary>
         /// <param name="cancellationToken">Not used</param>
-        public async Task StartAsync(CancellationToken cancellationToken)
+        public override Task StartAsync(CancellationToken cancellationToken)
         {
-            if (isStopped)
+            if (isDisabled)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            await Task.Factory.StartNew(() => RunAsync(), TaskCreationOptions.LongRunning);
+            return base.StartAsync(cancellationToken);
         }
 
-        /// <summary>
-        /// Attempt to gracefully stop the service.
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation token to stop waiting for graceful exit</param>
-        public async Task StopAsync(CancellationToken cancellationToken)
+        /// <inheritdoc />
+        public override Task StopAsync(CancellationToken cancellationToken)
         {
-            jobCleanupService.Cancel();
             logger.LogInformation("Batch Job cleanup stopping...");
-
-            while (!cancellationToken.IsCancellationRequested && !isStopped)
-            {
-                await Task.Delay(100);
-            }
-
-            logger.LogInformation("Batch Job cleanup gracefully stopped.");
+            return base.StopAsync(cancellationToken);
         }
 
         /// <summary>
         /// The job clean up service that checks for old jobs on the Batch account that are safe to delete
         /// </summary>
-        private async Task RunAsync()
+        /// <param name="stoppingToken">Triggered when Microsoft.Extensions.Hosting.IHostedService.StopAsync(System.Threading.CancellationToken) is called.</param>
+        /// <returns>A System.Threading.Tasks.Task that represents the long running operations.</returns>
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             var runInterval = TimeSpan.FromDays(1);
             logger.LogInformation("Batch Job cleanup started.");
 
-            while (!jobCleanupService.IsCancellationRequested)
+            while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    await DeleteOldBatchJobs();
+                    await DeleteOldBatchJobs(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
                 }
                 catch (Exception exc)
                 {
                     logger.LogError(exc, exc.Message);
                 }
 
-                await Task.Delay(runInterval);
+                try
+                {
+                    await Task.Delay(runInterval, stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
             }
 
-            isStopped = true;
+            logger.LogInformation("Batch Job cleanup gracefully stopped.");
         }
 
-        private async Task DeleteOldBatchJobs()
+        private async Task DeleteOldBatchJobs(CancellationToken cancellationToken) // TODO: implement
         {
             var jobsToDelete = await azureProxy.ListOldJobsToDeleteAsync(oldestJobAge);
 

@@ -862,13 +862,13 @@ namespace CromwellOnAzureDeployer
             // If the value is not empty, create/update the property on the VM
             // If the value is not provided, don't do anything, the property may or may not exist on the VM
             // Properties are kept in env-* files, aggregated to .env file at VM startup, and used in docker-compose.yml as environment variables
-            if (value is not null && value.Equals(string.Empty))
-            {
-                await DeleteFileFromVirtualMachineAsync(sshConnectionInfo, $"{CromwellAzureRootDir}/{envFileName}");
-            }
-            else if (!string.IsNullOrEmpty(value))
+            if (!string.IsNullOrEmpty(value))
             {
                 await UploadFilesToVirtualMachineAsync(sshConnectionInfo, ($"{key}={value}", $"{CromwellAzureRootDir}/{envFileName}", false));
+            }
+            else if (value is not null)
+            {
+                await DeleteFileFromVirtualMachineAsync(sshConnectionInfo, $"{CromwellAzureRootDir}/{envFileName}");
             }
         }
 

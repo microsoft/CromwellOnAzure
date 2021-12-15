@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -15,20 +18,11 @@ namespace CromwellOnAzureDeployer
         private readonly string endpoint;
         private readonly string key;
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2208:Instantiate argument exceptions correctly", Justification = "Matching standard.")]
         public CosmosRestClient(string endpoint, string key)
         {
-            if (endpoint == null)
-            {
-                throw new ArgumentNullException("accountEndpoint");
-            }
-
-            if (key == null)
-            {
-                throw new ArgumentNullException("authKeyOrResourceToken");
-            }
-
-            this.endpoint = endpoint;
-            this.key = key;
+            this.endpoint = endpoint ?? throw new ArgumentNullException("accountEndpoint");
+            this.key = key ?? throw new ArgumentNullException("authKeyOrResourceToken");
         }
 
         public async Task<ThroughputProperties> GetContainerRequestThroughputAsync(string databaseName, string containerName)
@@ -48,7 +42,7 @@ namespace CromwellOnAzureDeployer
             await PutAsync(this.endpoint, offer.SelfLink, this.key, "offers", offer.OfferRID.ToLower(), JsonConvert.SerializeObject(offer), ("x-ms-cosmos-migrate-offer-to-autopilot", "true"));
         }
 
-        async Task<string> GetAsync(string baseUrl, string relativeUrl, string key, string resourceType, string resourceId)
+        private static async Task<string> GetAsync(string baseUrl, string relativeUrl, string key, string resourceType, string resourceId)
         {
             var dateString = DateTime.UtcNow.ToString("R");
             var authHeader = GenerateAuthToken("GET", resourceType, resourceId, dateString, key, "master", "1.0");
@@ -62,7 +56,7 @@ namespace CromwellOnAzureDeployer
             return await client.GetStringAsync($"{baseUrl}/{relativeUrl}");
         }
 
-        private async Task<string> QueryAsync(string baseUrl, string relativeUrl, string key, string resourceType, string resourceId, string body)
+        private static async Task<string> QueryAsync(string baseUrl, string relativeUrl, string key, string resourceType, string resourceId, string body)
         {
             var dateString = DateTime.UtcNow.ToString("R");
             var authHeader = GenerateAuthToken("POST", resourceType, resourceId, dateString, key, "master", "1.0");
@@ -81,7 +75,7 @@ namespace CromwellOnAzureDeployer
             return await result.Content.ReadAsStringAsync();
         }
 
-        async Task<string> PutAsync(string baseUrl, string relativeUrl, string key, string resourceType, string resourceId, string body, params (string name, string value)[] additionalHeaders)
+        private static async Task<string> PutAsync(string baseUrl, string relativeUrl, string key, string resourceType, string resourceId, string body, params (string name, string value)[] additionalHeaders)
         {
             var dateString = DateTime.UtcNow.ToString("R");
             var authHeader = GenerateAuthToken("PUT", resourceType, resourceId, dateString, key, "master", "1.0");
@@ -103,24 +97,24 @@ namespace CromwellOnAzureDeployer
             return await result.Content.ReadAsStringAsync();
         }
 
-        private string GenerateAuthToken(string verb, string resourceType, string resourceId, string date, string key, string keyType, string tokenVersion)
+        private static string GenerateAuthToken(string verb, string resourceType, string resourceId, string date, string key, string keyType, string tokenVersion)
         {
             var hmacSha256 = new System.Security.Cryptography.HMACSHA256 { Key = Convert.FromBase64String(key) };
 
-            verb = verb ?? "";
-            resourceType = resourceType ?? "";
-            resourceId = resourceId ?? "";
+            verb ??= string.Empty;
+            resourceType ??= string.Empty;
+            resourceId ??= string.Empty;
 
-            string payload = string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}\n{1}\n{2}\n{3}\n{4}\n",
+            var payload = string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}\n{1}\n{2}\n{3}\n{4}\n",
                     verb.ToLowerInvariant(),
                     resourceType.ToLowerInvariant(),
                     resourceId,
                     date.ToLowerInvariant(),
-                    ""
+                    string.Empty
             );
 
-            byte[] hashPayload = hmacSha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload));
-            string signature = Convert.ToBase64String(hashPayload);
+            var hashPayload = hmacSha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload));
+            var signature = Convert.ToBase64String(hashPayload);
 
             return System.Web.HttpUtility.UrlEncode(String.Format(System.Globalization.CultureInfo.InvariantCulture, "type={0}&ver={1}&sig={2}",
                 keyType,

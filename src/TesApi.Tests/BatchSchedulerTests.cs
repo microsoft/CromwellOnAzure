@@ -27,8 +27,8 @@ namespace TesApi.Tests
     [TestClass]
     public class BatchSchedulerTests
     {
-        private static readonly Regex downloadFilesBlobxferRegex = new Regex(@"path='([^']*)' && url='([^']*)' && blobxfer download");
-        private static readonly Regex downloadFilesWgetRegex = new Regex(@"path='([^']*)' && url='([^']*)' && mkdir .* wget");
+        private static readonly Regex downloadFilesBlobxferRegex = new(@"path='([^']*)' && url='([^']*)' && blobxfer download");
+        private static readonly Regex downloadFilesWgetRegex = new(@"path='([^']*)' && url='([^']*)' && mkdir .* wget");
 
         [TestMethod]
         public async Task TesTaskFailsWithSystemErrorWhenNoSuitableVmExists()
@@ -99,7 +99,7 @@ namespace TesApi.Tests
         {
             (_, var cloudTask, _) = await ProcessTesTaskAndGetBatchJobArgumentsAsync();
 
-            Assert.AreEqual(3, cloudTask.ResourceFiles.Count());
+            Assert.AreEqual(3, cloudTask.ResourceFiles.Count);
             Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/batch_script")));
             Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/upload_files_script")));
             Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("/mnt/cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/download_files_script")));
@@ -345,7 +345,7 @@ namespace TesApi.Tests
 
             Assert.AreEqual(TesState.CANCELEDEnum, tesTask.State);
             Assert.IsFalse(tesTask.IsCancelRequested);
-            azureProxy.Verify(i => i.DeleteBatchJobAsync(tesTask.Id));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync(tesTask.Id, It.IsAny<System.Threading.CancellationToken>()));
         }
 
         [TestMethod]
@@ -762,9 +762,7 @@ namespace TesApi.Tests
         }
 
         private static Task<(string JobId, CloudTask CloudTask, PoolInformation PoolInformation)> ProcessTesTaskAndGetBatchJobArgumentsAsync()
-        {
-            return ProcessTesTaskAndGetBatchJobArgumentsAsync(GetTesTask(), GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
-        }
+            => ProcessTesTaskAndGetBatchJobArgumentsAsync(GetTesTask(), GetMockConfig(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
 
         private static async Task<(string JobId, CloudTask CloudTask, PoolInformation PoolInformation)> ProcessTesTaskAndGetBatchJobArgumentsAsync(TesTask tesTask, IConfiguration configuration, Mock<IAzureProxy> azureProxy)
         {
@@ -794,10 +792,7 @@ namespace TesApi.Tests
         }
 
         private static Task<TesState> GetNewTesTaskStateAsync(TesState currentTesTaskState, AzureBatchJobAndTaskState azureBatchJobAndTaskState)
-        {
-            var tesTask = new TesTask { Id = "test", State = currentTesTaskState };
-            return GetNewTesTaskStateAsync(tesTask, azureBatchJobAndTaskState);
-        }
+            => GetNewTesTaskStateAsync(new TesTask { Id = "test", State = currentTesTaskState }, azureBatchJobAndTaskState);
 
         private static Task<TesState> GetNewTesTaskStateAsync(TesTask tesTask, AzureBatchJobAndTaskState? azureBatchJobAndTaskState = null)
         {
@@ -816,9 +811,7 @@ namespace TesApi.Tests
         }
 
         private static TesTask GetTesTask()
-        {
-            return JsonConvert.DeserializeObject<TesTask>(File.ReadAllText("testask1.json"));
-        }
+            => JsonConvert.DeserializeObject<TesTask>(File.ReadAllText("testask1.json"));
 
         private static Mock<IAzureProxy> GetMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
         {
@@ -871,19 +864,19 @@ namespace TesApi.Tests
 
         private struct BatchJobAndTaskStates
         {
-            public static AzureBatchJobAndTaskState TaskActive => new AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = TaskState.Active };
-            public static AzureBatchJobAndTaskState TaskPreparing => new AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = TaskState.Preparing };
-            public static AzureBatchJobAndTaskState TaskRunning => new AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = TaskState.Running };
-            public static AzureBatchJobAndTaskState TaskCompletedSuccessfully => new AzureBatchJobAndTaskState { JobState = JobState.Completed, TaskState = TaskState.Completed, TaskExitCode = 0 };
-            public static AzureBatchJobAndTaskState TaskFailed => new AzureBatchJobAndTaskState { JobState = JobState.Completed, TaskState = TaskState.Completed, TaskExitCode = -1 };
-            public static AzureBatchJobAndTaskState JobNotFound => new AzureBatchJobAndTaskState { JobState = null };
-            public static AzureBatchJobAndTaskState TaskNotFound => new AzureBatchJobAndTaskState { JobState = JobState.Active, TaskState = null };
-            public static AzureBatchJobAndTaskState MoreThanOneJobFound => new AzureBatchJobAndTaskState { MoreThanOneActiveJobFound = true };
-            public static AzureBatchJobAndTaskState NodeAllocationFailed => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeAllocationFailed = true };
-            public static AzureBatchJobAndTaskState NodePreempted => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeState = ComputeNodeState.Preempted };
-            public static AzureBatchJobAndTaskState NodeDiskFull => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeErrorCode = "DiskFull" };
-            public static AzureBatchJobAndTaskState ActiveJobWithMissingAutoPool => new AzureBatchJobAndTaskState { ActiveJobWithMissingAutoPool = true };
-            public static AzureBatchJobAndTaskState ImageDownloadFailed => new AzureBatchJobAndTaskState { JobState = JobState.Active, NodeErrorCode = "ContainerInvalidImage" };
+            public static AzureBatchJobAndTaskState TaskActive => new() { JobState = JobState.Active, TaskState = TaskState.Active };
+            public static AzureBatchJobAndTaskState TaskPreparing => new() { JobState = JobState.Active, TaskState = TaskState.Preparing };
+            public static AzureBatchJobAndTaskState TaskRunning => new() { JobState = JobState.Active, TaskState = TaskState.Running };
+            public static AzureBatchJobAndTaskState TaskCompletedSuccessfully => new() { JobState = JobState.Completed, TaskState = TaskState.Completed, TaskExitCode = 0 };
+            public static AzureBatchJobAndTaskState TaskFailed => new() { JobState = JobState.Completed, TaskState = TaskState.Completed, TaskExitCode = -1 };
+            public static AzureBatchJobAndTaskState JobNotFound => new() { JobState = null };
+            public static AzureBatchJobAndTaskState TaskNotFound => new() { JobState = JobState.Active, TaskState = null };
+            public static AzureBatchJobAndTaskState MoreThanOneJobFound => new() { MoreThanOneActiveJobFound = true };
+            public static AzureBatchJobAndTaskState NodeAllocationFailed => new() { JobState = JobState.Active, NodeAllocationFailed = true };
+            public static AzureBatchJobAndTaskState NodePreempted => new() { JobState = JobState.Active, NodeState = ComputeNodeState.Preempted };
+            public static AzureBatchJobAndTaskState NodeDiskFull => new() { JobState = JobState.Active, NodeErrorCode = "DiskFull" };
+            public static AzureBatchJobAndTaskState ActiveJobWithMissingAutoPool => new() { ActiveJobWithMissingAutoPool = true };
+            public static AzureBatchJobAndTaskState ImageDownloadFailed => new() { JobState = JobState.Active, NodeErrorCode = "ContainerInvalidImage" };
         }
 
         private class AzureProxyReturnValues
@@ -901,7 +894,7 @@ namespace TesApi.Tests
             public string DownloadedBlobContent { get; set; }
             public bool LocalFileExists { get; set; }
 
-            public static AzureProxyReturnValues Defaults => new AzureProxyReturnValues
+            public static AzureProxyReturnValues Defaults => new()
             {
                 StorageAccountInfos = new Dictionary<string, StorageAccountInfo> {
                     { "defaultstorageaccount", new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount.blob.core.windows.net/", SubscriptionId = "SubId" } },

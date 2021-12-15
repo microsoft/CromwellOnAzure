@@ -281,71 +281,65 @@ namespace TriggerService.Tests
         }
 
         private static TesTask GetTesTask(string workflowId, int shard, int attempt, params TesTaskLog[] tesTaskLogs)
-        {
-            return new TesTask
+            => new()
             {
                 WorkflowId = $"{workflowId}",
                 Description = $"BackendJobDescriptorKey_CommandCallNode_BamToUnmappedBams.SortSam:{shard}:{attempt}",
                 Executors = new List<TesExecutor> { new TesExecutor { Stdout = "execution/stdout", Stderr = "execution/stderr" } },
                 Logs = tesTaskLogs.ToList()
             };
-        }
 
-        private static TesTaskLog TesTaskLogForBatchTaskFailure => new TesTaskLog
+        private static TesTaskLog TesTaskLogForBatchTaskFailure => new()
         {
             Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 1 } },
             SystemLogs = new List<string> { "FailureExitCode", "The task process exited with an unexpected exit code" },
             FailureReason = "FailureExitCode"
         };
 
-        private static TesTaskLog TesTaskLogForBatchNodeAllocationFailure => new TesTaskLog
+        private static TesTaskLog TesTaskLogForBatchNodeAllocationFailure => new()
         {
             Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = null } },
             FailureReason = "NodeAllocationFailed"
         };
 
-        private static TesTaskLog TesTaskLogForCromwellScriptFailure => new TesTaskLog
+        private static TesTaskLog TesTaskLogForCromwellScriptFailure => new()
         {
             Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
             FailureReason = null,
             CromwellResultCode = 1
         };
 
-        private static TesTaskLog TesTaskLogForSuccessfulTask => new TesTaskLog
+        private static TesTaskLog TesTaskLogForSuccessfulTask => new()
         {
             Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
             FailureReason = null,
             CromwellResultCode = 0
         };
 
-        private static TesTaskLog TesTaskLogForSuccessfulTaskWithWarning => new TesTaskLog
+        private static TesTaskLog TesTaskLogForSuccessfulTaskWithWarning => new()
         {
             Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
             SystemLogs = new List<string> { "Warning1", "Warning1Details" },
             Warning = "Warning1"
         };
 
-        private Task<(string newTriggerName, Workflow newTriggerContent)> UpdateWorkflowStatusAsync(string workflowId, IEnumerable<TesTask> tesTasks, WorkflowStatus cromwellWorkflowStatus)
-        {
-            return UpdateWorkflowStatusAsync(
-                workflowId, 
-                tesTasks, 
-                cromwellApiClient => cromwellApiClient
-                    .Setup(ac => ac.GetStatusAsync(It.IsAny<Guid>()))
-                    .Returns(Task.FromResult(new GetStatusResponse { Id = Guid.Parse(workflowId), Status = cromwellWorkflowStatus })));
-        }
-
-        private Task<(string newTriggerName, Workflow newTriggerContent)> UpdateWorkflowStatusAsync(string workflowId, IEnumerable<TesTask> tesTasks, Exception cromwellWorkflowStatusException)
-        {
-            return UpdateWorkflowStatusAsync(
+        private static Task<(string newTriggerName, Workflow newTriggerContent)> UpdateWorkflowStatusAsync(string workflowId, IEnumerable<TesTask> tesTasks, WorkflowStatus cromwellWorkflowStatus)
+            => UpdateWorkflowStatusAsync(
                 workflowId,
                 tesTasks,
                 cromwellApiClient => cromwellApiClient
                     .Setup(ac => ac.GetStatusAsync(It.IsAny<Guid>()))
-                    .Throws(cromwellWorkflowStatusException) );
-        }
+                    .Returns(Task.FromResult(new GetStatusResponse { Id = Guid.Parse(workflowId), Status = cromwellWorkflowStatus })));
 
-        private async Task<(string newTriggerName, Workflow newTriggerContent)> UpdateWorkflowStatusAsync(string workflowId, IEnumerable<TesTask> tesTasks, Action<Mock<ICromwellApiClient>> cromwellApiClientSetup)
+        private static Task<(string newTriggerName, Workflow newTriggerContent)> UpdateWorkflowStatusAsync(string workflowId, IEnumerable<TesTask> tesTasks, Exception cromwellWorkflowStatusException)
+            => UpdateWorkflowStatusAsync(
+                workflowId,
+                tesTasks,
+                cromwellApiClient => cromwellApiClient
+                    .Setup(ac => ac.GetStatusAsync(It.IsAny<Guid>()))
+                    .Throws(cromwellWorkflowStatusException));
+
+        private static async Task<(string newTriggerName, Workflow newTriggerContent)> UpdateWorkflowStatusAsync(string workflowId, IEnumerable<TesTask> tesTasks, Action<Mock<ICromwellApiClient>> cromwellApiClientSetup)
         {
             string newTriggerName = null;
             Workflow newTriggerContent = null;

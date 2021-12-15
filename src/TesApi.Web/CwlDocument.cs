@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -12,9 +15,10 @@ namespace TesApi.Web
     /// </summary>
     public class CwlDocument
     {
-        private readonly Regex sizeRegex = new Regex(@"^([0-9\.]+) *(.+)?$");
+        private readonly Regex sizeRegex = new(@"^([0-9\.]+) *(.+)?$");
 
-        private readonly List<MemoryUnit> memoryUnits = new List<MemoryUnit> {
+        private readonly List<MemoryUnit> memoryUnits = new()
+        {
             new MemoryUnit(1, "B"),
             new MemoryUnit(1L << 10, "KB", "K", "KiB", "Ki"),
             new MemoryUnit(1L << 20, "MB", "M", "MiB", "Mi"),
@@ -102,19 +106,13 @@ namespace TesApi.Web
                 .Where(kv => kv.Key != "class");
 
         private string GetResourceRequirementAsString(string key)
-        {
-            return this.ResourceRequirements?.FirstOrDefault(kv => kv.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value;
-        }
+            => this.ResourceRequirements?.FirstOrDefault(kv => kv.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value;
 
         private int? GetResourceRequirementAsInt(string key)
-        {
-            return int.TryParse(this.GetResourceRequirementAsString(key), out var temp) ? temp : default(int?);
-        }
+            => int.TryParse(this.GetResourceRequirementAsString(key), out var temp) ? temp : default(int?);
 
         private bool? GetResourceRequirementAsBool(string key)
-        {
-            return bool.TryParse(this.GetResourceRequirementAsString(key), out var temp) ? temp : default(bool?);
-        }
+            => bool.TryParse(this.GetResourceRequirementAsString(key), out var temp) ? temp : default(bool?);
 
         private double? GetSizeInGb(string key)
         {
@@ -129,7 +127,7 @@ namespace TesApi.Web
 
             var matchGroups = sizeRegex.Match(value).Groups;
             var size = double.TryParse(matchGroups[1].Value, out var temp) ? temp : default(double?);
-            var unit = !string.IsNullOrEmpty(matchGroups[2].Value) ? matchGroups[2].Value.Trim() : "MB";
+            var unit = !string.IsNullOrWhiteSpace(matchGroups[2].Value) ? matchGroups[2].Value.Trim() : "MB";
 
             if (size == null)
             {
@@ -138,7 +136,7 @@ namespace TesApi.Web
 
             var bytesInUnit = this.memoryUnits.FirstOrDefault(u => u.Suffixes.Any(s => s.Equals(unit, StringComparison.OrdinalIgnoreCase)))?.SizeInBytes;
 
-            return bytesInUnit != null ? size * bytesInUnit / 1024 / 1024 / 1024 : default(double?);
+            return bytesInUnit != null ? size * bytesInUnit / 1024 / 1024 / 1024 : default;
         }
 
         private class MemoryUnit

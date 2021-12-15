@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
@@ -44,18 +47,27 @@ namespace TesApi.Web
                 {
                     await DeleteOrphanedJobsAsync(cancellationToken);
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
                 catch (Exception ex) when (!(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
                 {
                     logger.LogError(ex, ex.Message);
                 }
 
-                await Task.Delay(runInterval, cancellationToken);
+                try
+                {
+                    await Task.Delay(runInterval, cancellationToken);
+                }
+                catch (TaskCanceledException)
+                { }
             }
         }
 
         private async Task DeleteOrphanedJobsAsync(CancellationToken cancellationToken)
         {
-            var jobsToDelete = await azureProxy.ListOrphanedJobsToDeleteAsync(minJobAge);
+            var jobsToDelete = await azureProxy.ListOrphanedJobsToDeleteAsync(minJobAge, cancellationToken);
 
             foreach (var jobId in jobsToDelete)
             {
@@ -63,7 +75,7 @@ namespace TesApi.Web
 
                 TesTask tesTask = null;
 
-                if (await repository.TryGetItemAsync(tesTaskId, item => tesTask = item))
+                if (await repository.TryGetItemAsync(tesTaskId, item => tesTask = item)) // TODO: Add CancellationToken to IRepository and add unit tests
                 {
                     if (tesTask.State == TesState.COMPLETEEnum ||
                         tesTask.State == TesState.EXECUTORERROREnum ||
@@ -71,7 +83,7 @@ namespace TesApi.Web
                         tesTask.State == TesState.CANCELEDEnum ||
                         tesTask.State == TesState.UNKNOWNEnum)
                     {
-                        await azureProxy.DeleteBatchJobAsync(tesTaskId);
+                        await azureProxy.DeleteBatchJobAsync(tesTaskId, cancellationToken);
                         logger.LogInformation($"Deleted orphaned Batch Job '{jobId}'");
                     }
                     else

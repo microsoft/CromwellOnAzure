@@ -39,7 +39,7 @@ namespace TesApi.Controllers
         private readonly ILogger<TaskServiceApiController> logger;
         private readonly IAzureProxy azureProxy;
 
-        private static readonly Dictionary<TesView, JsonSerializerSettings> TesJsonSerializerSettings = new Dictionary<TesView, JsonSerializerSettings>
+        private static readonly Dictionary<TesView, JsonSerializerSettings> TesJsonSerializerSettings = new()
         {
             { TesView.MINIMAL, new JsonSerializerSettings{ ContractResolver = MinimalTesTaskContractResolver.Instance } },
             { TesView.BASIC, new JsonSerializerSettings{ ContractResolver = BasicTesTaskContractResolver.Instance } },
@@ -51,6 +51,7 @@ namespace TesApi.Controllers
         /// </summary>
         /// <param name="repository">The main <see cref="TesTask"/> database repository</param>
         /// <param name="logger">The logger instance</param>
+        /// <param name="azureProxy">The Azure API wrapper</param>
         public TaskServiceApiController(IRepository<TesTask> repository, ILogger<TaskServiceApiController> logger, IAzureProxy azureProxy)
         {
             this.repository = repository;
@@ -133,7 +134,7 @@ namespace TesApi.Controllers
 
             // Prefix the TES task id with first eight characters of root Cromwell job id to facilitate easier debugging
             var tesTaskIdPrefix = tesTask.WorkflowId != null && Guid.TryParse(tesTask.WorkflowId, out _) ? $"{tesTask.WorkflowId.Substring(0, 8)}_" : "";
-            tesTask.Id = $"{tesTaskIdPrefix}{Guid.NewGuid().ToString("N")}";
+            tesTask.Id = $"{tesTaskIdPrefix}{Guid.NewGuid():N}";
 
             // For CWL workflows, if disk size is not specified in TES object (always), try to retrieve it from the corresponding workflow stored by Cromwell in /cromwell-tmp directory
             // Also allow for TES-style "memory" and "cpu" hints in CWL.
@@ -143,7 +144,7 @@ namespace TesApi.Controllers
                 && azureProxy.TryReadCwlFile(tesTask.WorkflowId, out var cwlContent) 
                 && CwlDocument.TryCreate(cwlContent, out var cwlDocument))
             {
-                tesTask.Resources = tesTask.Resources ?? new TesResources();
+                tesTask.Resources ??= new TesResources();
                 tesTask.Resources.DiskGb = tesTask.Resources.DiskGb ?? cwlDocument.DiskGb;
                 tesTask.Resources.CpuCores = tesTask.Resources.CpuCores ?? cwlDocument.Cpu;
                 tesTask.Resources.RamGb = tesTask.Resources.RamGb ?? cwlDocument.MemoryGb;

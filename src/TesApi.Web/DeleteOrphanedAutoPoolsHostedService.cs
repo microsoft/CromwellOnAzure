@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,6 +34,7 @@ namespace TesApi.Web
             this.logger = logger;
         }
 
+        /// <inheritdoc />
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             logger.LogInformation("Orphaned pool cleanup service started");
@@ -41,12 +45,23 @@ namespace TesApi.Web
                 {
                     await DeleteOrphanedAutoPoolsAsync(cancellationToken);
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
                 catch (Exception ex) when (!(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
                 {
                     logger.LogError(ex, ex.Message);
                 }
 
-                await Task.Delay(runInterval, cancellationToken);
+                try
+                {
+                    await Task.Delay(runInterval, cancellationToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
             }
         }
 

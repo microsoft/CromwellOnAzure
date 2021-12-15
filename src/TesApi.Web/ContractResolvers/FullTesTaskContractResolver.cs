@@ -17,8 +17,8 @@ namespace TesApi.Web
     public class FullTesTaskContractResolver : DefaultContractResolver
     {
         // In FULL view, task message will include all fields EXCEPT custom fields added to support running TES with Cromwell on Azure
-        private static readonly List<Tuple<Type, string>> PropertiesToSkip = new List<Tuple<Type, string>>
-            {
+        private static readonly List<Tuple<Type, string>> PropertiesToSkip = new()
+        {
                 Tuple.Create(typeof(TesTask), nameof(TesTask.IsCancelRequested)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.ErrorCount)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.EndTime)),
@@ -30,7 +30,7 @@ namespace TesApi.Web
         /// <summary>
         /// Instance of the resolver
         /// </summary>
-        public static readonly FullTesTaskContractResolver Instance = new FullTesTaskContractResolver();
+        public static readonly FullTesTaskContractResolver Instance = new();
 
         /// <summary>
         /// Overridden CreateProperty in order to skip specific properties

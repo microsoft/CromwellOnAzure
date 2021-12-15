@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -186,7 +189,7 @@ namespace TesApi.Tests
             repository.Verify(mock => mock.TryGetItemAsync("throws", It.IsAny<Action<TesTask>>()), Times.Exactly(4));
         }
 
-        private Mock<IRepository<TesTask>> GetMockRepository()
+        private static Mock<IRepository<TesTask>> GetMockRepository()
         {
             var repository = new Mock<IRepository<TesTask>>();
 

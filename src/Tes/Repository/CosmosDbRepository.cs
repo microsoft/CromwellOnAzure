@@ -123,9 +123,7 @@ namespace Tes.Repository
 
         /// <inheritdoc/>
         public async Task DeleteItemAsync(string id)
-        {
-            await container.DeleteItemAsync<T>(id, partitionKey);
-        }
+            => await container.DeleteItemAsync<T>(id, partitionKey);
 
         /// <summary>
         /// Creates a new database

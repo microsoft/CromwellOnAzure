@@ -16,9 +16,7 @@ namespace TesApi.Web
         }
 
         public AzureBatchQuotaMaxedOutException(Exception exception)
-        {
-            this.exception = exception;
-        }
+            => this.exception = exception;
 
         public AzureBatchQuotaMaxedOutException(string message) : base(message)
         {

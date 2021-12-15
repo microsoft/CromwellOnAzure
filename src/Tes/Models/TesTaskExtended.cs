@@ -11,9 +11,9 @@ namespace Tes.Models
 {
     public partial class TesTask : RepositoryItem<TesTask>
     {
-        private static readonly Regex CromwellTaskInstanceNameRegex = new Regex("(.*):[^:]*:[^:]*");
-        private static readonly Regex CromwellShardRegex = new Regex(".*:([^:]*):[^:]*");
-        private static readonly Regex CromwellAttemptRegex = new Regex(".*:([^:]*)");
+        private static readonly Regex CromwellTaskInstanceNameRegex = new("(.*):[^:]*:[^:]*");
+        private static readonly Regex CromwellShardRegex = new(".*:([^:]*):[^:]*");
+        private static readonly Regex CromwellAttemptRegex = new(".*:([^:]*)");
 
         /// <summary>
         /// Number of retries attempted

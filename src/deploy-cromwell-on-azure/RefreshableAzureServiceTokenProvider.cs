@@ -29,7 +29,7 @@ namespace CromwellOnAzureDeployer
         {
             if(string.IsNullOrEmpty(resource))
             {
-                throw new ArgumentException(nameof(resource));
+                throw new ArgumentException(null, nameof(resource));
             }
 
             this.resource = resource;

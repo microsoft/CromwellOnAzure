@@ -127,30 +127,22 @@ namespace TriggerService
 
             var context = new OperationContext();
 
-            using (var memoryStream = new MemoryStream())
-            {
-                await blob.DownloadToStreamAsync(memoryStream, null, options, context);
-                return memoryStream.ToArray();
-            }
+            using var memoryStream = new MemoryStream();
+            await blob.DownloadToStreamAsync(memoryStream, null, options, context);
+            return memoryStream.ToArray();
         }
 
         /// <inheritdoc />
         public async Task<byte[]> DownloadFileUsingHttpClientAsync(string url)
-        {
-            return await httpClient.GetByteArrayAsync(url);
-        }
+            => await httpClient.GetByteArrayAsync(url);
 
         /// <inheritdoc />
         public Task<string> DownloadBlobTextAsync(string container, string blobName)
-        {
-            return blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DownloadTextAsync();
-        }
+            => blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DownloadTextAsync();
 
         /// <inheritdoc />
         public Task DeleteBlobIfExistsAsync(string container, string blobName)
-        {
-			return blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DeleteIfExistsAsync();
-        }
+            => blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DeleteIfExistsAsync();
 
         private class StorageAccountInfo
         {
@@ -236,9 +228,7 @@ namespace TriggerService
         }
 
         private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
-        {
-            return new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
-        }
+            => new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
 
         private static async Task<List<StorageAccountInfo>> GetAccessibleStorageAccountsAsync()
         {

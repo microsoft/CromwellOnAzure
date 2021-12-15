@@ -21,9 +21,7 @@ namespace TriggerService
     internal class Program
     {
         public static async Task Main()
-        {
-            await InitAndRunAsync();
-        }
+            => await InitAndRunAsync();
 
         private static async Task InitAndRunAsync()
         {
@@ -113,8 +111,6 @@ namespace TriggerService
         }
 
         private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
-        {
-            return new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
-        }
+            => new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
     }
 }

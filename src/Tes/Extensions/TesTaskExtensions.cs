@@ -46,9 +46,7 @@ namespace Tes.Extensions
         /// <param name="tesTask"><see cref="TesTask"/></param>
         /// <param name="tesException"><see cref="TesException"/></param>
         public static void SetFailureReason(this TesTask tesTask, TesException tesException)
-        {
-            tesTask.SetFailureReason(tesException.FailureReason, tesException.Message, tesException.StackTrace);
-        }
+            => tesTask.SetFailureReason(tesException.FailureReason, tesException.Message, tesException.StackTrace);
 
         /// <summary>
         /// Sets the warning for <see cref="TesTask"/> and optionally adds additional system log items
@@ -97,9 +95,7 @@ namespace Tes.Extensions
         /// <param name="tesTaskLog"><see cref="TesTaskLog"/></param>
         /// <returns>Initialized <see cref="BatchNodeMetrics"/></returns>
         public static BatchNodeMetrics GetOrAddBatchNodeMetrics(this TesTaskLog tesTaskLog)
-        {
-            return tesTaskLog.BatchNodeMetrics ??= new BatchNodeMetrics();
-        }
+            => tesTaskLog.BatchNodeMetrics ??= new BatchNodeMetrics();
 
         /// <summary>
         /// Returns the Metadata property of <see cref="TesTaskLog"/>. Adds it if it doesn't exist.
@@ -107,9 +103,7 @@ namespace Tes.Extensions
         /// <param name="tesTaskLog"><see cref="TesTaskLog"/></param>
         /// <returns>Initialized Metadata property</returns>
         public static Dictionary<string, string> GetOrAddMetadata(this TesTaskLog tesTaskLog)
-        {
-            return tesTaskLog.Metadata ??= new Dictionary<string, string>();
-        }
+            => tesTaskLog.Metadata ??= new Dictionary<string, string>();
 
         /// <summary>
         /// Returns the last <see cref="TesExecutorLog"/>. Adds it if none exist.

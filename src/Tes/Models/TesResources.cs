@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -66,26 +66,22 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("class TesResources {\n");
-            sb.Append("  CpuCores: ").Append(CpuCores).Append("\n");
-            sb.Append("  Preemptible: ").Append(Preemptible).Append("\n");
-            sb.Append("  RamGb: ").Append(RamGb).Append("\n");
-            sb.Append("  DiskGb: ").Append(DiskGb).Append("\n");
-            sb.Append("  Zones: ").Append(Zones).Append("\n");
-            sb.Append("}\n");
-            return sb.ToString();
-        }
+            => new StringBuilder()
+                .Append("class TesResources {\n")
+                .Append("  CpuCores: ").Append(CpuCores).Append('\n')
+                .Append("  Preemptible: ").Append(Preemptible).Append('\n')
+                .Append("  RamGb: ").Append(RamGb).Append('\n')
+                .Append("  DiskGb: ").Append(DiskGb).Append('\n')
+                .Append("  Zones: ").Append(Zones).Append('\n')
+                .Append("}\n")
+                .ToString();
 
         /// <summary>
         /// Returns the JSON string presentation of the object
         /// </summary>
         /// <returns>JSON string presentation of the object</returns>
         public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
+            => JsonConvert.SerializeObject(this, Formatting.Indented);
 
         /// <summary>
         /// Returns true if objects are equal
@@ -93,19 +89,12 @@ namespace Tes.Models
         /// <param name="obj">Object to be compared</param>
         /// <returns>Boolean</returns>
         public override bool Equals(object obj)
-        {
-            if (obj is null)
+            => obj switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-
-            return obj.GetType() == GetType() && Equals((TesResources)obj);
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ => obj.GetType() == GetType() && Equals((TesResources)obj),
+            };
 
         /// <summary>
         /// Returns true if TesResources instances are equal
@@ -113,18 +102,11 @@ namespace Tes.Models
         /// <param name="other">Instance of TesResources to be compared</param>
         /// <returns>Boolean</returns>
         public bool Equals(TesResources other)
-        {
-            if (other is null)
+            => other switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, other))
-            {
-                return true;
-            }
-
-            return
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ =>
                 (
                     CpuCores == other.CpuCores ||
                     CpuCores != null &&
@@ -149,8 +131,8 @@ namespace Tes.Models
                     Zones == other.Zones ||
                     Zones != null &&
                     Zones.SequenceEqual(other.Zones)
-                );
-        }
+                ),
+            };
 
         /// <summary>
         /// Gets the hash code
@@ -195,14 +177,10 @@ namespace Tes.Models
 #pragma warning disable 1591
 
         public static bool operator ==(TesResources left, TesResources right)
-        {
-            return Equals(left, right);
-        }
+            => Equals(left, right);
 
         public static bool operator !=(TesResources left, TesResources right)
-        {
-            return !Equals(left, right);
-        }
+            => !Equals(left, right);
 
 #pragma warning restore 1591
         #endregion Operators

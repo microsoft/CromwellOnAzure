@@ -51,7 +51,7 @@ namespace TriggerService.Tests
             Assert.AreEqual("Error submitting new workflow", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReasonDetail);
         }
 
-        private async Task<(string newTriggerName, Workflow newTriggerContent)> ProcessNewWorkflowAsync(ICromwellApiClient cromwellApiClient)
+        private static async Task<(string newTriggerName, Workflow newTriggerContent)> ProcessNewWorkflowAsync(ICromwellApiClient cromwellApiClient)
         {
             string newTriggerName = null;
             Workflow newTriggerContent = null;

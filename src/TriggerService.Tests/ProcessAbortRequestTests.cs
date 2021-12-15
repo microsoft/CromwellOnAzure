@@ -46,7 +46,7 @@ namespace TriggerService.Tests
             cromwellApiClient.Verify(mock => mock.PostAbortAsync(workflowId), Times.Once());
         }
 
-        private async Task<(string newTriggerName, Workflow newTriggerContent)> ProcessAbortRequestAsync(Guid workflowId, ICromwellApiClient cromwellApiClient)
+        private static async Task<(string newTriggerName, Workflow newTriggerContent)> ProcessAbortRequestAsync(Guid workflowId, ICromwellApiClient cromwellApiClient)
         {
             string newTriggerName = null;
             Workflow newTriggerContent = null;

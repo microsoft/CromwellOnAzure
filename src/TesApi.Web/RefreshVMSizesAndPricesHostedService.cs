@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using LazyCache;
@@ -11,14 +14,13 @@ namespace TesApi.Web
     /// <summary>
     /// Background service to refresh VM list cache
     /// </summary>
-    public class RefreshVMSizesAndPricesHostedService : IHostedService
+    public class RefreshVMSizesAndPricesHostedService : BackgroundService
     {
         private static readonly TimeSpan listRefreshInterval = TimeSpan.FromDays(1);
 
         private readonly AzureProxy azureProxy;
         private readonly IAppCache cache;
         private readonly ILogger<RefreshVMSizesAndPricesHostedService> logger;
-        private readonly CancellationTokenSource vmListRefreshService = new CancellationTokenSource();
 
         /// <summary>
         /// Default constructor
@@ -33,55 +35,51 @@ namespace TesApi.Web
             this.logger = logger;
         }
 
-        /// <summary>
-        /// Start the service
-        /// </summary>
-        /// <param name="cancellationToken">Not used</param>
-        public async Task StartAsync(CancellationToken cancellationToken)
+        /// <inheritdoc />
+        public override Task StopAsync(CancellationToken cancellationToken)
         {
-            await Task.Factory.StartNew(() => RunAsync(), TaskCreationOptions.LongRunning);
-        }
-
-        /// <summary>
-        /// Attempt to gracefully stop the service.
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation token to stop waiting for graceful exit</param>
-        public async Task StopAsync(CancellationToken cancellationToken)
-        {
-            vmListRefreshService.Cancel();
             logger.LogInformation("VM list refresh task stopping...");
-
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                await Task.Delay(100);
-            }
-
-            logger.LogInformation("VM list refresh task gracefully stopped.");
+            return base.StopAsync(cancellationToken);
         }
 
         /// <summary>
         /// The VM list cache refresh service that runs every day to get new sizes and prices
         /// </summary>
-        private async Task RunAsync()
+        /// <param name="stoppingToken">Triggered when Microsoft.Extensions.Hosting.IHostedService.StopAsync(System.Threading.CancellationToken) is called.</param>
+        /// <returns>A System.Threading.Tasks.Task that represents the long running operations.</returns>
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             logger.LogInformation("VM list cache refresh background service started.");
 
-            while (!vmListRefreshService.IsCancellationRequested)
+            while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
                     await RefreshVMSizesAndPricesAsync();
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
                 }
                 catch (Exception exc)
                 {
                     logger.LogError(exc, exc.Message);
                 }
 
-                await Task.Delay(listRefreshInterval);
+                try
+                {
+                    await Task.Delay(listRefreshInterval, stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
             }
+
+            logger.LogInformation("VM list refresh task gracefully stopped.");
         }
 
-        private async Task RefreshVMSizesAndPricesAsync()
+        private async Task RefreshVMSizesAndPricesAsync() // TODO: implement
         {
             logger.LogInformation("VM list cache refresh call to Azure started.");
             var virtualMachineInfos = await azureProxy.GetVmSizesAndPricesAsync();

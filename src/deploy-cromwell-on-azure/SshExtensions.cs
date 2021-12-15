@@ -20,9 +20,7 @@ namespace CromwellOnAzureDeployer
 
         // TODO: cancellationToken
         public static Task UploadFileAsync(this SftpClient sftpClient, Stream input, string path, bool canOverride = true)
-        {
-            return Task.Factory.FromAsync(sftpClient.BeginUploadFile(input, path, canOverride, null, null), sftpClient.EndUploadFile);
-        }
+            => Task.Factory.FromAsync(sftpClient.BeginUploadFile(input, path, canOverride, null, null), sftpClient.EndUploadFile);
 
         public static async Task<(string output, string error, int exitStatus)> ExecuteCommandAsync(this SshClient sshClient, string commandText)
         {
@@ -38,8 +36,6 @@ namespace CromwellOnAzureDeployer
         }
 
         public static void ConnectWithRetries(this SshClient sshClient)
-        {
-            retryPolicy.Execute(() => sshClient.Connect());
-        }
+            => retryPolicy.Execute(() => sshClient.Connect());
     }
 }
