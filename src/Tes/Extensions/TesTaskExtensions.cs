@@ -19,7 +19,7 @@ namespace Tes.Extensions
         /// <param name="logEntries">List of strings to write to the log.</param>
         public static void AddToSystemLog(this TesTask tesTask, IEnumerable<string> logEntries)
         {
-            if (logEntries != null && logEntries.Any(e => !string.IsNullOrEmpty(e)))
+            if (logEntries is not null && logEntries.Any(e => !string.IsNullOrEmpty(e)))
             {
                 var tesTaskLog = tesTask.GetOrAddTesTaskLog();
                 tesTaskLog.SystemLogs ??= new List<string>();
@@ -68,7 +68,7 @@ namespace Tes.Extensions
         /// <returns>Last <see cref="TesTaskLog"/></returns>
         public static TesTaskLog GetOrAddTesTaskLog(this TesTask tesTask)
         {
-            if (tesTask.Logs == null || !tesTask.Logs.Any())
+            if (tesTask.Logs is null || !tesTask.Logs.Any())
             {
                 tesTask.Logs = new List<TesTaskLog> { new TesTaskLog() };
             }
@@ -112,7 +112,7 @@ namespace Tes.Extensions
         /// <returns>Initialized <see cref="TesExecutorLog"/></returns>
         public static TesExecutorLog GetOrAddExecutorLog(this TesTaskLog tesTaskLog)
         {
-            if (tesTaskLog.Logs == null || !tesTaskLog.Logs.Any())
+            if (tesTaskLog.Logs is null || !tesTaskLog.Logs.Any())
             {
                 tesTaskLog.Logs = new List<TesExecutorLog> { new TesExecutorLog() };
             }

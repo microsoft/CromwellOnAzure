@@ -61,7 +61,7 @@ namespace TesApi.Web
             ConfigureServices(services, cache, azureProxy, cachingAzureProxy, storageAccessProvider, repository);
         }
 
-        private (IAppCache cache, IAzureProxy azureProxy, IAzureProxy cachingAzureProxy, IStorageAccessProvider storageAccessProvider, IRepository<TesTask> repository) ConfigureServices()
+        private (IAppCache cache, AzureProxy azureProxy, IAzureProxy cachingAzureProxy, IStorageAccessProvider storageAccessProvider, IRepository<TesTask> repository) ConfigureServices()
         {
             var cache = new CachingService();
 
@@ -78,7 +78,7 @@ namespace TesApi.Web
             return (cache, azureProxy, cachingAzureProxy, storageAccessProvider, cosmosDbRepository);
         }
 
-        private void ConfigureServices(IServiceCollection services, IAppCache cache, IAzureProxy azureProxy, IAzureProxy cachingAzureProxy, IStorageAccessProvider storageAccessProvider, IRepository<TesTask> repository)
+        private void ConfigureServices(IServiceCollection services, IAppCache cache, AzureProxy azureProxy, IAzureProxy cachingAzureProxy, IStorageAccessProvider storageAccessProvider, IRepository<TesTask> repository)
             => services.AddSingleton(cache)
 
                 .AddSingleton(cachingAzureProxy)
@@ -125,7 +125,7 @@ namespace TesApi.Web
                         var applicationInsightsAccountName = Configuration["ApplicationInsightsAccountName"];
                         var instrumentationKey = AzureProxy.GetAppInsightsInstrumentationKeyAsync(applicationInsightsAccountName).Result;
 
-                        if (instrumentationKey != null)
+                        if (instrumentationKey is not null)
                         {
                             return s.AddApplicationInsightsTelemetry(instrumentationKey);
                         }

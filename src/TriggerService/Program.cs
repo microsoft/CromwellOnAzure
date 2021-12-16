@@ -87,7 +87,7 @@ namespace TriggerService
                 .SelectMany(a => a)
                 .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase));
 
-            if (account == null)
+            if (account is null)
             {
                 throw new Exception($"CosmosDB account '{cosmosDbAccountName} does not exist or the TES app service does not have Account Reader role on the account.");
             }

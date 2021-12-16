@@ -109,27 +109,27 @@ namespace Tes.Models
                 _ =>
                 (
                     CpuCores == other.CpuCores ||
-                    CpuCores != null &&
+                    CpuCores is not null &&
                     CpuCores.Equals(other.CpuCores)
                 ) &&
                 (
                     Preemptible == other.Preemptible ||
-                    Preemptible != null &&
+                    Preemptible is not null &&
                     Preemptible.Equals(other.Preemptible)
                 ) &&
                 (
                     RamGb == other.RamGb ||
-                    RamGb != null &&
+                    RamGb is not null &&
                     RamGb.Equals(other.RamGb)
                 ) &&
                 (
                     DiskGb == other.DiskGb ||
-                    DiskGb != null &&
+                    DiskGb is not null &&
                     DiskGb.Equals(other.DiskGb)
                 ) &&
                 (
                     Zones == other.Zones ||
-                    Zones != null &&
+                    Zones is not null &&
                     Zones.SequenceEqual(other.Zones)
                 ),
             };
@@ -144,27 +144,27 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (CpuCores != null)
+                if (CpuCores is not null)
                 {
                     hashCode = hashCode * 59 + CpuCores.GetHashCode();
                 }
 
-                if (Preemptible != null)
+                if (Preemptible is not null)
                 {
                     hashCode = hashCode * 59 + Preemptible.GetHashCode();
                 }
 
-                if (RamGb != null)
+                if (RamGb is not null)
                 {
                     hashCode = hashCode * 59 + RamGb.GetHashCode();
                 }
 
-                if (DiskGb != null)
+                if (DiskGb is not null)
                 {
                     hashCode = hashCode * 59 + DiskGb.GetHashCode();
                 }
 
-                if (Zones != null)
+                if (Zones is not null)
                 {
                     hashCode = hashCode * 59 + Zones.GetHashCode();
                 }

@@ -112,22 +112,22 @@ namespace Tes.Models
                 _ =>
                 (
                     Name == other.Name ||
-                    Name != null &&
+                    Name is not null &&
                     Name.Equals(other.Name)
                 ) &&
                 (
                     Description == other.Description ||
-                    Description != null &&
+                    Description is not null &&
                     Description.Equals(other.Description)
                 ) &&
                 (
                     Url == other.Url ||
-                    Url != null &&
+                    Url is not null &&
                     Url.Equals(other.Url)
                 ) &&
                 (
                     Path == other.Path ||
-                    Path != null &&
+                    Path is not null &&
                     Path.Equals(other.Path)
                 ) &&
                 (
@@ -136,7 +136,7 @@ namespace Tes.Models
                 ) &&
                 (
                     Content == other.Content ||
-                    Content != null &&
+                    Content is not null &&
                     Content.Equals(other.Content)
                 ),
             };
@@ -151,28 +151,28 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Name != null)
+                if (Name is not null)
                 {
                     hashCode = hashCode * 59 + Name.GetHashCode();
                 }
 
-                if (Description != null)
+                if (Description is not null)
                 {
                     hashCode = hashCode * 59 + Description.GetHashCode();
                 }
 
-                if (Url != null)
+                if (Url is not null)
                 {
                     hashCode = hashCode * 59 + Url.GetHashCode();
                 }
 
-                if (Path != null)
+                if (Path is not null)
                 {
                     hashCode = hashCode * 59 + Path.GetHashCode();
                 }
 
                 hashCode = hashCode * 59 + Type.GetHashCode();
-                if (Content != null)
+                if (Content is not null)
                 {
                     hashCode = hashCode * 59 + Content.GetHashCode();
                 }

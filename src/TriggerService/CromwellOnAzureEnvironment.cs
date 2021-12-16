@@ -123,7 +123,7 @@ namespace TriggerService
         internal async Task<ProcessedTriggerInfo> ProcessBlobTrigger(string blobTriggerJson)
         {
             var triggerInfo = JsonConvert.DeserializeObject<Workflow>(blobTriggerJson);
-            if (triggerInfo == null)
+            if (triggerInfo is null)
             {
                 throw new ArgumentNullException(nameof(blobTriggerJson), "must have data in the Trigger File");
             }
@@ -137,12 +137,12 @@ namespace TriggerService
 
             var workflowSource = await GetBlobFileNameAndData(triggerInfo.WorkflowUrl);
 
-            if (triggerInfo.WorkflowInputsUrl != null)
+            if (triggerInfo.WorkflowInputsUrl is not null)
             {
                 workflowInputs.Add(await GetBlobFileNameAndData(triggerInfo.WorkflowInputsUrl));
             }
 
-            if (triggerInfo.WorkflowInputsUrls != null)
+            if (triggerInfo.WorkflowInputsUrls is not null)
             {
                 foreach (var workflowInputsUrl in triggerInfo.WorkflowInputsUrls)
                 {
@@ -317,7 +317,7 @@ namespace TriggerService
                 bool IsBlockBlobUrl(IAzureStorage storage)
                     => (Uri.TryCreate(url, UriKind.Absolute, out var uri)
                     && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase)
-                    && uri.ParseQueryString().Get("sig") == null)
+                    && uri.ParseQueryString().Get("sig") is null)
                     || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase);
             }
         }
@@ -333,7 +333,7 @@ namespace TriggerService
             var newStateText = newState.ToString().ToLowerInvariant();
             var newBlobName = workflowStateRegex.Replace(blobName, newStateText);
 
-            if (workflowNameAction != null)
+            if (workflowNameAction is not null)
             {
                 newBlobName = workflowNameAction(newBlobName);
             }
@@ -363,7 +363,7 @@ namespace TriggerService
             }
             else
             {
-                var jsonSerializerSettings = workflow == null ? new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore } : null;
+                var jsonSerializerSettings = workflow is null ? new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore } : null;
                 workflow ??= new Workflow();
                 workflowContentAction?.Invoke(workflow);
                 newBlobText = JsonConvert.SerializeObject(workflow, Formatting.Indented, jsonSerializerSettings);
@@ -402,15 +402,15 @@ namespace TriggerService
             var failedTesTasks = tesTasks
                 .GroupBy(t => new { t.CromwellTaskInstanceName, t.CromwellShard })
                 .Select(grp => grp.OrderBy(t => t.CromwellAttempt).Last())
-                .Where(t => t.FailureReason != null || t.CromwellResultCode.GetValueOrDefault() != 0)
+                .Where(t => t.FailureReason is not null || t.CromwellResultCode.GetValueOrDefault() != 0)
                 .Select(t => {
                     var cromwellScriptFailed = t.CromwellResultCode.GetValueOrDefault() != 0;
                     var batchTaskFailed = (t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode).GetValueOrDefault() != 0;
                     var executor = t.Executors?.LastOrDefault();
                     var executionDirectoryPath = GetParentPath(executor?.Stdout);
-                    var batchExecutionDirectoryPath = executionDirectoryPath != null ? $"{executionDirectoryPath}/{BatchExecutionDirectoryName}" : null;
-                    var batchStdOut = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stdout.txt" : null;
-                    var batchStdErr = batchExecutionDirectoryPath != null ? $"{batchExecutionDirectoryPath}/stderr.txt" : null;
+                    var batchExecutionDirectoryPath = executionDirectoryPath is not null ? $"{executionDirectoryPath}/{BatchExecutionDirectoryName}" : null;
+                    var batchStdOut = batchExecutionDirectoryPath is not null ? $"{batchExecutionDirectoryPath}/stdout.txt" : null;
+                    var batchStdErr = batchExecutionDirectoryPath is not null ? $"{batchExecutionDirectoryPath}/stderr.txt" : null;
 
                     return new FailedTaskInfo {
                         TaskId = t.Id,
@@ -438,7 +438,7 @@ namespace TriggerService
             var taskWarnings = tesTasks
                 .GroupBy(t => new { t.CromwellTaskInstanceName, t.CromwellShard })
                 .Select(grp => grp.OrderBy(t => t.CromwellAttempt).Last())
-                .Where(t => t.Warning != null)
+                .Where(t => t.Warning is not null)
                 .Select(t => new TaskWarning {
                     TaskId = t.Id,
                     TaskName = t.Name,

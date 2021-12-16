@@ -13,7 +13,7 @@ namespace CromwellOnAzureDeployer
         {
             var content = cloudException?.Response?.Content;
 
-            if (content == null)
+            if (content is null)
             {
                 return null;
             }

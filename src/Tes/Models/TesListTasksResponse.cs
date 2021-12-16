@@ -85,12 +85,12 @@ namespace Tes.Models
                 _ =>
                 (
                     Tasks == other.Tasks ||
-                    Tasks != null &&
+                    Tasks is not null &&
                     Tasks.SequenceEqual(other.Tasks)
                 ) &&
                 (
                     NextPageToken == other.NextPageToken ||
-                    NextPageToken != null &&
+                    NextPageToken is not null &&
                     NextPageToken.Equals(other.NextPageToken)
                 ),
             };
@@ -105,12 +105,12 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Tasks != null)
+                if (Tasks is not null)
                 {
                     hashCode = hashCode * 59 + Tasks.GetHashCode();
                 }
 
-                if (NextPageToken != null)
+                if (NextPageToken is not null)
                 {
                     hashCode = hashCode * 59 + NextPageToken.GetHashCode();
                 }

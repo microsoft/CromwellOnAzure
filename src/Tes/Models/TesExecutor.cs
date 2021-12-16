@@ -125,37 +125,37 @@ namespace Tes.Models
                 _ =>
                 (
                     Image == other.Image ||
-                    Image != null &&
+                    Image is not null &&
                     Image.Equals(other.Image)
                 ) &&
                 (
                     Command == other.Command ||
-                    Command != null &&
+                    Command is not null &&
                     Command.SequenceEqual(other.Command)
                 ) &&
                 (
                     Workdir == other.Workdir ||
-                    Workdir != null &&
+                    Workdir is not null &&
                     Workdir.Equals(other.Workdir)
                 ) &&
                 (
                     Stdin == other.Stdin ||
-                    Stdin != null &&
+                    Stdin is not null &&
                     Stdin.Equals(other.Stdin)
                 ) &&
                 (
                     Stdout == other.Stdout ||
-                    Stdout != null &&
+                    Stdout is not null &&
                     Stdout.Equals(other.Stdout)
                 ) &&
                 (
                     Stderr == other.Stderr ||
-                    Stderr != null &&
+                    Stderr is not null &&
                     Stderr.Equals(other.Stderr)
                 ) &&
                 (
                     Env == other.Env ||
-                    Env != null &&
+                    Env is not null &&
                     Env.SequenceEqual(other.Env)
                 ),
             };
@@ -170,37 +170,37 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Image != null)
+                if (Image is not null)
                 {
                     hashCode = hashCode * 59 + Image.GetHashCode();
                 }
 
-                if (Command != null)
+                if (Command is not null)
                 {
                     hashCode = hashCode * 59 + Command.GetHashCode();
                 }
 
-                if (Workdir != null)
+                if (Workdir is not null)
                 {
                     hashCode = hashCode * 59 + Workdir.GetHashCode();
                 }
 
-                if (Stdin != null)
+                if (Stdin is not null)
                 {
                     hashCode = hashCode * 59 + Stdin.GetHashCode();
                 }
 
-                if (Stdout != null)
+                if (Stdout is not null)
                 {
                     hashCode = hashCode * 59 + Stdout.GetHashCode();
                 }
 
-                if (Stderr != null)
+                if (Stderr is not null)
                 {
                     hashCode = hashCode * 59 + Stderr.GetHashCode();
                 }
 
-                if (Env != null)
+                if (Env is not null)
                 {
                     hashCode = hashCode * 59 + Env.GetHashCode();
                 }

@@ -76,21 +76,10 @@ namespace TesApi.Web
         {
             get
             {
-                var tmpDirMin = this.GetSizeInGb("tmpDirMin");
-                var tmpDirMax = this.GetSizeInGb("tmpDirMax");
-                var outDirMin = this.GetSizeInGb("outDirMin");
-                var outDirMax = this.GetSizeInGb("outDirMax");
-                var tesDisk = this.GetSizeInGb("disk");
+                var tmpDir = this.GetSizeInGb("tmpDirMin") ?? this.GetSizeInGb("tmpDirMax");
+                var outDir = this.GetSizeInGb("outDirMin") ?? this.GetSizeInGb("outDirMax");
 
-                if (tesDisk != null)
-                {
-                    return tesDisk;
-                }
-
-                var tmpDir = tmpDirMin ?? tmpDirMax;
-                var outDir = outDirMin ?? outDirMax;
-
-                return (tmpDir ?? outDir) != null ? (tmpDir ?? 0) + (outDir ?? 0) : default(double?);
+                return this.GetSizeInGb("disk") ?? ((tmpDir ?? outDir) is not null ? (tmpDir ?? 0) + (outDir ?? 0) : default(double?));
             }
         }
 
@@ -129,14 +118,14 @@ namespace TesApi.Web
             var size = double.TryParse(matchGroups[1].Value, out var temp) ? temp : default(double?);
             var unit = !string.IsNullOrWhiteSpace(matchGroups[2].Value) ? matchGroups[2].Value.Trim() : "MB";
 
-            if (size == null)
+            if (size is null)
             {
                 return null;
             }
 
             var bytesInUnit = this.memoryUnits.FirstOrDefault(u => u.Suffixes.Any(s => s.Equals(unit, StringComparison.OrdinalIgnoreCase)))?.SizeInBytes;
 
-            return bytesInUnit != null ? size * bytesInUnit / 1024 / 1024 / 1024 : default;
+            return bytesInUnit is not null ? size * bytesInUnit / 1024 / 1024 / 1024 : default;
         }
 
         private class MemoryUnit

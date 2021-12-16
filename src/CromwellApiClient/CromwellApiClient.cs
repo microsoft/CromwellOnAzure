@@ -92,12 +92,12 @@ namespace CromwellApiClient
                 files.Add(new FileToPost(workflowInputsFilename[i], workflowInputsData[i], parameterName, removeTabs: true));
             }
 
-            if (workflowOptionsFilename != null && workflowOptionsData != null)
+            if (workflowOptionsFilename is not null && workflowOptionsData is not null)
             {
                 files.Add(new FileToPost(workflowOptionsFilename, workflowOptionsData, "workflowOptions", removeTabs: true));
             }
 
-            if (workflowDependenciesFilename != null && workflowDependenciesData != null)
+            if (workflowDependenciesFilename is not null && workflowDependenciesData is not null)
             {
                 files.Add(new FileToPost(workflowDependenciesFilename, workflowDependenciesData, "workflowDependencies"));
             }

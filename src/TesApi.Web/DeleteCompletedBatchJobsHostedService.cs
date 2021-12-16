@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -116,7 +119,7 @@ namespace TesApi.Web
                         tesTask.State == TesState.CANCELEDEnum ||
                         tesTask.State == TesState.UNKNOWNEnum)
                     {
-                        await azureProxy.DeleteBatchJobAsync(tesTaskId);
+                        await azureProxy.DeleteBatchJobAsync(tesTaskId, cancellationToken);
                     }
                 }
             }

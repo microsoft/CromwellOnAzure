@@ -93,17 +93,17 @@ namespace Tes.Models
                 _ =>
                 (
                     Name == other.Name ||
-                    Name != null &&
+                    Name is not null &&
                     Name.Equals(other.Name)
                 ) &&
                 (
                     Doc == other.Doc ||
-                    Doc != null &&
+                    Doc is not null &&
                     Doc.Equals(other.Doc)
                 ) &&
                 (
                     Storage == other.Storage ||
-                    Storage != null &&
+                    Storage is not null &&
                     Storage.SequenceEqual(other.Storage)
                 ),
             };
@@ -118,17 +118,17 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Name != null)
+                if (Name is not null)
                 {
                     hashCode = hashCode * 59 + Name.GetHashCode();
                 }
 
-                if (Doc != null)
+                if (Doc is not null)
                 {
                     hashCode = hashCode * 59 + Doc.GetHashCode();
                 }
 
-                if (Storage != null)
+                if (Storage is not null)
                 {
                     hashCode = hashCode * 59 + Storage.GetHashCode();
                 }

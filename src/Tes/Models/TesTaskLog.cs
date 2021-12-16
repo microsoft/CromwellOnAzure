@@ -117,32 +117,32 @@ namespace Tes.Models
                 _ =>
                 (
                     Logs == other.Logs ||
-                    Logs != null &&
+                    Logs is not null &&
                     Logs.SequenceEqual(other.Logs)
                 ) &&
                 (
                     Metadata == other.Metadata ||
-                    Metadata != null &&
+                    Metadata is not null &&
                     Metadata.SequenceEqual(other.Metadata)
                 ) &&
                 (
                     StartTime == other.StartTime ||
-                    StartTime != null &&
+                    StartTime is not null &&
                     StartTime.Equals(other.StartTime)
                 ) &&
                 (
                     EndTime == other.EndTime ||
-                    EndTime != null &&
+                    EndTime is not null &&
                     EndTime.Equals(other.EndTime)
                 ) &&
                 (
                     Outputs == other.Outputs ||
-                    Outputs != null &&
+                    Outputs is not null &&
                     Outputs.SequenceEqual(other.Outputs)
                 ) &&
                 (
                     SystemLogs == other.SystemLogs ||
-                    SystemLogs != null &&
+                    SystemLogs is not null &&
                     SystemLogs.SequenceEqual(other.SystemLogs)
                 ),
             };
@@ -157,32 +157,32 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Logs != null)
+                if (Logs is not null)
                 {
                     hashCode = hashCode * 59 + Logs.GetHashCode();
                 }
 
-                if (Metadata != null)
+                if (Metadata is not null)
                 {
                     hashCode = hashCode * 59 + Metadata.GetHashCode();
                 }
 
-                if (StartTime != null)
+                if (StartTime is not null)
                 {
                     hashCode = hashCode * 59 + StartTime.GetHashCode();
                 }
 
-                if (EndTime != null)
+                if (EndTime is not null)
                 {
                     hashCode = hashCode * 59 + EndTime.GetHashCode();
                 }
 
-                if (Outputs != null)
+                if (Outputs is not null)
                 {
                     hashCode = hashCode * 59 + Outputs.GetHashCode();
                 }
 
-                if (SystemLogs != null)
+                if (SystemLogs is not null)
                 {
                     hashCode = hashCode * 59 + SystemLogs.GetHashCode();
                 }

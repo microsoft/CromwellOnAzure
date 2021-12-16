@@ -133,14 +133,14 @@ namespace TesApi.Controllers
                 ?.FirstOrDefault();
 
             // Prefix the TES task id with first eight characters of root Cromwell job id to facilitate easier debugging
-            var tesTaskIdPrefix = tesTask.WorkflowId != null && Guid.TryParse(tesTask.WorkflowId, out _) ? $"{tesTask.WorkflowId.Substring(0, 8)}_" : "";
+            var tesTaskIdPrefix = tesTask.WorkflowId is not null && Guid.TryParse(tesTask.WorkflowId, out _) ? $"{tesTask.WorkflowId.Substring(0, 8)}_" : "";
             tesTask.Id = $"{tesTaskIdPrefix}{Guid.NewGuid():N}";
 
             // For CWL workflows, if disk size is not specified in TES object (always), try to retrieve it from the corresponding workflow stored by Cromwell in /cromwell-tmp directory
             // Also allow for TES-style "memory" and "cpu" hints in CWL.
-            if (tesTask.Name != null 
+            if (tesTask.Name is not null
                 && tesTask.Inputs.Any(i => i.Path.Contains(".cwl/"))
-                && tesTask.WorkflowId != null
+                && tesTask.WorkflowId is not null
                 && azureProxy.TryReadCwlFile(tesTask.WorkflowId, out var cwlContent) 
                 && CwlDocument.TryCreate(cwlContent, out var cwlDocument))
             {
@@ -210,7 +210,7 @@ namespace TesApi.Controllers
         public virtual async Task<IActionResult> ListTasks([FromQuery]string namePrefix, [FromQuery]long? pageSize, [FromQuery]string pageToken, [FromQuery]string view)
         {
             var decodedPageToken =
-                pageToken != null ? Encoding.UTF8.GetString(Base64UrlTextEncoder.Decode(pageToken)) : null;
+                pageToken is not null ? Encoding.UTF8.GetString(Base64UrlTextEncoder.Decode(pageToken)) : null;
 
             if (pageSize < 1 || pageSize > 2047)
             {
@@ -223,7 +223,7 @@ namespace TesApi.Controllers
                 pageSize.HasValue ? (int)pageSize : 256,
                 decodedPageToken);
 
-            var encodedNextPageToken = nextPageToken != null ? Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(nextPageToken)) : null;
+            var encodedNextPageToken = nextPageToken is not null ? Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(nextPageToken)) : null;
             var response = new TesListTasksResponse { Tasks = tasks.ToList(), NextPageToken = encodedNextPageToken };
 
             return TesJsonResult(response, view);

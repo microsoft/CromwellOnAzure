@@ -52,7 +52,7 @@ namespace TesApi.Web
                         return null;
                     }
                 })
-                .Where(storageAccountInfo => storageAccountInfo != null)
+                .Where(storageAccountInfo => storageAccountInfo is not null)
                 .ToList();
         }
 
@@ -102,7 +102,7 @@ namespace TesApi.Web
                 return false;
             }
 
-            if (HttpUtility.ParseQueryString(uri.Query).Get("sig") != null)
+            if (HttpUtility.ParseQueryString(uri.Query).Get("sig") is not null)
             {
                 return true;
             }
@@ -193,7 +193,7 @@ namespace TesApi.Web
             {
                 var storageAccountInfo = await azureProxy.GetStorageAccountInfoAsync(accountName);
 
-                if (storageAccountInfo != null)
+                if (storageAccountInfo is not null)
                 {
                     onSuccess?.Invoke(storageAccountInfo);
                     return true;
@@ -217,7 +217,7 @@ namespace TesApi.Web
                 c.AccountName.Equals(accountName, StringComparison.OrdinalIgnoreCase)
                 && (string.IsNullOrEmpty(c.ContainerName) || c.ContainerName.Equals(containerName, StringComparison.OrdinalIgnoreCase)));
 
-            return result != null;
+            return result is not null;
         }
 
         private class ExternalStorageContainerInfo

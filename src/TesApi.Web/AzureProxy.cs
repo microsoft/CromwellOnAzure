@@ -100,7 +100,7 @@ namespace TesApi.Web
                     var app = (await new ApplicationInsightsManagementClient(credentials) { SubscriptionId = subscriptionId }.Components.ListAsync())
                         .FirstOrDefault(a => a.ApplicationId.Equals(appInsightsApplicationId, StringComparison.OrdinalIgnoreCase));
 
-                    if (app != null)
+                    if (app is not null)
                     {
                         return app.InstrumentationKey;
                     }
@@ -127,7 +127,7 @@ namespace TesApi.Web
                 .SelectMany(a => a)
                 .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase));
 
-            if (account == null)
+            if (account is null)
             {
                 throw new Exception($"CosmosDB account '{cosmosDbAccountName} does not exist or the TES app service does not have Account Reader role on the account.");
             }
@@ -263,11 +263,13 @@ namespace TesApi.Web
             }
         }
 
+
         /// <summary>
         /// Gets the combined state of Azure Batch job, task and pool that corresponds to the given TES task
         /// </summary>
         /// <param name="tesTaskId">The unique TES task ID</param>
         /// <returns>Job state information</returns>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1826:Do not use Enumerable methods on indexable collections", Justification = "FirstOrDefault() is straightforward, the alternative is less clear.")]
         public async Task<AzureBatchJobAndTaskState> GetBatchJobAndTaskStateAsync(string tesTaskId)
         {
             try
@@ -304,7 +306,7 @@ namespace TesApi.Web
                 var job = lastJobInfo.Job;
                 var attemptNumber = lastJobInfo.AttemptNumber;
 
-                if (job.State == JobState.Active && job.ExecutionInformation?.PoolId != null)
+                if (job.State == JobState.Active && job.ExecutionInformation?.PoolId is not null)
                 {
                     var poolFilter = new ODATADetailLevel
                     {
@@ -314,13 +316,13 @@ namespace TesApi.Web
 
                     var pool = (await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync()).FirstOrDefault();
 
-                    if (pool != null)
+                    if (pool is not null)
                     {
                         nodeAllocationFailed = pool.ResizeErrors?.Count > 0;
 
                         var node = (await pool.ListComputeNodes().ToListAsync()).FirstOrDefault();
 
-                        if (node != null)
+                        if (node is not null)
                         {
                             nodeState = node.State;
                             var nodeError = node.Errors?.FirstOrDefault();
@@ -541,7 +543,7 @@ namespace TesApi.Web
                 var azureClient = await GetAzureManagementClientAsync();
                 var storageAccount = await azureClient.WithSubscription(storageAccountInfo.SubscriptionId).StorageAccounts.GetByIdAsync(storageAccountInfo.Id);
 
-                return (await storageAccount.GetKeysAsync()).First().Value;
+                return (await storageAccount.GetKeysAsync())[0].Value;
             }
             catch (Exception ex)
             {
@@ -595,7 +597,7 @@ namespace TesApi.Web
                 continuationToken = response.ContinuationToken;
                 results.AddRange(response.Results.Cast<CloudBlob>().Select(b => b.Name));
             }
-            while (continuationToken != null);
+            while (continuationToken is not null);
 
             return results;
         }
@@ -627,7 +629,7 @@ namespace TesApi.Web
             {
                 var filePath = Directory.GetFiles("/cromwell-tmp", fileName, SearchOption.AllDirectories).FirstOrDefault();
 
-                if (filePath != null)
+                if (filePath is not null)
                 {
                     content = File.ReadAllText(filePath);
                     return true;
@@ -684,7 +686,7 @@ namespace TesApi.Web
                     VmSize = v.VmSize,
                     PricePerHourDedicated = v.RateCardMeters.FirstOrDefault(m => !m.IsLowPriority)?.MeterRate,
                     PricePerHourLowPriority = v.RateCardMeters.FirstOrDefault(m => m.IsLowPriority)?.MeterRate })
-                .Where(v => v.PricePerHourDedicated != null);
+                .Where(v => v.PricePerHourDedicated is not null);
         }
 
         /// <summary>
@@ -720,7 +722,7 @@ namespace TesApi.Web
                 var vmSpecification = vmSizesAvailableAtLocation.SingleOrDefault(x => x.Name.Equals(VmSize, StringComparison.OrdinalIgnoreCase));
                 var vmPrice = vmPrices.SingleOrDefault(x => x.VmSize.Equals(VmSize, StringComparison.OrdinalIgnoreCase));
 
-                if (vmSpecification != null && vmPrice != null)
+                if (vmSpecification is not null && vmPrice is not null)
                 {
                     vmInfos.Add(new VirtualMachineInfo
                     {
@@ -785,7 +787,7 @@ namespace TesApi.Web
                 var batchAccount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = subId }.BatchAccount.ListAsync())
                     .FirstOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase));
 
-                if (batchAccount != null)
+                if (batchAccount is not null)
                 {
                     var resourceGroupName = resourceGroupRegex.Match(batchAccount.Id).Groups[1].Value;
 
@@ -813,7 +815,7 @@ namespace TesApi.Web
             public decimal? PricePerHourLowPriority { get; set; }
 
             [JsonIgnore]
-            public bool LowPriorityAvailable => PricePerHourLowPriority != null;
+            public bool LowPriorityAvailable => PricePerHourLowPriority is not null;
         }
     }
 }

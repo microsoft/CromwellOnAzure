@@ -32,7 +32,7 @@ namespace TesApi.Web
         /// <summary>
         /// Contructor to create a cache of <see cref="IAzureProxy"/>
         /// </summary>
-        /// <param name="azureProxy"><see cref="AzureProxy"/></param>
+        /// <param name="azureProxy"><see cref="IAzureProxy"/></param>
         /// <param name="cache">Lazy cache using <see cref="IAppCache"/></param>
         public CachingWithRetriesAzureProxy(IAzureProxy azureProxy, IAppCache cache)
         {
@@ -77,11 +77,11 @@ namespace TesApi.Web
         {
             var containerRegistryInfo = cache.Get<ContainerRegistryInfo>(imageName);
 
-            if (containerRegistryInfo == null)
+            if (containerRegistryInfo is null)
             {
                 containerRegistryInfo = await asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetContainerRegistryInfoAsync(imageName));
 
-                if (containerRegistryInfo != null)
+                if (containerRegistryInfo is not null)
                 {
                     cache.Add(imageName, containerRegistryInfo, DateTimeOffset.Now.AddHours(1));
                 }
@@ -106,11 +106,11 @@ namespace TesApi.Web
         {
             var storageAccountInfo = cache.Get<StorageAccountInfo>(storageAccountName);
 
-            if (storageAccountInfo == null)
+            if (storageAccountInfo is null)
             {
                 storageAccountInfo = await asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetStorageAccountInfoAsync(storageAccountName));
 
-                if (storageAccountInfo != null)
+                if (storageAccountInfo is not null)
                 {
                     cache.Add(storageAccountName, storageAccountInfo, DateTimeOffset.MaxValue);
                 }

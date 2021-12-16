@@ -107,27 +107,27 @@ namespace Tes.Models
                 _ =>
                 (
                     StartTime == other.StartTime ||
-                    StartTime != null &&
+                    StartTime is not null &&
                     StartTime.Equals(other.StartTime)
                 ) &&
                 (
                     EndTime == other.EndTime ||
-                    EndTime != null &&
+                    EndTime is not null &&
                     EndTime.Equals(other.EndTime)
                 ) &&
                 (
                     Stdout == other.Stdout ||
-                    Stdout != null &&
+                    Stdout is not null &&
                     Stdout.Equals(other.Stdout)
                 ) &&
                 (
                     Stderr == other.Stderr ||
-                    Stderr != null &&
+                    Stderr is not null &&
                     Stderr.Equals(other.Stderr)
                 ) &&
                 (
                     ExitCode == other.ExitCode ||
-                    ExitCode != null &&
+                    ExitCode is not null &&
                     ExitCode.Equals(other.ExitCode)
                 ),
             };
@@ -142,27 +142,27 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (StartTime != null)
+                if (StartTime is not null)
                 {
                     hashCode = hashCode * 59 + StartTime.GetHashCode();
                 }
 
-                if (EndTime != null)
+                if (EndTime is not null)
                 {
                     hashCode = hashCode * 59 + EndTime.GetHashCode();
                 }
 
-                if (Stdout != null)
+                if (Stdout is not null)
                 {
                     hashCode = hashCode * 59 + Stdout.GetHashCode();
                 }
 
-                if (Stderr != null)
+                if (Stderr is not null)
                 {
                     hashCode = hashCode * 59 + Stderr.GetHashCode();
                 }
 
-                if (ExitCode != null)
+                if (ExitCode is not null)
                 {
                     hashCode = hashCode * 59 + ExitCode.GetHashCode();
                 }

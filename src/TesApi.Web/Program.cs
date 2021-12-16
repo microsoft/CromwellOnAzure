@@ -45,7 +45,7 @@ namespace TesApi.Web
                             Console.WriteLine($"ApplicationInsightsAccountName: {applicationInsightsAccountName}");
                             var instrumentationKey = AzureProxy.GetAppInsightsInstrumentationKeyAsync(applicationInsightsAccountName).Result;
 
-                            if (instrumentationKey != null)
+                            if (instrumentationKey is not null)
                             {
                                 logging.AddApplicationInsights(instrumentationKey);
                             }

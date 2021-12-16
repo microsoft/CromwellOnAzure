@@ -75,7 +75,7 @@ namespace Tes.Models
                 _ =>
                     (
                         Id == other.Id ||
-                        Id != null &&
+                        Id is not null &&
                         Id.Equals(other.Id)
                     ),
             };
@@ -90,7 +90,7 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Id != null)
+                if (Id is not null)
                 {
                     hashCode = hashCode * 59 + Id.GetHashCode();
                 }

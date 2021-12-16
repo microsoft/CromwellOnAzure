@@ -223,7 +223,7 @@ namespace TesApi.Tests
                 (_, _, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(tesTask, config, GetMockAzureProxy(AzureProxyReturnValues.Defaults));
                 Assert.AreEqual(expectedTaskState, tesTask.State);
 
-                if (expectedSelectedVmSize != null)
+                if (expectedSelectedVmSize is not null)
                 {
                     Assert.AreEqual(expectedSelectedVmSize, poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineSize);
                 }

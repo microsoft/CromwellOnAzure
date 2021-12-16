@@ -54,7 +54,7 @@ namespace Tes.Repository
                 var response = await this.container.ReadItemAsync<T>(id, partitionKey);
                 var item = response.Resource;
 
-                if (item != null)
+                if (item is not null)
                 {
                     onSuccess?.Invoke(item);
                     return true;
@@ -85,7 +85,7 @@ namespace Tes.Repository
                 (continuationToken, repositoryItems) = await GetItemsAsync(predicate, pageSize: 256, continuationToken);
                 listOfRepositoryItems.AddRange(repositoryItems);
             }
-            while (continuationToken != null);
+            while (continuationToken is not null);
 
             return listOfRepositoryItems;
         }
@@ -144,7 +144,7 @@ namespace Tes.Repository
 
             var existingPartitionKeyPath = (await container.ReadContainerAsync()).Resource.PartitionKeyPath;
 
-            if (existingPartitionKeyPath == null)
+            if (existingPartitionKeyPath is null)
             {
                 throw new Exception($"Existing CosmosDb container {container.Id} does not have partition key path defined. Recreate the container.");
             }

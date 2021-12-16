@@ -148,7 +148,7 @@ namespace CromwellOnAzureDeployer
                         {
                             linuxVm = existingVms.FirstOrDefault(vm => vm.Name.Equals(configuration.VmName, StringComparison.OrdinalIgnoreCase));
 
-                            if (linuxVm == null)
+                            if (linuxVm is null)
                             {
                                 throw new ValidationException($"Virtual machine {configuration.VmName} does not exist in resource group {configuration.ResourceGroupName}.");
                             }
@@ -160,11 +160,11 @@ namespace CromwellOnAzureDeployer
 
                         configuration.VmName = linuxVm.Name;
                         configuration.RegionName = linuxVm.RegionName;
-                        configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() == null;
+                        configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() is null;
 
                         networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault();
 
-                        if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup == null)
+                        if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup is null)
                         {
                             if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
                             {
@@ -267,30 +267,30 @@ namespace CromwellOnAzureDeployer
 
                         var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
 
-                        if (installedVersion == null)
+                        if (installedVersion is null)
                         {
                             // If upgrading from pre-2.1 version, patch the installed Cromwell configuration file (disable call caching and default to preemptible)
                             await PatchCromwellConfigurationFileV200Async(storageAccount);
                             await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
                         }
 
-                        if (installedVersion == null || installedVersion < new Version(2, 1))
+                        if (installedVersion is null || installedVersion < new Version(2, 1))
                         {
                             await PatchContainersToMountFileV210Async(storageAccount, managedIdentity.Name);
                         }
 
-                        if (installedVersion == null || installedVersion < new Version(2, 2))
+                        if (installedVersion is null || installedVersion < new Version(2, 2))
                         {
                             await PatchContainersToMountFileV220Async(storageAccount);
                         }
 
-                        if (installedVersion == null || installedVersion < new Version(2, 4))
+                        if (installedVersion is null || installedVersion < new Version(2, 4))
                         {
                             await PatchContainersToMountFileV240Async(storageAccount);
                             await PatchAccountNamesFileV240Async(sshConnectionInfo, managedIdentity);
                         }
 
-                        if (installedVersion == null || installedVersion < new Version(2, 5))
+                        if (installedVersion is null || installedVersion < new Version(2, 5))
                         {
                             await MitigateChaosDbV250Async(cosmosDb);
                         }
@@ -341,7 +341,7 @@ namespace CromwellOnAzureDeployer
                         await RegisterResourceProvidersAsync();
                         await ValidateVmAsync();
 
-                        if (batchAccount == null)
+                        if (batchAccount is null)
                         {
                             await ValidateBatchAccountQuotaAsync();
                         }
@@ -367,22 +367,22 @@ namespace CromwellOnAzureDeployer
 
                         managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
 
-                        if (vnetAndSubnet != null)
+                        if (vnetAndSubnet is not null)
                         {
                             RefreshableConsole.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.subnetName}");
                         }
 
-                        if (storageAccount != null)
+                        if (storageAccount is not null)
                         {
                             RefreshableConsole.WriteLine($"Using existing Storage Account {storageAccount.Name}");
                         }
 
-                        if (batchAccount != null)
+                        if (batchAccount is not null)
                         {
                             RefreshableConsole.WriteLine($"Using existing Batch Account {batchAccount.Name}");
                         }
 
-                        if (vnetAndSubnet == null)
+                        if (vnetAndSubnet is null)
                         {
                             configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
                             vnetAndSubnet = await CreateVnetAsync(resourceGroup, configuration.VnetName, configuration.VnetAddressSpace);
@@ -830,13 +830,13 @@ namespace CromwellOnAzureDeployer
                 return loadedImageName;
             }
 
-            if (imageNameOrTag != null && imageNameOrTag.Equals(string.Empty))
+            if (imageNameOrTag is not null && imageNameOrTag.Equals(string.Empty))
             {
                 await DeleteFileFromVirtualMachineAsync(sshConnectionInfo, $"{CromwellAzureRootDir}/{envFileName}");
             }
             else if (!string.IsNullOrEmpty(imageNameOrTag))
             {
-                var actualImageName = imageNameFactory != null ? imageNameFactory(imageNameOrTag) : imageNameOrTag;
+                var actualImageName = imageNameFactory is not null ? imageNameFactory(imageNameOrTag) : imageNameOrTag;
                 await UploadFilesToVirtualMachineAsync(sshConnectionInfo, ($"{envFileKey}={actualImageName}", $"{CromwellAzureRootDir}/{envFileName}", false));
             }
             else if (!string.IsNullOrEmpty(customImagePath))
@@ -1156,7 +1156,7 @@ namespace CromwellOnAzureDeployer
                 .Define(configuration.ResourceGroupName)
                 .WithRegion(configuration.RegionName);
 
-            resourceGroupDefinition = tags != null ? resourceGroupDefinition.WithTags(tags) : resourceGroupDefinition;
+            resourceGroupDefinition = tags is not null ? resourceGroupDefinition.WithTags(tags) : resourceGroupDefinition;
 
             return Execute(
                 $"Creating Resource Group: {configuration.ResourceGroupName}...",
@@ -1227,7 +1227,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName);
 
-                    if (cromwellConfigText == null)
+                    if (cromwellConfigText is null)
                     {
                         cromwellConfigText = GetFileContent("scripts", CromwellConfigurationFileName);
                     }
@@ -1252,7 +1252,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName);
 
-                    if (containersToMountText != null)
+                    if (containersToMountText is not null)
                     {
                         // Add datasettestinputs container if not already present
                         if (!containersToMountText.Contains("datasettestinputs.blob.core.windows.net/dataset"))
@@ -1278,7 +1278,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName);
 
-                    if (containersToMountText != null)
+                    if (containersToMountText is not null)
                     {
                         containersToMountText = containersToMountText.Replace("https://msgenpublicdata", $"#https://msgenpublicdata");
 
@@ -1293,7 +1293,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName);
 
-                    if (containersToMountText != null)
+                    if (containersToMountText is not null)
                     {
                         var regex = new Regex("^.*msgenpublicdata.blob.core.windows.net/inputs.*(\n|\r|\r\n)", RegexOptions.Multiline);
                         containersToMountText = regex.Replace(containersToMountText, string.Empty);
@@ -1323,7 +1323,7 @@ namespace CromwellOnAzureDeployer
             var taskContainer = await tesDb.GetSqlContainerAsync(Constants.CosmosDbContainerId);
             var requestThroughput = await taskContainer.GetThroughputSettingsAsync();
 
-            if (requestThroughput != null && requestThroughput.Throughput != null && requestThroughput.AutopilotSettings?.MaxThroughput == null)
+            if (requestThroughput is not null && requestThroughput.Throughput is not null && requestThroughput.AutopilotSettings?.MaxThroughput is null)
             {
                 var key = (await cosmosDb.ListKeysAsync()).PrimaryMasterKey;
                 var cosmosClient = new CosmosRestClient(cosmosDb.DocumentEndpoint, key);
@@ -1340,7 +1340,7 @@ namespace CromwellOnAzureDeployer
             var publicIPAddress = linuxVm.GetPrimaryPublicIPAddress();
 
             return new ConnectionInfo(
-                publicIPAddress != null ? publicIPAddress.Fqdn : linuxVm.GetPrimaryNetworkInterface().PrimaryPrivateIP,
+                publicIPAddress is not null ? publicIPAddress.Fqdn : linuxVm.GetPrimaryNetworkInterface().PrimaryPrivateIP,
                 vmUsername,
                 new PasswordAuthenticationMethod(vmUsername, vmPassword));
         }
@@ -1435,7 +1435,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task<IStorageAccount> ValidateAndGetExistingStorageAccountAsync()
         {
-            if (configuration.StorageAccountName == null)
+            if (configuration.StorageAccountName is null)
             {
                 return null;
             }
@@ -1446,7 +1446,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task<BatchAccount> ValidateAndGetExistingBatchAccountAsync()
         {
-            if (configuration.BatchAccountName == null)
+            if (configuration.BatchAccountName is null)
             {
                 return null;
             }
@@ -1474,7 +1474,7 @@ namespace CromwellOnAzureDeployer
 
             var vnet = await azureSubscriptionClient.Networks.GetByResourceGroupAsync(configuration.VnetResourceGroupName, configuration.VnetName);
 
-            if (vnet == null)
+            if (vnet is null)
             {
                 throw new ValidationException($"Virtual network '{configuration.VnetName}' does not exist in resource group '{configuration.VnetResourceGroupName}'.");
             }
@@ -1496,7 +1496,7 @@ namespace CromwellOnAzureDeployer
 
             var subnet = vnet.Subnets.Keys.FirstOrDefault(k => string.IsNullOrWhiteSpace(configuration.SubnetName) || k.Equals(configuration.SubnetName, StringComparison.OrdinalIgnoreCase));
 
-            if (subnet == null)
+            if (subnet is null)
             {
                 throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.SubnetName}'.");
             }
@@ -1534,7 +1534,7 @@ namespace CromwellOnAzureDeployer
 
         private static async Task<CloudBlobClient> GetBlobClientAsync(IStorageAccount storageAccount)
         {
-            var accessKey = (await storageAccount.GetKeysAsync()).First().Value;
+            var accessKey = (await storageAccount.GetKeysAsync())[0].Value;
             var storageCredentials = new StorageCredentials(storageAccount.Name, accessKey);
 
             return new CloudStorageAccount(storageCredentials, true).CreateCloudBlobClient();
@@ -1559,7 +1559,7 @@ namespace CromwellOnAzureDeployer
         {
             void ThrowIfProvidedForUpdate(object attributeValue, string attributeName)
             {
-                if (configuration.Update && attributeValue != null)
+                if (configuration.Update && attributeValue is not null)
                 {
                     throw new ValidationException($"{attributeName} must not be provided when updating", false);
                 }

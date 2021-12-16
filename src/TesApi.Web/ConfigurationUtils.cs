@@ -1,4 +1,7 @@
-﻿using System;
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -59,7 +62,7 @@ namespace TesApi.Web
 
             var allowedVmSizesFileContent = await storageAccessProvider.DownloadBlobAsync(allowedVmSizesFilePath);
 
-            if (allowedVmSizesFileContent == null)
+            if (allowedVmSizesFileContent is null)
             {
                 logger.LogWarning($"Unable to read from {allowedVmSizesFilePath}. All supported VM sizes will be eligible for Azure Batch task scheduling.");
                 return;
@@ -127,7 +130,7 @@ namespace TesApi.Web
                     v.VmInfoWithDedicatedPrice.VmSize,
                     v.VmInfoWithDedicatedPrice.VmFamily,
                     PricePerHourDedicated = v.VmInfoWithDedicatedPrice.PricePerHour?.ToString("###0.000"),
-                    PricePerHourLowPri = v.PricePerHourLowPri != null ? v.PricePerHourLowPri?.ToString("###0.000") : "N/A",
+                    PricePerHourLowPri = v.PricePerHourLowPri is not null ? v.PricePerHourLowPri?.ToString("###0.000") : "N/A",
                     MemoryInGiB = v.VmInfoWithDedicatedPrice.MemoryInGB?.ToString(),
                     NumberOfCores = v.VmInfoWithDedicatedPrice.NumberOfCores.ToString(),
                     ResourceDiskSizeInGiB = v.VmInfoWithDedicatedPrice.ResourceDiskSizeInGB.ToString(),

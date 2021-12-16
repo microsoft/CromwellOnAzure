@@ -81,7 +81,7 @@ namespace TriggerService.Tests
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
                 .Callback((string content, string container, string blobName) => {
                     newTriggerName = blobName;
-                    newTriggerContent = content != null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
+                    newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
                 });
 
             var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));

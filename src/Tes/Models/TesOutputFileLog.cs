@@ -91,17 +91,17 @@ namespace Tes.Models
                 _ =>
                 (
                     Url == other.Url ||
-                    Url != null &&
+                    Url is not null &&
                     Url.Equals(other.Url)
                 ) &&
                 (
                     Path == other.Path ||
-                    Path != null &&
+                    Path is not null &&
                     Path.Equals(other.Path)
                 ) &&
                 (
                     SizeBytes == other.SizeBytes ||
-                    SizeBytes != null &&
+                    SizeBytes is not null &&
                     SizeBytes.Equals(other.SizeBytes)
                 ),
             };
@@ -116,17 +116,17 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Url != null)
+                if (Url is not null)
                 {
                     hashCode = hashCode * 59 + Url.GetHashCode();
                 }
 
-                if (Path != null)
+                if (Path is not null)
                 {
                     hashCode = hashCode * 59 + Path.GetHashCode();
                 }
 
-                if (SizeBytes != null)
+                if (SizeBytes is not null)
                 {
                     hashCode = hashCode * 59 + SizeBytes.GetHashCode();
                 }

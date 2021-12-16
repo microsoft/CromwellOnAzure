@@ -162,7 +162,7 @@ namespace Tes.Models
                 _ =>
                 (
                     Id == other.Id ||
-                    Id != null &&
+                    Id is not null &&
                     Id.Equals(other.Id)
                 ) &&
                 (
@@ -171,52 +171,52 @@ namespace Tes.Models
                 ) &&
                 (
                     Name == other.Name ||
-                    Name != null &&
+                    Name is not null &&
                     Name.Equals(other.Name)
                 ) &&
                 (
                     Description == other.Description ||
-                    Description != null &&
+                    Description is not null &&
                     Description.Equals(other.Description)
                 ) &&
                 (
                     Inputs == other.Inputs ||
-                    Inputs != null &&
+                    Inputs is not null &&
                     Inputs.SequenceEqual(other.Inputs)
                 ) &&
                 (
                     Outputs == other.Outputs ||
-                    Outputs != null &&
+                    Outputs is not null &&
                     Outputs.SequenceEqual(other.Outputs)
                 ) &&
                 (
                     Resources == other.Resources ||
-                    Resources != null &&
+                    Resources is not null &&
                     Resources.Equals(other.Resources)
                 ) &&
                 (
                     Executors == other.Executors ||
-                    Executors != null &&
+                    Executors is not null &&
                     Executors.SequenceEqual(other.Executors)
                 ) &&
                 (
                     Volumes == other.Volumes ||
-                    Volumes != null &&
+                    Volumes is not null &&
                     Volumes.SequenceEqual(other.Volumes)
                 ) &&
                 (
                     Tags == other.Tags ||
-                    Tags != null &&
+                    Tags is not null &&
                     Tags.SequenceEqual(other.Tags)
                 ) &&
                 (
                     Logs == other.Logs ||
-                    Logs != null &&
+                    Logs is not null &&
                     Logs.SequenceEqual(other.Logs)
                 ) &&
                 (
                     CreationTime == other.CreationTime ||
-                    CreationTime != null &&
+                    CreationTime is not null &&
                     CreationTime.Equals(other.CreationTime)
                 ),
             };
@@ -231,58 +231,58 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Id != null)
+                if (Id is not null)
                 {
                     hashCode = hashCode * 59 + Id.GetHashCode();
                 }
 
                 hashCode = hashCode * 59 + State.GetHashCode();
-                if (Name != null)
+                if (Name is not null)
                 {
                     hashCode = hashCode * 59 + Name.GetHashCode();
                 }
 
-                if (Description != null)
+                if (Description is not null)
                 {
                     hashCode = hashCode * 59 + Description.GetHashCode();
                 }
 
-                if (Inputs != null)
+                if (Inputs is not null)
                 {
                     hashCode = hashCode * 59 + Inputs.GetHashCode();
                 }
 
-                if (Outputs != null)
+                if (Outputs is not null)
                 {
                     hashCode = hashCode * 59 + Outputs.GetHashCode();
                 }
 
-                if (Resources != null)
+                if (Resources is not null)
                 {
                     hashCode = hashCode * 59 + Resources.GetHashCode();
                 }
 
-                if (Executors != null)
+                if (Executors is not null)
                 {
                     hashCode = hashCode * 59 + Executors.GetHashCode();
                 }
 
-                if (Volumes != null)
+                if (Volumes is not null)
                 {
                     hashCode = hashCode * 59 + Volumes.GetHashCode();
                 }
 
-                if (Tags != null)
+                if (Tags is not null)
                 {
                     hashCode = hashCode * 59 + Tags.GetHashCode();
                 }
 
-                if (Logs != null)
+                if (Logs is not null)
                 {
                     hashCode = hashCode * 59 + Logs.GetHashCode();
                 }
 
-                if (CreationTime != null)
+                if (CreationTime is not null)
                 {
                     hashCode = hashCode * 59 + CreationTime.GetHashCode();
                 }

@@ -58,7 +58,7 @@ namespace TriggerService
                     var app = (await new ApplicationInsightsManagementClient(credentials) { SubscriptionId = subscriptionId }.Components.ListAsync())
                         .FirstOrDefault(a => a.ApplicationId.Equals(appInsightsApplicationId, StringComparison.OrdinalIgnoreCase));
 
-                    if (app != null)
+                    if (app is not null)
                     {
                         return app.InstrumentationKey;
                     }
@@ -186,7 +186,7 @@ namespace TriggerService
 
                 blobList.AddRange(partialResult.Results.OfType<CloudBlockBlob>());
             }
-            while (continuationToken != null);
+            while (continuationToken is not null);
 
             return blobList;
         }
@@ -249,7 +249,7 @@ namespace TriggerService
             var azureClient = await GetAzureManagementClientAsync();
             var storageAccount = await azureClient.WithSubscription(storageAccountInfo.SubscriptionId).StorageAccounts.GetByIdAsync(storageAccountInfo.Id);
 
-            return (await storageAccount.GetKeysAsync()).First().Value;
+            return (await storageAccount.GetKeysAsync())[0].Value;
         }
     }
 }

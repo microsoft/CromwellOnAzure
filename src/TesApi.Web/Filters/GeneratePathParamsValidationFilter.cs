@@ -29,52 +29,52 @@ namespace TesApi.Filters
 
                 var attributes = ((ControllerParameterDescriptor)par.ParameterDescriptor).ParameterInfo.CustomAttributes;
 
-                if (attributes != null && attributes.Any() && swaggerParam != null)
+                if (attributes is not null && attributes.Any() && swaggerParam is not null)
                 {
                     // Required - [Required]
                     var requiredAttr = attributes.FirstOrDefault(p => p.AttributeType == typeof(RequiredAttribute));
-                    if (requiredAttr != null)
+                    if (requiredAttr is not null)
                     {
                         swaggerParam.Required = true;
                     }
 
                     // Regex Pattern [RegularExpression]
                     var regexAttr = attributes.FirstOrDefault(p => p.AttributeType == typeof(RegularExpressionAttribute));
-                    if (regexAttr != null)
+                    if (regexAttr is not null)
                     {
                         swaggerParam.Schema.Pattern = (string)regexAttr.ConstructorArguments[0].Value;
                     }
 
                     // String Length [StringLength]
-                    int? minLenght = null, maxLength = null;
+                    int? minLength = null, maxLength = null;
                     var stringLengthAttr = attributes.FirstOrDefault(p => p.AttributeType == typeof(StringLengthAttribute));
-                    if (stringLengthAttr != null)
+                    if (stringLengthAttr is not null)
                     {
                         if (stringLengthAttr.NamedArguments.Count == 1)
                         {
-                            minLenght = (int)stringLengthAttr.NamedArguments.Single(p => p.MemberName == "MinimumLength").TypedValue.Value;
+                            minLength = (int)stringLengthAttr.NamedArguments.Single(p => p.MemberName == "MinimumLength").TypedValue.Value;
                         }
                         maxLength = (int)stringLengthAttr.ConstructorArguments[0].Value;
                     }
 
                     var minLengthAttr = attributes.FirstOrDefault(p => p.AttributeType == typeof(MinLengthAttribute));
-                    if (minLengthAttr != null)
+                    if (minLengthAttr is not null)
                     {
-                        minLenght = (int)minLengthAttr.ConstructorArguments[0].Value;
+                        minLength = (int)minLengthAttr.ConstructorArguments[0].Value;
                     }
 
                     var maxLengthAttr = attributes.FirstOrDefault(p => p.AttributeType == typeof(MaxLengthAttribute));
-                    if (maxLengthAttr != null)
+                    if (maxLengthAttr is not null)
                     {
                         maxLength = (int)maxLengthAttr.ConstructorArguments[0].Value;
                     }
 
-                    swaggerParam.Schema.MinLength = minLenght;
+                    swaggerParam.Schema.MinLength = minLength;
                     swaggerParam.Schema.MaxLength = maxLength;
 
                     // Range [Range]
                     var rangeAttr = attributes.FirstOrDefault(p => p.AttributeType == typeof(RangeAttribute));
-                    if (rangeAttr != null)
+                    if (rangeAttr is not null)
                     {
                         swaggerParam.Schema.Minimum = (int)rangeAttr.ConstructorArguments[0].Value;
                         swaggerParam.Schema.Maximum = (int)rangeAttr.ConstructorArguments[1].Value;
