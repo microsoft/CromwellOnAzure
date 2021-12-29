@@ -298,7 +298,7 @@ namespace CromwellOnAzureDeployer
 
                     if (!configuration.Update)
                     {
-                        if (configuration.PrivateNetworking.HasValue != string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry))
+                        if (configuration.PrivateNetworking.HasValue == string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry))
                         {
                             throw new ValidationException("PrivateContainerRegistry must be set when PrivateNetworking is set.");
                         }
