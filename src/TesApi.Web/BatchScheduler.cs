@@ -898,7 +898,7 @@ namespace TesApi.Web
 
             if (previouslyFailedVmSizes is not null)
             {
-                noVmFoundMessage += $" The following VM sizes were excluded from consideration because of {BatchTaskState.NodeAllocationFailed} error(s) on previous attempts: {string.Join(", ", previouslyFailedVmSizes)}";
+                noVmFoundMessage += $" The following VM sizes were excluded from consideration because of {BatchTaskState.NodeAllocationFailed} error(s) on previous attempts: {string.Join(", ", previouslyFailedVmSizes)}.";
             }
 
             if (allowedVmSizes?.Any() ?? false)

@@ -162,7 +162,7 @@ namespace CromwellOnAzureDeployer
                         configuration.RegionName = linuxVm.RegionName;
                         configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() is null;
 
-                        networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault();
+                        networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(g => g.NetworkInterfaceIds.Contains(linuxVm.GetPrimaryNetworkInterface().Id));
 
                         if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup is null)
                         {
@@ -298,6 +298,11 @@ namespace CromwellOnAzureDeployer
 
                     if (!configuration.Update)
                     {
+                        if (configuration.PrivateNetworking.HasValue != string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry))
+                        {
+                            throw new ValidationException("PrivateContainerRegistry must be set when PrivateNetworking is set.");
+                        }
+
                         ValidateRegionName(configuration.RegionName);
                         ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
@@ -452,7 +457,7 @@ namespace CromwellOnAzureDeployer
                 }
                 finally
                 {
-                    if (networkSecurityGroup is not null && true != configuration.KeepSshPortOpen)
+                    if (!configuration.KeepSshPortOpen.GetValueOrDefault())
                     {
                         await DisableSsh(networkSecurityGroup);
                     }
@@ -715,6 +720,27 @@ namespace CromwellOnAzureDeployer
             {
                 await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down");
             }
+            else if (!string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry))
+            {
+                const string file = "/etc/docker/daemon.json";
+                var dockerDaemonJsonContent = (await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {file}")).Output;
+
+                const string propName = "registry-mirrors";
+                var propValue = $"https://{configuration.PrivateContainerRegistry.Trim()}.azurecr.io";
+
+                var (content, replace) = string.IsNullOrWhiteSpace(dockerDaemonJsonContent)
+                    ? ($"{{\n  \"{propName}\": [\"{propValue}\"]\n}}\n", false)
+                    : (UpdateJsonArray(dockerDaemonJsonContent, propName, propValue), true);
+
+                if (replace)
+                {
+                    await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo rm -f {file}");
+                }
+
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo mkdir -p -m 755 {Path.GetDirectoryName(file)}");
+                await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (content, file, false));
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo chown root:root {file} && sudo chmod 644 {file}");
+            }
 
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo mkdir -p {CromwellAzureRootDir} && sudo chown {configuration.VmUsername} {CromwellAzureRootDir} && sudo chmod ug=rwx,o= {CromwellAzureRootDir}");
@@ -726,6 +752,43 @@ namespace CromwellOnAzureDeployer
             if (!configuration.Update)
             {
                 await WritePersonalizedFilesToVmAsync(sshConnectionInfo, managedIdentity);
+            }
+
+            static string UpdateJsonArray(string json, string property, string value)
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+                {
+                    throw new ArgumentException(null, nameof(json));
+                }
+
+                var replace = doc.RootElement.TryGetProperty(property, out var _);
+                var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+                using var writer = new System.Text.Json.Utf8JsonWriter(buffer, new System.Text.Json.JsonWriterOptions { Indented = true });
+                writer.WriteStartObject();
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    if (replace && prop.NameEquals(property) && !prop.Value.EnumerateArray().Select(e => e.GetString()).Contains(value))
+                    {
+                        writer.WriteStartArray(property);
+                        writer.WriteStringValue(value);
+                        prop.Value.WriteTo(writer);
+                        writer.WriteEndArray();
+                    }
+                    else
+                    {
+                        prop.WriteTo(writer);
+                    }
+                }
+
+                if (!replace)
+                {
+                    writer.WriteString(property, value);
+                }
+
+                writer.WriteEndObject();
+                writer.Flush();
+                return Encoding.UTF8.GetString(buffer.WrittenSpan);
             }
         }
 
@@ -1102,8 +1165,9 @@ namespace CromwellOnAzureDeployer
         }
 
         private Task EnableSsh(INetworkSecurityGroup networkSecurityGroup)
-            => networkSecurityGroup.SecurityRules[SshNsgRuleName].Access switch
+            => networkSecurityGroup?.SecurityRules[SshNsgRuleName].Access switch
             {
+                null => Task.FromResult(false),
                 var x when SecurityRuleAccess.Allow.Equals(x) => Task.FromResult(false),
                 _ => Execute(
                     "Enabling SSH on VM...",
@@ -1111,7 +1175,7 @@ namespace CromwellOnAzureDeployer
             };
 
         private Task DisableSsh(INetworkSecurityGroup networkSecurityGroup)
-            => Execute(
+            => networkSecurityGroup is null ? Task.FromResult(false) : Execute(
                 "Disabling SSH on VM...",
                 () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).DenyInbound().Parent().ApplyAsync()
             );
@@ -1411,7 +1475,9 @@ namespace CromwellOnAzureDeployer
                 .Body
                 .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
-            if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId)))
+            var isuserAccessAdministrator = currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId);
+
+            if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && isuserAccessAdministrator))
             {
                 if (!rgExists)
                 {
@@ -1427,9 +1493,11 @@ namespace CromwellOnAzureDeployer
                     throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
                 }
 
-                SkipBillingReaderRoleAssignment = true;
-
-                DisplayBillingReaderInsufficientAccessLevelWarning();
+                if (!isuserAccessAdministrator)
+                {
+                    SkipBillingReaderRoleAssignment = true;
+                    DisplayBillingReaderInsufficientAccessLevelWarning();
+                }
             }
         }
 
@@ -1620,8 +1688,10 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
+            ThrowIfProvidedForUpdate(configuration.VnetResourceGroupName, nameof(configuration.VnetResourceGroupName));
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
+            ThrowIfProvidedForUpdate(configuration.PrivateContainerRegistry, nameof(configuration.PrivateContainerRegistry));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
         }
 
