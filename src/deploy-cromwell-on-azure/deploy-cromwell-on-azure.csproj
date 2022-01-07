@@ -74,4 +74,16 @@
     <EmbeddedResource Include="testInputs.json" />
   </ItemGroup>
 
+  <Target Name="GetDeploymentHelpers" BeforeTargets="ResolveReferences">
+    <MSBuild Projects="..\SetDockerDaemon\SetDockerDaemon.csproj"
+	     Targets="Publish;PublishItemsOutputGroup"
+	     Properties="PublishProfile=FolderProfile"
+	     RemoveProperties="Configure">
+      <Output TaskParameter="TargetOutputs" ItemName="CoABuiltResource"/>
+    </MSBuild>
+    <ItemGroup>
+      <EmbeddedResource Condition=" '%(CoABuiltResource.MSBuildSourceTargetName)' == 'PublishItemsOutputGroup' And '%(CoABuiltResource.Extension)' != '.pdb'" Include="@(CoABuiltResource->'..\SetDockerDaemon\%(Identity)')"/>
+    </ItemGroup>
+  </Target>
+
 </Project>

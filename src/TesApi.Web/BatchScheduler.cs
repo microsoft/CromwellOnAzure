@@ -206,9 +206,8 @@ namespace TesApi.Web
                 var tesTaskLog = tesTask.AddTesTaskLog();
 
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
-                var dockerImage = tesTask.Executors.First().Image;
-                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask);
-                var poolInformation = await CreatePoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority);
+                var poolInformation = await CreatePoolInformation(tesTask.Executors.First().Image, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority);
+                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, poolInformation?.AutoPoolSpecification?.PoolSpecification?.VirtualMachineConfiguration?.ContainerConfiguration is not null);
 
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
 
@@ -429,8 +428,9 @@ namespace TesApi.Web
         /// Returns job preparation and main Batch tasks that represents the given <see cref="TesTask"/>
         /// </summary>
         /// <param name="task">The <see cref="TesTask"/></param>
+        /// <param name="poolHasContainerConfig">Indicates that <see cref="TaskContainerSettings"/> must be set.</param>
         /// <returns>Job preparation and main Batch tasks</returns>
-        private async Task<CloudTask> ConvertTesTaskToBatchTaskAsync(TesTask task)
+        private async Task<CloudTask> ConvertTesTaskToBatchTaskAsync(TesTask task, bool poolHasContainerConfig)
         {
             var cromwellPathPrefixWithoutEndSlash = CromwellPathPrefix.TrimEnd('/');
             var taskId = task.Id;
@@ -577,7 +577,7 @@ namespace TesApi.Web
                 }
             };
 
-            if (!executorImageIsPublic)
+            if (poolHasContainerConfig)
             {
                 // If the executor image is private, and in order to run multiple containers in the main task, the image has to be downloaded via pool ContainerConfiguration.
                 // This also requires that the main task runs inside a container. So we run the "docker" container that in turn runs other containers.
@@ -715,6 +715,15 @@ namespace TesApi.Web
                 TargetLowPriorityComputeNodes = preemptible ? 1 : 0,
                 TargetDedicatedComputeNodes = preemptible ? 0 : 1
             };
+
+            if (vmConfig.ContainerConfiguration is not null)
+            {
+                poolSpecification.StartTask = new StartTask
+                {
+                    CommandLine = $"/usr/bin/sudo ./SetDockerDaemon {Environment.GetEnvironmentVariable("PrivateContainerRegistry")}",
+                    ResourceFiles = Enumerable.Repeat(ResourceFile.FromAutoStorageContainer("utilities", fileMode: "0775"), 1).ToList()
+                };
+            }
 
             if (!string.IsNullOrEmpty(this.batchNodesSubnetId))
             {

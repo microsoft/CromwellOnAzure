@@ -27,6 +27,7 @@ services:
       - DockerInDockerImageName=$DockerInDockerImageName
       - BlobxferImageName=$BlobxferImageName
       - DisableBatchNodesPublicIpAddress=$DisableBatchNodesPublicIpAddress
+      - PrivateContainerRegistry=$PrivateContainerRegistry
     expose:
       - "80"
     volumes:
