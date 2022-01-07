@@ -77,7 +77,7 @@
 
   <Target Name="GetDeploymentHelpersPaths" BeforeTargets="GetDeploymentHelpers">
     <MSBuild Projects="$(CoAEmbedResourceProjects)"
-	     Targets="BuiltProjectOutputGroup;PublishItemsOutputGroup"
+	     Targets="Restore;BuiltProjectOutputGroup;PublishItemsOutputGroup"
 	     RemoveProperties="PublishDir"
 	     Properties="PublishProfile=FolderProfile">
       <Output TaskParameter="TargetOutputs" ItemName="_CoABuiltResource"/>
