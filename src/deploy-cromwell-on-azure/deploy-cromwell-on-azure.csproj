@@ -78,6 +78,7 @@
   <Target Name="GetDeploymentHelpersPaths" BeforeTargets="GetDeploymentHelpers">
     <MSBuild Projects="$(CoAEmbedResourceProjects)"
 	     Targets="BuiltProjectOutputGroup;PublishItemsOutputGroup"
+	     RemoveProperties="PublishDir"
 	     Properties="PublishProfile=FolderProfile">
       <Output TaskParameter="TargetOutputs" ItemName="_CoABuiltResource"/>
     </MSBuild>
@@ -92,7 +93,7 @@
   <Target Name="GetDeploymentHelpers" BeforeTargets="ResolveReferences" Inputs="@(CoAPrebuiltResource);@(CoABuiltResource)" Outputs="$(TargetPath)">
     <MSBuild Projects="$(CoAEmbedResourceProjects)"
 	     Targets="Publish"
-	     RemoveProperties="PublishTrimmed"
+	     RemoveProperties="PublishTrimmed;PublishDir"
 	     Properties="PublishProfile=FolderProfile"/>
     <ItemGroup>
       <EmbeddedResource Include="@(CoABuiltResource)"/>
