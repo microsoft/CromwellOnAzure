@@ -92,6 +92,7 @@
   <Target Name="GetDeploymentHelpers" BeforeTargets="ResolveReferences" Inputs="@(CoAPrebuiltResource);@(CoABuiltResource)" Outputs="$(TargetPath)">
     <MSBuild Projects="$(CoAEmbedResourceProjects)"
 	     Targets="Publish"
+	     RemoveProperties="PublishTrimmed"
 	     Properties="PublishProfile=FolderProfile"/>
     <ItemGroup>
       <EmbeddedResource Include="@(CoABuiltResource)"/>
