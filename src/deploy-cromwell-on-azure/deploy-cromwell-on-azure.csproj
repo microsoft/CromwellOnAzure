@@ -77,14 +77,14 @@
 
   <Target Name="GetDeploymentHelpersPaths" BeforeTargets="GetDeploymentHelpers">
     <MSBuild Projects="$(CoAEmbedResourceProjects)"
-	     Targets="Restore;BuiltProjectOutputGroup;PublishItemsOutputGroup"
-	     RemoveProperties="PublishDir"
+	     Targets="BuiltProjectOutputGroup;SourceFilesProjectOutputGroup;ContentFilesProjectOutputGroup;PublishItemsOutputGroup"
+	     RemoveProperties="PublishTrimmed;PublishDir;Platform;TargetFramework;RuntimeIdentifier;SelfContained;PublishSingleFile;OutputType;TargetDir;TargetPath;OutDir;OutputPath;IntermediateOutputPath;BaseIntermediateOutputPath"
 	     Properties="PublishProfile=FolderProfile">
       <Output TaskParameter="TargetOutputs" ItemName="_CoABuiltResource"/>
     </MSBuild>
     <ItemGroup>
-      <CoAPrebuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' == 'BuiltProjectOutputGroup' And $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'%(Identity)')"/>
-      <CoAPrebuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' == 'BuiltProjectOutputGroup' And ! $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'..\SetDockerDaemon\%(Identity)')"/>
+      <CoAPrebuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' != 'PublishItemsOutputGroup' And $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'%(Identity)')"/>
+      <CoAPrebuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' != 'PublishItemsOutputGroup' And ! $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'..\SetDockerDaemon\%(Identity)')"/>
       <CoABuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' == 'PublishItemsOutputGroup' And '%(_CoABuiltResource.Extension)' != '.pdb' And $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'%(Identity)')"/>
       <CoABuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' == 'PublishItemsOutputGroup' And '%(_CoABuiltResource.Extension)' != '.pdb' And ! $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'..\SetDockerDaemon\%(Identity)')"/>
     </ItemGroup>
