@@ -75,7 +75,7 @@
     <EmbeddedResource Include="testInputs.json" />
   </ItemGroup>
 
-  <Target Name="GetDeploymentHelpersPaths" BeforeTargets="GetDeploymentHelpers">
+  <!--Target Name="GetDeploymentHelpersPaths" BeforeTargets="GetDeploymentHelpers">
     <MSBuild Projects="$(CoAEmbedResourceProjects)"
 	     Targets="BuiltProjectOutputGroup;SourceFilesProjectOutputGroup;ContentFilesProjectOutputGroup;PublishItemsOutputGroup"
 	     RemoveProperties="PublishTrimmed;PublishDir;Platform;TargetFramework;RuntimeIdentifier;SelfContained;PublishSingleFile;OutputType;TargetDir;TargetPath;OutDir;OutputPath;IntermediateOutputPath;BaseIntermediateOutputPath"
@@ -98,6 +98,6 @@
     <ItemGroup>
       <EmbeddedResource Include="@(CoABuiltResource)"/>
     </ItemGroup>
-  </Target>
+  </Target-->
 
 </Project>
