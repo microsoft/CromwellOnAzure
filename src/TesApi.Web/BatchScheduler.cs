@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
+using Microsoft.Azure.KeyVault.WebKey;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -194,7 +195,7 @@ namespace TesApi.Web
 
         private async Task DeleteBatchJobAndPoolIfExists(IAzureProxy azureProxy, TesTask tesTask)
         {
-            var deletionException = new BatchDeletionException();
+            var batchDeletionExceptions = new List<Exception>();
 
             try
             {
@@ -203,7 +204,7 @@ namespace TesApi.Web
             catch (Exception exc)
             {
                 logger.LogError(exc, $"Exception deleting batch job with tesTask.Id: {tesTask?.Id}");
-                deletionException.JobDeletionException = exc;
+                batchDeletionExceptions.Add(exc);
             }
 
             try
@@ -213,13 +214,12 @@ namespace TesApi.Web
             catch (Exception exc)
             {
                 logger.LogError(exc, $"Exception deleting batch pool with tesTask.Id: {tesTask?.Id}");
-                deletionException.PoolDeletionException = exc;
+                batchDeletionExceptions.Add(exc);
             }
 
-            if (deletionException.JobDeletionException != null
-                || deletionException.PoolDeletionException != null)
+            if (batchDeletionExceptions.Any())
             {
-                throw deletionException;
+                throw new AggregateException(batchDeletionExceptions);
             }
         }
 
