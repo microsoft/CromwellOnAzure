@@ -1370,8 +1370,8 @@ namespace CromwellOnAzureDeployer
                 $"Adding new settings to 'env-04-settings.txt' file on the VM...",
                 async () =>
                 {
-                    var commandResult = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
-                    var newFileContent = Utility.UpdateExistingSettingsFileContentV300(commandResult.Output.Trim());
+                    var existingFileContent = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
+                    var newFileContent = Utility.UpdateExistingSettingsFileContentV300(existingFileContent.Output.Trim());
 
                     await UploadFilesToVirtualMachineAsync(
                         sshConnectionInfo,

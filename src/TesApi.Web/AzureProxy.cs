@@ -254,7 +254,6 @@ namespace TesApi.Web
                 job = await batchClient.JobOperations.GetJobAsync(job.Id); // Retrieve the "bound" version of the job
                 job.PoolInformation = poolInformation;  // Redoing this since the container registry password is not retrieved by GetJobAsync()
                 job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
-                
                 await job.AddTaskAsync(cloudTask);
                 await job.CommitAsync();
             }
