@@ -1,5 +1,3 @@
-version 1.0
-
 task hello {
   String name
   File inputFile
