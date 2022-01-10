@@ -43,33 +43,22 @@ namespace TesApi.Tests
                 new VirtualMachineInfo { VmSize = "VmSize1", LowPriority = true, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 1 },
                 new VirtualMachineInfo { VmSize = "VmSize2", LowPriority = true, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 2 }};
 
-            var backendParameters = new Dictionary<string, string>();
-            backendParameters.Add("vm_size", "VmSize1");
-            var state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = backendParameters }, azureProxyReturnValues);
+            var state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new() { { "vm_size", "VmSize1" } } }, azureProxyReturnValues);
             Assert.AreEqual(TesState.INITIALIZINGEnum, state);
 
-            backendParameters = new Dictionary<string, string>();
-            backendParameters.Add("vm_size", "VMSIZE1");
-            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = backendParameters }, azureProxyReturnValues);
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new() { { "vm_size", "VMSIZE1" } } }, azureProxyReturnValues);
             Assert.AreEqual(TesState.INITIALIZINGEnum, state);
 
-            backendParameters = new Dictionary<string, string>();
-            backendParameters.Add("vm_size", "VmSize1");
-            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = backendParameters, CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new() { { "vm_size", "VmSize1" } } , CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
             Assert.AreEqual(TesState.INITIALIZINGEnum, state);
 
-            backendParameters = new Dictionary<string, string>();
-            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = backendParameters, CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new(), CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
             Assert.AreEqual(TesState.SYSTEMERROREnum, state);
 
-            backendParameters = new Dictionary<string, string>();
-            backendParameters.Add("vm_size", "VmSize1");
-            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = false, BackendParameters = backendParameters }, azureProxyReturnValues);
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = false, BackendParameters = new() { { "vm_size", "VmSize1" } } }, azureProxyReturnValues);
             Assert.AreEqual(TesState.SYSTEMERROREnum, state);
 
-            backendParameters = new Dictionary<string, string>();
-            backendParameters.Add("vm_size", "VmSize3");
-            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = backendParameters }, azureProxyReturnValues);
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new() { { "vm_size", "VmSize3" } } }, azureProxyReturnValues);
             Assert.AreEqual(TesState.SYSTEMERROREnum, state);
         }
 
