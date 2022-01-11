@@ -901,13 +901,33 @@ namespace TesApi.Web
                 }
             }
 
+            // Pool StartTask: Install Docker as start task if it's not already. Only for Debian based systems.
+            // Must be added to a job's PoolSpecification.
+            var poolStartTask = new StringBuilder();
+            poolStartTask.Append($"echo \"Start Task: Running, Checking if Docker is installed\"");
+            poolStartTask.Append($"if  !docker -v ; then");
+            poolStartTask.Append($"echo \"Start Task: Installing Docker\"");
+            poolStartTask.Append($"sudo apt update && \\");
+            poolStartTask.Append($"sudo apt install -y apt-transport-https ca-certificates curl software-properties-common && \\");
+            poolStartTask.Append($"sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \\");
+            poolStartTask.Append($"sudo apt-key add - && \\");
+            poolStartTask.Append($"sudo add-apt-repository -y \"deb[arch = amd64] https://download.docker.com/linux/ubuntu bionic stable\" && \\");
+            poolStartTask.Append($"sudo apt update && \\");
+            poolStartTask.Append($"sudo apt install -y docker-ce");
+            poolStartTask.Append($"fi");
+            poolStartTask.Append($"echo \"Start Task: Completed, Docker is currently installed\"");
+
             var poolSpecification = new PoolSpecification
             {
                 VirtualMachineConfiguration = vmConfig,
                 VirtualMachineSize = vmSize,
                 ResizeTimeout = TimeSpan.FromMinutes(30),
                 TargetLowPriorityComputeNodes = preemptible ? 1 : 0,
-                TargetDedicatedComputeNodes = preemptible ? 0 : 1
+                TargetDedicatedComputeNodes = preemptible ? 0 : 1,
+                StartTask = new Microsoft.Azure.Batch.StartTask
+                {
+                    CommandLine = poolStartTask.ToString()
+                }
             };
 
             if (!string.IsNullOrEmpty(this.batchNodesSubnetId))
