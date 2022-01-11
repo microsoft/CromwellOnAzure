@@ -483,15 +483,19 @@ namespace TesApi.Web
             var azureClient = await GetAzureManagementClientAsync();
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
             var infos = new List<ContainerRegistryInfo>();
+            logger.LogInformation(@"GetAccessibleContainerRegistriesAsync() called.");
 
             foreach (var subId in subscriptionIds)
             {
                 try
                 {
                     var registries = (await azureClient.WithSubscription(subId).ContainerRegistries.ListAsync()).ToList();
+                    logger.LogInformation(@"Searching {subscriptionId} for container registries.", subId);
 
                     foreach (var r in registries)
                     {
+                        logger.LogInformation(@"Found {Name}. AdminUserEnabled: {AdminUserEnabled}", r.Name, r.AdminUserEnabled);
+
                         try
                         {
                             var server = await r.GetCredentialsAsync();
@@ -510,6 +514,7 @@ namespace TesApi.Web
                 }
             }
 
+            logger.LogInformation(@"GetAccessibleContainerRegistriesAsync() returning {Count} registries.", infos.Count);
             return infos;
         }
 

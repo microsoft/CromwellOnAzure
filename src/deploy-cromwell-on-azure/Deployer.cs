@@ -1782,6 +1782,11 @@ namespace CromwellOnAzureDeployer
                 wdlFileContent = wdlFileContent.Replace("preemptible: true", "preemptible: false", StringComparison.OrdinalIgnoreCase);
             }
 
+            if (!string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry))
+            {
+                wdlFileContent = wdlFileContent.Replace($"'{configuration.PrivateContainerRegistry.Trim()}.azurecr.io/ubuntu:", "'ubuntu:", StringComparison.Ordinal);
+            }
+
             var workflowTrigger = new Workflow
             {
                 WorkflowUrl = $"/{storageAccount.Name}/{InputsContainerName}/{testDirectoryName}/{wdlFileName}",
