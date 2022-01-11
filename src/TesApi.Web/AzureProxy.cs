@@ -921,6 +921,18 @@ namespace TesApi.Web
                     }
                 }
 
+                // Pool StartTask: Install Docker as start task if it's not already. Only for Debian based systems.
+                var poolStartTask = new StringBuilder();
+                poolStartTask.Append($"if  !docker - v ; then");
+                poolStartTask.Append($"sudo apt update && \\");
+                poolStartTask.Append($"sudo apt install - y apt - transport - https ca - certificates curl software-properties - common && \\");
+                poolStartTask.Append($"sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \\");
+                poolStartTask.Append($"sudo apt-key add - && \\");
+                poolStartTask.Append($"sudo add-apt - repository - y \"deb[arch = amd64] https://download.docker.com/linux/ubuntu bionic stable\" && \\");
+                poolStartTask.Append($"sudo apt update && \\");
+                poolStartTask.Append($"sudo apt install -y docker - ce");
+                poolStartTask.Append($"fi");
+
                 var poolInfo = new Microsoft.Azure.Management.Batch.Models.Pool(name: poolName)
                 {
                     VmSize = vmSize,
@@ -946,6 +958,10 @@ namespace TesApi.Web
                         {
                             [identityResourceId] = new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities()
                         }
+                    },
+                    StartTask = new Microsoft.Azure.Management.Batch.Models.StartTask
+                    { 
+                        CommandLine = poolStartTask.ToString()
                     }
                     
                 };
