@@ -128,7 +128,7 @@ namespace CromwellOnAzureDeployer
                     {
                         resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
 
-                        var targetVersion = DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
+                        var targetVersion = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
 
                         RefreshableConsole.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
@@ -207,7 +207,7 @@ namespace CromwellOnAzureDeployer
                             configuration.KeepSshPortOpen ??= retrievedKeepSshPortOpen;
                         }
 
-                        var accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
+                        var accountNames = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
 
                         if (!accountNames.Any())
                         {
@@ -1188,7 +1188,7 @@ namespace CromwellOnAzureDeployer
 
         private Task<IResourceGroup> CreateResourceGroupAsync()
         {
-            var tags = !string.IsNullOrWhiteSpace(configuration.Tags) ? DelimitedTextToDictionary(configuration.Tags, "=", ",") : null;
+            var tags = !string.IsNullOrWhiteSpace(configuration.Tags) ? Utility.DelimitedTextToDictionary(configuration.Tags, "=", ",") : null;
 
             var resourceGroupDefinition = azureSubscriptionClient
                 .ResourceGroups
@@ -1357,10 +1357,10 @@ namespace CromwellOnAzureDeployer
                 $"Adding Managed Identity ClientId to 'env-01-account-names.txt' file on the VM...",
                 async () =>
                 {
-                    var accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt")).Output);
+                    var accountNames = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt")).Output);
                     accountNames["ManagedIdentityClientId"] = managedIdentity.ClientId;
 
-                    await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (DictionaryToDelimitedText(accountNames), $"{CromwellAzureRootDir}/env-01-account-names.txt", false));
+                    await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.DictionaryToDelimitedText(accountNames), $"{CromwellAzureRootDir}/env-01-account-names.txt", false));
                 });
         }
 
@@ -1371,7 +1371,15 @@ namespace CromwellOnAzureDeployer
                 async () =>
                 {
                     var existingFileContent = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
-                    var newFileContent = Utility.UpdateExistingSettingsFileContentV300(existingFileContent.Output.Trim());
+                    var existingSettings = Utility.DelimitedTextToDictionary(existingFileContent.Output.Trim());
+                    var newSettings = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-04-settings.txt"));
+
+                    foreach (var key in newSettings.Keys.Except(existingSettings.Keys))
+                    {
+                        existingSettings.Add(key, newSettings[key]);
+                    }
+
+                    var newFileContent = Utility.DictionaryToDelimitedText(existingSettings);
 
                     await UploadFilesToVirtualMachineAsync(
                         sshConnectionInfo,
@@ -1659,7 +1667,7 @@ namespace CromwellOnAzureDeployer
 
                 try
                 {
-                    DelimitedTextToDictionary(attributeValue, "=", ",");
+                    Utility.DelimitedTextToDictionary(attributeValue, "=", ",");
                 }
                 catch
                 {
@@ -1962,19 +1970,6 @@ namespace CromwellOnAzureDeployer
 
             return string.Join(dirSeparator, pathComponents.Take(pathComponents.Length - 1));
         }
-
-        private static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
-        {
-            return text.Trim().Split(rowDelimiter)
-                .Select(r => r.Trim().Split(fieldDelimiter))
-                .ToDictionary(f => f[0].Trim(), f => f[1].Trim());
-        }
-        
-        private static string DictionaryToDelimitedText(Dictionary<string, string> dictionary, string fieldDelimiter = "=", string rowDelimiter = "\n")
-        {
-            return string.Join(rowDelimiter, dictionary.Select(kv => $"{kv.Key}{fieldDelimiter}{kv.Value}"));
-        }
-
         private class ValidationException : Exception
         {
             public string Reason { get; set; }

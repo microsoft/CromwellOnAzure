@@ -12,6 +12,17 @@ namespace CromwellOnAzureDeployer
 {
     public static class Utility
     {
+        public static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
+        {
+            return text.Trim().Split(rowDelimiter)
+                .Select(r => r.Trim().Split(fieldDelimiter))
+                .ToDictionary(f => f[0].Trim(), f => f[1].Trim());
+        }
+
+        public static string DictionaryToDelimitedText(Dictionary<string, string> dictionary, string fieldDelimiter = "=", string rowDelimiter = "\n")
+        {
+            return string.Join(rowDelimiter, dictionary.Select(kv => $"{kv.Key}{fieldDelimiter}{kv.Value}"));
+        }
         public static string GetFileContent(params string[] pathComponentsRelativeToAppBase)
         {
             var embeddedResourceName = $"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}";
@@ -19,49 +30,6 @@ namespace CromwellOnAzureDeployer
 
             using var reader = new StreamReader(embeddedResourceStream);
             return reader.ReadToEnd().Replace("\r\n", "\n");
-        }
-
-        public static string UpdateExistingSettingsFileContentV300(string existingSettingsFileContent)
-        {
-            var existingSettingsFileContentLines = existingSettingsFileContent.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            var settingsFileContent = GetFileContent("scripts", "env-04-settings.txt");
-
-            var newSettingsKeys = new List<string>
-                {
-                    "BatchImageOffer",
-                    "BatchImagePublisher",
-                    "BatchImageSku",
-                    "BatchImageVersion",
-                    "BatchNodeAgentSkuId",
-                    "XilinxFpgaVmSizePrefixes",
-                    "XilinxFpgaBatchImageOffer",
-                    "XilinxFpgaBatchImagePublisher",
-                    "XilinxFpgaBatchImageSku",
-                    "XilinxFpgaBatchImageVersion",
-                    "XilinxFpgaBatchNodeAgentSkuId",
-                    "MarthaUrl",
-                    "MarthaKeyVaultName",
-                    "MarthaSecretName"
-                };
-
-            var newEnv04SettingsLines = settingsFileContent
-                .Replace("\r\n", "\n")
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                .Where(line => newSettingsKeys.Any(key => line.StartsWith($"{key}=", StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-
-            foreach (var line in newEnv04SettingsLines)
-            {
-                var kv = line.Split('=', StringSplitOptions.RemoveEmptyEntries);
-
-                if (!existingSettingsFileContentLines.Any(line => line.Trim().StartsWith($"{kv[0]}=", StringComparison.OrdinalIgnoreCase)))
-                {
-                    // Add new settings if they don't exist
-                    existingSettingsFileContent += $"{line}\n";
-                }
-            }
-
-            return existingSettingsFileContent;
         }
 
         /// <summary>
