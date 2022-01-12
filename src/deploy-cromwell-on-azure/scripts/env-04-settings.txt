@@ -1,11 +1,11 @@
 ﻿UsePreemptibleVmsOnly=false
 DisableBatchScheduling=false
 AzureOfferDurableId=MS-AZR-0003p
-BatchImageOffer=ubuntu-server-container
-BatchImagePublisher=microsoft-azure-batch
-BatchImageSku=20-04-lts
+BatchImageOffer=xilinx_alveo_u250_deployment_vm_ubuntu1804_032321
+BatchImagePublisher=xilinx
+BatchImageSku=xilinx_alveo_u250_deployment_vm_ubuntu_1804_032321
 BatchImageVersion=latest
-BatchNodeAgentSkuId=batch.node.ubuntu 20.04
+BatchNodeAgentSkuId=batch.node.ubuntu 18.04
 XilinxFpgaVmSizePrefixes=Standard_NP,
 XilinxFpgaBatchImageOffer=xilinx_alveo_u250_deployment_vm_ubuntu1804_032321
 XilinxFpgaBatchImagePublisher=xilinx
