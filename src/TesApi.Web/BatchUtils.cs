@@ -12,10 +12,15 @@ namespace TesApi.Web
     public class BatchUtils
     {
         /// <summary>
+        /// Readonly variable for the command line string so we're only reading from the file once.
+        /// </summary>
+        public static readonly string BatchDockerInstallationScript = GetBatchDockerInstallationScript(); 
+
+        /// <summary>
         /// Converts the install-docker.sh shell script to a string.
         /// </summary>
         /// <returns>The string version of the shell script.</returns>
-        public static string GetBatchDockerInstallationScript()
+        private static string GetBatchDockerInstallationScript()
         {
             return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Scripts/install-docker.sh"));
         }

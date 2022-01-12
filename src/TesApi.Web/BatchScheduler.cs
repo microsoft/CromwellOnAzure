@@ -911,7 +911,7 @@ namespace TesApi.Web
                 StartTask = new Microsoft.Azure.Batch.StartTask
                 {
                     // Pool StartTask: Install Docker as start task if it's not already. Only for Debian based systems.
-                    CommandLine = BatchUtils.GetBatchDockerInstallationScript()
+                    CommandLine = BatchUtils.BatchDockerInstallationScript
         }
             };
 

@@ -950,7 +950,7 @@ namespace TesApi.Web
                     StartTask = new Microsoft.Azure.Management.Batch.Models.StartTask
                     { 
                         // Install Docker as pool's start task.
-                        CommandLine = BatchUtils.GetBatchDockerInstallationScript()
+                        CommandLine = BatchUtils.BatchDockerInstallationScript
                     }
                     
                 };
