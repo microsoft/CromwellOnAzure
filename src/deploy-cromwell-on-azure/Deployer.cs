@@ -1317,11 +1317,9 @@ namespace CromwellOnAzureDeployer
 
                     await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.DictionaryToDelimitedText(accountNames), $"{CromwellAzureRootDir}/env-01-account-names.txt", false));
                 });
-        }
 
         private Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
-        {
-            return Execute(
+            => Execute(
                 $"Adding new settings to 'env-04-settings.txt' file on the VM...",
                 async () =>
                 {
