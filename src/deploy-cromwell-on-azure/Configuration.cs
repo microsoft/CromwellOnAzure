@@ -14,6 +14,8 @@ namespace CromwellOnAzureDeployer
         public string SubscriptionId { get; set; }
         public string RegionName { get; set; }
         public string MainIdentifierPrefix { get; set; } = "coa";
+        public string VmOsProvider { get; set; } = "Canonical";
+        public string VmOsName { get; set; } = "UbuntuServer";
         public string VmOsVersion { get; set; } = "18.04-LTS";
         public string VmSize { get; set; } = "Standard_D3_v2";
         public string VnetAddressSpace { get; set; } = "10.0.0.0/24";
