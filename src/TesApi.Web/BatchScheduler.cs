@@ -907,7 +907,12 @@ namespace TesApi.Web
                 VirtualMachineSize = vmSize,
                 ResizeTimeout = TimeSpan.FromMinutes(30),
                 TargetLowPriorityComputeNodes = preemptible ? 1 : 0,
-                TargetDedicatedComputeNodes = preemptible ? 0 : 1
+                TargetDedicatedComputeNodes = preemptible ? 0 : 1,
+                StartTask = new Microsoft.Azure.Batch.StartTask
+                {
+                    // Pool StartTask: Install Docker as start task if it's not already. Only for Debian based systems.
+                    CommandLine = BatchUtils.BatchDockerInstallationScript
+        }
             };
 
             if (!string.IsNullOrEmpty(this.batchNodesSubnetId))

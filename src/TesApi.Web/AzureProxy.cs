@@ -946,6 +946,11 @@ namespace TesApi.Web
                         {
                             [identityResourceId] = new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities()
                         }
+                    },
+                    StartTask = new Microsoft.Azure.Management.Batch.Models.StartTask
+                    { 
+                        // Install Docker as pool's start task.
+                        CommandLine = BatchUtils.BatchDockerInstallationScript
                     }
                     
                 };
