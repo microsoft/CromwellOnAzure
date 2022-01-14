@@ -14,15 +14,15 @@ namespace TesApi.Web
         /// <summary>
         /// Readonly variable for the command line string so we're only reading from the file once.
         /// </summary>
-        public static readonly string BatchDockerInstallationScript = GetBatchDockerInstallationScript(); 
+        public static readonly string XilinxStartTaskScript = GetXilinxStartTaskScript(); 
 
         /// <summary>
         /// Converts the install-docker.sh shell script to a string.
         /// </summary>
         /// <returns>The string version of the shell script.</returns>
-        private static string GetBatchDockerInstallationScript()
+        private static string GetXilinxStartTaskScript()
         {
-            return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Scripts/install-docker.sh"));
+            return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Scripts/xilinx-start-task.sh"));
         }
     }
 }

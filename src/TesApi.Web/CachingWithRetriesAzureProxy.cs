@@ -154,8 +154,8 @@ namespace TesApi.Web
         public bool TryReadCwlFile(string workflowId, out string content) => azureProxy.TryReadCwlFile(workflowId, out content);
 
         /// <inheritdoc/>
-        public Task CreateManualBatchPoolAsync(string poolName, string vmSize, bool isLowPriority, string executorImage, BatchNodeInfo nodeInfo, string dockerInDockerImageName, string blobxferImageName, string identityResourceId, bool disableBatchNodesPublicIpAddress, string batchNodesSubnetId, BatchNodeInfo xilinxFpgaBatchNodeInfo, string[] xilinxFpgaVmSizePrefixes)
-            => azureProxy.CreateManualBatchPoolAsync(poolName, vmSize, isLowPriority, executorImage, nodeInfo, dockerInDockerImageName, blobxferImageName, identityResourceId, disableBatchNodesPublicIpAddress, batchNodesSubnetId, xilinxFpgaBatchNodeInfo, xilinxFpgaVmSizePrefixes);
+        public Task CreateManualBatchPoolAsync(string poolName, string vmSize, bool isLowPriority, string executorImage, BatchNodeInfo nodeInfo, string dockerInDockerImageName, string blobxferImageName, string identityResourceId, bool disableBatchNodesPublicIpAddress, string batchNodesSubnetId, BatchNodeInfo xilinxFpgaBatchNodeInfo, bool isVmSizeXilinxFpga, string startTaskSasUrl, string startTaskPath)
+            => azureProxy.CreateManualBatchPoolAsync(poolName, vmSize, isLowPriority, executorImage, nodeInfo, dockerInDockerImageName, blobxferImageName, identityResourceId, disableBatchNodesPublicIpAddress, batchNodesSubnetId, xilinxFpgaBatchNodeInfo, isVmSizeXilinxFpga, startTaskSasUrl, startTaskPath);
 
         /// <inheritdoc/>
         public Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default)

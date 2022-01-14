@@ -839,7 +839,9 @@ namespace TesApi.Web
         /// <param name="disableBatchNodesPublicIpAddress">True to remove the public IP address of the Batch node</param>
         /// <param name="batchNodesSubnetId">The subnet ID of the Batch VM in the pool</param>
         /// <param name="xilinxFpgaBatchNodeInfo">Information about the pool to be created for Xilinx FPGA skus</param>
-        /// <param name="xilinxFpgaVmSizePrefixes">Prefixes of VM sizes for Xilinx FPGAs</param>
+        /// <param name="isVmSizeXilinxFpga">True if the VM size has a Xilinx FPGA</param>
+        /// <param name="startTaskSasUrl">SAS URL for the start task</param>
+        /// <param name="startTaskPath">Local path on the Azure Batch node for the script</param>
         /// <returns></returns>
         public async Task CreateManualBatchPoolAsync(
             string poolName, 
@@ -853,7 +855,9 @@ namespace TesApi.Web
             bool disableBatchNodesPublicIpAddress, 
             string batchNodesSubnetId,
             BatchNodeInfo xilinxFpgaBatchNodeInfo,
-            string [] xilinxFpgaVmSizePrefixes
+            bool isVmSizeXilinxFpga,
+            string startTaskSasUrl,
+            string startTaskPath
             )
         {
             try
@@ -868,7 +872,9 @@ namespace TesApi.Web
                     nodeInfo.BatchImageVersion),
                     nodeInfo.BatchNodeAgentSkuId);
 
-                if (xilinxFpgaVmSizePrefixes?.Any(prefix => vmSize.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) == true)
+                Microsoft.Azure.Management.Batch.Models.StartTask startTask = null;
+
+                if (isVmSizeXilinxFpga)
                 {
                     vmConfigManagement = new Microsoft.Azure.Management.Batch.Models.VirtualMachineConfiguration(
                     imageReference: new Microsoft.Azure.Management.Batch.Models.ImageReference(
@@ -877,6 +883,14 @@ namespace TesApi.Web
                         xilinxFpgaBatchNodeInfo.BatchImageSku,
                         xilinxFpgaBatchNodeInfo.BatchImageVersion),
                     nodeAgentSkuId: xilinxFpgaBatchNodeInfo.BatchNodeAgentSkuId);
+
+                    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
+                    {
+                        // Pool StartTask: install Docker as start task if it's not already
+                        CommandLine = $"/bin/sh {startTaskPath}",
+                        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
+                        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
+                    };
                 }
 
                 var containerRegistryInfo = await GetContainerRegistryInfoAsync(executorImage);
@@ -947,12 +961,7 @@ namespace TesApi.Web
                             [identityResourceId] = new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities()
                         }
                     },
-                    StartTask = new Microsoft.Azure.Management.Batch.Models.StartTask
-                    { 
-                        // Install Docker as pool's start task.
-                        CommandLine = BatchUtils.BatchDockerInstallationScript
-                    }
-                    
+                    StartTask = startTask
                 };
 
                 if (!string.IsNullOrEmpty(batchNodesSubnetId))

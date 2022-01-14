@@ -66,7 +66,9 @@ namespace TesApi.Web
             bool disableBatchNodesPublicIpAddress,
             string batchNodesSubnetId,
             BatchNodeInfo xilinxFpgaBatchNodeInfo,
-            string[] xilinxFpgaVmSizePrefixes);
+            bool isVmSizeXilinxFpga,
+            string startTaskSasUrl,
+            string startTaskPath);
 
 
         /// <summary>

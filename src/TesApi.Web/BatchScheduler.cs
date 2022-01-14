@@ -10,7 +10,6 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
-using Microsoft.Azure.KeyVault.WebKey;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -34,6 +33,8 @@ namespace TesApi.Web
         private const string BatchScriptFileName = "batch_script";
         private const string UploadFilesScriptFileName = "upload_files_script";
         private const string DownloadFilesScriptFileName = "download_files_script";
+        private const string XilinxStartTaskScriptFilename = "xilinx-start-task.sh";
+        private static readonly string batchXilinxStartTaskLocalPathOnBatchNode = $"/mnt/batch/tasks/startup/wd/{XilinxStartTaskScriptFilename}";
         private static readonly Regex queryStringRegex = new Regex(@"[^\?.]*(\?.*)");
         private readonly string dockerInDockerImageName;
         private readonly string blobxferImageName;
@@ -52,6 +53,7 @@ namespace TesApi.Web
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
         private readonly string[] xilinxFpgaVmSizePrefixes;
+        private readonly string defaultStorageAccountName;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -76,11 +78,11 @@ namespace TesApi.Web
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
             this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
-
+            this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
-
+            
             this.batchNodeInfo = new BatchNodeInfo
             {
                 BatchImageOffer = GetStringValue(configuration, "BatchImageOffer"),
@@ -319,10 +321,19 @@ namespace TesApi.Web
                 if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
                 {
                     // Only create manual pool if an identity was specified
-
+                    var batchExecutionPath = GetBatchExecutionDirectoryPath(tesTask);
                     // By default, the pool will have the same name/ID as the job
                     string poolName = jobId;
                     string identityResourceId = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
+                    bool isVmSizeXilinxFpga = xilinxFpgaVmSizePrefixes?.Any(prefix => virtualMachineInfo.VmSize.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) == true;
+                    string startTaskSasUrl = null;
+
+                    if (isVmSizeXilinxFpga)
+                    {
+                        var scriptPath = $"{GetBatchExecutionDirectoryPath(tesTask)}/{XilinxStartTaskScriptFilename}";
+                        await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.XilinxStartTaskScript);
+                        startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
+                    }
 
                     await azureProxy.CreateManualBatchPoolAsync(
                         poolName: poolName,
@@ -336,7 +347,9 @@ namespace TesApi.Web
                         disableBatchNodesPublicIpAddress: disableBatchNodesPublicIpAddress,
                         batchNodesSubnetId: batchNodesSubnetId,
                         xilinxFpgaBatchNodeInfo: xilinxFpgaBatchNodeInfo,
-                        xilinxFpgaVmSizePrefixes: xilinxFpgaVmSizePrefixes
+                        isVmSizeXilinxFpga: isVmSizeXilinxFpga,
+                        startTaskSasUrl: startTaskSasUrl,
+                        startTaskPath: batchXilinxStartTaskLocalPathOnBatchNode
                     );
                         
                     poolInformation = new PoolInformation { PoolId = poolName };
@@ -837,8 +850,9 @@ namespace TesApi.Web
         /// <param name="vmSize">The Azure VM sku</param>
         /// <param name="preemptible">True if preemptible machine should be used</param>
         /// <param name="useAutoPool">True if an Azure Batch AutoPool should be used</param>
+        /// <param name="batchExecutionDirectoryPath">Relative path to the Batch execution location</param>
         /// <returns></returns>
-        private async Task<PoolInformation> CreateAutoPoolPoolInformation(string executorImage, string vmSize, bool preemptible, bool useAutoPool = true)
+        private async Task<PoolInformation> CreateAutoPoolPoolInformation(string executorImage, string vmSize, bool preemptible, bool useAutoPool = true, string batchExecutionDirectoryPath = null)
         {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
@@ -848,15 +862,29 @@ namespace TesApi.Web
                     batchNodeInfo.BatchImageVersion),
                 nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
 
+            Microsoft.Azure.Batch.StartTask startTask = null;
+
             if (xilinxFpgaVmSizePrefixes?.Any(prefix => vmSize.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) == true)
             {
                 vmConfig = new VirtualMachineConfiguration(
-                imageReference: new ImageReference(
-                    xilinxFpgaBatchNodeInfo.BatchImageOffer,
-                    xilinxFpgaBatchNodeInfo.BatchImagePublisher,
-                    xilinxFpgaBatchNodeInfo.BatchImageSku,
-                    xilinxFpgaBatchNodeInfo.BatchImageVersion),
-                nodeAgentSkuId: xilinxFpgaBatchNodeInfo.BatchNodeAgentSkuId);
+                    imageReference: new ImageReference(
+                        xilinxFpgaBatchNodeInfo.BatchImageOffer,
+                        xilinxFpgaBatchNodeInfo.BatchImagePublisher,
+                        xilinxFpgaBatchNodeInfo.BatchImageSku,
+                        xilinxFpgaBatchNodeInfo.BatchImageVersion),
+                    nodeAgentSkuId: xilinxFpgaBatchNodeInfo.BatchNodeAgentSkuId);
+ 
+                var scriptPath = $"{batchExecutionDirectoryPath}/{XilinxStartTaskScriptFilename}";
+                await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.XilinxStartTaskScript);
+                var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
+
+                startTask = new Microsoft.Azure.Batch.StartTask
+                {
+                    // Pool StartTask: install Docker as start task if it's not already
+                    CommandLine = $"/bin/sh {batchXilinxStartTaskLocalPathOnBatchNode}",
+                    UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                    ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchXilinxStartTaskLocalPathOnBatchNode) }
+                };
             }
 
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
@@ -908,11 +936,7 @@ namespace TesApi.Web
                 ResizeTimeout = TimeSpan.FromMinutes(30),
                 TargetLowPriorityComputeNodes = preemptible ? 1 : 0,
                 TargetDedicatedComputeNodes = preemptible ? 0 : 1,
-                StartTask = new Microsoft.Azure.Batch.StartTask
-                {
-                    // Pool StartTask: Install Docker as start task if it's not already. Only for Debian based systems.
-                    CommandLine = BatchUtils.BatchDockerInstallationScript
-        }
+                StartTask = startTask
             };
 
             if (!string.IsNullOrEmpty(this.batchNodesSubnetId))

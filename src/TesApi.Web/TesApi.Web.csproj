@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Scripts\install-docker.sh" />
+    <None Remove="Scripts\xilinx-start-task.sh" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,7 +44,7 @@
     </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Scripts\install-docker.sh">
+    <Content Include="Scripts\xilinx-start-task.sh">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
