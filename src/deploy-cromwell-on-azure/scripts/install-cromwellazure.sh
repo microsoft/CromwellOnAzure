@@ -88,6 +88,9 @@ if [ ! -L "/cromwellazure" ]; then
     sudo ln -s /data/cromwellazure /cromwellazure
 fi
 
+write_log "Disabling the Docker service, because the cromwellazure service is responsible for starting Docker"
+sudo systemctl disable docker
+
 write_log "Enabling cromwellazure service"
 sudo systemctl enable cromwellazure.service
 
