@@ -934,6 +934,7 @@ namespace CromwellOnAzureDeployer
                     .Define(configuration.StorageAccountName)
                     .WithRegion(configuration.RegionName)
                     .WithExistingResourceGroup(configuration.ResourceGroupName)
+                    .WithGeneralPurposeAccountKindV2()
                     .WithOnlyHttpsTraffic()
                     .CreateAsync(cts.Token));
 
