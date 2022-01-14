@@ -298,6 +298,11 @@ namespace CromwellOnAzureDeployer
                         if (installedVersion == null || installedVersion < new Version(3, 0))
                         {
                             await AddNewSettingsV300Async(sshConnectionInfo);
+                            await UpgradeBlobfuseV300Async(sshConnectionInfo);
+
+                            RefreshableConsole.WriteLine($"It's recommended to update the default CoA storage account to a General Purpose v2 account.");
+                            RefreshableConsole.WriteLine($"To do that, navigate to the storage account in the Azure Portal,");
+                            RefreshableConsole.WriteLine($"Configuration tab, and click 'Upgrade.'");
                         }
                     }
 
@@ -1358,6 +1363,10 @@ namespace CromwellOnAzureDeployer
         private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
             => await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)",
                 () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
+
+        private async Task UpgradeBlobfuseV300Async(ConnectionInfo sshConnectionInfo)
+            => await Execute("Upgrading blobfuse to 1.4.3...",
+                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo apt-get update ; sudo apt-get --only-upgrade install blobfuse=1.4.3"));
 
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
