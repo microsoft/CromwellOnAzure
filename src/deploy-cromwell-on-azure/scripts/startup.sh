@@ -23,6 +23,9 @@ function write_log() {
 write_log "CromwellOnAzure startup log"
 write_log
 
+write_log "Stopping Docker containers to mount Azure Storage containers via blobfuse..."
+docker-compose down
+
 write_log "Generating Docker Compose .env file"
 declare -A kv
 while IFS='=' read key value; do kv[$key]=$value; done < <(awk 'NF > 0' env-*)
