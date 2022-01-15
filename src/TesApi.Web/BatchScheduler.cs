@@ -315,13 +315,14 @@ namespace TesApi.Web
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var dockerImage = tesTask.Executors.First().Image;
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask);
+                var batchExecutionPath = GetBatchExecutionDirectoryPath(tesTask);
 
                 PoolInformation poolInformation = null;
 
                 if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
                 {
                     // Only create manual pool if an identity was specified
-                    var batchExecutionPath = GetBatchExecutionDirectoryPath(tesTask);
+                    
                     // By default, the pool will have the same name/ID as the job
                     string poolName = jobId;
                     string identityResourceId = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
@@ -330,7 +331,7 @@ namespace TesApi.Web
 
                     if (isVmSizeXilinxFpga)
                     {
-                        var scriptPath = $"{GetBatchExecutionDirectoryPath(tesTask)}/{XilinxStartTaskScriptFilename}";
+                        var scriptPath = $"{batchExecutionPath}/{XilinxStartTaskScriptFilename}";
                         await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.XilinxStartTaskScript);
                         startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
                     }
@@ -356,7 +357,7 @@ namespace TesApi.Web
                 }
                 else
                 {
-                    poolInformation = await CreateAutoPoolPoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority);
+                    poolInformation = await CreateAutoPoolPoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority, true, batchExecutionPath);
                 }
 
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
