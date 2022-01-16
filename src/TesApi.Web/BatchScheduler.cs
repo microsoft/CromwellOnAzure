@@ -882,7 +882,7 @@ namespace TesApi.Web
                 startTask = new Microsoft.Azure.Batch.StartTask
                 {
                     // Pool StartTask: install Docker as start task if it's not already
-                    CommandLine = $"/bin/sh {batchXilinxStartTaskLocalPathOnBatchNode}",
+                    CommandLine = $"sudo /bin/sh {batchXilinxStartTaskLocalPathOnBatchNode}",
                     UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                     ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchXilinxStartTaskLocalPathOnBatchNode) }
                 };
