@@ -83,13 +83,11 @@ namespace TesApi.Tests
 
         [Ignore]
         [TestMethod]
-        public async Task CheckIfNP10sVmSizeIsAvailable()
+        public async Task TestIfVmSizeIsAvailable(string batchAccountName = "", string vmSize = "Standard_NP10s")
         {
-            // TODO add a Batch Account name here to test this
-            const string batchAccountName = "";
             const string offer = "MS-AZR-0003p";
 
-            var backendParameters = new Dictionary<string, string> { { "vm_size", "Standard_NP10s" } };
+            var backendParameters = new Dictionary<string, string> { { "vm_size", vmSize } };
             var proxy = new AzureProxy(batchAccountName, offer, new Mock<ILogger>().Object);
             var task = GetTesTask();
             task.Resources.BackendParameters = backendParameters;
@@ -101,7 +99,7 @@ namespace TesApi.Tests
                 new StorageAccessProvider(new Mock<ILogger>().Object, GetMockConfig(), proxy));
 
             var size = await batchScheduler.GetVmSizeAsync(task);
-            Assert.AreEqual("Standard_NP10s", size.VmSize);
+            Assert.AreEqual(vmSize, size.VmSize);
         }
 
         [TestMethod]

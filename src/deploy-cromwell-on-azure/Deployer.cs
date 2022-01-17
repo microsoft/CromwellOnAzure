@@ -301,9 +301,9 @@ namespace CromwellOnAzureDeployer
                             await AddNewSettingsV300Async(sshConnectionInfo);
                             await UpgradeBlobfuseV300Async(sshConnectionInfo);
 
-                            RefreshableConsole.WriteLine($"It's recommended to update the default CoA storage account to a General Purpose v2 account.");
-                            RefreshableConsole.WriteLine($"To do that, navigate to the storage account in the Azure Portal,");
-                            RefreshableConsole.WriteLine($"Configuration tab, and click 'Upgrade.'");
+                            RefreshableConsole.WriteLine($"It's recommended to update the default CoA storage account to a General Purpose v2 account.", ConsoleColor.Yellow);
+                            RefreshableConsole.WriteLine($"To do that, navigate to the storage account in the Azure Portal,", ConsoleColor.Yellow);
+                            RefreshableConsole.WriteLine($"Configuration tab, and click 'Upgrade.'", ConsoleColor.Yellow);
                         }
                     }
 
@@ -965,7 +965,7 @@ namespace CromwellOnAzureDeployer
         private async Task<BatchAccount> GetExistingBatchAccountAsync(string batchAccountName)
             => (await Task.WhenAll(subscriptionIds.Select(s => new BatchManagementClient(tokenCredentials) { SubscriptionId = s }.BatchAccount.ListAsync())))
                 .SelectMany(a => a)
-                .SingleOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase) && a.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
+                .SingleOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase)); // && a.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
 
         private async Task CreateDefaultStorageContainersAsync(IStorageAccount storageAccount)
         {
