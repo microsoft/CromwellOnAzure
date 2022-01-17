@@ -1053,7 +1053,7 @@ namespace TesApi.Web
         /// <param name="tesTask"><see cref="TesTask"/></param>
         /// <param name="forcePreemptibleVmsOnly">Force consideration of preemptible virtual machines only.</param>
         /// <returns>The virtual machine info</returns>
-        private async Task<VirtualMachineInfo> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
+        public async Task<VirtualMachineInfo> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
         {
             var tesResources = tesTask.Resources;
 
