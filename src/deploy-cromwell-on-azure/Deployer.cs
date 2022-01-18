@@ -71,6 +71,7 @@ namespace CromwellOnAzureDeployer
                 "Microsoft.Batch",
                 "Microsoft.Compute",
                 "Microsoft.DocumentDB",
+                "Microsoft.OperationalInsights",
                 "Microsoft.insights",
                 "Microsoft.Network",
                 "Microsoft.Storage"
@@ -114,6 +115,7 @@ namespace CromwellOnAzureDeployer
 
                 IResourceGroup resourceGroup = null;
                 BatchAccount batchAccount = null;
+                IGenericResource logAnalyticsWorkspace = null;
                 IGenericResource appInsights = null;
                 ICosmosDBAccount cosmosDb = null;
                 IStorageAccount storageAccount = null;
@@ -399,10 +401,17 @@ namespace CromwellOnAzureDeployer
                             vnetAndSubnet = await CreateVnetAsync(resourceGroup, configuration.VnetName, configuration.VnetAddressSpace);
                         }
 
+                        if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
+                        {
+                            var workspaceName = SdkContext.RandomResourceName(configuration.MainIdentifierPrefix, 15);
+                            logAnalyticsWorkspace = await CreateLogAnalyticsWorkspaceResourceAsync(workspaceName);
+                            configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
+                        }
+
                         await Task.WhenAll(new Task[]
                         {
                         Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync()),
-                        Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync()),
+                        Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
                         Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
 
                         Task.Run(async () => {
@@ -1147,7 +1156,25 @@ namespace CromwellOnAzureDeployer
                 () => networkInterface.Update().WithExistingNetworkSecurityGroup(networkSecurityGroup).ApplyAsync()
             );
 
-        private Task<IGenericResource> CreateAppInsightsResourceAsync()
+
+        private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
+            => Execute(
+                $"Creating Log Analytics Workspace: {workspaceName}...",
+                () => ResourceManager
+                    .Configure()
+                    .Authenticate(azureCredentials)
+                    .WithSubscription(configuration.SubscriptionId)
+                    .GenericResources.Define(workspaceName)
+                    .WithRegion(configuration.RegionName)
+                    .WithExistingResourceGroup(configuration.ResourceGroupName)
+                    .WithResourceType("workspaces")
+                    .WithProviderNamespace("Microsoft.OperationalInsights")
+                    .WithoutPlan()
+                    .WithApiVersion("2020-08-01")
+                    .WithParentResource(string.Empty)
+                    .CreateAsync(cts.Token));
+
+        private Task<IGenericResource> CreateAppInsightsResourceAsync(string logAnalyticsArmId)
             => Execute(
                 $"Creating Application Insights: {configuration.ApplicationInsightsAccountName}...",
                 () => ResourceManager
@@ -1160,9 +1187,12 @@ namespace CromwellOnAzureDeployer
                     .WithResourceType("components")
                     .WithProviderNamespace("microsoft.insights")
                     .WithoutPlan()
-                    .WithApiVersion("2015-05-01")
+                    .WithApiVersion("2020-02-02")
                     .WithParentResource(string.Empty)
-                    .WithProperties(new Dictionary<string, string>() { { "Application_Type", "other" } })
+                    .WithProperties(new Dictionary<string, string>() { 
+                        { "Application_Type", "other" } ,
+                        { "WorkspaceResourceId", logAnalyticsArmId }
+                    })
                     .CreateAsync(cts.Token));
 
         private Task<BatchAccount> CreateBatchAccountAsync()
