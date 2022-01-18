@@ -2,6 +2,9 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
@@ -9,6 +12,24 @@ namespace CromwellOnAzureDeployer
 {
     public static class Utility
     {
+        public static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
+            => text.Trim().Split(rowDelimiter)
+                .Select(r => r.Trim().Split(fieldDelimiter))
+                .ToDictionary(f => f[0].Trim(), f => f[1].Trim());
+
+
+        public static string DictionaryToDelimitedText(Dictionary<string, string> dictionary, string fieldDelimiter = "=", string rowDelimiter = "\n")
+            => string.Join(rowDelimiter, dictionary.Select(kv => $"{kv.Key}{fieldDelimiter}{kv.Value}"));
+
+        public static string GetFileContent(params string[] pathComponentsRelativeToAppBase)
+        {
+            var embeddedResourceName = $"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}";
+            var embeddedResourceStream = typeof(Deployer).Assembly.GetManifestResourceStream(embeddedResourceName);
+
+            using var reader = new StreamReader(embeddedResourceStream);
+            return reader.ReadToEnd().Replace("\r\n", "\n");
+        }
+
         /// <summary>
         /// Generates a secure password with one lowercase letter, one uppercase letter, and one number
         /// </summary>
