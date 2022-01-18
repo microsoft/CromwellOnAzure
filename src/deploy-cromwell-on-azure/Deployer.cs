@@ -392,7 +392,7 @@ namespace CromwellOnAzureDeployer
 
                         if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
                         {
-                            var workspaceName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                            var workspaceName = SdkContext.RandomResourceName(configuration.MainIdentifierPrefix, 15);
                             logAnalyticsWorkspace = await CreateLogAnalyticsWorkspaceResourceAsync(workspaceName);
                             configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
                         }
