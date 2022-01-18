@@ -46,7 +46,7 @@ namespace CromwellApiClient
 
         public async Task<GetMetadataResponse> GetMetadataAsync(Guid id)
         {
-            return new GetMetadataResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata", "application/json") };
+            return new GetMetadataResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json") };
         }
 
         public async Task<GetStatusResponse> GetStatusAsync(Guid id)

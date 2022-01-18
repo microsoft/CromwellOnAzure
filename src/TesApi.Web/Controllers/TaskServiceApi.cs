@@ -51,6 +51,7 @@ namespace TesApi.Controllers
         /// </summary>
         /// <param name="repository">The main <see cref="TesTask"/> database repository</param>
         /// <param name="logger">The logger instance</param>
+        /// <param name="azureProxy">The Azure Proxy instance</param>
         public TaskServiceApiController(IRepository<TesTask> repository, ILogger<TaskServiceApiController> logger, IAzureProxy azureProxy)
         {
             this.repository = repository;
@@ -153,6 +154,44 @@ namespace TesApi.Controllers
                 // If CWL document has it specified, override the value sent by Cromwell
                 tesTask.Resources.Preemptible = cwlDocument.Preemptible ?? tesTask.Resources.Preemptible;
             }
+
+            if (tesTask?.Resources?.BackendParameters != null)
+            {
+                var keys = tesTask.Resources.BackendParameters.Keys.Select(k => k).ToList();
+
+                if (keys.Count > 1 && keys.Select(k => k?.ToLowerInvariant()).Distinct().Count() != keys.Count)
+                {
+                    return BadRequest("Duplicate backend_parameters were specified");
+                }
+
+                // Force all keys to be lowercase
+                tesTask.Resources.BackendParameters = new Dictionary<string, string>(
+                    tesTask.Resources.BackendParameters.Select(k => new KeyValuePair<string, string> (k.Key?.ToLowerInvariant(), k.Value)));
+
+                keys = tesTask.Resources.BackendParameters.Keys.Select(k => k).ToList();
+
+                // Backends shall log system warnings if a key is passed that is unsupported.
+                var unsupportedKeys = keys.Except(Enum.GetNames(typeof(TesResources.SupportedBackendParameters))).ToList();
+
+                if (unsupportedKeys.Count > 0)
+                {
+                    logger.LogWarning($"Unsupported keys were passed to TesResources.backend_parameters: {string.Join(",", unsupportedKeys)}");
+                }
+
+                // If backend_parameters_strict equals true, backends should fail the task if any key / values are unsupported
+                if (tesTask.Resources?.BackendParametersStrict == true 
+                    && unsupportedKeys.Count > 0)
+                {
+                    return BadRequest($"backend_parameters_strict is set to true and unsupported backend_parameters were specified: {string.Join(",", unsupportedKeys)}");                   
+                }
+
+                // Backends shall not store or return unsupported keys if included in a task.
+                foreach (var key in unsupportedKeys)
+                {
+                    tesTask.Resources.BackendParameters.Remove(key);
+                }
+            }
+
             logger.LogDebug($"Creating task with id {tesTask.Id} state {tesTask.State}");
             await repository.CreateItemAsync(tesTask);
             return StatusCode(200, new TesCreateTaskResponse { Id = tesTask.Id });
@@ -169,8 +208,14 @@ namespace TesApi.Controllers
         [SwaggerResponse(statusCode: 200, type: typeof(TesServiceInfo), description: "")]
         public virtual IActionResult GetServiceInfo()
         {
-            var serviceInfo = new TesServiceInfo { Name = "Microsoft Genomics Task Execution Service", Doc = "", Storage = new List<string>() };
-            logger.LogInformation($"Name: {serviceInfo.Name} Doc: {serviceInfo.Doc} Storage: {serviceInfo.Storage}");
+            var serviceInfo = new TesServiceInfo {
+                Name = "Microsoft Genomics Task Execution Service",
+                Doc = "",
+                Storage = new List<string>(),
+                TesResourcesSupportedBackendParameters = Enum.GetNames(typeof(TesResources.SupportedBackendParameters)).ToList()
+            };
+
+            logger.LogInformation($"Name: {serviceInfo.Name} Doc: {serviceInfo.Doc} Storage: {serviceInfo.Storage} TesResourcesSupportedBackendParameters: {string.Join(",",serviceInfo.TesResourcesSupportedBackendParameters)}");
             return StatusCode(200, serviceInfo);
         }
 
