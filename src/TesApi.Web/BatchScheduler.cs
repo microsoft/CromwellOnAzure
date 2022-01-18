@@ -721,7 +721,8 @@ namespace TesApi.Web
                 poolSpecification.StartTask = new StartTask
                 {
                     CommandLine = $"/usr/bin/sudo ./SetDockerDaemon {Environment.GetEnvironmentVariable("PrivateContainerRegistry")}",
-                    ResourceFiles = Enumerable.Repeat(ResourceFile.FromAutoStorageContainer("utilities", fileMode: "0775"), 1).ToList()
+                    ResourceFiles = Enumerable.Repeat(ResourceFile.FromAutoStorageContainer("utilities", fileMode: "0775"), 1).ToList(),
+                    UserIdentity = new UserIdentity(new AutoUserSpecification(AutoUserScope.Pool, ElevationLevel.Admin))
                 };
             }
 
@@ -775,7 +776,7 @@ namespace TesApi.Web
         /// Check quotas for available active jobs, pool and CPU cores.
         /// </summary>
         /// <param name="vmInfo">Dedicated virtual machine information.</param>
-        private async Task CheckBatchAccountQuotas(VirtualMachineInfo vmInfo)
+        private async Task CheckBatchAccountQuotas(Tes.Models.VirtualMachineInfo vmInfo)
         {
             var workflowCoresRequirement = vmInfo.NumberOfCores.Value;
             var preemptible = vmInfo.LowPriority;
@@ -838,7 +839,7 @@ namespace TesApi.Web
         /// <param name="tesTask"><see cref="TesTask"/></param>
         /// <param name="forcePreemptibleVmsOnly">Force consideration of preemptible virtual machines only.</param>
         /// <returns>The virtual machine info</returns>
-        private async Task<VirtualMachineInfo> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
+        private async Task<Tes.Models.VirtualMachineInfo> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
         {
             var tesResources = tesTask.Resources;
 

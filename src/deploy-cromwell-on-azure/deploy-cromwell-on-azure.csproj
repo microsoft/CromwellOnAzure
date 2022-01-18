@@ -23,23 +23,23 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.Management.Batch" Version="13.0.0" />
-    <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.37.1" />
-    <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.6.1" />
-    <PackageReference Include="Microsoft.Azure.Storage.Blob" Version="11.2.3" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.10.0" />
+    <PackageReference Include="Microsoft.Azure.Management.Batch" Version="14.0.0" />
+    <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.38.0" />
+    <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.6.2" />
     <PackageReference Include="Microsoft.Extensions.CommandLineUtils" Version="1.1.1" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.0" />
     <PackageReference Include="Microsoft.IdentityModel.Clients.ActiveDirectory" Version="5.2.9" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="Polly" Version="7.2.2" />
     <PackageReference Include="SSH.NET" Version="2020.0.1" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.10.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.15.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -76,27 +76,21 @@
   </ItemGroup>
 
   <!--Target Name="GetDeploymentHelpersPaths" BeforeTargets="GetDeploymentHelpers">
-    <MSBuild Projects="$(CoAEmbedResourceProjects)"
-	     Targets="BuiltProjectOutputGroup;SourceFilesProjectOutputGroup;ContentFilesProjectOutputGroup;PublishItemsOutputGroup"
-	     RemoveProperties="PublishTrimmed;PublishDir;Platform;TargetFramework;RuntimeIdentifier;SelfContained;PublishSingleFile;OutputType;TargetDir;TargetPath;OutDir;OutputPath;IntermediateOutputPath;BaseIntermediateOutputPath"
-	     Properties="PublishProfile=FolderProfile">
-      <Output TaskParameter="TargetOutputs" ItemName="_CoABuiltResource"/>
+    <MSBuild Projects="$(CoAEmbedResourceProjects)" Targets="BuiltProjectOutputGroup;SourceFilesProjectOutputGroup;ContentFilesProjectOutputGroup;PublishItemsOutputGroup" RemoveProperties="PublishTrimmed;PublishDir;Platform;TargetFramework;RuntimeIdentifier;SelfContained;PublishSingleFile;OutputType;TargetDir;TargetPath;OutDir;OutputPath;IntermediateOutputPath;BaseIntermediateOutputPath" Properties="PublishProfile=FolderProfile">
+      <Output TaskParameter="TargetOutputs" ItemName="_CoABuiltResource" />
     </MSBuild>
     <ItemGroup>
-      <CoAPrebuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' != 'PublishItemsOutputGroup' And $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'%(Identity)')"/>
-      <CoAPrebuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' != 'PublishItemsOutputGroup' And ! $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'..\SetDockerDaemon\%(Identity)')"/>
-      <CoABuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' == 'PublishItemsOutputGroup' And '%(_CoABuiltResource.Extension)' != '.pdb' And $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'%(Identity)')"/>
-      <CoABuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' == 'PublishItemsOutputGroup' And '%(_CoABuiltResource.Extension)' != '.pdb' And ! $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'..\SetDockerDaemon\%(Identity)')"/>
+      <CoAPrebuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' != 'PublishItemsOutputGroup' And $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'%(Identity)')" />
+      <CoAPrebuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' != 'PublishItemsOutputGroup' And ! $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'..\SetDockerDaemon\%(Identity)')" />
+      <CoABuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' == 'PublishItemsOutputGroup' And '%(_CoABuiltResource.Extension)' != '.pdb' And $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'%(Identity)')" />
+      <CoABuiltResource Condition=" '%(_CoABuiltResource.MSBuildSourceTargetName)' == 'PublishItemsOutputGroup' And '%(_CoABuiltResource.Extension)' != '.pdb' And ! $([System.IO.Path]::IsPathRooted(%(_CoABuiltResource.Identity))) " Include="@(_CoABuiltResource->'..\SetDockerDaemon\%(Identity)')" />
     </ItemGroup>
   </Target>
 
   <Target Name="GetDeploymentHelpers" BeforeTargets="ResolveReferences" Inputs="@(CoAPrebuiltResource);@(CoABuiltResource)" Outputs="$(TargetPath)">
-    <MSBuild Projects="$(CoAEmbedResourceProjects)"
-	     Targets="Restore;Publish"
-	     RemoveProperties="PublishTrimmed;PublishDir;Platform;TargetFramework;RuntimeIdentifier;SelfContained;PublishSingleFile;OutputType;TargetDir;TargetPath;OutDir;OutputPath;IntermediateOutputPath;BaseIntermediateOutputPath"
-	     Properties="PublishProfile=FolderProfile"/>
+    <MSBuild Projects="$(CoAEmbedResourceProjects)" Targets="Restore;Publish" RemoveProperties="PublishTrimmed;PublishDir;Platform;TargetFramework;RuntimeIdentifier;SelfContained;PublishSingleFile;OutputType;TargetDir;TargetPath;OutDir;OutputPath;IntermediateOutputPath;BaseIntermediateOutputPath" Properties="PublishProfile=FolderProfile" />
     <ItemGroup>
-      <EmbeddedResource Include="@(CoABuiltResource)"/>
+      <EmbeddedResource Include="@(CoABuiltResource)" />
     </ItemGroup>
   </Target-->
 

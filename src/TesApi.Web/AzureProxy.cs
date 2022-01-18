@@ -610,8 +610,8 @@ namespace TesApi.Web
         /// <summary>
         /// Get/sets cached value for the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>.
         /// </summary>
-        /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
-        public async Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
+        /// <returns><see cref="Tes.Models.VirtualMachineInfo"/> for available VMs in a region.</returns>
+        public async Task<List<Tes.Models.VirtualMachineInfo>> GetVmSizesAndPricesAsync()
             => (await GetVmSizesAndPricesRawAsync()).ToList();
 
         /// <summary>
@@ -697,8 +697,8 @@ namespace TesApi.Web
         /// <summary>
         /// Get the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>.
         /// </summary>
-        /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
-        private async Task<IEnumerable<VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
+        /// <returns><see cref="Tes.Models.VirtualMachineInfo"/> for available VMs in a region.</returns>
+        private async Task<IEnumerable<Tes.Models.VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
         {
             static double ConvertMiBToGiB(int value) => Math.Round(value / 1024.0, 2);
 
@@ -720,7 +720,7 @@ namespace TesApi.Web
                 vmPrices = JsonConvert.DeserializeObject<IEnumerable<VmPrice>>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "DefaultVmPrices.json")));
             }
 
-            var vmInfos = new List<VirtualMachineInfo>();
+            var vmInfos = new List<Tes.Models.VirtualMachineInfo>();
 
             foreach (var (VmSize, FamilyName, _, _) in supportedVmSizes)
             {
@@ -729,7 +729,7 @@ namespace TesApi.Web
 
                 if (vmSpecification is not null && vmPrice is not null)
                 {
-                    vmInfos.Add(new VirtualMachineInfo
+                    vmInfos.Add(new Tes.Models.VirtualMachineInfo
                     {
                         VmSize = VmSize,
                         MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
@@ -743,7 +743,7 @@ namespace TesApi.Web
 
                     if(vmPrice.LowPriorityAvailable)
                     {
-                        vmInfos.Add(new VirtualMachineInfo
+                        vmInfos.Add(new Tes.Models.VirtualMachineInfo
                         {
                             VmSize = VmSize,
                             MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
