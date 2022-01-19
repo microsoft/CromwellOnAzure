@@ -1417,7 +1417,7 @@ namespace CromwellOnAzureDeployer
                 () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo apt-get update ; sudo apt-get --only-upgrade install blobfuse=1.4.3"));
 
         private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
-            => await Execute("Disabling Docker service...",
+            => await Execute("Disabling auto-start of Docker service...",
                 () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
 
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
