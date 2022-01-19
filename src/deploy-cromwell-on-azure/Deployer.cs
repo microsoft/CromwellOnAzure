@@ -974,7 +974,7 @@ namespace CromwellOnAzureDeployer
         private async Task<BatchAccount> GetExistingBatchAccountAsync(string batchAccountName)
             => (await Task.WhenAll(subscriptionIds.Select(s => new BatchManagementClient(tokenCredentials) { SubscriptionId = s }.BatchAccount.ListAsync())))
                 .SelectMany(a => a)
-                .SingleOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase)); // && a.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
+                .SingleOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase) && a.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
 
         private async Task CreateDefaultStorageContainersAsync(IStorageAccount storageAccount)
         {
