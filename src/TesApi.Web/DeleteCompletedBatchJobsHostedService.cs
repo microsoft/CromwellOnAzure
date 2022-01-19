@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Tes.Extensions;
 using Tes.Models;
 using Tes.Repository;
 
@@ -35,14 +36,11 @@ namespace TesApi.Web
             this.repository = repository;
             this.azureProxy = azureProxy;
             this.logger = logger;
-            isDisabled = configuration.GetValue("DisableBatchJobCleanup", false);
+            this.isDisabled = configuration.GetValue("DisableBatchJobCleanup", false);
         }
 
 
-        /// <summary>
-        /// Start the service
-        /// </summary>
-        /// <param name="cancellationToken">Not used</param>
+        /// <inheritdoc />
         public override Task StartAsync(CancellationToken cancellationToken)
         {
             if (isDisabled)
@@ -60,23 +58,19 @@ namespace TesApi.Web
             return base.StopAsync(cancellationToken);
         }
 
-        /// <summary>
-        /// The job clean up service that checks for old jobs on the Batch account that are safe to delete
-        /// </summary>
-        /// <param name="stoppingToken">Triggered when Microsoft.Extensions.Hosting.IHostedService.StopAsync(System.Threading.CancellationToken) is called.</param>
-        /// <returns>A System.Threading.Tasks.Task that represents the long running operations.</returns>
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        /// <inheritdoc />
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             var runInterval = TimeSpan.FromDays(1);
             logger.LogInformation("Batch Job cleanup started.");
 
-            while (!stoppingToken.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    await DeleteOldBatchJobs(stoppingToken);
+                    await DeleteOldBatchJobs(cancellationToken);
                 }
-                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     break;
                 }
@@ -87,7 +81,7 @@ namespace TesApi.Web
 
                 try
                 {
-                    await Task.Delay(runInterval, stoppingToken);
+                    await Task.Delay(runInterval, cancellationToken);
                 }
                 catch (TaskCanceledException)
                 {
@@ -120,6 +114,19 @@ namespace TesApi.Web
                         tesTask.State == TesState.UNKNOWNEnum)
                     {
                         await azureProxy.DeleteBatchJobAsync(tesTaskId, cancellationToken);
+
+                        try
+                        {
+                            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+                            {
+                                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTaskId);
+                            }
+                        }
+                        catch (Exception exc)
+                        {
+                            logger.LogError(exc, $"Exception in DeleteOldBatchJobs when attempting to delete the manual batch pool {tesTaskId}");
+                            // Do not rethrow
+                        }
                     }
                 }
             }

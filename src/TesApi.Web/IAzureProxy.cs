@@ -52,6 +52,26 @@ namespace TesApi.Web
         Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName);
 
         /// <summary>
+        /// Creates a Pool in Azure Batch that is NOT an AutoPool
+        /// </summary>
+        Task CreateManualBatchPoolAsync(
+            string poolName,
+            string vmSize,
+            bool isLowPriority,
+            string executorImage,
+            BatchNodeInfo nodeInfo,
+            string dockerInDockerImageName,
+            string blobxferImageName,
+            string identityResourceId,
+            bool disableBatchNodesPublicIpAddress,
+            string batchNodesSubnetId,
+            BatchNodeInfo xilinxFpgaBatchNodeInfo,
+            bool isVmSizeXilinxFpga,
+            string startTaskSasUrl,
+            string startTaskPath);
+
+
+        /// <summary>
         /// Get the current states of the Azure Batch job and task corresponding to the given TES task
         /// </summary>
         /// <param name="tesTaskId">The unique ID of the TES task</param>
@@ -159,7 +179,12 @@ namespace TesApi.Web
         /// <summary>
         /// Deletes the specified pool
         /// </summary>
-        Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken);
+        Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Deletes the specified pool if it exists
+        /// </summary>
+        Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Checks if a local file exists

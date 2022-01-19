@@ -28,6 +28,21 @@ services:
       - BlobxferImageName=$BlobxferImageName
       - DisableBatchNodesPublicIpAddress=$DisableBatchNodesPublicIpAddress
       - PrivateContainerRegistry=$PrivateContainerRegistry
+      - BatchImageOffer=$BatchImageOffer
+      - BatchImagePublisher=$BatchImagePublisher
+      - BatchImageSku=$BatchImageSku
+      - BatchImageVersion=$BatchImageVersion
+      - BatchNodeAgentSkuId=$BatchNodeAgentSkuId
+      - XilinxFpgaVmSizePrefixes=$XilinxFpgaVmSizePrefixes
+      - XilinxFpgaBatchImageOffer=$XilinxFpgaBatchImageOffer
+      - XilinxFpgaBatchImagePublisher=$XilinxFpgaBatchImagePublisher
+      - XilinxFpgaBatchImageSku=$XilinxFpgaBatchImageSku
+      - XilinxFpgaBatchImageVersion=$XilinxFpgaBatchImageVersion
+      - XilinxFpgaBatchNodeAgentSkuId=$XilinxFpgaBatchNodeAgentSkuId
+      - CromwellDrsLocalizerImageName=$CromwellDrsLocalizerImageName
+      - MarthaUrl=$MarthaUrl
+      - MarthaKeyVaultName=$MarthaKeyVaultName
+      - MarthaSecretName=$MarthaSecretName
     expose:
       - "80"
     volumes:

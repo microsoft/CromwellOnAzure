@@ -39,7 +39,7 @@ namespace CromwellApiClient
 	    => new GetOutputsResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json") };
 
         public async Task<GetMetadataResponse> GetMetadataAsync(Guid id)
-	    => new GetMetadataResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata", "application/json") };
+	    => new GetMetadataResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json") };
 
         public async Task<GetStatusResponse> GetStatusAsync(Guid id)
 	    => await GetAsync<GetStatusResponse>($"/{id}/status");

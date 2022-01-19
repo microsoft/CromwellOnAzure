@@ -7,13 +7,11 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Services.AppAuthentication;
-using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
@@ -27,6 +25,7 @@ namespace TriggerService
         private readonly CloudStorageAccount account;
         private readonly CloudBlobClient blobClient;
         private readonly HttpClient httpClient;
+        private readonly HashSet<string> createdContainers = new HashSet<string>();
 
         public AzureStorage(CloudStorageAccount account, HttpClient httpClient)
         {
@@ -103,7 +102,14 @@ namespace TriggerService
         public async Task<string> UploadFileTextAsync(string content, string container, string blobName)
         {
             var containerReference = blobClient.GetContainerReference(container);
-            await containerReference.CreateIfNotExistsAsync();
+
+            if (!createdContainers.Contains(container.ToLowerInvariant()))
+            {
+                // Only attempt to create the container once per lifetime of the process
+                await containerReference.CreateIfNotExistsAsync();
+                createdContainers.Add(container.ToLowerInvariant());
+            }
+
             var blob = containerReference.GetBlockBlobReference(blobName);
             await blob.UploadTextAsync(content);
             return blob.Uri.AbsoluteUri;

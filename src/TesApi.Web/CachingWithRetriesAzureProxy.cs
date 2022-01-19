@@ -47,7 +47,7 @@ namespace TesApi.Web
         public Task DeleteBatchJobAsync(string taskId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.DeleteBatchJobAsync(taskId, ct), cancellationToken);
 
         /// <inheritdoc/>
-        public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchPoolAsync(poolId, cancellationToken));
+        public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchPoolAsync(poolId, cancellationToken));
 
         /// <inheritdoc/>
         public Task<string> DownloadBlobAsync(Uri blobAbsoluteUri) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DownloadBlobAsync(blobAbsoluteUri));
@@ -120,7 +120,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
+        public Task<List<Tes.Models.VirtualMachineInfo>> GetVmSizesAndPricesAsync()
             => cache.GetOrAddAsync("vmSizesAndPrices", () => azureProxy.GetVmSizesAndPricesAsync(), DateTimeOffset.MaxValue);
 
         /// <inheritdoc/>
@@ -146,5 +146,13 @@ namespace TesApi.Web
 
         /// <inheritdoc/>
         public bool TryReadCwlFile(string workflowId, out string content) => azureProxy.TryReadCwlFile(workflowId, out content);
+
+        /// <inheritdoc/>
+        public Task CreateManualBatchPoolAsync(string poolName, string vmSize, bool isLowPriority, string executorImage, BatchNodeInfo nodeInfo, string dockerInDockerImageName, string blobxferImageName, string identityResourceId, bool disableBatchNodesPublicIpAddress, string batchNodesSubnetId, BatchNodeInfo xilinxFpgaBatchNodeInfo, bool isVmSizeXilinxFpga, string startTaskSasUrl, string startTaskPath)
+            => azureProxy.CreateManualBatchPoolAsync(poolName, vmSize, isLowPriority, executorImage, nodeInfo, dockerInDockerImageName, blobxferImageName, identityResourceId, disableBatchNodesPublicIpAddress, batchNodesSubnetId, xilinxFpgaBatchNodeInfo, isVmSizeXilinxFpga, startTaskSasUrl, startTaskPath);
+
+        /// <inheritdoc/>
+        public Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default)
+            => azureProxy.DeleteBatchPoolIfExistsAsync(poolId, cancellationToken);
     }
 }

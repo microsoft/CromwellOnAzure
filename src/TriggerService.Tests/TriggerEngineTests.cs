@@ -49,19 +49,19 @@ namespace TriggerService.Tests
 
             var engine = new TriggerEngine(loggerFactory, environment.Object, TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(25));
             var task = Task.Run(() => engine.RunAsync());
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromSeconds(2));
 
             isStorageAvailable = true;
             isCromwellAvailable = true;
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromSeconds(2));
 
             isStorageAvailable = false;
             isCromwellAvailable = false;
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromSeconds(2));
 
             isStorageAvailable = true;
             isCromwellAvailable = true;
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromSeconds(2));
 
             var lines = loggerFactory.TestLogger.LogLines;
             var availableLines = lines.Where(line => line.Contains("is available", StringComparison.OrdinalIgnoreCase)).ToList();
