@@ -302,6 +302,7 @@ namespace CromwellOnAzureDeployer
                             await PatchCromwellConfigurationFileV300Async(storageAccount);
                             await AddNewSettingsV300Async(sshConnectionInfo);
                             await UpgradeBlobfuseV300Async(sshConnectionInfo);
+                            await DisableDockerServiceV300Async(sshConnectionInfo);
 
                             RefreshableConsole.WriteLine($"It's recommended to update the default CoA storage account to a General Purpose v2 account.", ConsoleColor.Yellow);
                             RefreshableConsole.WriteLine($"To do that, navigate to the storage account in the Azure Portal,", ConsoleColor.Yellow);
@@ -1414,6 +1415,10 @@ namespace CromwellOnAzureDeployer
         private async Task UpgradeBlobfuseV300Async(ConnectionInfo sshConnectionInfo)
             => await Execute("Upgrading blobfuse to 1.4.3...",
                 () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo apt-get update ; sudo apt-get --only-upgrade install blobfuse=1.4.3"));
+
+        private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
+            => await Execute("Disabling auto-start of Docker service...",
+                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
 
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
