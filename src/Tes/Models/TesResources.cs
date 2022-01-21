@@ -26,7 +26,7 @@ namespace Tes.Models
     [DataContract]
     public partial class TesResources : IEquatable<TesResources>
     {
-        public enum SupportedBackendParameters { vm_size, workflow_execution_identity };
+        public enum SupportedBackendParameters { vm_size, workflow_execution_identity, disks };
 
         /// <summary>
         /// Requested number of CPUs

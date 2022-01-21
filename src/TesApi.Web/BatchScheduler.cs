@@ -239,7 +239,7 @@ namespace TesApi.Web
 
         private async Task DeleteManualBatchPoolIfExistsAsync(TesTask tesTask)
         {
-            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+            if (tesTask.Resources.TryGetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity, out var _) == true)
             {
                 await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
             }
@@ -319,13 +319,12 @@ namespace TesApi.Web
 
                 PoolInformation poolInformation = null;
 
-                if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+                if (tesTask.Resources.TryGetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity, out var identityResourceId) == true)
                 {
                     // Only create manual pool if an identity was specified
                     
                     // By default, the pool will have the same name/ID as the job
                     string poolName = jobId;
-                    string identityResourceId = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
                     bool isVmSizeXilinxFpga = xilinxFpgaVmSizePrefixes?.Any(prefix => virtualMachineInfo.VmSize.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) == true;
                     string startTaskSasUrl = null;
 
@@ -685,9 +684,7 @@ namespace TesApi.Web
                 sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");  // Install bash if running on alpine (will be the case if running inside "docker" image)
             }
 
-            var vmSize = task.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size);
-
-            if (drsInputFiles.Count > 0 && task.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+            if (drsInputFiles.Count > 0 && task.Resources.TryGetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity, out var _) == true)
             {
                 sb.AppendLine($"write_ts CromwellDrsLocalizerPullStart && \\");
                 sb.AppendLine($"docker pull --quiet {cromwellDrsLocalizerImageName} && \\");
@@ -1069,7 +1066,7 @@ namespace TesApi.Web
             var eligibleVms = new List<VirtualMachineInfo>();
             string noVmFoundMessage = string.Empty;
 
-            string vmSize = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size);
+            tesTask.Resources.TryGetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size, out var vmSize);
 
             if (!string.IsNullOrWhiteSpace(vmSize))
             {

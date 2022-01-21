@@ -19,9 +19,11 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Azure.Management.Compute.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Swashbuckle.AspNetCore.Annotations;
+using Tes.Extensions;
 using Tes.Models;
 using Tes.Repository;
 using TesApi.Attributes;
@@ -189,6 +191,18 @@ namespace TesApi.Controllers
                 foreach (var key in unsupportedKeys)
                 {
                     tesTask.Resources.BackendParameters.Remove(key);
+                }
+
+                if (tesTask.Resources.TryGetBackendParameterValue(TesResources.SupportedBackendParameters.disks, out var disksValue)
+                    && tesTask.Resources.DiskGb == null)
+                {
+                    // Example value: local-disk 100 HDD
+                    var parts = disksValue.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    
+                    if (double.TryParse(parts?[1], out double diskGb))
+                    {
+                        tesTask.Resources.DiskGb = diskGb;   
+                    }
                 }
             }
 

@@ -75,7 +75,7 @@ namespace TesApi.Web
                         await azureProxy.DeleteBatchJobAsync(tesTaskId);
                         logger.LogInformation($"Deleted orphaned Batch Job '{jobId}'");
 
-                        if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+                        if (tesTask.Resources.TryGetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity, out var _) == true)
                         {
                             await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
                         }

@@ -118,7 +118,7 @@ namespace TesApi.Web
 
                         try
                         {
-                            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+                            if (tesTask.Resources.TryGetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity, out var _) == true)
                             {
                                 await azureProxy.DeleteBatchPoolIfExistsAsync(tesTaskId);
                             }

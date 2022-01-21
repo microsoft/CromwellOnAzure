@@ -127,23 +127,18 @@ namespace Tes.Extensions
         }
 
         /// <summary>
-        /// Get the backend parameter value for the specified parameter
+        /// Try to get a backend parameter value if present
         /// </summary>
-        /// <returns>The value if it exists; null otherwise</returns>
-        public static string GetBackendParameterValue(this TesResources resources, TesResources.SupportedBackendParameters parameter)
+        /// <returns>True if a value exists, false otherwise</returns>
+        public static bool TryGetBackendParameterValue(this TesResources resources, TesResources.SupportedBackendParameters parameter, out string value)
         {
-            string backendParameterValue = null;
-            resources.BackendParameters?.TryGetValue(parameter.ToString(), out backendParameterValue);
-            return backendParameterValue;
-        }
+            if (resources.BackendParameters?.TryGetValue(parameter.ToString(), out value) == true)
+            {
+                return true;
+            }
 
-        /// <summary>
-        /// Checks if a backend parameter was present
-        /// </summary>
-        /// <returns>True if the parameter value is not null or whitespace; false otherwise</returns>
-        public static bool ContainsBackendParameterValue(this TesResources resources, TesResources.SupportedBackendParameters parameter)
-        {
-            return !string.IsNullOrWhiteSpace(resources.GetBackendParameterValue(parameter));
+            value = null;
+            return false;
         }
     }
 }
