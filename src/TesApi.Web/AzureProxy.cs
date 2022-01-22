@@ -838,8 +838,6 @@ namespace TesApi.Web
         /// <param name="identityResourceId">The resource ID of a user-assigned managed identity to assign to the pool</param>
         /// <param name="disableBatchNodesPublicIpAddress">True to remove the public IP address of the Batch node</param>
         /// <param name="batchNodesSubnetId">The subnet ID of the Batch VM in the pool</param>
-        /// <param name="xilinxFpgaBatchNodeInfo">Information about the pool to be created for Xilinx FPGA skus</param>
-        /// <param name="isVmSizeXilinxFpga">True if the VM size has a Xilinx FPGA</param>
         /// <param name="startTaskSasUrl">SAS URL for the start task</param>
         /// <param name="startTaskPath">Local path on the Azure Batch node for the script</param>
         /// <returns></returns>
@@ -854,8 +852,6 @@ namespace TesApi.Web
             string identityResourceId, 
             bool disableBatchNodesPublicIpAddress, 
             string batchNodesSubnetId,
-            BatchNodeInfo xilinxFpgaBatchNodeInfo,
-            bool isVmSizeXilinxFpga,
             string startTaskSasUrl,
             string startTaskPath
             )
@@ -874,24 +870,16 @@ namespace TesApi.Web
 
                 Microsoft.Azure.Management.Batch.Models.StartTask startTask = null;
 
-                if (isVmSizeXilinxFpga)
-                {
-                    vmConfigManagement = new Microsoft.Azure.Management.Batch.Models.VirtualMachineConfiguration(
-                    imageReference: new Microsoft.Azure.Management.Batch.Models.ImageReference(
-                        xilinxFpgaBatchNodeInfo.BatchImageOffer,
-                        xilinxFpgaBatchNodeInfo.BatchImagePublisher,
-                        xilinxFpgaBatchNodeInfo.BatchImageSku,
-                        xilinxFpgaBatchNodeInfo.BatchImageVersion),
-                    nodeAgentSkuId: xilinxFpgaBatchNodeInfo.BatchNodeAgentSkuId);
-
-                    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
-                    {
-                        // Pool StartTask: install Docker as start task if it's not already
-                        CommandLine = $"/bin/sh {startTaskPath}",
-                        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
-                        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
-                    };
-                }
+                //if (useStartTask)
+                //{
+                //    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
+                //    {
+                //        // Pool StartTask: install Docker as start task if it's not already
+                //        CommandLine = $"/bin/sh {startTaskPath}",
+                //        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
+                //        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
+                //    };
+                //}
 
                 var containerRegistryInfo = await GetContainerRegistryInfoAsync(executorImage);
 
