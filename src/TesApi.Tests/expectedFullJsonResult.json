@@ -29,7 +29,9 @@
     "disk_gb": 0.0,
     "zones": [
       "string"
-    ]
+    ],
+    "backend_parameters": null,
+    "backend_parameters_strict": null
   },
   "executors": [
     {

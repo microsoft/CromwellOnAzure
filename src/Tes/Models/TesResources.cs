@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -26,6 +26,8 @@ namespace Tes.Models
     [DataContract]
     public partial class TesResources : IEquatable<TesResources>
     {
+        public enum SupportedBackendParameters { vm_size, workflow_execution_identity };
+
         /// <summary>
         /// Requested number of CPUs
         /// </summary>
@@ -62,6 +64,20 @@ namespace Tes.Models
         public List<string> Zones { get; set; }
 
         /// <summary>
+        /// Key/value pairs for backend configuration
+        /// </summary>
+        /// <value> Key/value pairs for backend configuration</value>
+        [DataMember(Name = "backend_parameters")]
+        public Dictionary<string, string> BackendParameters { get; set; }
+
+        /// <summary>
+        /// If set to true, TES shall fail the task if any backend_parameters key/values are unsupported, otherwise, TES will attempt to run the task
+        /// </summary>
+        /// <value> If set to true, TES shall fail the task if any backend_parameters key/values are unsupported, otherwise, TES will attempt to run the task</value>
+        [DataMember(Name = "backend_parameters_strict")]
+        public bool? BackendParametersStrict { get; set; }
+
+        /// <summary>
         /// Returns the string presentation of the object
         /// </summary>
         /// <returns>String presentation of the object</returns>
@@ -73,7 +89,30 @@ namespace Tes.Models
             sb.Append("  Preemptible: ").Append(Preemptible).Append("\n");
             sb.Append("  RamGb: ").Append(RamGb).Append("\n");
             sb.Append("  DiskGb: ").Append(DiskGb).Append("\n");
-            sb.Append("  Zones: ").Append(Zones).Append("\n");
+            sb.Append("  Zones: ");
+            
+            if (Zones?.Count > 0)
+            {
+                sb.Append(string.Join(",", Zones));
+            }
+
+            sb.Append("\n");
+            sb.Append("  BackendParameters: ");
+
+            if (BackendParameters?.Keys.Count > 0)
+            {
+                var keyValues = new List<string>();
+
+                foreach (var key in BackendParameters.Keys)
+                {
+                    keyValues.Add($"({key},{BackendParameters[key]})");
+                }
+
+                sb.Append(string.Join(",", keyValues));
+            }
+
+            sb.Append("\n");
+            sb.Append("  BackendParametersStrict: ").Append(BackendParametersStrict).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
@@ -147,8 +186,16 @@ namespace Tes.Models
                 ) &&
                 (
                     Zones == other.Zones ||
-                    Zones != null &&
+                    Zones != null && other.Zones !=null &&
                     Zones.SequenceEqual(other.Zones)
+                ) &&
+                (
+                    BackendParameters == other.BackendParameters ||
+                    BackendParameters != null && other.BackendParameters != null &&
+                    BackendParameters.SequenceEqual(other.BackendParameters)
+                ) &&
+                (
+                    BackendParametersStrict == other?.BackendParametersStrict
                 );
         }
 
@@ -185,6 +232,16 @@ namespace Tes.Models
                 if (Zones != null)
                 {
                     hashCode = hashCode * 59 + Zones.GetHashCode();
+                }
+
+                if (BackendParameters != null)
+                {
+                    hashCode = hashCode * 59 + BackendParameters.GetHashCode();
+                }
+
+                if (BackendParametersStrict != null)
+                {
+                    hashCode = hashCode * 59 + BackendParametersStrict.GetHashCode();
                 }
 
                 return hashCode;
