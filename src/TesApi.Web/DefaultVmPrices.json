@@ -1,7 +1,7 @@
 [
   {
     "VmSize": "Basic_A1",
-    "PricePerHourDedicated": "0.023",
+    "PricePerHourDedicated": "0.031",
     "PricePerHourLowPriority": "0.0062"
   },
   {
@@ -12,11 +12,11 @@
   {
     "VmSize": "Basic_A3",
     "PricePerHourDedicated": "0.188",
-    "PricePerHourLowPriority": "0.0352"
+    "PricePerHourLowPriority": "0.0376"
   },
   {
     "VmSize": "Basic_A4",
-    "PricePerHourDedicated": "0.376",
+    "PricePerHourDedicated": "0.352",
     "PricePerHourLowPriority": "0.0704"
   },
   {
@@ -116,8 +116,8 @@
   },
   {
     "VmSize": "Standard_D1_v2",
-    "PricePerHourDedicated": "0.07",
-    "PricePerHourLowPriority": "0.0146"
+    "PricePerHourDedicated": "0.073",
+    "PricePerHourLowPriority": "0.014"
   },
   {
     "VmSize": "Standard_D11",
@@ -132,7 +132,7 @@
   {
     "VmSize": "Standard_D12",
     "PricePerHourDedicated": "0.386",
-    "PricePerHourLowPriority": "0.077"
+    "PricePerHourLowPriority": "0.0771"
   },
   {
     "VmSize": "Standard_D12_v2",
@@ -161,7 +161,7 @@
   },
   {
     "VmSize": "Standard_D15_v2",
-    "PricePerHourDedicated": "1.853",
+    "PricePerHourDedicated": "1.852",
     "PricePerHourLowPriority": "0.37"
   },
   {
@@ -185,8 +185,18 @@
     "PricePerHourLowPriority": "0.213"
   },
   {
+    "VmSize": "Standard_D16d_v5",
+    "PricePerHourDedicated": "1.64",
+    "PricePerHourLowPriority": "0.181"
+  },
+  {
     "VmSize": "Standard_D16ds_v4",
     "PricePerHourDedicated": "1.064",
+    "PricePerHourLowPriority": "0.181"
+  },
+  {
+    "VmSize": "Standard_D16ds_v5",
+    "PricePerHourDedicated": "1.64",
     "PricePerHourLowPriority": "0.181"
   },
   {
@@ -202,11 +212,11 @@
   {
     "VmSize": "Standard_D2_v2",
     "PricePerHourDedicated": "0.14",
-    "PricePerHourLowPriority": "0.0279"
+    "PricePerHourLowPriority": "0.029"
   },
   {
     "VmSize": "Standard_D2_v3",
-    "PricePerHourDedicated": "0.096",
+    "PricePerHourDedicated": "0.117",
     "PricePerHourLowPriority": "0.019"
   },
   {
@@ -222,16 +232,26 @@
   {
     "VmSize": "Standard_D2d_v4",
     "PricePerHourDedicated": "0.113",
-    "PricePerHourLowPriority": "0.0266"
+    "PricePerHourLowPriority": "0.0226"
+  },
+  {
+    "VmSize": "Standard_D2d_v5",
+    "PricePerHourDedicated": "0.225",
+    "PricePerHourLowPriority": "0.082"
   },
   {
     "VmSize": "Standard_D2ds_v4",
-    "PricePerHourDedicated": "0.133",
+    "PricePerHourDedicated": "0.113",
     "PricePerHourLowPriority": "0.0266"
   },
   {
+    "VmSize": "Standard_D2ds_v5",
+    "PricePerHourDedicated": "0.113",
+    "PricePerHourLowPriority": "0.0226"
+  },
+  {
     "VmSize": "Standard_D2s_v3",
-    "PricePerHourDedicated": "0.096",
+    "PricePerHourDedicated": "0.117",
     "PricePerHourLowPriority": "0.019"
   },
   {
@@ -241,12 +261,12 @@
   },
   {
     "VmSize": "Standard_D3_v2",
-    "PricePerHourDedicated": "0.279",
-    "PricePerHourLowPriority": "0.0585"
+    "PricePerHourDedicated": "0.293",
+    "PricePerHourLowPriority": "0.0559"
   },
   {
     "VmSize": "Standard_D32_v3",
-    "PricePerHourDedicated": "1.872",
+    "PricePerHourDedicated": "1.536",
     "PricePerHourLowPriority": "0.307"
   },
   {
@@ -265,13 +285,23 @@
     "PricePerHourLowPriority": "0.362"
   },
   {
+    "VmSize": "Standard_D32d_v5",
+    "PricePerHourDedicated": "3.28",
+    "PricePerHourLowPriority": "1.44"
+  },
+  {
     "VmSize": "Standard_D32ds_v4",
     "PricePerHourDedicated": "1.808",
     "PricePerHourLowPriority": "0.362"
   },
   {
+    "VmSize": "Standard_D32ds_v5",
+    "PricePerHourDedicated": "2.128",
+    "PricePerHourLowPriority": "0.362"
+  },
+  {
     "VmSize": "Standard_D32s_v3",
-    "PricePerHourDedicated": "1.872",
+    "PricePerHourDedicated": "1.536",
     "PricePerHourLowPriority": "0.307"
   },
   {
@@ -281,7 +311,7 @@
   },
   {
     "VmSize": "Standard_D4_v2",
-    "PricePerHourDedicated": "0.559",
+    "PricePerHourDedicated": "0.585",
     "PricePerHourLowPriority": "0.112"
   },
   {
@@ -291,23 +321,28 @@
   },
   {
     "VmSize": "Standard_D48_v3",
-    "PricePerHourDedicated": "2.304",
+    "PricePerHourDedicated": "2.808",
     "PricePerHourLowPriority": "0.562"
   },
   {
     "VmSize": "Standard_D48a_v4",
     "PricePerHourDedicated": "2.304",
-    "PricePerHourLowPriority": "0.538"
+    "PricePerHourLowPriority": "0.461"
   },
   {
     "VmSize": "Standard_D48as_v4",
     "PricePerHourDedicated": "2.304",
-    "PricePerHourLowPriority": "0.538"
+    "PricePerHourLowPriority": "0.461"
   },
   {
     "VmSize": "Standard_D48d_v4",
-    "PricePerHourDedicated": "3.192",
+    "PricePerHourDedicated": "2.712",
     "PricePerHourLowPriority": "0.542"
+  },
+  {
+    "VmSize": "Standard_D48d_v5",
+    "PricePerHourDedicated": "3.192",
+    "PricePerHourLowPriority": "0.638"
   },
   {
     "VmSize": "Standard_D48ds_v4",
@@ -315,19 +350,24 @@
     "PricePerHourLowPriority": "0.638"
   },
   {
+    "VmSize": "Standard_D48ds_v5",
+    "PricePerHourDedicated": "2.712",
+    "PricePerHourLowPriority": "0.542"
+  },
+  {
     "VmSize": "Standard_D48s_v3",
-    "PricePerHourDedicated": "2.304",
+    "PricePerHourDedicated": "2.808",
     "PricePerHourLowPriority": "0.562"
   },
   {
     "VmSize": "Standard_D4a_v4",
     "PricePerHourDedicated": "0.224",
-    "PricePerHourLowPriority": "0.0384"
+    "PricePerHourLowPriority": "0.0448"
   },
   {
     "VmSize": "Standard_D4as_v4",
     "PricePerHourDedicated": "0.224",
-    "PricePerHourLowPriority": "0.0384"
+    "PricePerHourLowPriority": "0.0448"
   },
   {
     "VmSize": "Standard_D4d_v4",
@@ -335,9 +375,19 @@
     "PricePerHourLowPriority": "0.0452"
   },
   {
+    "VmSize": "Standard_D4d_v5",
+    "PricePerHourDedicated": "0.45",
+    "PricePerHourLowPriority": "0.164"
+  },
+  {
     "VmSize": "Standard_D4ds_v4",
     "PricePerHourDedicated": "0.226",
-    "PricePerHourLowPriority": "0.0532"
+    "PricePerHourLowPriority": "0.0452"
+  },
+  {
+    "VmSize": "Standard_D4ds_v5",
+    "PricePerHourDedicated": "0.226",
+    "PricePerHourLowPriority": "0.164"
   },
   {
     "VmSize": "Standard_D4s_v3",
@@ -347,42 +397,52 @@
   {
     "VmSize": "Standard_D5_v2",
     "PricePerHourDedicated": "1.117",
-    "PricePerHourLowPriority": "0.234"
+    "PricePerHourLowPriority": "0.223"
   },
   {
     "VmSize": "Standard_D64_v3",
     "PricePerHourDedicated": "3.072",
-    "PricePerHourLowPriority": "0.614"
+    "PricePerHourLowPriority": "0.749"
   },
   {
     "VmSize": "Standard_D64a_v4",
-    "PricePerHourDedicated": "3.072",
+    "PricePerHourDedicated": "3.584",
     "PricePerHourLowPriority": "0.614"
   },
   {
     "VmSize": "Standard_D64as_v4",
-    "PricePerHourDedicated": "3.072",
+    "PricePerHourDedicated": "3.584",
     "PricePerHourLowPriority": "0.614"
   },
   {
     "VmSize": "Standard_D64d_v4",
-    "PricePerHourDedicated": "3.616",
+    "PricePerHourDedicated": "4.256",
+    "PricePerHourLowPriority": "0.723"
+  },
+  {
+    "VmSize": "Standard_D64d_v5",
+    "PricePerHourDedicated": "6.56",
     "PricePerHourLowPriority": "0.851"
   },
   {
     "VmSize": "Standard_D64ds_v4",
     "PricePerHourDedicated": "3.616",
-    "PricePerHourLowPriority": "0.723"
+    "PricePerHourLowPriority": "0.851"
+  },
+  {
+    "VmSize": "Standard_D64ds_v5",
+    "PricePerHourDedicated": "7.2",
+    "PricePerHourLowPriority": "2.624"
   },
   {
     "VmSize": "Standard_D64s_v3",
     "PricePerHourDedicated": "3.072",
-    "PricePerHourLowPriority": "0.614"
+    "PricePerHourLowPriority": "0.749"
   },
   {
     "VmSize": "Standard_D8_v3",
     "PricePerHourDedicated": "0.468",
-    "PricePerHourLowPriority": "0.0936"
+    "PricePerHourLowPriority": "0.0768"
   },
   {
     "VmSize": "Standard_D8a_v4",
@@ -397,42 +457,62 @@
   {
     "VmSize": "Standard_D8d_v4",
     "PricePerHourDedicated": "0.452",
-    "PricePerHourLowPriority": "0.106"
+    "PricePerHourLowPriority": "0.0904"
+  },
+  {
+    "VmSize": "Standard_D8d_v5",
+    "PricePerHourDedicated": "0.82",
+    "PricePerHourLowPriority": "0.0904"
   },
   {
     "VmSize": "Standard_D8ds_v4",
-    "PricePerHourDedicated": "0.452",
+    "PricePerHourDedicated": "0.532",
     "PricePerHourLowPriority": "0.106"
+  },
+  {
+    "VmSize": "Standard_D8ds_v5",
+    "PricePerHourDedicated": "0.532",
+    "PricePerHourLowPriority": "0.36"
   },
   {
     "VmSize": "Standard_D8s_v3",
     "PricePerHourDedicated": "0.468",
-    "PricePerHourLowPriority": "0.0936"
+    "PricePerHourLowPriority": "0.0768"
   },
   {
     "VmSize": "Standard_D96a_v4",
-    "PricePerHourDedicated": "4.608",
+    "PricePerHourDedicated": "5.376",
     "PricePerHourLowPriority": "1.075"
   },
   {
     "VmSize": "Standard_D96as_v4",
-    "PricePerHourDedicated": "4.608",
+    "PricePerHourDedicated": "5.376",
     "PricePerHourLowPriority": "1.075"
   },
   {
+    "VmSize": "Standard_D96d_v5",
+    "PricePerHourDedicated": "9.84",
+    "PricePerHourLowPriority": "1.085"
+  },
+  {
+    "VmSize": "Standard_D96ds_v5",
+    "PricePerHourDedicated": "9.84",
+    "PricePerHourLowPriority": "3.936"
+  },
+  {
     "VmSize": "Standard_DC1s_v2",
-    "PricePerHourDedicated": "0.198",
-    "PricePerHourLowPriority": "0.0395"
+    "PricePerHourDedicated": "0.125",
+    "PricePerHourLowPriority": "0.0192"
   },
   {
     "VmSize": "Standard_DC2s_v2",
-    "PricePerHourDedicated": "0.395",
-    "PricePerHourLowPriority": "0.0791"
+    "PricePerHourDedicated": "0.192",
+    "PricePerHourLowPriority": "0.0384"
   },
   {
     "VmSize": "Standard_DC4s_v2",
-    "PricePerHourDedicated": "1.028",
-    "PricePerHourLowPriority": "0.158"
+    "PricePerHourDedicated": "0.384",
+    "PricePerHourLowPriority": "0.0768"
   },
   {
     "VmSize": "Standard_DS1",
@@ -441,8 +521,8 @@
   },
   {
     "VmSize": "Standard_DS1_v2",
-    "PricePerHourDedicated": "0.07",
-    "PricePerHourLowPriority": "0.0146"
+    "PricePerHourDedicated": "0.073",
+    "PricePerHourLowPriority": "0.014"
   },
   {
     "VmSize": "Standard_DS11",
@@ -457,7 +537,7 @@
   {
     "VmSize": "Standard_DS12",
     "PricePerHourDedicated": "0.386",
-    "PricePerHourLowPriority": "0.077"
+    "PricePerHourLowPriority": "0.0771"
   },
   {
     "VmSize": "Standard_DS12_v2",
@@ -486,7 +566,7 @@
   },
   {
     "VmSize": "Standard_DS15_v2",
-    "PricePerHourDedicated": "1.853",
+    "PricePerHourDedicated": "1.852",
     "PricePerHourLowPriority": "0.37"
   },
   {
@@ -497,7 +577,7 @@
   {
     "VmSize": "Standard_DS2_v2",
     "PricePerHourDedicated": "0.14",
-    "PricePerHourLowPriority": "0.0279"
+    "PricePerHourLowPriority": "0.029"
   },
   {
     "VmSize": "Standard_DS3",
@@ -506,8 +586,8 @@
   },
   {
     "VmSize": "Standard_DS3_v2",
-    "PricePerHourDedicated": "0.279",
-    "PricePerHourLowPriority": "0.0585"
+    "PricePerHourDedicated": "0.293",
+    "PricePerHourLowPriority": "0.0559"
   },
   {
     "VmSize": "Standard_DS4",
@@ -516,28 +596,28 @@
   },
   {
     "VmSize": "Standard_DS4_v2",
-    "PricePerHourDedicated": "0.559",
+    "PricePerHourDedicated": "0.585",
     "PricePerHourLowPriority": "0.112"
   },
   {
     "VmSize": "Standard_DS5_v2",
     "PricePerHourDedicated": "1.117",
-    "PricePerHourLowPriority": "0.234"
+    "PricePerHourLowPriority": "0.223"
   },
   {
     "VmSize": "Standard_E16_v3",
     "PricePerHourDedicated": "1.12",
-    "PricePerHourLowPriority": "0.202"
+    "PricePerHourLowPriority": "0.237"
   },
   {
     "VmSize": "Standard_E16a_v4",
     "PricePerHourDedicated": "1.12",
-    "PricePerHourLowPriority": "0.224"
+    "PricePerHourLowPriority": "0.202"
   },
   {
     "VmSize": "Standard_E16as_v4",
     "PricePerHourDedicated": "1.12",
-    "PricePerHourLowPriority": "0.224"
+    "PricePerHourLowPriority": "0.202"
   },
   {
     "VmSize": "Standard_E16d_v4",
@@ -545,28 +625,68 @@
     "PricePerHourLowPriority": "0.23"
   },
   {
+    "VmSize": "Standard_E16d_v5",
+    "PricePerHourDedicated": "1.888",
+    "PricePerHourLowPriority": "0.755"
+  },
+  {
     "VmSize": "Standard_E16ds_v4",
+    "PricePerHourDedicated": "1.296",
+    "PricePerHourLowPriority": "0.23"
+  },
+  {
+    "VmSize": "Standard_E16ds_v5",
     "PricePerHourDedicated": "1.296",
     "PricePerHourLowPriority": "0.23"
   },
   {
     "VmSize": "Standard_E16s_v3",
     "PricePerHourDedicated": "1.12",
-    "PricePerHourLowPriority": "0.202"
+    "PricePerHourLowPriority": "0.237"
   },
   {
     "VmSize": "Standard_E2_v3",
-    "PricePerHourDedicated": "0.148",
+    "PricePerHourDedicated": "0.126",
     "PricePerHourLowPriority": "0.0252"
   },
   {
+    "VmSize": "Standard_E20a_v4",
+    "PricePerHourDedicated": "1.26",
+    "PricePerHourLowPriority": "0.28"
+  },
+  {
+    "VmSize": "Standard_E20as_v4",
+    "PricePerHourDedicated": "1.26",
+    "PricePerHourLowPriority": "0.28"
+  },
+  {
+    "VmSize": "Standard_E20d_v4",
+    "PricePerHourDedicated": "1.44",
+    "PricePerHourLowPriority": "0.324"
+  },
+  {
+    "VmSize": "Standard_E20d_v5",
+    "PricePerHourDedicated": "1.44",
+    "PricePerHourLowPriority": "1.016"
+  },
+  {
+    "VmSize": "Standard_E20ds_v4",
+    "PricePerHourDedicated": "1.62",
+    "PricePerHourLowPriority": "0.288"
+  },
+  {
+    "VmSize": "Standard_E20ds_v5",
+    "PricePerHourDedicated": "1.44",
+    "PricePerHourLowPriority": "0.288"
+  },
+  {
     "VmSize": "Standard_E2a_v4",
-    "PricePerHourDedicated": "0.14",
+    "PricePerHourDedicated": "0.126",
     "PricePerHourLowPriority": "0.028"
   },
   {
     "VmSize": "Standard_E2as_v4",
-    "PricePerHourDedicated": "0.14",
+    "PricePerHourDedicated": "0.126",
     "PricePerHourLowPriority": "0.028"
   },
   {
@@ -575,13 +695,23 @@
     "PricePerHourLowPriority": "0.0288"
   },
   {
-    "VmSize": "Standard_E2ds_v4",
+    "VmSize": "Standard_E2d_v5",
     "PricePerHourDedicated": "0.162",
+    "PricePerHourLowPriority": "0.102"
+  },
+  {
+    "VmSize": "Standard_E2ds_v4",
+    "PricePerHourDedicated": "0.144",
     "PricePerHourLowPriority": "0.0324"
   },
   {
+    "VmSize": "Standard_E2ds_v5",
+    "PricePerHourDedicated": "0.144",
+    "PricePerHourLowPriority": "0.0288"
+  },
+  {
     "VmSize": "Standard_E2s_v3",
-    "PricePerHourDedicated": "0.148",
+    "PricePerHourDedicated": "0.126",
     "PricePerHourLowPriority": "0.0252"
   },
   {
@@ -601,13 +731,23 @@
   },
   {
     "VmSize": "Standard_E32d_v4",
-    "PricePerHourDedicated": "2.304",
+    "PricePerHourDedicated": "2.592",
     "PricePerHourLowPriority": "0.518"
   },
   {
+    "VmSize": "Standard_E32d_v5",
+    "PricePerHourDedicated": "3.776",
+    "PricePerHourLowPriority": "0.461"
+  },
+  {
     "VmSize": "Standard_E32ds_v4",
-    "PricePerHourDedicated": "2.304",
+    "PricePerHourDedicated": "2.592",
     "PricePerHourLowPriority": "0.518"
+  },
+  {
+    "VmSize": "Standard_E32ds_v5",
+    "PricePerHourDedicated": "2.592",
+    "PricePerHourLowPriority": "0.461"
   },
   {
     "VmSize": "Standard_E32s_v3",
@@ -616,12 +756,12 @@
   },
   {
     "VmSize": "Standard_E4_v3",
-    "PricePerHourDedicated": "0.252",
+    "PricePerHourDedicated": "0.296",
     "PricePerHourLowPriority": "0.059"
   },
   {
     "VmSize": "Standard_E48_v3",
-    "PricePerHourDedicated": "3.36",
+    "PricePerHourDedicated": "3.024",
     "PricePerHourLowPriority": "0.605"
   },
   {
@@ -640,13 +780,23 @@
     "PricePerHourLowPriority": "0.691"
   },
   {
+    "VmSize": "Standard_E48d_v5",
+    "PricePerHourDedicated": "3.888",
+    "PricePerHourLowPriority": "0.691"
+  },
+  {
     "VmSize": "Standard_E48ds_v4",
     "PricePerHourDedicated": "3.888",
     "PricePerHourLowPriority": "0.778"
   },
   {
+    "VmSize": "Standard_E48ds_v5",
+    "PricePerHourDedicated": "3.456",
+    "PricePerHourLowPriority": "0.691"
+  },
+  {
     "VmSize": "Standard_E48s_v3",
-    "PricePerHourDedicated": "3.36",
+    "PricePerHourDedicated": "3.024",
     "PricePerHourLowPriority": "0.605"
   },
   {
@@ -662,16 +812,26 @@
   {
     "VmSize": "Standard_E4d_v4",
     "PricePerHourDedicated": "0.288",
-    "PricePerHourLowPriority": "0.0576"
+    "PricePerHourLowPriority": "0.0648"
+  },
+  {
+    "VmSize": "Standard_E4d_v5",
+    "PricePerHourDedicated": "0.288",
+    "PricePerHourLowPriority": "0.203"
   },
   {
     "VmSize": "Standard_E4ds_v4",
+    "PricePerHourDedicated": "0.324",
+    "PricePerHourLowPriority": "0.0648"
+  },
+  {
+    "VmSize": "Standard_E4ds_v5",
     "PricePerHourDedicated": "0.324",
     "PricePerHourLowPriority": "0.0576"
   },
   {
     "VmSize": "Standard_E4s_v3",
-    "PricePerHourDedicated": "0.252",
+    "PricePerHourDedicated": "0.296",
     "PricePerHourLowPriority": "0.059"
   },
   {
@@ -681,18 +841,23 @@
   },
   {
     "VmSize": "Standard_E64a_v4",
-    "PricePerHourDedicated": "4.48",
+    "PricePerHourDedicated": "4.032",
     "PricePerHourLowPriority": "0.806"
   },
   {
     "VmSize": "Standard_E64as_v4",
-    "PricePerHourDedicated": "4.48",
+    "PricePerHourDedicated": "4.032",
     "PricePerHourLowPriority": "0.806"
   },
   {
     "VmSize": "Standard_E64d_v4",
-    "PricePerHourDedicated": "5.184",
+    "PricePerHourDedicated": "4.608",
     "PricePerHourLowPriority": "0.922"
+  },
+  {
+    "VmSize": "Standard_E64d_v5",
+    "PricePerHourDedicated": "8.128",
+    "PricePerHourLowPriority": "3.021"
   },
   {
     "VmSize": "Standard_E64ds_v4",
@@ -700,9 +865,14 @@
     "PricePerHourLowPriority": "1.037"
   },
   {
+    "VmSize": "Standard_E64ds_v5",
+    "PricePerHourDedicated": "5.184",
+    "PricePerHourLowPriority": "0.922"
+  },
+  {
     "VmSize": "Standard_E64i_v3",
-    "PricePerHourDedicated": "4.032",
-    "PricePerHourLowPriority": "0.806"
+    "PricePerHourDedicated": "3.629",
+    "PricePerHourLowPriority": "0.726"
   },
   {
     "VmSize": "Standard_E64s_v3",
@@ -711,28 +881,28 @@
   },
   {
     "VmSize": "Standard_E8_v3",
-    "PricePerHourDedicated": "0.504",
+    "PricePerHourDedicated": "0.56",
     "PricePerHourLowPriority": "0.101"
   },
   {
     "VmSize": "Standard_E80ids_v4",
-    "PricePerHourDedicated": "5.76",
+    "PricePerHourDedicated": "6.48",
     "PricePerHourLowPriority": "1.152"
   },
   {
     "VmSize": "Standard_E80is_v4",
     "PricePerHourDedicated": "5.04",
-    "PricePerHourLowPriority": "1.12"
+    "PricePerHourLowPriority": "1.008"
   },
   {
     "VmSize": "Standard_E8a_v4",
-    "PricePerHourDedicated": "0.504",
-    "PricePerHourLowPriority": "0.112"
+    "PricePerHourDedicated": "0.56",
+    "PricePerHourLowPriority": "0.101"
   },
   {
     "VmSize": "Standard_E8as_v4",
-    "PricePerHourDedicated": "0.504",
-    "PricePerHourLowPriority": "0.112"
+    "PricePerHourDedicated": "0.56",
+    "PricePerHourLowPriority": "0.101"
   },
   {
     "VmSize": "Standard_E8d_v4",
@@ -740,24 +910,44 @@
     "PricePerHourLowPriority": "0.13"
   },
   {
+    "VmSize": "Standard_E8d_v5",
+    "PricePerHourDedicated": "0.944",
+    "PricePerHourLowPriority": "0.378"
+  },
+  {
     "VmSize": "Standard_E8ds_v4",
     "PricePerHourDedicated": "0.648",
     "PricePerHourLowPriority": "0.115"
   },
   {
+    "VmSize": "Standard_E8ds_v5",
+    "PricePerHourDedicated": "0.576",
+    "PricePerHourLowPriority": "0.115"
+  },
+  {
     "VmSize": "Standard_E8s_v3",
-    "PricePerHourDedicated": "0.504",
+    "PricePerHourDedicated": "0.56",
     "PricePerHourLowPriority": "0.101"
   },
   {
     "VmSize": "Standard_E96a_v4",
-    "PricePerHourDedicated": "6.048",
+    "PricePerHourDedicated": "6.72",
     "PricePerHourLowPriority": "1.344"
   },
   {
     "VmSize": "Standard_E96as_v4",
-    "PricePerHourDedicated": "6.048",
+    "PricePerHourDedicated": "6.72",
     "PricePerHourLowPriority": "1.344"
+  },
+  {
+    "VmSize": "Standard_E96d_v5",
+    "PricePerHourDedicated": "12.192",
+    "PricePerHourLowPriority": "4.877"
+  },
+  {
+    "VmSize": "Standard_E96ds_v5",
+    "PricePerHourDedicated": "6.912",
+    "PricePerHourLowPriority": "1.555"
   },
   {
     "VmSize": "Standard_F1",
@@ -776,8 +966,8 @@
   },
   {
     "VmSize": "Standard_F16s_v2",
-    "PricePerHourDedicated": "0.848",
-    "PricePerHourLowPriority": "0.135"
+    "PricePerHourDedicated": "0.677",
+    "PricePerHourLowPriority": "0.136"
   },
   {
     "VmSize": "Standard_F1s",
@@ -796,8 +986,8 @@
   },
   {
     "VmSize": "Standard_F2s_v2",
-    "PricePerHourDedicated": "0.106",
-    "PricePerHourLowPriority": "0.017"
+    "PricePerHourDedicated": "0.0846",
+    "PricePerHourLowPriority": "0.0169"
   },
   {
     "VmSize": "Standard_F32s_v2",
@@ -807,7 +997,7 @@
   {
     "VmSize": "Standard_F4",
     "PricePerHourDedicated": "0.199",
-    "PricePerHourLowPriority": "0.0398"
+    "PricePerHourLowPriority": "0.0498"
   },
   {
     "VmSize": "Standard_F48s_v2",
@@ -817,11 +1007,11 @@
   {
     "VmSize": "Standard_F4s",
     "PricePerHourDedicated": "0.199",
-    "PricePerHourLowPriority": "0.0398"
+    "PricePerHourLowPriority": "0.0498"
   },
   {
     "VmSize": "Standard_F4s_v2",
-    "PricePerHourDedicated": "0.212",
+    "PricePerHourDedicated": "0.169",
     "PricePerHourLowPriority": "0.034"
   },
   {
@@ -847,7 +1037,32 @@
   {
     "VmSize": "Standard_F8s_v2",
     "PricePerHourDedicated": "0.424",
-    "PricePerHourLowPriority": "0.0677"
+    "PricePerHourLowPriority": "0.068"
+  },
+  {
+    "VmSize": "Standard_FX12mds",
+    "PricePerHourDedicated": "1.116",
+    "PricePerHourLowPriority": "0.667"
+  },
+  {
+    "VmSize": "Standard_FX24mds",
+    "PricePerHourDedicated": "3.336",
+    "PricePerHourLowPriority": "1.334"
+  },
+  {
+    "VmSize": "Standard_FX36mds",
+    "PricePerHourDedicated": "5.004",
+    "PricePerHourLowPriority": "2.002"
+  },
+  {
+    "VmSize": "Standard_FX48mds",
+    "PricePerHourDedicated": "6.672",
+    "PricePerHourLowPriority": "0.893"
+  },
+  {
+    "VmSize": "Standard_FX4mds",
+    "PricePerHourDedicated": "0.556",
+    "PricePerHourLowPriority": "0.0744"
   },
   {
     "VmSize": "Standard_G1",
@@ -901,12 +1116,12 @@
   },
   {
     "VmSize": "Standard_H16",
-    "PricePerHourDedicated": "1.941",
+    "PricePerHourDedicated": "1.807",
     "PricePerHourLowPriority": "0.361"
   },
   {
     "VmSize": "Standard_H16_Promo",
-    "PricePerHourDedicated": "1.165",
+    "PricePerHourDedicated": "1.085",
     "PricePerHourLowPriority": null
   },
   {
@@ -922,7 +1137,7 @@
   {
     "VmSize": "Standard_H16mr",
     "PricePerHourDedicated": "2.664",
-    "PricePerHourLowPriority": "0.533"
+    "PricePerHourLowPriority": "0.572"
   },
   {
     "VmSize": "Standard_H16mr_Promo",
@@ -932,11 +1147,11 @@
   {
     "VmSize": "Standard_H16r",
     "PricePerHourDedicated": "2.136",
-    "PricePerHourLowPriority": "0.398"
+    "PricePerHourLowPriority": "0.427"
   },
   {
     "VmSize": "Standard_H16r_Promo",
-    "PricePerHourDedicated": "1.194",
+    "PricePerHourDedicated": "1.281",
     "PricePerHourLowPriority": null
   },
   {
@@ -951,12 +1166,12 @@
   },
   {
     "VmSize": "Standard_H8m",
-    "PricePerHourDedicated": "1.211",
-    "PricePerHourLowPriority": "0.26"
+    "PricePerHourDedicated": "1.301",
+    "PricePerHourLowPriority": "0.242"
   },
   {
     "VmSize": "Standard_H8m_Promo",
-    "PricePerHourDedicated": "0.727",
+    "PricePerHourDedicated": "0.78",
     "PricePerHourLowPriority": null
   },
   {
@@ -1022,7 +1237,7 @@
   {
     "VmSize": "Standard_L48s_v2",
     "PricePerHourDedicated": "4.128",
-    "PricePerHourLowPriority": "0.749"
+    "PricePerHourLowPriority": "0.826"
   },
   {
     "VmSize": "Standard_L4s",
@@ -1036,7 +1251,7 @@
   },
   {
     "VmSize": "Standard_L80s_v2",
-    "PricePerHourDedicated": "6.24",
+    "PricePerHourDedicated": "6.88",
     "PricePerHourLowPriority": "1.376"
   },
   {
@@ -1047,12 +1262,12 @@
   {
     "VmSize": "Standard_L8s_v2",
     "PricePerHourDedicated": "0.688",
-    "PricePerHourLowPriority": "0.125"
+    "PricePerHourLowPriority": "0.138"
   },
   {
     "VmSize": "Standard_M128",
-    "PricePerHourDedicated": "17.339",
-    "PricePerHourLowPriority": "3.468"
+    "PricePerHourDedicated": "13.338",
+    "PricePerHourLowPriority": "2.668"
   },
   {
     "VmSize": "Standard_M128m",
@@ -1066,8 +1281,8 @@
   },
   {
     "VmSize": "Standard_M128s",
-    "PricePerHourDedicated": "17.339",
-    "PricePerHourLowPriority": "3.468"
+    "PricePerHourDedicated": "13.338",
+    "PricePerHourLowPriority": "2.668"
   },
   {
     "VmSize": "Standard_M16ms",
@@ -1082,11 +1297,11 @@
   {
     "VmSize": "Standard_M208s_v2",
     "PricePerHourDedicated": "29.003",
-    "PricePerHourLowPriority": "4.462"
+    "PricePerHourLowPriority": "5.801"
   },
   {
     "VmSize": "Standard_M32ls",
-    "PricePerHourDedicated": "2.873",
+    "PricePerHourDedicated": "3.201",
     "PricePerHourLowPriority": "0.5746"
   },
   {
@@ -1096,7 +1311,7 @@
   },
   {
     "VmSize": "Standard_M32ts",
-    "PricePerHourDedicated": "2.707",
+    "PricePerHourDedicated": "3.016",
     "PricePerHourLowPriority": "0.603"
   },
   {
@@ -1106,7 +1321,7 @@
   },
   {
     "VmSize": "Standard_M416s_v2",
-    "PricePerHourDedicated": "64.454",
+    "PricePerHourDedicated": "49.58",
     "PricePerHourLowPriority": "12.891"
   },
   {
@@ -1116,17 +1331,17 @@
   },
   {
     "VmSize": "Standard_M64ls",
-    "PricePerHourDedicated": "6.403",
+    "PricePerHourDedicated": "5.415",
     "PricePerHourLowPriority": "1.281"
   },
   {
     "VmSize": "Standard_M64m",
-    "PricePerHourDedicated": "10.337",
+    "PricePerHourDedicated": "17.347",
     "PricePerHourLowPriority": "3.469"
   },
   {
     "VmSize": "Standard_M64ms",
-    "PricePerHourDedicated": "10.337",
+    "PricePerHourDedicated": "17.347",
     "PricePerHourLowPriority": "3.469"
   },
   {
@@ -1156,22 +1371,22 @@
   },
   {
     "VmSize": "Standard_NC12s_v3",
-    "PricePerHourDedicated": "7.956",
+    "PricePerHourDedicated": "6.12",
     "PricePerHourLowPriority": "1.224"
   },
   {
     "VmSize": "Standard_NC16as_T4_v3",
-    "PricePerHourDedicated": "1.204",
-    "PricePerHourLowPriority": "0.241"
+    "PricePerHourDedicated": "1.445",
+    "PricePerHourLowPriority": "0.289"
   },
   {
     "VmSize": "Standard_NC24",
     "PricePerHourDedicated": "3.6",
-    "PricePerHourLowPriority": "0.864"
+    "PricePerHourLowPriority": "0.72"
   },
   {
     "VmSize": "Standard_NC24_Promo",
-    "PricePerHourDedicated": "1.584",
+    "PricePerHourDedicated": "1.901",
     "PricePerHourLowPriority": null
   },
   {
@@ -1181,7 +1396,7 @@
   },
   {
     "VmSize": "Standard_NC24r_Promo",
-    "PricePerHourDedicated": "2.091",
+    "PricePerHourDedicated": "1.742",
     "PricePerHourLowPriority": null
   },
   {
@@ -1201,12 +1416,12 @@
   },
   {
     "VmSize": "Standard_NC24s_v3",
-    "PricePerHourDedicated": "15.912",
+    "PricePerHourDedicated": "12.24",
     "PricePerHourLowPriority": "3.182"
   },
   {
     "VmSize": "Standard_NC4as_T4_v3",
-    "PricePerHourDedicated": "0.526",
+    "PricePerHourDedicated": "0.631",
     "PricePerHourLowPriority": "0.105"
   },
   {
@@ -1231,7 +1446,7 @@
   },
   {
     "VmSize": "Standard_NC6s_v3",
-    "PricePerHourDedicated": "3.06",
+    "PricePerHourDedicated": "3.978",
     "PricePerHourLowPriority": "0.796"
   },
   {
@@ -1268,6 +1483,11 @@
     "VmSize": "Standard_ND6s",
     "PricePerHourDedicated": "2.07",
     "PricePerHourLowPriority": "0.414"
+  },
+  {
+    "VmSize": "Standard_ND96amsr_A100_v4",
+    "PricePerHourDedicated": "37.186",
+    "PricePerHourLowPriority": "6.554"
   },
   {
     "VmSize": "Standard_ND96asr_v4",
@@ -1312,11 +1532,11 @@
   {
     "VmSize": "Standard_NV24",
     "PricePerHourDedicated": "4.56",
-    "PricePerHourLowPriority": "0.992"
+    "PricePerHourLowPriority": "0.912"
   },
   {
     "VmSize": "Standard_NV24_Promo",
-    "PricePerHourDedicated": "2.976",
+    "PricePerHourDedicated": "2.736",
     "PricePerHourLowPriority": null
   },
   {
@@ -1342,7 +1562,7 @@
   {
     "VmSize": "Standard_NV6",
     "PricePerHourDedicated": "1.14",
-    "PricePerHourLowPriority": "0.228"
+    "PricePerHourLowPriority": "0.248"
   },
   {
     "VmSize": "Standard_NV6_Promo",

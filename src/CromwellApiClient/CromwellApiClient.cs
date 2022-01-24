@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -30,25 +30,25 @@ namespace CromwellApiClient
         }
 
         public string GetUrl()
-	    => url;
+            => url;
 
         public async Task<GetLogsResponse> GetLogsAsync(Guid id)
-	    => await GetAsync<GetLogsResponse>($"/{id}/logs");
+            => await GetAsync<GetLogsResponse>($"/{id}/logs");
 
         public async Task<GetOutputsResponse> GetOutputsAsync(Guid id)
-	    => new GetOutputsResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json") };
+            => new GetOutputsResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json") };
 
         public async Task<GetMetadataResponse> GetMetadataAsync(Guid id)
-	    => new GetMetadataResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata", "application/json") };
+            => new GetMetadataResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json") };
 
         public async Task<GetStatusResponse> GetStatusAsync(Guid id)
-	    => await GetAsync<GetStatusResponse>($"/{id}/status");
+            => await GetAsync<GetStatusResponse>($"/{id}/status");
 
         public async Task<GetTimingResponse> GetTimingAsync(Guid id)
-	    => new GetTimingResponse { Id = id, Html = await GetAsyncWithMediaType($"/{id}/timing", "text/html") };
+            => new GetTimingResponse { Id = id, Html = await GetAsyncWithMediaType($"/{id}/timing", "text/html") };
 
         public async Task<PostAbortResponse> PostAbortAsync(Guid id)
-	    => await PostAsync<PostAbortResponse>($"/{id}/abort", id);
+            => await PostAsync<PostAbortResponse>($"/{id}/abort", id);
 
         public async Task<PostWorkflowResponse> PostWorkflowAsync(
             string workflowSourceFilename,
@@ -106,10 +106,10 @@ namespace CromwellApiClient
         }
 
         public async Task<PostQueryResponse> PostQueryAsync(string queryJson)
-	    => await PostAsync<PostQueryResponse>("/query", queryJson);
+            => await PostAsync<PostQueryResponse>("/query", queryJson);
 
         private string GetApiUrl(string path)
-	    => $"{url}{path}";
+            => $"{url}{path}";
 
         private async Task<T> GetAsync<T>(string path)
         {

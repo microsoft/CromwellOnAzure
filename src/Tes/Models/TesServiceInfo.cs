@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -48,6 +48,12 @@ namespace Tes.Models
         public List<string> Storage { get; set; }
 
         /// <summary>
+        /// List keys supported in TesResources.backend_parameters
+        /// </summary>
+        [DataMember(Name = "tesResources_backend_parameters")]
+        public List<string> TesResourcesSupportedBackendParameters { get; set; }
+
+        /// <summary>
         /// Returns the string presentation of the object
         /// </summary>
         /// <returns>String presentation of the object</returns>
@@ -56,7 +62,18 @@ namespace Tes.Models
                 .Append("class TesServiceInfo {\n")
                 .Append("  Name: ").Append(Name).Append('\n')
                 .Append("  Doc: ").Append(Doc).Append('\n')
-                .Append("  Storage: ").Append(Storage).Append('\n')
+                .Append("  Storage: ")
+                .IfThenElse(
+                    Storage?.Count > 0,
+                    s => s.Append(string.Join(",", Storage)),
+                    s => s)
+                .Append('\n')
+                .Append("  TesResourcesSupportedBackendParameters: ")
+                .IfThenElse(
+                    TesResourcesSupportedBackendParameters?.Count > 0,
+                    s => s.Append(string.Join(",", Enum.GetNames(typeof(TesResources.SupportedBackendParameters)))),
+                    s => s)
+                .Append('\n')
                 .Append("}\n")
                 .ToString();
 
@@ -105,7 +122,13 @@ namespace Tes.Models
                     Storage == other.Storage ||
                     Storage is not null &&
                     Storage.SequenceEqual(other.Storage)
-                ),
+                )
+                ) &&
+                (
+                    TesResourcesSupportedBackendParameters == other.TesResourcesSupportedBackendParameters ||
+                    TesResourcesSupportedBackendParameters is not null &&
+                    TesResourcesSupportedBackendParameters.SequenceEqual(other.TesResourcesSupportedBackendParameters)
+                )
             };
 
         /// <summary>
@@ -131,6 +154,11 @@ namespace Tes.Models
                 if (Storage is not null)
                 {
                     hashCode = hashCode * 59 + Storage.GetHashCode();
+                }
+
+                if (TesResourcesSupportedBackendParameters != null)
+                {
+                    hashCode = hashCode * 59 + TesResourcesSupportedBackendParameters.GetHashCode();
                 }
 
                 return hashCode;
