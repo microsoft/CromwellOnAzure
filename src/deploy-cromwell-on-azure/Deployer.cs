@@ -52,7 +52,6 @@ namespace CromwellOnAzureDeployer
             .Handle<Exception>(ex => !(ex is SshAuthenticationException && ex.Message.StartsWith("Permission")))
             .WaitAndRetryAsync(5, retryAttempt => TimeSpan.FromSeconds(5));
 
-        private const string BatchAutoStorageContainerName = "utilities";
         private const string WorkflowsContainerName = "workflows";
         private const string ConfigurationContainerName = "configuration";
         private const string CromwellConfigurationFileName = "cromwell-application.conf";
@@ -738,9 +737,6 @@ namespace CromwellOnAzureDeployer
             }
             else if (!string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry))
             {
-                //await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (GetBinaryFileContent("SetDockerDaemon"), $"/tmp/SetDockerDaemon", true));
-                //await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"sudo /tmp/SetDockerDaemon {configuration.PrivateContainerRegistry}");
-
                 await AssignVmAsAcrPullToContainerRegistryAsync(managedIdentity, resourceGroup, (await azureSubscriptionClient.ContainerRegistries.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(r => configuration.PrivateContainerRegistry.Equals(r.Name, StringComparison.OrdinalIgnoreCase)));
             }
 
@@ -933,15 +929,12 @@ namespace CromwellOnAzureDeployer
             //            .WithResourceScope(containerRegistry)
             //            .CreateAsync(cts.Token)));
 
-            const string acrPullReader = "eb5609c3-80b1-405f-8a54-b82d7cd2c949";
-
-            async Task<IRoleDefinition> GetAcrPullReaderDefinition()
-                => (await azureSubscriptionClient.AccessManagement.RoleDefinitions.ListByScopeAsync(resourceGroup.Id)).FirstOrDefault(d => acrPullReader.Equals(d.Name));
+            const string acrPullReader = "0567d4de-7a34-4b2c-8747-3dbb7a3b8e18";
 
             return Task.Run(async () =>
             {
-                var definition = await GetAcrPullReaderDefinition();
-                if (definition is null)
+                var definitionId = (await azureSubscriptionClient.AccessManagement.RoleDefinitions.GetByScopeAsync(resourceGroup.Id, acrPullReader))?.Id;
+                if (definitionId is null)
                 {
                     var roleDefinition =
                     await Execute(
@@ -952,9 +945,10 @@ namespace CromwellOnAzureDeployer
                         acrPullReader,
                         new RoleDefinitionInner
                         {
-                            AssignableScopes = Enumerable.Repeat(containerRegistry.Id, 1).ToList(),
+                            //AssignableScopes = Enumerable.Repeat($"/subscriptions/{configuration.SubscriptionId}", 1).ToList(),
+                            AssignableScopes = Enumerable.Repeat($"/subscriptions", 1).ToList(),
                             Description = "Role facilitating TES access to ACR on behalf of Batch Account.",
-                            RoleName = $"role-{resourceGroup.Name}-acr-reader",
+                            RoleName = $"role-CromwellOnAzure-acr-reader",
                             Permissions = Enumerable
                                 .Repeat(new PermissionInner
                                 {
@@ -969,9 +963,7 @@ namespace CromwellOnAzureDeployer
                                 .ToList()
                         }));
 
-                    RefreshableConsole.WriteLine($"Id: {roleDefinition.Id}\nName: {roleDefinition.Name}\nRoleName: {roleDefinition.RoleName}\nType: {roleDefinition.Type}\nRoleType: {roleDefinition.RoleType}\nAssignableScopes: {roleDefinition.AssignableScopes}");
-                    definition = await GetAcrPullReaderDefinition();
-                    RefreshableConsole.WriteLine($"{definition?.Id ?? "<null>"}");
+                    definitionId = roleDefinition.Id;
                 }
 
                 await Execute(
@@ -980,7 +972,7 @@ namespace CromwellOnAzureDeployer
                         () => azureSubscriptionClient.AccessManagement.RoleAssignments
                             .Define(Guid.NewGuid().ToString())
                             .ForObjectId(managedIdentity.PrincipalId)
-                            .WithRoleDefinition(definition.Id)
+                            .WithRoleDefinition(definitionId)
                             .WithResourceScope(containerRegistry)
                             .CreateAsync(cts.Token)));
             });
@@ -1050,7 +1042,7 @@ namespace CromwellOnAzureDeployer
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
 
-            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName, BatchAutoStorageContainerName };
+            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
             await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
         }
 
@@ -1061,7 +1053,6 @@ namespace CromwellOnAzureDeployer
                 {
                     await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
                     await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
-                    //await UploadBinaryToStorageAccountAsync(storageAccount, BatchAutoStorageContainerName, "SetDockerDaemon", GetBinaryFileContent("SetDockerDaemon"));
                 });
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
@@ -1069,7 +1060,7 @@ namespace CromwellOnAzureDeployer
             var cromwellConfiguration = Utility.GetFileContent("scripts", CromwellConfigurationFileName);
             if (!string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry) && !cromwellConfiguration.Contains("method = \"local\""))
             {
-                cromwellConfiguration = Utility.PersonalizeContent(new[] { new Utility.ConfigReplaceTextItem("\nengine {\n", "\ndocker {\n  hash-lookup {\n    method = \"local\"\n  }\n}\n\nengine {\n") }, cromwellConfiguration);
+                cromwellConfiguration = Utility.PersonalizeContent(new[] { new Utility.ConfigReplaceTextItem("\nengine {\n", "\ndocker.hash-lookup.enabled = false\n\nengine {\n") }, cromwellConfiguration);
             }
 
             return Execute(
@@ -1737,12 +1728,11 @@ namespace CromwellOnAzureDeployer
         }
 
         private static async Task<BlobServiceClient> GetBlobClientAsync(IStorageAccount storageAccount)
-        {
-            var accessKey = (await storageAccount.GetKeysAsync())[0].Value;
-            var storageCredentials = new StorageSharedKeyCredential(storageAccount.Name, accessKey);
-
-            return new BlobServiceClient(new Uri($"https://{storageAccount.Name}.blob.core.windows.net"), storageCredentials);
-        }
+            => new(
+                new Uri($"https://{storageAccount.Name}.blob.core.windows.net"),
+                new StorageSharedKeyCredential(
+                    storageAccount.Name,
+                    (await storageAccount.GetKeysAsync())[0].Value));
 
         private async Task ValidateTokenProviderAsync()
         {
