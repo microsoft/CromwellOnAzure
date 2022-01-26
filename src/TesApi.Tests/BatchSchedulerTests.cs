@@ -69,9 +69,11 @@ namespace TesApi.Tests
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
             azureProxyReturnValues.BatchJobAndTaskState = new AzureBatchJobAndTaskState { JobState = null };
 
-            var backendParameters = new Dictionary<string, string>();
-            backendParameters.Add("workflow_execution_identity", "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/coa/providers/Microsoft.ManagedIdentity/userAssignedIdentities/coa-test-uami");
-            
+            var backendParameters = new Dictionary<string, string>
+            {
+                { "workflow_execution_identity", "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/coa/providers/Microsoft.ManagedIdentity/userAssignedIdentities/coa-test-uami" }
+            };
+
             var task = GetTesTask();
             task.Resources.BackendParameters = backendParameters;
 
@@ -306,7 +308,7 @@ namespace TesApi.Tests
             }
 
             await RunTest(null, TesState.INITIALIZINGEnum, "VmSizeLowPri1");
-            await RunTest("", TesState.INITIALIZINGEnum, "VmSizeLowPri1");
+            await RunTest(string.Empty, TesState.INITIALIZINGEnum, "VmSizeLowPri1");
             await RunTest("VmSizeLowPri1", TesState.INITIALIZINGEnum, "VmSizeLowPri1");
             await RunTest("VmSizeLowPri1,VmSizeLowPri2", TesState.INITIALIZINGEnum, "VmSizeLowPri1");
             await RunTest("VmSizeLowPri2", TesState.INITIALIZINGEnum, "VmSizeLowPri2");
@@ -444,7 +446,7 @@ namespace TesApi.Tests
                 DiskSizeInKiB=8000000
                 DiskUsedInKiB=1000000
                 FileDownloadSizeInBytes=2000000000
-                FileUploadSizeInBytes=4000000000".Replace(" ", "");
+                FileUploadSizeInBytes=4000000000".Replace(" ", string.Empty);
 
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
             azureProxyReturnValues.BatchJobAndTaskState = BatchJobAndTaskStates.TaskCompletedSuccessfully;
@@ -990,7 +992,7 @@ namespace TesApi.Tests
                 BatchJobAndTaskState = BatchJobAndTaskStates.JobNotFound,
                 NextBatchJobId = "JobId-1",
                 StorageAccountKey = "Key1",
-                DownloadedBlobContent = "",
+                DownloadedBlobContent = string.Empty,
                 LocalFileExists = true
             };
 

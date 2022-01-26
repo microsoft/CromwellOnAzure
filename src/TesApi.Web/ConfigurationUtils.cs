@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -139,7 +139,7 @@ namespace TesApi.Web
                         : batchAccountQuotas.DedicatedCoreQuota.ToString()
                 });
 
-            vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = "", VmFamily = "", PricePerHourDedicated = "dedicated", PricePerHourLowPri = "low pri", MemoryInGiB = "(GiB)", NumberOfCores = "", ResourceDiskSizeInGiB = "(GiB)", DedicatedQuota = $"quota {(batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? "(per fam.)" : "(total)")}" });
+            vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = string.Empty, VmFamily = string.Empty, PricePerHourDedicated = "dedicated", PricePerHourLowPri = "low pri", MemoryInGiB = "(GiB)", NumberOfCores = string.Empty, ResourceDiskSizeInGiB = "(GiB)", DedicatedQuota = $"quota {(batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? "(per fam.)" : "(total)")}" });
             vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = "VM Size", VmFamily = "Family", PricePerHourDedicated = "$/hour", PricePerHourLowPri = "$/hour", MemoryInGiB = "Memory", NumberOfCores = "CPUs", ResourceDiskSizeInGiB = "Disk", DedicatedQuota = "Dedicated CPU" });
 
             var sizeColWidth = vmInfosAsStrings.Max(v => v.VmSize.Length);

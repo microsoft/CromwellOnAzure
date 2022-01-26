@@ -1356,10 +1356,6 @@ namespace CromwellOnAzureDeployer
                 {
                     var userManagedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
 
-                    (await azureSubscriptionClient.AccessManagement.ServicePrincipals.GetByIdAsync((await azureSubscriptionClient.Identities.ListAsync(true)).FirstOrDefault(i => linuxVm.SystemAssignedManagedServiceIdentityPrincipalId.Equals(i.PrincipalId)).Id))
-                        .RoleAssignments
-                    
-
                     var existingVmRoles = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync(
                             $"/subscriptions/{configuration.SubscriptionId}",
                             new ODataQuery<RoleAssignmentFilter>($"assignedTo('{linuxVm.SystemAssignedManagedServiceIdentityPrincipalId}')"))).Body

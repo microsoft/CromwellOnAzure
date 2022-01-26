@@ -165,7 +165,7 @@ namespace TriggerService.Tests
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException), "must have data in the Trigger File")]
         public async Task ProcessBlobTrigger_Empty()
-            => await ProcessBlobTriggerWithMocksAsync("");
+            => await ProcessBlobTriggerWithMocksAsync(string.Empty);
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException), "must have data in the Trigger File")]

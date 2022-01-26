@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -119,7 +119,7 @@ namespace TesApi.Web
                         {
                             if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
                             {
-                                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTaskId);
+                                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTaskId, cancellationToken);
                             }
                         }
                         catch (Exception exc)

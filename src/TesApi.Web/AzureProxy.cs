@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -713,7 +713,7 @@ namespace TesApi.Web
                 .Select(m => new { MeterName = m["MeterName"].ToString(), MeterSubCategory = m["MeterSubCategory"].ToString(), MeterRate = m["MeterRates"]["0"].ToString() })
                 .Where(m => !m.MeterSubCategory.Contains("Windows"))
                 .Select(m => new { 
-                    MeterName = m.MeterName.Replace(" Low Priority", "", StringComparison.OrdinalIgnoreCase),
+                    MeterName = m.MeterName.Replace(" Low Priority", string.Empty, StringComparison.OrdinalIgnoreCase),
                     m.MeterSubCategory,
                     MeterRate = decimal.Parse(m.MeterRate), 
                     IsLowPriority = m.MeterName.Contains(" Low Priority", StringComparison.OrdinalIgnoreCase) })
