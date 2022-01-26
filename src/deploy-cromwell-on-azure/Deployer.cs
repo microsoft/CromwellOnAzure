@@ -13,7 +13,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Azure.Storage;
 using Azure.Storage.Blobs;
-using Common;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
@@ -39,6 +38,7 @@ using Polly;
 using Polly.Retry;
 using Renci.SshNet;
 using Renci.SshNet.Common;
+using Common;
 
 namespace CromwellOnAzureDeployer
 {
@@ -2090,22 +2090,6 @@ namespace CromwellOnAzureDeployer
 
             await container.CreateIfNotExistsAsync();
             await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), cts.Token);
-        }
-
-        private async Task UploadBinaryToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, Stream content)
-        {
-            try
-            {
-                var blobClient = await GetBlobClientAsync(storageAccount);
-                var container = blobClient.GetBlobContainerClient(containerName);
-
-                await container.CreateIfNotExistsAsync();
-                await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromStream(content), cts.Token);
-            }
-            finally
-            {
-                content?.Dispose();
-            }
         }
 
         private static string GetLinuxParentPath(string path)

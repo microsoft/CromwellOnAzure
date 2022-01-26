@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -756,7 +756,7 @@ namespace TesApi.Web
                 vmPrices = JsonConvert.DeserializeObject<IEnumerable<VmPrice>>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "DefaultVmPrices.json")));
             }
 
-            var vmInfos = new List<Tes.Models.VirtualMachineInformation>();
+            var vmInfos = new List<VirtualMachineInformation>();
 
             foreach (var (VmSize, FamilyName, _, _) in supportedVmSizes)
             {
@@ -765,7 +765,7 @@ namespace TesApi.Web
 
                 if (vmSpecification is not null && vmPrice is not null)
                 {
-                    vmInfos.Add(new Tes.Models.VirtualMachineInformation
+                    vmInfos.Add(new VirtualMachineInformation
                     {
                         VmSize = VmSize,
                         MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
@@ -779,7 +779,7 @@ namespace TesApi.Web
 
                     if(vmPrice.LowPriorityAvailable)
                     {
-                        vmInfos.Add(new Tes.Models.VirtualMachineInformation
+                        vmInfos.Add(new VirtualMachineInformation
                         {
                             VmSize = VmSize,
                             MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
