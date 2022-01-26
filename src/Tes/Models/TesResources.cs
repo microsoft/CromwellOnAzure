@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -109,7 +109,7 @@ namespace Tes.Models
                     },
                     s => s)
                 .Append('\n')
-                .Append("  BackendParametersStrict: ").Append(BackendParametersStrict).Append('\n');
+                .Append("  BackendParametersStrict: ").Append(BackendParametersStrict).Append('\n')
                 .Append("}\n")
                 .ToString();
 
@@ -239,7 +239,6 @@ namespace Tes.Models
 
 #pragma warning restore 1591
         #endregion Operators
-    }
     }
 
     internal static class StringBuilderSelectorExtensions

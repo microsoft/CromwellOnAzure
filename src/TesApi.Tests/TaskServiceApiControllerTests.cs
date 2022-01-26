@@ -26,8 +26,10 @@ namespace TesApi.Tests
         {
             const string backend_parameter_key = "vm_size";
 
-            var backendParameters = new Dictionary<string, string>();
-            backendParameters.Add(backend_parameter_key, "VmSize1");
+            var backendParameters = new Dictionary<string, string>
+            {
+                { backend_parameter_key, "VmSize1" }
+            };
 
             var tesTask = new TesTask
             {
@@ -36,7 +38,7 @@ namespace TesApi.Tests
             };
 
             var repository = new Mock<IRepository<TesTask>>();
-            var controller = this.GetTaskServiceApiController(repository.Object);
+            var controller = GetTaskServiceApiController(repository.Object);
 
             var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
 
@@ -54,8 +56,10 @@ namespace TesApi.Tests
         {
             const string backend_parameter_key = "workflow_execution_identity";
 
-            var backendParameters = new Dictionary<string, string>();
-            backendParameters.Add(backend_parameter_key, "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/coa/providers/Microsoft.ManagedIdentity/userAssignedIdentities/coa-test-uami");
+            var backendParameters = new Dictionary<string, string>
+            {
+                { backend_parameter_key, "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/coa/providers/Microsoft.ManagedIdentity/userAssignedIdentities/coa-test-uami" }
+            };
 
             var tesTask = new TesTask
             {
@@ -64,7 +68,7 @@ namespace TesApi.Tests
             };
 
             var repository = new Mock<IRepository<TesTask>>();
-            var controller = this.GetTaskServiceApiController(repository.Object);
+            var controller = GetTaskServiceApiController(repository.Object);
 
             var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
 
@@ -82,8 +86,10 @@ namespace TesApi.Tests
         {
             const string unsupportedKey = "unsupported_key_2021";
 
-            var backendParameters = new Dictionary<string, string>();
-            backendParameters.Add(unsupportedKey, Guid.NewGuid().ToString());
+            var backendParameters = new Dictionary<string, string>
+            {
+                { unsupportedKey, Guid.NewGuid().ToString() }
+            };
 
             var tesTask = new TesTask
             {
@@ -92,7 +98,7 @@ namespace TesApi.Tests
             };
 
             var repository = new Mock<IRepository<TesTask>>();
-            var controller = this.GetTaskServiceApiController(repository.Object);
+            var controller = GetTaskServiceApiController(repository.Object);
 
             var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
 
@@ -112,8 +118,10 @@ namespace TesApi.Tests
         {
             const string unsupportedKey = "unsupported_key_2021";
 
-            var backendParameters = new Dictionary<string, string>();
-            backendParameters.Add(unsupportedKey, Guid.NewGuid().ToString());
+            var backendParameters = new Dictionary<string, string>
+            {
+                { unsupportedKey, Guid.NewGuid().ToString() }
+            };
 
             var tesTask = new TesTask
             {
@@ -121,7 +129,7 @@ namespace TesApi.Tests
                 Resources = new TesResources { BackendParameters = backendParameters, BackendParametersStrict = true }
             };
 
-            var controller = this.GetTaskServiceApiController();
+            var controller = GetTaskServiceApiController();
 
             var result = await controller.CreateTaskAsync(tesTask) as BadRequestObjectResult;
 
@@ -140,9 +148,11 @@ namespace TesApi.Tests
         {
             const string backend_parameter_key = "vmsize";
 
-            var backendParameters = new Dictionary<string, string>();
-            backendParameters.Add(backend_parameter_key, Guid.NewGuid().ToString());
-            backendParameters.Add("VmSize", Guid.NewGuid().ToString());
+            var backendParameters = new Dictionary<string, string>
+            {
+                { backend_parameter_key, Guid.NewGuid().ToString() },
+                { "VmSize", Guid.NewGuid().ToString() }
+            };
 
             var tesTask = new TesTask
             {
@@ -150,7 +160,7 @@ namespace TesApi.Tests
                 Resources = new TesResources { BackendParameters = backendParameters, BackendParametersStrict = true }
             };
 
-            var controller = this.GetTaskServiceApiController();
+            var controller = GetTaskServiceApiController();
 
             var result = await controller.CreateTaskAsync(tesTask) as BadRequestObjectResult;
 

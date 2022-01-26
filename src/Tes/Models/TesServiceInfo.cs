@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -122,7 +122,6 @@ namespace Tes.Models
                     Storage == other.Storage ||
                     Storage is not null &&
                     Storage.SequenceEqual(other.Storage)
-                )
                 ) &&
                 (
                     TesResourcesSupportedBackendParameters == other.TesResourcesSupportedBackendParameters ||
