@@ -27,7 +27,6 @@ services:
       - DockerInDockerImageName=$DockerInDockerImageName
       - BlobxferImageName=$BlobxferImageName
       - DisableBatchNodesPublicIpAddress=$DisableBatchNodesPublicIpAddress
-      - PrivateContainerRegistry=$PrivateContainerRegistry
       - BatchImageOffer=$BatchImageOffer
       - BatchImagePublisher=$BatchImagePublisher
       - BatchImageSku=$BatchImageSku

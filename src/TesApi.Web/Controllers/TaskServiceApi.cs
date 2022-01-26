@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -34,7 +34,7 @@ namespace TesApi.Controllers
     /// </summary>
     public class TaskServiceApiController : ControllerBase
     {
-        private const string rootExecutionPath = "/cromwell-executions";
+        //private const string rootExecutionPath = "/cromwell-executions";
         private readonly IRepository<TesTask> repository;
         private readonly ILogger<TaskServiceApiController> logger;
         private readonly IAzureProxy azureProxy;

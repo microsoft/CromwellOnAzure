@@ -38,7 +38,6 @@ write_log
 
 storage_account_name=${kv["DefaultStorageAccountName"]}
 managed_identity_client_id=${kv["ManagedIdentityClientId"]}
-private_container_registry=${kv["PrivateContainerRegistry"]-}
 
 write_log "Checking account access (this could take awhile due to role assignment propagation delay)..."
 
@@ -87,11 +86,6 @@ do
 
     sleep 10
 done
-
-sudo az login -o none --identity --username $managed_identity_client_id
-if [ ! -z "$private_container_registry" ]; then
-    sudo az acr login -n $private_container_registry
-fi
 
 write_log "Account access OK"
 write_log

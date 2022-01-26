@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -51,7 +51,7 @@ namespace TesApi.Web
         private readonly string marthaUrl;
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
-        private readonly string defaultStorageAccountName;
+        //private readonly string defaultStorageAccountName;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -76,7 +76,7 @@ namespace TesApi.Web
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
             this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
-            this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
+            //this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
@@ -899,16 +899,6 @@ namespace TesApi.Web
                 TargetDedicatedComputeNodes = preemptible ? 0 : 1,
                 StartTask = startTask
             };
-
-            //if (vmConfig.ContainerConfiguration is not null)
-            //{
-            //    poolSpecification.StartTask = new StartTask
-            //    {
-            //        CommandLine = $"/usr/bin/sudo ./SetDockerDaemon {Environment.GetEnvironmentVariable("PrivateContainerRegistry")}",
-            //        ResourceFiles = Enumerable.Repeat(ResourceFile.FromAutoStorageContainer("utilities", fileMode: "0775"), 1).ToList(),
-            //        UserIdentity = new UserIdentity(new AutoUserSpecification(AutoUserScope.Pool, ElevationLevel.Admin))
-            //    };
-            //}
 
             if (!string.IsNullOrEmpty(this.batchNodesSubnetId))
             {

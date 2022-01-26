@@ -299,11 +299,6 @@ namespace CromwellOnAzureDeployer
 
                     if (!configuration.Update)
                     {
-                        if (configuration.PrivateNetworking.HasValue == string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry))
-                        {
-                            throw new ValidationException("PrivateContainerRegistry must be set when PrivateNetworking is set.");
-                        }
-
                         ValidateRegionName(configuration.RegionName);
                         ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
@@ -735,10 +730,6 @@ namespace CromwellOnAzureDeployer
             {
                 await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down");
             }
-            else if (!string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry))
-            {
-                await AssignVmAsAcrPullToContainerRegistryAsync(managedIdentity, resourceGroup, (await azureSubscriptionClient.ContainerRegistries.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(r => configuration.PrivateContainerRegistry.Equals(r.Name, StringComparison.OrdinalIgnoreCase)));
-            }
 
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
             await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo mkdir -p {CromwellAzureRootDir} && sudo chown {configuration.VmUsername} {CromwellAzureRootDir} && sudo chmod ug=rwx,o= {CromwellAzureRootDir}");
@@ -872,7 +863,6 @@ namespace CromwellOnAzureDeployer
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "DockerInDockerImageName", configuration.DockerInDockerImageName, "env-09-docker-in-docker-image-name.txt");
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "BlobxferImageName", configuration.BlobxferImageName, "env-10-blobxfer-image-name.txt");
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress, "env-11-disable-batch-nodes-public-ip-address.txt");
-            await HandleConfigurationPropertyAsync(sshConnectionInfo, "PrivateContainerRegistry", configuration.PrivateContainerRegistry, "env-12-private-container-registry.txt");
         }
 
         private static async Task HandleConfigurationPropertyAsync(ConnectionInfo sshConnectionInfo, string key, string value, string envFileName)
@@ -913,70 +903,6 @@ namespace CromwellOnAzureDeployer
                         return;
                     }
                 });
-
-        private Task AssignVmAsAcrPullToContainerRegistryAsync(IIdentity managedIdentity, IResourceGroup resourceGroup, IRegistry containerRegistry)
-        {
-            //// https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#acrpull
-            //var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/7f951dda-4ed3-4680-a7ca-43fe172d538d";
-
-            //return Execute(
-            //    $"Assigning Pull Artifacts role for VM to Container Registry resource scope...",
-            //    () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-            //        () => azureSubscriptionClient.AccessManagement.RoleAssignments
-            //            .Define(Guid.NewGuid().ToString())
-            //            .ForObjectId(managedIdentity.PrincipalId)
-            //            .WithRoleDefinition(roleDefinitionId)
-            //            .WithResourceScope(containerRegistry)
-            //            .CreateAsync(cts.Token)));
-
-            const string acrPullReader = "0567d4de-7a34-4b2c-8747-3dbb7a3b8e18";
-
-            return Task.Run(async () =>
-            {
-                var definitionId = (await azureSubscriptionClient.AccessManagement.RoleDefinitions.GetByScopeAsync(resourceGroup.Id, acrPullReader))?.Id;
-                if (definitionId is null)
-                {
-                    var roleDefinition =
-                    await Execute(
-                    "Creating Pull Artifacts role for VM to Container Registry resource scope...",
-                    () => azureSubscriptionClient.AccessManagement.RoleDefinitions.Inner.CreateOrUpdateAsync(
-                        resourceGroup.Id,
-                        //$"{resourceGroup.Id}/providers/Microsoft.Authorization/roleDefinitions/{acrPullReader}",
-                        acrPullReader,
-                        new RoleDefinitionInner
-                        {
-                            //AssignableScopes = Enumerable.Repeat($"/subscriptions/{configuration.SubscriptionId}", 1).ToList(),
-                            AssignableScopes = Enumerable.Repeat($"/subscriptions", 1).ToList(),
-                            Description = "Role facilitating TES access to ACR on behalf of Batch Account.",
-                            RoleName = $"role-CromwellOnAzure-acr-reader",
-                            Permissions = Enumerable
-                                .Repeat(new PermissionInner
-                                {
-                                    Actions = new string[]
-                                    {
-                                        "Microsoft.ContainerRegistry/registries/listCredentials/action",
-                                        //"*/read"
-                                        "Microsoft.ContainerRegistry/registries/pull/read",
-                                        "Microsoft.ContainerRegistry/registries/read"
-                                    }
-                                }, 1)
-                                .ToList()
-                        }));
-
-                    definitionId = roleDefinition.Id;
-                }
-
-                await Execute(
-                    "Assigning Pull Artifacts role for VM to Container Registry resource scope...",
-                    () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                        () => azureSubscriptionClient.AccessManagement.RoleAssignments
-                            .Define(Guid.NewGuid().ToString())
-                            .ForObjectId(managedIdentity.PrincipalId)
-                            .WithRoleDefinition(definitionId)
-                            .WithResourceScope(containerRegistry)
-                            .CreateAsync(cts.Token)));
-            });
-        }
 
         private Task AssignVmAsDataReaderToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
         {
@@ -1056,14 +982,7 @@ namespace CromwellOnAzureDeployer
                 });
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
-        {
-            var cromwellConfiguration = Utility.GetFileContent("scripts", CromwellConfigurationFileName);
-            if (!string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry) && !cromwellConfiguration.Contains("method = \"local\""))
-            {
-                cromwellConfiguration = Utility.PersonalizeContent(new[] { new Utility.ConfigReplaceTextItem("\nengine {\n", "\ndocker.hash-lookup.enabled = false\n\nengine {\n") }, cromwellConfiguration);
-            }
-
-            return Execute(
+            => Execute(
                 $"Writing {ContainersToMountFileName} and {CromwellConfigurationFileName} files to '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
@@ -1072,10 +991,9 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
                         new Utility.ConfigReplaceTextItem("{ManagedIdentityName}", managedIdentityName)
                     }, "scripts", ContainersToMountFileName));
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfiguration);
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.GetFileContent("scripts", CromwellConfigurationFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
-        }
 
         private Task AssignVmAsContributorToBatchAccountAsync(IIdentity managedIdentity, BatchAccount batchAccount)
             => Task.WhenAll(
@@ -1817,7 +1735,6 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.VnetResourceGroupName, nameof(configuration.VnetResourceGroupName));
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
-            ThrowIfProvidedForUpdate(configuration.PrivateContainerRegistry, nameof(configuration.PrivateContainerRegistry));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
         }
 
@@ -1912,11 +1829,6 @@ namespace CromwellOnAzureDeployer
             if (!usePreemptibleVm)
             {
                 wdlFileContent = wdlFileContent.Replace("preemptible: true", "preemptible: false", StringComparison.OrdinalIgnoreCase);
-            }
-
-            if (!string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry))
-            {
-                wdlFileContent = wdlFileContent.Replace("'ubuntu:", $"'{configuration.PrivateContainerRegistry.Trim()}.azurecr.io/ubuntu:", StringComparison.Ordinal);
             }
 
             var workflowTrigger = new Workflow
@@ -2090,22 +2002,6 @@ namespace CromwellOnAzureDeployer
 
             await container.CreateIfNotExistsAsync();
             await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), cts.Token);
-        }
-
-        private async Task UploadBinaryToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, Stream content)
-        {
-            try
-            {
-                var blobClient = await GetBlobClientAsync(storageAccount);
-                var container = blobClient.GetBlobContainerClient(containerName);
-
-                await container.CreateIfNotExistsAsync();
-                await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromStream(content), cts.Token);
-            }
-            finally
-            {
-                content?.Dispose();
-            }
         }
 
         private static string GetLinuxParentPath(string path)
