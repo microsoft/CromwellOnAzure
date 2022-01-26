@@ -64,17 +64,16 @@ namespace Tes.Models
                 .Append("  Doc: ").Append(Doc).Append('\n')
                 .Append("  Storage: ")
                 .IfThenElse(
-                	Storage?.Count > 0,
-                	s => s.Append(string.Join(",", Storage)),
-                	s => s)
+                    Storage?.Count > 0,
+                    s => s.Append(string.Join(",", Storage)),
+                    s => s)
                 .Append('\n')
+                .Append("  TesResourcesSupportedBackendParameters: ")
+                .IfThenElse(
+                    TesResourcesSupportedBackendParameters?.Count > 0,
+                    s => s.Append(string.Join(",", Enum.GetNames(typeof(TesResources.SupportedBackendParameters)))),
+                    s => s)
                 .Append("}\n")
-	            .Append("  TesResourcesSupportedBackendParameters: ")
-    	        .IfThenElse(
-    	        	TesResourcesSupportedBackendParameters?.Count > 0,
-            	    s => s.Append(string.Join(",", Enum.GetNames(typeof(TesResources.SupportedBackendParameters)))),
-            	    s => s)
-    	        .Append("\n")
                 .ToString();
 
         /// <summary>
@@ -125,10 +124,10 @@ namespace Tes.Models
                 ) &&
                 (
                     TesResourcesSupportedBackendParameters == other.TesResourcesSupportedBackendParameters ||
-                    TesResourcesSupportedBackendParameters != null &&
+                    TesResourcesSupportedBackendParameters is not null &&
                     TesResourcesSupportedBackendParameters.SequenceEqual(other.TesResourcesSupportedBackendParameters)
                 )
-	    };
+            };
 
         /// <summary>
         /// Gets the hash code

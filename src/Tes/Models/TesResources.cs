@@ -109,8 +109,8 @@ namespace Tes.Models
                         return s.Append(string.Join(",", keyValues));
                     },
                     s => s)
-                .Append("\n")
-                .Append("  BackendParametersStrict: ").Append(BackendParametersStrict).Append("\n")
+                .Append('\n')
+                .Append("  BackendParametersStrict: ").Append(BackendParametersStrict).Append('\n')
                 .Append("}\n")
                 .ToString();
 
@@ -167,18 +167,18 @@ namespace Tes.Models
                 ) &&
                 (
                     Zones == other.Zones ||
-                    Zones is not null && other.Zones != null &&
+                    Zones is not null && other.Zones is not null &&
                     Zones.SequenceEqual(other.Zones)
                 ) &&
                 (
                     BackendParameters == other.BackendParameters ||
-                    BackendParameters != null && other.BackendParameters != null &&
+                    BackendParameters is not null && other.BackendParameters is not null &&
                     BackendParameters.SequenceEqual(other.BackendParameters)
                 ) &&
                 (
                     BackendParametersStrict == other?.BackendParametersStrict
                 )
-	    };
+            };
 
         /// <summary>
         /// Gets the hash code
