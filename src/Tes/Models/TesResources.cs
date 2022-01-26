@@ -94,6 +94,7 @@ namespace Tes.Models
                     s => s.Append(string.Join(",", Zones)),
                     s => s)
                 .Append('\n')
+                .Append("  BackendParameters: ")
                 .IfThenElse(
                     BackendParameters?.Keys.Count > 0,
                     s =>
@@ -166,7 +167,7 @@ namespace Tes.Models
                 ) &&
                 (
                     Zones == other.Zones ||
-                    Zones is not null &&
+                    Zones is not null && other.Zones is not null &&
                     Zones.SequenceEqual(other.Zones)
                 ) &&
                 (

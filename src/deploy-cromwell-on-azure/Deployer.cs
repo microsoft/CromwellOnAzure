@@ -11,11 +11,13 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Common;
+using Azure.Storage;
+using Azure.Storage.Blobs;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
 using Microsoft.Azure.Management.Compute.Fluent.Models;
+using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.CosmosDB.Fluent;
 using Microsoft.Azure.Management.CosmosDB.Fluent.Models;
 using Microsoft.Azure.Management.Fluent;
@@ -29,9 +31,6 @@ using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Management.Storage.Fluent;
 using Microsoft.Azure.Services.AppAuthentication;
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Auth;
-using Microsoft.Azure.Storage.Blob;
 using Microsoft.Rest;
 using Microsoft.Rest.Azure.OData;
 using Newtonsoft.Json;
@@ -39,6 +38,7 @@ using Polly;
 using Polly.Retry;
 using Renci.SshNet;
 using Renci.SshNet.Common;
+using Common;
 
 namespace CromwellOnAzureDeployer
 {
@@ -80,7 +80,7 @@ namespace CromwellOnAzureDeployer
         private Configuration configuration { get; set; }
         private TokenCredentials tokenCredentials;
         private IAzure azureSubscriptionClient { get; set; }
-        private Azure.IAuthenticated azureClient { get; set; }
+        private Microsoft.Azure.Management.Fluent.Azure.IAuthenticated azureClient { get; set; }
         private IResourceManager resourceManagerClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
@@ -164,7 +164,7 @@ namespace CromwellOnAzureDeployer
                         configuration.RegionName = linuxVm.RegionName;
                         configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() is null;
 
-                        networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault();
+                        networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(g => g.NetworkInterfaceIds.Contains(linuxVm.GetPrimaryNetworkInterface().Id));
 
                         if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup is null)
                         {
@@ -182,19 +182,6 @@ namespace CromwellOnAzureDeployer
                         sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
 
                         await WaitForSshConnectivityAsync(sshConnectionInfo);
-
-                        bool? retrievedKeepSshPortOpen = null;
-                        try
-                        {
-                            if (!configuration.KeepSshPortOpen.HasValue)
-                            {
-                                retrievedKeepSshPortOpen = await GetInstalledKeepSshPortOpenAsync(sshConnectionInfo);
-                            }
-                        }
-                        finally
-                        {
-                            configuration.KeepSshPortOpen ??= retrievedKeepSshPortOpen;
-                        }
 
                         await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
 
@@ -297,7 +284,7 @@ namespace CromwellOnAzureDeployer
                             await MitigateChaosDbV250Async(cosmosDb);
                         }
 
-                        if (installedVersion == null || installedVersion < new Version(3, 0))
+                        if (installedVersion is null || installedVersion < new Version(3, 0))
                         {
                             await PatchCromwellConfigurationFileV300Async(storageAccount);
                             await AddNewSettingsV300Async(sshConnectionInfo);
@@ -411,34 +398,41 @@ namespace CromwellOnAzureDeployer
 
                         await Task.WhenAll(new Task[]
                         {
-                        Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync()),
-                        Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
-                        Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
+                        	Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
+                        	Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
 
-                        Task.Run(async () => {
-                            storageAccount ??= await CreateStorageAccountAsync();
-                            await CreateDefaultStorageContainersAsync(storageAccount);
-                            await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
-                            await WritePersonalizedFilesToStorageAccountAsync(storageAccount, managedIdentity.Name);
-                        }),
-
-                        Task.Run(() => CreateVirtualMachineAsync(managedIdentity, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName)
-                            .ContinueWith(async t =>
+                            Task.Run(async () =>
+                            {
+                                storageAccount ??= await CreateStorageAccountAsync();
+                                await Task.WhenAll(new Task[]
                                 {
-                                    linuxVm = t.Result;
-
-                                    if (!configuration.PrivateNetworking.GetValueOrDefault())
+                                    Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync(storageAccount.Id)),
+                                    Task.Run(async () =>
                                     {
-                                        networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
-                                        await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
-                                    }
+                                        await CreateDefaultStorageContainersAsync(storageAccount);
+                                        await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
+                                        await WritePersonalizedFilesToStorageAccountAsync(storageAccount, managedIdentity.Name);
+                                    })
+                                });
+                            }),
 
-                                    sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
-                                    await WaitForSshConnectivityAsync(sshConnectionInfo);
-                                    await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
-                                },
-                                TaskContinuationOptions.OnlyOnRanToCompletion)
-                            .Unwrap())
+                            Task.Run(() => CreateVirtualMachineAsync(managedIdentity, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName)
+                                .ContinueWith(async t =>
+                                    {
+                                        linuxVm = t.Result;
+
+                                        if (!configuration.PrivateNetworking.GetValueOrDefault())
+                                        {
+                                            networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
+                                            await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
+                                        }
+
+                                        sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
+                                        await WaitForSshConnectivityAsync(sshConnectionInfo);
+                                        await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
+                                    },
+                                    TaskContinuationOptions.OnlyOnRanToCompletion)
+                                .Unwrap())
                         });
 
                         await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
@@ -473,13 +467,13 @@ namespace CromwellOnAzureDeployer
                 }
                 finally
                 {
-                    if (networkSecurityGroup is not null && true != configuration.KeepSshPortOpen)
+                    if (!configuration.KeepSshPortOpen.GetValueOrDefault())
                     {
                         await DisableSsh(networkSecurityGroup);
                     }
                 }
 
-                var maxPerFamilyQuota = batchAccount.DedicatedCoreQuotaPerVMFamilyEnforced ? Enumerable.Empty<int>() : batchAccount.DedicatedCoreQuotaPerVMFamily.Select(q => q.CoreQuota).Where(q => 0 != q);
+                var maxPerFamilyQuota = batchAccount.DedicatedCoreQuotaPerVMFamilyEnforced ? batchAccount.DedicatedCoreQuotaPerVMFamily.Select(q => q.CoreQuota).Where(q => 0 != q) : Enumerable.Repeat(batchAccount.DedicatedCoreQuota ?? 0, 1);
                 var isBatchQuotaAvailable = batchAccount.LowPriorityCoreQuota > 0 || (batchAccount.DedicatedCoreQuota > 0 && maxPerFamilyQuota.Append(0).Max() > 0);
 
                 int exitCode;
@@ -644,8 +638,8 @@ namespace CromwellOnAzureDeployer
         private static async Task<bool> MountWarningsExistAsync(ConnectionInfo sshConnectionInfo)
             => int.Parse((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"grep -c 'WARNING' {CromwellAzureRootDir}/mount.blobfuse.log || :")).Output) > 0;
 
-        private static Azure.IAuthenticated GetAzureClient(AzureCredentials azureCredentials)
-            => Azure
+        private static Microsoft.Azure.Management.Fluent.Azure.IAuthenticated GetAzureClient(AzureCredentials azureCredentials)
+            => Microsoft.Azure.Management.Fluent.Azure
                 .Configure()
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                 .Authenticate(azureCredentials);
@@ -757,13 +751,6 @@ namespace CromwellOnAzureDeployer
             return !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
         }
 
-        private static async Task<bool?> GetInstalledKeepSshPortOpenAsync(ConnectionInfo sshConnectionInfo)
-        {
-            var boolString = (await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $@"grep -sPo 'KeepSshPortOpen=\K(.*)$' {CromwellAzureRootDir}/env-12-keep-ssh-port-open.txt || :")).Output;
-
-            return !string.IsNullOrEmpty(boolString) && bool.TryParse(boolString, out var keepPortOpen) ? keepPortOpen : null;
-        }
-
         private Task MountDataDiskOnTheVirtualMachineAsync(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Mounting data disk to the VM...",
@@ -810,12 +797,14 @@ namespace CromwellOnAzureDeployer
             => await UploadFilesToVirtualMachineAsync(
                 sshConnectionInfo,
                 new[] {
-                    (Utility.GetFileContent("scripts", "env-01-account-names.txt")
-                        .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
-                        .Replace("{CosmosDbAccountName}", configuration.CosmosDbAccountName)
-                        .Replace("{BatchAccountName}", configuration.BatchAccountName)
-                        .Replace("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName)
-                        .Replace("{ManagedIdentityClientId}", managedIdentity.ClientId),
+                    (Utility.PersonalizeContent(new []
+                    {
+                        new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
+                        new Utility.ConfigReplaceTextItem("{CosmosDbAccountName}", configuration.CosmosDbAccountName),
+                        new Utility.ConfigReplaceTextItem("{BatchAccountName}", configuration.BatchAccountName),
+                        new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
+                        new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
+                    }, "scripts", "env-01-account-names.txt"),
                     $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
                     (Utility.GetFileContent("scripts", "env-04-settings.txt"),
@@ -874,7 +863,6 @@ namespace CromwellOnAzureDeployer
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "DockerInDockerImageName", configuration.DockerInDockerImageName, "env-09-docker-in-docker-image-name.txt");
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "BlobxferImageName", configuration.BlobxferImageName, "env-10-blobxfer-image-name.txt");
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress, "env-11-disable-batch-nodes-public-ip-address.txt");
-            await HandleConfigurationPropertyAsync(sshConnectionInfo, "KeepSshPortOpen", configuration.KeepSshPortOpen, "env-12-keep-ssh-port-open.txt");
         }
 
         private static async Task HandleConfigurationPropertyAsync(ConnectionInfo sshConnectionInfo, string key, string value, string envFileName)
@@ -897,7 +885,7 @@ namespace CromwellOnAzureDeployer
         {
             if (value.HasValue)
             {
-                await UploadFilesToVirtualMachineAsync(sshConnectionInfo, ($"{key}={value.Value}", $"{CromwellAzureRootDir}/{envFileName}", false));
+                await HandleConfigurationPropertyAsync(sshConnectionInfo, key, value.Value.ToString(), envFileName);
             }
         }
 
@@ -966,10 +954,9 @@ namespace CromwellOnAzureDeployer
                     // Ignore exception if a user does not have the required role to list storage accounts in a subscription
                     return null;
                 }
-            }
-            )))
+            })))
                 .SelectMany(a => a)
-                .Where(a => a != null)
+                .Where(a => a is not null)
                 .SingleOrDefault(a => a.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase) && a.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
 
         private async Task<BatchAccount> GetExistingBatchAccountAsync(string batchAccountName)
@@ -982,7 +969,7 @@ namespace CromwellOnAzureDeployer
             var blobClient = await GetBlobClientAsync(storageAccount);
 
             var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
-            await Task.WhenAll(defaultContainers.Select(c => blobClient.GetContainerReference(c).CreateIfNotExistsAsync(cts.Token)));
+            await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
         }
 
         private Task WriteNonPersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount)
@@ -999,25 +986,36 @@ namespace CromwellOnAzureDeployer
                 $"Writing {ContainersToMountFileName} and {CromwellConfigurationFileName} files to '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var containersToMountFileContent = Utility.GetFileContent("scripts", ContainersToMountFileName)
-                        .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
-                        .Replace("{ManagedIdentityName}", managedIdentityName);
-
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountFileContent);
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, Utility.PersonalizeContent(new[]
+                    {
+                        new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
+                        new Utility.ConfigReplaceTextItem("{ManagedIdentityName}", managedIdentityName)
+                    }, "scripts", ContainersToMountFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.GetFileContent("scripts", CromwellConfigurationFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
 
         private Task AssignVmAsContributorToBatchAccountAsync(IIdentity managedIdentity, BatchAccount batchAccount)
-            => Execute(
-                $"Assigning {BuiltInRole.Contributor} role for VM to Batch Account resource scope...",
-                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                    () => azureSubscriptionClient.AccessManagement.RoleAssignments
-                        .Define(Guid.NewGuid().ToString())
-                        .ForObjectId(managedIdentity.PrincipalId)
-                        .WithBuiltInRole(BuiltInRole.Contributor)
-                        .WithScope(batchAccount.Id)
-                        .CreateAsync(cts.Token)));
+            => Task.WhenAll(
+                string.IsNullOrWhiteSpace(configuration.BatchNodesSubnetId) ? Task.CompletedTask : Execute(
+                    "Assigning Virtual Machine Contributor role for VM to Batch Nodes Subnet resource scope...",
+                    () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
+                        () => azureSubscriptionClient.AccessManagement.RoleAssignments
+                            .Define(Guid.NewGuid().ToString())
+                            .ForObjectId(managedIdentity.PrincipalId)
+                            .WithRoleDefinition($"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/9980e02c-c2be-4d73-94e8-173b1dc7cf3c") // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#virtual-machine-contributor
+                            .WithScope(configuration.BatchNodesSubnetId)
+                            .CreateAsync(cts.Token))),
+                Execute(
+                    $"Assigning {BuiltInRole.Contributor} role for VM to Batch Account resource scope...",
+                    () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
+                        () => azureSubscriptionClient.AccessManagement.RoleAssignments
+                            .Define(Guid.NewGuid().ToString())
+                            .ForObjectId(managedIdentity.PrincipalId)
+                            .WithBuiltInRole(BuiltInRole.Contributor)
+                            .WithScope(batchAccount.Id)
+                            .CreateAsync(cts.Token)))
+                );
 
         private Task AssignVmAsContributorToCosmosDb(IIdentity managedIdentity, IResource cosmosDb)
             => Execute(
@@ -1137,16 +1135,38 @@ namespace CromwellOnAzureDeployer
         }
 
         private Task EnableSsh(INetworkSecurityGroup networkSecurityGroup)
-            => networkSecurityGroup.SecurityRules[SshNsgRuleName].Access switch
+        {
+            try
             {
-                var x when SecurityRuleAccess.Allow.Equals(x) => Task.FromResult(false),
-                _ => Execute(
-                    "Enabling SSH on VM...",
-                    () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).AllowInbound().Parent().ApplyAsync()),
-            };
+                return networkSecurityGroup?.SecurityRules[SshNsgRuleName]?.Access switch
+                {
+                    null => Task.CompletedTask,
+                    var x when SecurityRuleAccess.Allow.Equals(x) => SetKeepSshPortOpen(true),
+                    _ => Execute(
+                        "Enabling SSH on VM...",
+                        () => EnableSshPort()),
+                };
+            }
+            catch (KeyNotFoundException)
+            {
+                return Task.CompletedTask;
+            }
+
+            Task<INetworkSecurityGroup> EnableSshPort()
+            {
+                _ = SetKeepSshPortOpen(false);
+                return networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).AllowInbound().Parent().ApplyAsync();
+            }
+
+            Task SetKeepSshPortOpen(bool value)
+            {
+                configuration.KeepSshPortOpen = value;
+                return Task.CompletedTask;
+            }
+        }
 
         private Task DisableSsh(INetworkSecurityGroup networkSecurityGroup)
-            => Execute(
+            => networkSecurityGroup is null ? Task.CompletedTask : Execute(
                 "Disabling SSH on VM...",
                 () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).DenyInbound().Parent().ApplyAsync()
             );
@@ -1196,12 +1216,18 @@ namespace CromwellOnAzureDeployer
                     })
                     .CreateAsync(cts.Token));
 
-        private Task<BatchAccount> CreateBatchAccountAsync()
+        private Task<BatchAccount> CreateBatchAccountAsync(string storageAccountId)
             => Execute(
                 $"Creating Batch Account: {configuration.BatchAccountName}...",
                 () => new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
                     .BatchAccount
-                    .CreateAsync(configuration.ResourceGroupName, configuration.BatchAccountName, new BatchAccountCreateParameters { Location = configuration.RegionName }, cts.Token));
+                    .CreateAsync(
+                        configuration.ResourceGroupName,
+                        configuration.BatchAccountName,
+                        new BatchAccountCreateParameters(
+                            configuration.RegionName,
+                            autoStorage: configuration.PrivateNetworking.GetValueOrDefault() ? new AutoStorageBaseProperties { StorageAccountId = storageAccountId } : null),
+                        cts.Token));
 
         private Task<IResourceGroup> CreateResourceGroupAsync()
         {
@@ -1239,11 +1265,10 @@ namespace CromwellOnAzureDeployer
                 {
                     var userManagedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
 
-                    var existingVmRoles =
-                        (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync(
+                    var existingVmRoles = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync(
                             $"/subscriptions/{configuration.SubscriptionId}",
-                            new ODataQuery<RoleAssignmentFilter>($"assignedTo('{linuxVm.SystemAssignedManagedServiceIdentityPrincipalId}')")))
-                        .Body
+                            new ODataQuery<RoleAssignmentFilter>($"assignedTo('{linuxVm.SystemAssignedManagedServiceIdentityPrincipalId}')"))).Body
+                        .AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
                         .ToList();
 
                     foreach (var role in existingVmRoles)
@@ -1281,24 +1306,13 @@ namespace CromwellOnAzureDeployer
                 $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName);
-
-                    if (cromwellConfigText is null)
-                    {
-                        cromwellConfigText = Utility.GetFileContent("scripts", CromwellConfigurationFileName);
-                    }
-                    else
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
                         // Replace "enabled = true" with "enabled = false" in call-caching element
+                        (Utility.ConfigReplaceTextItemBase)new Utility.ConfigReplaceRegExItemText(@"^(\s*call-caching\s*{[^}]*enabled\s*[=:]{1}\s*)(true)$", "$1false", RegexOptions.Multiline),
                         // Add "preemptible: true" to default-runtime-attributes element, if preemptible is not already present
-                        var callCachingRegex = new Regex(@"^(\s*call-caching\s*{[^}]*enabled\s*[=:]{1}\s*)(true)$", RegexOptions.Multiline);
-                        var preemptibleRegex = new Regex(@"(?![\s\S]*preemptible)^(\s*default-runtime-attributes\s*{)([^}]*$)(\s*})$", RegexOptions.Multiline);
-
-                        cromwellConfigText = callCachingRegex.Replace(cromwellConfigText, "$1false");
-                        cromwellConfigText = preemptibleRegex.Replace(cromwellConfigText, match => $"{match.Groups[1].Value}{match.Groups[2].Value}\n          preemptible: true{match.Groups[3].Value}");
-                    }
-
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
+                        new Utility.ConfigReplaceRegExItemEvaluator(@"(?![\s\S]*preemptible)^(\s*default-runtime-attributes\s*{)([^}]*$)(\s*})$", match => $"{match.Groups[1].Value}{match.Groups[2].Value}\n          preemptible: true{match.Groups[3].Value}", RegexOptions.Multiline),
+                    }, (await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName)) ?? Utility.GetFileContent("scripts", CromwellConfigurationFileName)));
                 });
 
         private Task PatchContainersToMountFileV210Async(IStorageAccount storageAccount, string managedIdentityName)
@@ -1385,6 +1399,7 @@ namespace CromwellOnAzureDeployer
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
                 });
+
         private Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Adding new settings to 'env-04-settings.txt' file on the VM...",
@@ -1479,7 +1494,7 @@ namespace CromwellOnAzureDeployer
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
             const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
 
-            var azure = Azure
+            var azure = Microsoft.Azure.Management.Fluent.Azure
                 .Configure()
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                 .Authenticate(azureCredentials);
@@ -1502,10 +1517,12 @@ namespace CromwellOnAzureDeployer
             var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
 
             var currentPrincipalSubscriptionRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
-                .Body
+                .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
                 .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
-            if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId)))
+            var isuserAccessAdministrator = currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId);
+
+            if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && isuserAccessAdministrator))
             {
                 if (!rgExists)
                 {
@@ -1513,7 +1530,7 @@ namespace CromwellOnAzureDeployer
                 }
 
                 var currentPrincipalRgRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}/resourceGroups/{configuration.ResourceGroupName}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
-                    .Body
+                    .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
                     .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
                 if (!currentPrincipalRgRoleIds.Contains(ownerRoleId))
@@ -1521,9 +1538,11 @@ namespace CromwellOnAzureDeployer
                     throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
                 }
 
-                SkipBillingReaderRoleAssignment = true;
-
-                DisplayBillingReaderInsufficientAccessLevelWarning();
+                if (!isuserAccessAdministrator)
+                {
+                    SkipBillingReaderRoleAssignment = true;
+                    DisplayBillingReaderInsufficientAccessLevelWarning();
+                }
             }
         }
 
@@ -1626,13 +1645,12 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private static async Task<CloudBlobClient> GetBlobClientAsync(IStorageAccount storageAccount)
-        {
-            var accessKey = (await storageAccount.GetKeysAsync())[0].Value;
-            var storageCredentials = new StorageCredentials(storageAccount.Name, accessKey);
-
-            return new CloudStorageAccount(storageCredentials, true).CreateCloudBlobClient();
-        }
+        private static async Task<BlobServiceClient> GetBlobClientAsync(IStorageAccount storageAccount)
+            => new(
+                new Uri($"https://{storageAccount.Name}.blob.core.windows.net"),
+                new StorageSharedKeyCredential(
+                    storageAccount.Name,
+                    (await storageAccount.GetKeysAsync())[0].Value));
 
         private async Task ValidateTokenProviderAsync()
         {
@@ -1714,6 +1732,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
+            ThrowIfProvidedForUpdate(configuration.VnetResourceGroupName, nameof(configuration.VnetResourceGroupName));
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
@@ -1828,14 +1847,14 @@ namespace CromwellOnAzureDeployer
 
         private static async Task<bool> IsWorkflowSuccessfulAfterLongPollingAsync(IStorageAccount storageAccount, string containerName, Guid id)
         {
-            var container = (await GetBlobClientAsync(storageAccount)).GetContainerReference(containerName);
+            var container = (await GetBlobClientAsync(storageAccount)).GetBlobContainerClient(containerName);
 
             while (true)
             {
                 try
                 {
-                    var succeeded = container.ListBlobs($"succeeded/{id}", useFlatBlobListing: true).Count() == 1;
-                    var failed = container.ListBlobs($"failed/{id}", useFlatBlobListing: true).Count() == 1;
+                    var succeeded = container.GetBlobs(prefix: $"succeeded/{id}").Count() == 1;
+                    var failed = container.GetBlobs(prefix: $"failed/{id}").Count() == 1;
 
                     if (succeeded || failed)
                     {
@@ -1916,35 +1935,48 @@ namespace CromwellOnAzureDeployer
             using var sshClient = new SshClient(sshConnectionInfo);
             using var sftpClient = new SftpClient(sshConnectionInfo);
 
-            sshClient.ConnectWithRetries();
-            sftpClient.Connect();
-
-            foreach (var (input, remoteFilePath, makeExecutable) in files)
+            try
             {
-                var dir = GetLinuxParentPath(remoteFilePath);
+                sshClient.ConnectWithRetries();
+                sftpClient.Connect();
 
-                // Create destination directory if needed and make it writable for the current user
-                var (output, _, _) = await sshClient.ExecuteCommandAsync($"sudo mkdir -p {dir} && owner=$(stat -c '%U' {dir}) && mask=$(stat -c '%a' {dir}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {dir} && echo 1 ))");
-                var dirWasMadeWritableToOthers = output == "1";
-
-                // Make the destination file writable for the current user. The user running the update might not be the same user that created the file.
-                await sshClient.ExecuteCommandAsync($"sudo touch {remoteFilePath} && sudo chmod o+w {remoteFilePath}");
-                await sftpClient.UploadFileAsync(input, remoteFilePath, true);
-                await sshClient.ExecuteCommandAsync($"sudo chmod o-w {remoteFilePath}");
-
-                if (makeExecutable)
+                foreach (var (input, remoteFilePath, makeExecutable) in files)
                 {
-                    await sshClient.ExecuteCommandAsync($"sudo chmod +x {remoteFilePath}");
-                }
+                    var dir = GetLinuxParentPath(remoteFilePath);
 
-                if (dirWasMadeWritableToOthers)
-                {
-                    await sshClient.ExecuteCommandAsync($"sudo chmod o-w {dir}");
+                    // Create destination directory if needed and make it writable for the current user
+                    var (output, _, _) = await sshClient.ExecuteCommandAsync($"sudo mkdir -p {dir} && owner=$(stat -c '%U' {dir}) && mask=$(stat -c '%a' {dir}) && ownerCanWrite=$(( (16#$mask & 16#200) > 0 )) && othersCanWrite=$(( (16#$mask & 16#002) > 0 )) && ( [[ $owner == $(whoami) && $ownerCanWrite == 1 || $othersCanWrite == 1 ]] && echo 0 || ( sudo chmod o+w {dir} && echo 1 ))");
+                    var dirWasMadeWritableToOthers = output == "1";
+
+                    // Make the destination file writable for the current user. The user running the update might not be the same user that created the file.
+                    await sshClient.ExecuteCommandAsync($"sudo touch {remoteFilePath} && sudo chmod o+w {remoteFilePath}");
+                    await sftpClient.UploadFileAsync(input, remoteFilePath, true);
+                    await sshClient.ExecuteCommandAsync($"sudo chmod o-w {remoteFilePath}");
+
+                    if (makeExecutable)
+                    {
+                        await sshClient.ExecuteCommandAsync($"sudo chmod +x {remoteFilePath}");
+                    }
+
+                    if (dirWasMadeWritableToOthers)
+                    {
+                        await sshClient.ExecuteCommandAsync($"sudo chmod o-w {dir}");
+                    }
                 }
             }
+            finally
+            {
+                sshClient.Disconnect();
+                sftpClient.Disconnect();
 
-            sshClient.Disconnect();
-            sftpClient.Disconnect();
+                foreach (var (input, _, _) in files)
+                {
+                    await input.DisposeAsync();
+                }
+
+                sshClient.Dispose();
+                sftpClient.Dispose();
+            }
         }
 
         private static async Task DeleteFileFromVirtualMachineAsync(ConnectionInfo sshConnectionInfo, string filePath)
@@ -1958,18 +1990,18 @@ namespace CromwellOnAzureDeployer
         private async Task<string> DownloadTextFromStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName)
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
-            var container = blobClient.GetContainerReference(containerName);
+            var container = blobClient.GetBlobContainerClient(containerName);
 
-            return await container.GetBlockBlobReference(blobName).DownloadTextAsync(cts.Token);
+            return (await container.GetBlobClient(blobName).DownloadContentAsync(cts.Token)).ToString();
         }
 
         private async Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
-            var container = blobClient.GetContainerReference(containerName);
+            var container = blobClient.GetBlobContainerClient(containerName);
 
             await container.CreateIfNotExistsAsync();
-            await container.GetBlockBlobReference(blobName).UploadTextAsync(content, cts.Token);
+            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), cts.Token);
         }
 
         private static string GetLinuxParentPath(string path)

@@ -36,17 +36,6 @@ kv["TriggerServiceImageSha"]=""
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 write_log
 
-write_log "Running docker-compose pull"
-docker-compose pull --ignore-pull-failures || true
-write_log
-
-write_log "Getting image digests"
-kv["CromwellImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["CromwellImageName"]})
-kv["MySqlImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["MySqlImageName"]})
-kv["TesImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TesImageName"]})
-kv["TriggerServiceImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TriggerServiceImageName"]})
-rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
-
 storage_account_name=${kv["DefaultStorageAccountName"]}
 managed_identity_client_id=${kv["ManagedIdentityClientId"]}
 
@@ -100,6 +89,17 @@ done
 
 write_log "Account access OK"
 write_log
+
+write_log "Running docker-compose pull"
+docker-compose pull --ignore-pull-failures || true
+write_log
+
+write_log "Getting image digests"
+kv["CromwellImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["CromwellImageName"]})
+kv["MySqlImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["MySqlImageName"]})
+kv["TesImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TesImageName"]})
+kv["TriggerServiceImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TriggerServiceImageName"]})
+rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 
 write_log "Mounting containers (default storage account = $storage_account_name)"
 ./mount_containers.sh -a $storage_account_name

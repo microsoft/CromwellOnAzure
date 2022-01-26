@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -495,7 +495,7 @@ namespace TesApi.Web
                     SelectClause = "id"
                 };
 
-                var poolsToDelete = await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync();
+                var poolsToDelete = await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync(cancellationToken);
 
                 foreach (var pool in poolsToDelete)
                 {
@@ -519,15 +519,19 @@ namespace TesApi.Web
             var azureClient = await GetAzureManagementClientAsync();
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
             var infos = new List<ContainerRegistryInfo>();
+            logger.LogInformation(@"GetAccessibleContainerRegistriesAsync() called.");
 
             foreach (var subId in subscriptionIds)
             {
                 try
                 {
                     var registries = (await azureClient.WithSubscription(subId).ContainerRegistries.ListAsync()).ToList();
+                    logger.LogInformation(@"Searching {subscriptionId} for container registries.", subId);
 
                     foreach (var r in registries)
                     {
+                        logger.LogInformation(@"Found {Name}. AdminUserEnabled: {AdminUserEnabled}", r.Name, r.AdminUserEnabled);
+
                         try
                         {
                             var server = await r.GetCredentialsAsync();
@@ -546,6 +550,7 @@ namespace TesApi.Web
                 }
             }
 
+            logger.LogInformation(@"GetAccessibleContainerRegistriesAsync() returning {Count} registries.", infos.Count);
             return infos;
         }
 
@@ -641,8 +646,8 @@ namespace TesApi.Web
         /// <summary>
         /// Get/sets cached value for the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>.
         /// </summary>
-        /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
-        public async Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
+        /// <returns><see cref="VirtualMachineInformation"/> for available VMs in a region.</returns>
+        public async Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync()
             => (await GetVmSizesAndPricesRawAsync()).ToList();
 
         /// <summary>
@@ -708,7 +713,7 @@ namespace TesApi.Web
                 .Select(m => new { MeterName = m["MeterName"].ToString(), MeterSubCategory = m["MeterSubCategory"].ToString(), MeterRate = m["MeterRates"]["0"].ToString() })
                 .Where(m => !m.MeterSubCategory.Contains("Windows"))
                 .Select(m => new { 
-                    MeterName = m.MeterName.Replace(" Low Priority", "", StringComparison.OrdinalIgnoreCase),
+                    MeterName = m.MeterName.Replace(" Low Priority", string.Empty, StringComparison.OrdinalIgnoreCase),
                     m.MeterSubCategory,
                     MeterRate = decimal.Parse(m.MeterRate), 
                     IsLowPriority = m.MeterName.Contains(" Low Priority", StringComparison.OrdinalIgnoreCase) })
@@ -728,8 +733,8 @@ namespace TesApi.Web
         /// <summary>
         /// Get the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>.
         /// </summary>
-        /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
-        private async Task<IEnumerable<VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
+        /// <returns><see cref="VirtualMachineInformation"/> for available VMs in a region.</returns>
+        private async Task<IEnumerable<VirtualMachineInformation>> GetVmSizesAndPricesRawAsync()
         {
             static double ConvertMiBToGiB(int value) => Math.Round(value / 1024.0, 2);
 
@@ -751,7 +756,7 @@ namespace TesApi.Web
                 vmPrices = JsonConvert.DeserializeObject<IEnumerable<VmPrice>>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "DefaultVmPrices.json")));
             }
 
-            var vmInfos = new List<VirtualMachineInfo>();
+            var vmInfos = new List<VirtualMachineInformation>();
 
             foreach (var (VmSize, FamilyName, _, _) in supportedVmSizes)
             {
@@ -760,7 +765,7 @@ namespace TesApi.Web
 
                 if (vmSpecification is not null && vmPrice is not null)
                 {
-                    vmInfos.Add(new VirtualMachineInfo
+                    vmInfos.Add(new VirtualMachineInformation
                     {
                         VmSize = VmSize,
                         MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
@@ -774,7 +779,7 @@ namespace TesApi.Web
 
                     if(vmPrice.LowPriorityAvailable)
                     {
-                        vmInfos.Add(new VirtualMachineInfo
+                        vmInfos.Add(new VirtualMachineInformation
                         {
                             VmSize = VmSize,
                             MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
@@ -867,7 +872,7 @@ namespace TesApi.Web
 
                 var containerRegistryInfo = await GetContainerRegistryInfoAsync(executorImage);
 
-                if (containerRegistryInfo != null)
+                if (containerRegistryInfo is not null)
                 {
                     var containerRegistryMgmt = new Microsoft.Azure.Management.Batch.Models.ContainerRegistry(
                         userName: containerRegistryInfo.Username,
@@ -884,7 +889,7 @@ namespace TesApi.Web
 
                     var containerRegistryInfoForDockerInDocker = await GetContainerRegistryInfoAsync(dockerInDockerImageName);
 
-                    if (containerRegistryInfoForDockerInDocker != null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
+                    if (containerRegistryInfoForDockerInDocker is not null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
                     {
                         var containerRegistryForDockerInDockerMgmt = new Microsoft.Azure.Management.Batch.Models.ContainerRegistry(
                             userName: containerRegistryInfoForDockerInDocker.Username,
@@ -896,7 +901,7 @@ namespace TesApi.Web
 
                     var containerRegistryInfoForBlobXfer = await GetContainerRegistryInfoAsync(blobxferImageName);
 
-                    if (containerRegistryInfoForBlobXfer != null && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfo.RegistryServer && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfoForDockerInDocker.RegistryServer)
+                    if (containerRegistryInfoForBlobXfer is not null && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfo.RegistryServer && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfoForDockerInDocker.RegistryServer)
                     {
                         var containerRegistryForBlobXferMgmt = new Microsoft.Azure.Management.Batch.Models.ContainerRegistry(
                             userName: containerRegistryInfoForBlobXfer.Username,

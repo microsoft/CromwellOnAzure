@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -110,8 +110,8 @@ namespace TesApi.Web
         /// <summary>
         /// Gets the price and resource summary of all available VMs in a region
         /// </summary>
-        /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
-        Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync();
+        /// <returns><see cref="Tes.Models.VirtualMachineInformation"/> for available VMs in a region.</returns>
+        Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync();
 
         /// <summary>
         /// Gets the primary key of the given storage account.

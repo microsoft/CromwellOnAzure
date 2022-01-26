@@ -30,7 +30,7 @@ namespace Tes.Models
         /// Virtual Machine used by Azure Batch to handle the task
         /// </summary>
         [JsonIgnore]
-        public VirtualMachineInfo VirtualMachineInfo { get; set; }
+        public VirtualMachineInformation VirtualMachineInfo { get; set; }
 
         /// <summary>
         /// Contains task execution metrics when task is handled by Azure Batch
@@ -79,7 +79,7 @@ namespace Tes.Models
         internal void LoadObjectsFromMetadata(StreamingContext context)
         {
             LoadObjectFromMetadata(this);
-            this.VirtualMachineInfo = TryGetObjectFromMetadata<VirtualMachineInfo>(out var vmInfo) ? vmInfo : null;
+            this.VirtualMachineInfo = TryGetObjectFromMetadata<VirtualMachineInformation>(out var vmInfo) ? vmInfo : null;
             this.BatchNodeMetrics = TryGetObjectFromMetadata<BatchNodeMetrics>(out var metrics) ? metrics : null;
         }
 

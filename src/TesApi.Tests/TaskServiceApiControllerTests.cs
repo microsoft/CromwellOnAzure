@@ -380,7 +380,7 @@ namespace TesApi.Tests
             mockRepo.Setup(repo => repo
                 .GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>(), It.IsAny<int>(), It.IsAny<string>()))
                 .ReturnsAsync((Expression<Func<TesTask, bool>> predicate, int pageSize, string continuationToken) =>
-                    ("", tesTasks.Where(i => predicate.Compile().Invoke(i)).Take(pageSize)));
+                    (string.Empty, tesTasks.Where(i => predicate.Compile().Invoke(i)).Take(pageSize)));
 
             var controller = GetTaskServiceApiController(mockRepo.Object);
 
