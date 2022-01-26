@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\workspace\src\CromwellOnAzure\src\deploy-cromwell-on-azure\scripts\kompose.exe convert
+    kompose.version: 1.26.0 (40646f47)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: tes
+  name: tes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: tes
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: C:\workspace\src\CromwellOnAzure\src\deploy-cromwell-on-azure\scripts\kompose.exe convert
+        kompose.version: 1.26.0 (40646f47)
+      creationTimestamp: null
+      labels:
+        io.kompose.service: tes
+    spec:
+      containers:
+        - env:
+            - name: ApplicationInsightsAccountName
+            - name: AzureOfferDurableId
+            - name: AzureServicesAuthConnectionString
+              value: RunAs=App;AppId=
+            - name: BatchAccountName
+            - name: BatchNodesSubnetId
+            - name: BlobxferImageName
+            - name: CosmosDbAccountName
+            - name: CromwellImageName
+            - name: CromwellImageSha
+            - name: CromwellOnAzureVersion
+            - name: DefaultStorageAccountName
+            - name: DisableBatchNodesPublicIpAddress
+            - name: DisableBatchScheduling
+            - name: DockerInDockerImageName
+            - name: MySqlImageName
+            - name: MySqlImageSha
+            - name: TesImageName
+            - name: TesImageSha
+            - name: TriggerServiceImageName
+            - name: TriggerServiceImageSha
+            - name: UsePreemptibleVmsOnly
+          image: mcr.microsoft.com/cromwellonazure/tes:2
+          name: tes
+          ports:
+            - containerPort: 80
+          resources: {}
+          volumeMounts:
+            - mountPath: /cromwell-tmp
+              name: cromwell-tmp-claim2
+      restartPolicy: Always
+      volumes:
+        - name: cromwell-tmp-claim2
+          persistentVolumeClaim:
+            claimName: cromwell-tmp-claim2
+status: {}

@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\workspace\src\CromwellOnAzure\src\deploy-cromwell-on-azure\scripts\kompose.exe convert
+    kompose.version: 1.26.0 (40646f47)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: mysqldb
+  name: mysqldb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: mysqldb
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: C:\workspace\src\CromwellOnAzure\src\deploy-cromwell-on-azure\scripts\kompose.exe convert
+        kompose.version: 1.26.0 (40646f47)
+      creationTimestamp: null
+      labels:
+        io.kompose.service: mysqldb
+    spec:
+      containers:
+        - args:
+            - ln -sf /cromwellazure/mysql-init/init-user.sql /docker-entrypoint-initdb.d/init_user.sql && docker-entrypoint.sh mysqld --init-file /cromwellazure/mysql-init/unlock-change-log.sql --disable-log-bin
+          command:
+            - /bin/sh
+            - -c
+          env:
+            - name: MYSQL_DATABASE
+              value: cromwell_db
+            - name: MYSQL_ROOT_PASSWORD
+              value: cromwell
+          image: mysql:latest
+          name: mysqldb
+          ports:
+            - containerPort: 3306
+          resources: {}
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: mysqldb-data-claim3
+            - mountPath: /cromwellazure
+              name: cromwellazure-claim1
+      restartPolicy: Always
+      volumes:
+        - name: mysqldb-data-claim3
+          persistentVolumeClaim:
+            claimName: mysqldb-data-claim3
+        - name: cromwellazure-claim1
+          persistentVolumeClaim:
+            claimName: cromwellazure-claim1
+status: {}

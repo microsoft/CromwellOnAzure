@@ -4,4 +4,12 @@
     <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Azure.Core" Version="1.22.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Autorest\" />
+  </ItemGroup>
+
 </Project>

@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using Common;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
+using Microsoft.Azure.Management.ContainerService;
 using Microsoft.Azure.Management.Compute.Fluent;
 using Microsoft.Azure.Management.Compute.Fluent.Models;
 using Microsoft.Azure.Management.CosmosDB.Fluent;
@@ -39,6 +40,7 @@ using Polly;
 using Polly.Retry;
 using Renci.SshNet;
 using Renci.SshNet.Common;
+using Microsoft.Azure.Management.ContainerService.Models;
 
 namespace CromwellOnAzureDeployer
 {
@@ -50,7 +52,7 @@ namespace CromwellOnAzureDeployer
 
         private static readonly AsyncRetryPolicy sshCommandRetryPolicy = Policy
             .Handle<Exception>(ex => !(ex is SshAuthenticationException && ex.Message.StartsWith("Permission")))
-            .WaitAndRetryAsync(5, retryAttempt => TimeSpan.FromSeconds(5));
+            .WaitAndRetryAsync(5, retryAttempt => System.TimeSpan.FromSeconds(5));
 
         private const string WorkflowsContainerName = "workflows";
         private const string ConfigurationContainerName = "configuration";
@@ -80,7 +82,7 @@ namespace CromwellOnAzureDeployer
         private Configuration configuration { get; set; }
         private TokenCredentials tokenCredentials;
         private IAzure azureSubscriptionClient { get; set; }
-        private Azure.IAuthenticated azureClient { get; set; }
+        private Microsoft.Azure.Management.Fluent.Azure.IAuthenticated azureClient { get; set; }
         private IResourceManager resourceManagerClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
@@ -352,6 +354,11 @@ namespace CromwellOnAzureDeployer
                             configuration.VmPassword = Utility.GeneratePassword();
                         }
 
+                        if (string.IsNullOrWhiteSpace(configuration.AksCluserName))
+                        {
+                            configuration.AksCluserName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 25);
+                        }
+
                         await RegisterResourceProvidersAsync();
                         await ValidateVmAsync();
 
@@ -409,6 +416,8 @@ namespace CromwellOnAzureDeployer
                             configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
                         }
 
+                        await CreateAKS(resourceGroup.ToString(), managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName);
+
                         await Task.WhenAll(new Task[]
                         {
                         Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync()),
@@ -451,7 +460,8 @@ namespace CromwellOnAzureDeployer
                         {
                             await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
                         }
-                    }
+
+                     }
 
                     await WriteCoaVersionToVmAsync(sshConnectionInfo);
                     await RebootVmAsync(sshConnectionInfo);
@@ -540,9 +550,22 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private async Task CreateAKS(string resourceGroup, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName)
+        {
+            var containerServiceClient = new ContainerServiceClient(azureCredentials);
+            var cluster = new ManagedCluster();
+            cluster.Location = configuration.RegionName;
+            cluster.NetworkProfile = new ContainerServiceNetworkProfile();
+            cluster.Identity = new ManagedClusterIdentity(managedIdentity.PrincipalId, managedIdentity.TenantId, Microsoft.Azure.Management.ContainerService.Models.ResourceIdentityType.UserAssigned);
+            
+            var result = await containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksCluserName, cluster);
+
+
+        }
+
         private Task WaitForSshConnectivityAsync(ConnectionInfo sshConnectionInfo)
         {
-            var timeout = TimeSpan.FromMinutes(10);
+            var timeout = System.TimeSpan.FromMinutes(10);
 
             return Execute(
                 $"Waiting for VM to accept SSH connections at {sshConnectionInfo.Host}...",
@@ -570,7 +593,7 @@ namespace CromwellOnAzureDeployer
                             }
                             else
                             {
-                                await Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
+                                await Task.Delay(System.TimeSpan.FromSeconds(5), cts.Token);
                                 continue;
                             }
                         }
@@ -644,8 +667,8 @@ namespace CromwellOnAzureDeployer
         private static async Task<bool> MountWarningsExistAsync(ConnectionInfo sshConnectionInfo)
             => int.Parse((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"grep -c 'WARNING' {CromwellAzureRootDir}/mount.blobfuse.log || :")).Output) > 0;
 
-        private static Azure.IAuthenticated GetAzureClient(AzureCredentials azureCredentials)
-            => Azure
+        private static Microsoft.Azure.Management.Fluent.Azure.IAuthenticated GetAzureClient(AzureCredentials azureCredentials)
+            => Microsoft.Azure.Management.Fluent.Azure
                 .Configure()
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                 .Authenticate(azureCredentials);
@@ -688,7 +711,7 @@ namespace CromwellOnAzureDeployer
                                 break;
                             }
 
-                            await Task.Delay(TimeSpan.FromSeconds(15));
+                            await Task.Delay(System.TimeSpan.FromSeconds(15));
                         }
                     });
             }
@@ -1479,7 +1502,7 @@ namespace CromwellOnAzureDeployer
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
             const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
 
-            var azure = Azure
+            var azure = Microsoft.Azure.Management.Fluent.Azure
                 .Configure()
                 .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                 .Authenticate(azureCredentials);
@@ -1848,7 +1871,7 @@ namespace CromwellOnAzureDeployer
                     RefreshableConsole.WriteLine(exc.Message);
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(10));
+                await Task.Delay(System.TimeSpan.FromSeconds(10));
             }
         }
 
