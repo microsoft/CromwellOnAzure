@@ -996,15 +996,26 @@ namespace CromwellOnAzureDeployer
                 });
 
         private Task AssignVmAsContributorToBatchAccountAsync(IIdentity managedIdentity, BatchAccount batchAccount)
-            => Execute(
-                $"Assigning {BuiltInRole.Contributor} role for VM to Batch Account resource scope...",
-                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                    () => azureSubscriptionClient.AccessManagement.RoleAssignments
-                        .Define(Guid.NewGuid().ToString())
-                        .ForObjectId(managedIdentity.PrincipalId)
-                        .WithBuiltInRole(BuiltInRole.Contributor)
-                        .WithScope(batchAccount.Id)
-                        .CreateAsync(cts.Token)));
+            => Task.WhenAll(
+                string.IsNullOrWhiteSpace(configuration.BatchNodesSubnetId) ? Task.CompletedTask : Execute(
+                    "Assigning Virtual Machine Contributor role for VM to Batch Nodes Subnet resource scope...",
+                    () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
+                        () => azureSubscriptionClient.AccessManagement.RoleAssignments
+                            .Define(Guid.NewGuid().ToString())
+                            .ForObjectId(managedIdentity.PrincipalId)
+                            .WithRoleDefinition($"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/9980e02c-c2be-4d73-94e8-173b1dc7cf3c") // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#virtual-machine-contributor
+                            .WithScope(configuration.BatchNodesSubnetId)
+                            .CreateAsync(cts.Token))),
+                Execute(
+                    $"Assigning {BuiltInRole.Contributor} role for VM to Batch Account resource scope...",
+                    () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
+                        () => azureSubscriptionClient.AccessManagement.RoleAssignments
+                            .Define(Guid.NewGuid().ToString())
+                            .ForObjectId(managedIdentity.PrincipalId)
+                            .WithBuiltInRole(BuiltInRole.Contributor)
+                            .WithScope(batchAccount.Id)
+                            .CreateAsync(cts.Token)))
+                );
 
         private Task AssignVmAsContributorToCosmosDb(IIdentity managedIdentity, IResource cosmosDb)
             => Execute(
