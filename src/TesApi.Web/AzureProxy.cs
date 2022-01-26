@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -39,7 +39,7 @@ namespace TesApi.Web
         private const char BatchJobAttemptSeparator = '-';
         private const string DefaultAzureBillingRegionName = "US West";
 
-        private static readonly HttpClient httpClient = new HttpClient();
+        private static readonly HttpClient httpClient = new();
 
         private readonly ILogger logger;
         private readonly Func<Task<BatchAccount>> getBatchAccountFunc;
@@ -62,16 +62,16 @@ namespace TesApi.Web
         {
             this.logger = logger;
             this.batchAccountName = batchAccountName;
-            var findBatchAccountResult = FindBatchAccountAsync(batchAccountName).Result;
-            batchResourceGroupName = findBatchAccountResult.ResourceGroupName;
-            subscriptionId = findBatchAccountResult.SubscriptionId;
-            location = findBatchAccountResult.Location;
-            batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{findBatchAccountResult.BatchAccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
+            var (SubscriptionId, ResourceGroupName, Location, BatchAccountEndpoint) = FindBatchAccountAsync(batchAccountName).Result;
+            batchResourceGroupName = ResourceGroupName;
+            subscriptionId = SubscriptionId;
+            location = Location;
+            batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{BatchAccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
 
             getBatchAccountFunc = async () => 
-                await new BatchManagementClient(new TokenCredentials(await GetAzureAccessTokenAsync())) { SubscriptionId = findBatchAccountResult.SubscriptionId }
+                await new BatchManagementClient(new TokenCredentials(await GetAzureAccessTokenAsync())) { SubscriptionId = SubscriptionId }
                     .BatchAccount
-                    .GetAsync(findBatchAccountResult.ResourceGroupName, batchAccountName);
+                    .GetAsync(ResourceGroupName, batchAccountName);
 
             this.azureOfferDurableId = azureOfferDurableId;
 
@@ -103,7 +103,7 @@ namespace TesApi.Web
                     var app = (await new ApplicationInsightsManagementClient(credentials) { SubscriptionId = subscriptionId }.Components.ListAsync())
                         .FirstOrDefault(a => a.ApplicationId.Equals(appInsightsApplicationId, StringComparison.OrdinalIgnoreCase));
 
-                    if (app != null)
+                    if (app is not null)
                     {
                         return app.InstrumentationKey;
                     }
@@ -130,7 +130,7 @@ namespace TesApi.Web
                 .SelectMany(a => a)
                 .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase));
 
-            if (account == null)
+            if (account is null)
             {
                 throw new Exception($"CosmosDB account '{cosmosDbAccountName} does not exist or the TES app service does not have Account Reader role on the account.");
             }
@@ -167,8 +167,7 @@ namespace TesApi.Web
         /// </summary>
         /// <returns>Batch node counts</returns>
         public IEnumerable<AzureBatchNodeCount> GetBatchActiveNodeCountByVmSize()
-        {
-            return batchClient.PoolOperations.ListPools()
+            => batchClient.PoolOperations.ListPools()
                 .Select(p => new
                 {
                     p.VirtualMachineSize,
@@ -177,7 +176,6 @@ namespace TesApi.Web
                 })
                 .GroupBy(x => x.VirtualMachineSize)
                 .Select(grp => new AzureBatchNodeCount { VirtualMachineSize = grp.Key, DedicatedNodeCount = grp.Sum(x => x.DedicatedNodeCount), LowPriorityNodeCount = grp.Sum(x => x.LowPriorityNodeCount) });
-        }
 
         /// <summary>
         /// Gets the count of active batch pools
@@ -274,11 +272,13 @@ namespace TesApi.Web
             }
         }
 
+
         /// <summary>
         /// Gets the combined state of Azure Batch job, task and pool that corresponds to the given TES task
         /// </summary>
         /// <param name="tesTaskId">The unique TES task ID</param>
         /// <returns>Job state information</returns>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1826:Do not use Enumerable methods on indexable collections", Justification = "FirstOrDefault() is straightforward, the alternative is less clear.")]
         public async Task<AzureBatchJobAndTaskState> GetBatchJobAndTaskStateAsync(string tesTaskId)
         {
             try
@@ -315,7 +315,7 @@ namespace TesApi.Web
                 var job = lastJobInfo.Job;
                 var attemptNumber = lastJobInfo.AttemptNumber;
 
-                if (job.State == JobState.Active && job.ExecutionInformation?.PoolId != null)
+                if (job.State == JobState.Active && job.ExecutionInformation?.PoolId is not null)
                 {
                     var poolFilter = new ODATADetailLevel
                     {
@@ -325,13 +325,13 @@ namespace TesApi.Web
 
                     var pool = (await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync()).FirstOrDefault();
 
-                    if (pool != null)
+                    if (pool is not null)
                     {
                         nodeAllocationFailed = pool.ResizeErrors?.Count > 0;
 
                         var node = (await pool.ListComputeNodes().ToListAsync()).FirstOrDefault();
 
-                        if (node != null)
+                        if (node is not null)
                         {
                             nodeState = node.State;
                             var nodeError = node.Errors?.FirstOrDefault();
@@ -393,7 +393,8 @@ namespace TesApi.Web
         /// Deletes an Azure Batch job
         /// </summary>
         /// <param name="tesTaskId">The unique TES task ID</param>
-        public async Task DeleteBatchJobAsync(string tesTaskId)
+        /// <param name="cancellationToken"></param>
+        public async Task DeleteBatchJobAsync(string tesTaskId, CancellationToken cancellationToken = default)
         {
             var jobFilter = new ODATADetailLevel
             {
@@ -401,7 +402,7 @@ namespace TesApi.Web
                 SelectClause = "id"
             };
 
-            var batchJobsToDelete = await batchClient.JobOperations.ListJobs(jobFilter).ToListAsync();
+            var batchJobsToDelete = await batchClient.JobOperations.ListJobs(jobFilter).ToListAsync(cancellationToken);
 
             if (batchJobsToDelete.Count > 1)
             {
@@ -411,7 +412,7 @@ namespace TesApi.Web
             foreach (var job in batchJobsToDelete)
             {
                 logger.LogInformation($"Deleting job {job.Id}");
-                await batchClient.JobOperations.DeleteJobAsync(job.Id);
+                await batchClient.JobOperations.DeleteJobAsync(job.Id, cancellationToken: cancellationToken);
             }
         }
 
@@ -435,7 +436,7 @@ namespace TesApi.Web
         /// These jobs are active for prolonged period of time, have auto pool, NoAction termination option, and no tasks
         /// </summary>
         /// <returns>List of Batch job ids</returns>
-        public async Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge)
+        public async Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge, CancellationToken cancellationToken = default)
         {
             var filter = new ODATADetailLevel
             {
@@ -443,10 +444,10 @@ namespace TesApi.Web
                 SelectClause = "id,poolInfo,onAllTasksComplete"
             };
 
-            var noActionTesjobs = (await batchClient.JobOperations.ListJobs(filter).ToListAsync())
+            var noActionTesjobs = (await batchClient.JobOperations.ListJobs(filter).ToListAsync(cancellationToken))
                 .Where(j => j.PoolInformation?.AutoPoolSpecification?.AutoPoolIdPrefix == "TES" && j.OnAllTasksComplete == OnAllTasksComplete.NoAction);
 
-            var noActionTesjobsWithNoTasks = await noActionTesjobs.ToAsyncEnumerable().WhereAwait(async j => !(await j.ListTasks().ToListAsync()).Any()).ToListAsync();
+            var noActionTesjobsWithNoTasks = await noActionTesjobs.ToAsyncEnumerable().WhereAwait(async j => !(await j.ListTasks().ToListAsync(cancellationToken)).Any()).ToListAsync(cancellationToken);
 
             return noActionTesjobsWithNoTasks.Select(j => j.Id);
         }
@@ -471,19 +472,15 @@ namespace TesApi.Web
         /// </summary>
         /// <returns>Pool ids</returns>
         public async Task<IEnumerable<string>> GetPoolIdsReferencedByJobsAsync(CancellationToken cancellationToken = default)
-        {
-            return (await batchClient.JobOperations.ListJobs(new ODATADetailLevel(selectClause: "executionInfo")).ToListAsync(cancellationToken))
+            => (await batchClient.JobOperations.ListJobs(new ODATADetailLevel(selectClause: "executionInfo")).ToListAsync(cancellationToken))
                 .Where(j => !string.IsNullOrEmpty(j.ExecutionInformation?.PoolId))
                 .Select(j => j.ExecutionInformation.PoolId);
-        }
 
         /// <summary>
         /// Deletes the specified pool
         /// </summary>
         public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default)
-        {
-            return batchClient.PoolOperations.DeletePoolAsync(poolId, cancellationToken: cancellationToken);
-        }
+            => batchClient.PoolOperations.DeletePoolAsync(poolId, cancellationToken: cancellationToken);
 
         /// <summary>
         /// Deletes the specified pool
@@ -582,7 +579,7 @@ namespace TesApi.Web
                 var azureClient = await GetAzureManagementClientAsync();
                 var storageAccount = await azureClient.WithSubscription(storageAccountInfo.SubscriptionId).StorageAccounts.GetByIdAsync(storageAccountInfo.Id);
 
-                return (await storageAccount.GetKeysAsync()).First().Value;
+                return (await storageAccount.GetKeysAsync())[0].Value;
             }
             catch (Exception ex)
             {
@@ -598,9 +595,7 @@ namespace TesApi.Web
         /// <param name="content">Blob content</param>
         /// <returns>A task to await</returns>
         public Task UploadBlobAsync(Uri blobAbsoluteUri, string content)
-        {
-            return new CloudBlockBlob(blobAbsoluteUri).UploadTextAsync(content);
-        }
+            => new CloudBlockBlob(blobAbsoluteUri).UploadTextAsync(content);
 
         /// <summary>
         /// Uploads the file content to a blob
@@ -609,9 +604,7 @@ namespace TesApi.Web
         /// <param name="filePath">File path</param>
         /// <returns>A task to await</returns>
         public Task UploadBlobFromFileAsync(Uri blobAbsoluteUri, string filePath)
-        {
-            return new CloudBlockBlob(blobAbsoluteUri).UploadFromFileAsync(filePath);
-        }
+            => new CloudBlockBlob(blobAbsoluteUri).UploadFromFileAsync(filePath);
 
         /// <summary>
         /// Downloads a blob
@@ -619,9 +612,7 @@ namespace TesApi.Web
         /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
         /// <returns>Blob content</returns>
         public Task<string> DownloadBlobAsync(Uri blobAbsoluteUri)
-        {
-            return new CloudBlockBlob(blobAbsoluteUri).DownloadTextAsync();
-        }
+            => new CloudBlockBlob(blobAbsoluteUri).DownloadTextAsync();
 
         /// <summary>
         /// Gets the list of blobs in the given directory
@@ -642,7 +633,7 @@ namespace TesApi.Web
                 continuationToken = response.ContinuationToken;
                 results.AddRange(response.Results.Cast<CloudBlob>().Select(b => b.Name));
             }
-            while (continuationToken != null);
+            while (continuationToken is not null);
 
             return results;
         }
@@ -652,18 +643,13 @@ namespace TesApi.Web
         /// </summary>
         /// <returns><see cref="VirtualMachineInfo"/> for available VMs in a region.</returns>
         public async Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
-        {
-            var vmSizesAndPrices = await GetVmSizesAndPricesRawAsync();
-            return vmSizesAndPrices.ToList();
-        }
-		
-		/// <summary>
+            => (await GetVmSizesAndPricesRawAsync()).ToList();
+
+        /// <summary>
         /// Checks if a local file exists
         /// </summary>
         public bool LocalFileExists(string path)
-        {
-            return File.Exists(path);
-        }
+            => File.Exists(path);
 
         /// <summary>
         /// Reads the content of the Common Workflow Language (CWL) file associated with the parent workflow of the TES task
@@ -679,7 +665,7 @@ namespace TesApi.Web
             {
                 var filePath = Directory.GetFiles("/cromwell-tmp", fileName, SearchOption.AllDirectories).FirstOrDefault();
 
-                if (filePath != null)
+                if (filePath is not null)
                 {
                     content = File.ReadAllText(filePath);
                     return true;
@@ -736,7 +722,7 @@ namespace TesApi.Web
                     VmSize = v.VmSize,
                     PricePerHourDedicated = v.RateCardMeters.FirstOrDefault(m => !m.IsLowPriority)?.MeterRate,
                     PricePerHourLowPriority = v.RateCardMeters.FirstOrDefault(m => m.IsLowPriority)?.MeterRate })
-                .Where(v => v.PricePerHourDedicated != null);
+                .Where(v => v.PricePerHourDedicated is not null);
         }
 
         /// <summary>
@@ -767,21 +753,21 @@ namespace TesApi.Web
 
             var vmInfos = new List<VirtualMachineInfo>();
 
-            foreach (var supportedVmSize in supportedVmSizes)
+            foreach (var (VmSize, FamilyName, _, _) in supportedVmSizes)
             {
-                var vmSpecification = vmSizesAvailableAtLocation.SingleOrDefault(x => x.Name.Equals(supportedVmSize.VmSize, StringComparison.OrdinalIgnoreCase));
-                var vmPrice = vmPrices.SingleOrDefault(x => x.VmSize.Equals(supportedVmSize.VmSize, StringComparison.OrdinalIgnoreCase));
+                var vmSpecification = vmSizesAvailableAtLocation.SingleOrDefault(x => x.Name.Equals(VmSize, StringComparison.OrdinalIgnoreCase));
+                var vmPrice = vmPrices.SingleOrDefault(x => x.VmSize.Equals(VmSize, StringComparison.OrdinalIgnoreCase));
 
-                if (vmSpecification != null && vmPrice != null)
+                if (vmSpecification is not null && vmPrice is not null)
                 {
                     vmInfos.Add(new VirtualMachineInfo
                     {
-                        VmSize = supportedVmSize.VmSize,
+                        VmSize = VmSize,
                         MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
                         NumberOfCores = vmSpecification.NumberOfCores,
                         ResourceDiskSizeInGB = ConvertMiBToGiB(vmSpecification.ResourceDiskSizeInMB),
                         MaxDataDiskCount = vmSpecification.MaxDataDiskCount,
-                        VmFamily = supportedVmSize.FamilyName,
+                        VmFamily = FamilyName,
                         LowPriority = false,
                         PricePerHour = vmPrice.PricePerHourDedicated
                     });
@@ -790,12 +776,12 @@ namespace TesApi.Web
                     {
                         vmInfos.Add(new VirtualMachineInfo
                         {
-                            VmSize = supportedVmSize.VmSize,
+                            VmSize = VmSize,
                             MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
                             NumberOfCores = vmSpecification.NumberOfCores,
                             ResourceDiskSizeInGB = ConvertMiBToGiB(vmSpecification.ResourceDiskSizeInMB),
                             MaxDataDiskCount = vmSpecification.MaxDataDiskCount,
-                            VmFamily = supportedVmSize.FamilyName,
+                            VmFamily = FamilyName,
                             LowPriority = true,
                             PricePerHour = vmPrice.PricePerHourLowPriority
                         });
@@ -808,9 +794,7 @@ namespace TesApi.Web
         }
 
         private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
-        {
-            return new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
-        }
+            => new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
 
         /// <summary>
         /// Gets an authenticated Azure Client instance
@@ -987,7 +971,7 @@ namespace TesApi.Web
                 var batchAccount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = subId }.BatchAccount.ListAsync())
                     .FirstOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase));
 
-                if (batchAccount != null)
+                if (batchAccount is not null)
                 {
                     var resourceGroupName = resourceGroupRegex.Match(batchAccount.Id).Groups[1].Value;
 
@@ -1000,17 +984,13 @@ namespace TesApi.Web
 
         /// <inheritdoc/>
         public async Task<ContainerRegistryInfo> GetContainerRegistryInfoAsync(string imageName)
-        {
-            return (await GetAccessibleContainerRegistriesAsync())
+            => (await GetAccessibleContainerRegistriesAsync())
                 .FirstOrDefault(reg => reg.RegistryServer.Equals(imageName.Split('/').FirstOrDefault(), StringComparison.OrdinalIgnoreCase));
-        }
 
         /// <inheritdoc/>
         public async Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName)
-        {
-            return (await GetAccessibleStorageAccountsAsync())
+            => (await GetAccessibleStorageAccountsAsync())
                 .FirstOrDefault(storageAccount => storageAccount.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase));
-        }
 
         private class VmPrice
         {
@@ -1019,7 +999,7 @@ namespace TesApi.Web
             public decimal? PricePerHourLowPriority { get; set; }
 
             [JsonIgnore]
-            public bool LowPriorityAvailable => PricePerHourLowPriority != null;
+            public bool LowPriorityAvailable => PricePerHourLowPriority is not null;
         }
     }
 }

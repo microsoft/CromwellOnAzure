@@ -80,7 +80,8 @@ namespace TesApi.Web
         /// Deletes an Azure Batch job
         /// </summary>
         /// <param name="taskId">The unique TES task ID</param>
-        Task DeleteBatchJobAsync(string taskId);
+        /// <param name="cancellationToken"></param>
+        Task DeleteBatchJobAsync(string taskId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Get Batch account quota
@@ -159,7 +160,7 @@ namespace TesApi.Web
         /// Gets the ids of orphaned Batch jobs older than specified timespan
         /// </summary>
         /// <returns>List of Batch job ids</returns>
-        Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge);
+        Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Gets the list of active pool ids matching the prefix and with creation time older than the minAge

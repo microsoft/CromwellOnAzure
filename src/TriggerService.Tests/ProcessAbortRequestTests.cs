@@ -46,7 +46,7 @@ namespace TriggerService.Tests
             cromwellApiClient.Verify(mock => mock.PostAbortAsync(workflowId), Times.Once());
         }
 
-        private async Task<(string newTriggerName, Workflow newTriggerContent)> ProcessAbortRequestAsync(Guid workflowId, ICromwellApiClient cromwellApiClient)
+        private static async Task<(string newTriggerName, Workflow newTriggerContent)> ProcessAbortRequestAsync(Guid workflowId, ICromwellApiClient cromwellApiClient)
         {
             string newTriggerName = null;
             Workflow newTriggerContent = null;
@@ -76,7 +76,7 @@ namespace TriggerService.Tests
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
                 .Callback((string content, string container, string blobName) => {
                     newTriggerName = blobName;
-                    newTriggerContent = content != null ? JsonConvert.DeserializeObject<Workflow>(content) : null; });
+                    newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null; });
 
             var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
 

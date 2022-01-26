@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -17,11 +17,10 @@ namespace TesApi.Web
         /// </summary>
         /// <returns>List of VM sizes</returns>
         public static List<(string VmSize, string FamilyName, string MeterName, string MeterSubCategory)> GetVmSizesSupportedByBatch()
-        {
-            return VmSizesFamiliesAndMeters.Where(v => VerifiedVmSizes.Contains(v.VmSize, StringComparer.OrdinalIgnoreCase)).ToList();
-        }
+            => VmSizesFamiliesAndMeters.Where(v => VerifiedVmSizes.Contains(v.VmSize, StringComparer.OrdinalIgnoreCase)).ToList();
 
-        private static IEnumerable<(string VmSize, string FamilyName, string MeterName, string MeterSubCategory)> VmSizesFamiliesAndMeters => new[] {
+        private static IEnumerable<(string VmSize, string FamilyName, string MeterName, string MeterSubCategory)> VmSizesFamiliesAndMeters => new[]
+        {
             ("Standard_A10", "standardA8_A11Family", "A10", "A Series"),
             ("Standard_A11", "standardA8_A11Family", "A11", "A Series"),
             ("Standard_A2", "standardA0_A7Family", "A2", "A Series"),
@@ -334,7 +333,8 @@ namespace TesApi.Web
         };
 
         // TODO: Batch will provide an API for this in a future release of the client library
-        private static IEnumerable<string> VerifiedVmSizes => new List<string> {
+        private static IEnumerable<string> VerifiedVmSizes => new List<string>
+        {
             "Standard_A1",
             "Standard_A1_v2",
             "Standard_A2",
@@ -528,6 +528,7 @@ namespace TesApi.Web
             "Standard_HB120-64rs_v3",
             "Standard_HB120-96rs_v3",
             "Standard_HB120rs_v2",
+            "Standard_HB120rs_v3",
             "Standard_HB60rs",
             "Standard_HC44rs",
             "Standard_L16s",
@@ -598,6 +599,6 @@ namespace TesApi.Web
             "Standard_NV6",
             "Standard_NV6_Promo",
             "Standard_NV8as_v4"
-            };
+        };
     }
 }

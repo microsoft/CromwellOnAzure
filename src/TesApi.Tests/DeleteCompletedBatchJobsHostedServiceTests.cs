@@ -43,7 +43,7 @@ namespace TesApi.Tests
 
             // Assert
             azureProxy.Verify(i => i.ListOldJobsToDeleteAsync(oldestJobAge));
-            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1"));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
@@ -58,8 +58,8 @@ namespace TesApi.Tests
 
             // Assert
             azureProxy.Verify(i => i.ListOldJobsToDeleteAsync(oldestJobAge));
-            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1"));
-            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId2"));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId2", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
@@ -74,7 +74,7 @@ namespace TesApi.Tests
 
             // Assert
             azureProxy.Verify(i => i.ListOldJobsToDeleteAsync(oldestJobAge));
-            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1"));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
@@ -89,7 +89,7 @@ namespace TesApi.Tests
 
             // Assert
             azureProxy.Verify(i => i.ListOldJobsToDeleteAsync(oldestJobAge));
-            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1"));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 

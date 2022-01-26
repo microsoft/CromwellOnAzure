@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -35,7 +35,7 @@ namespace TesApi.Web
         private const string DownloadFilesScriptFileName = "download_files_script";
         private const string startTaskScriptFilename = "start-task.sh";
         private static readonly string batchStartTaskLocalPathOnBatchNode = $"/mnt/batch/tasks/startup/wd/{startTaskScriptFilename}";
-        private static readonly Regex queryStringRegex = new Regex(@"[^\?.]*(\?.*)");
+        private static readonly Regex queryStringRegex = new(@"[^\?.]*(\?.*)");
         private readonly string dockerInDockerImageName;
         private readonly string blobxferImageName;
         private readonly string cromwellDrsLocalizerImageName;
@@ -118,7 +118,7 @@ namespace TesApi.Web
 
                 tesTask.SetFailureReason(batchInfo.FailureReason);
 
-                if (batchInfo.SystemLogItems != null)
+                if (batchInfo.SystemLogItems is not null)
                 {
                     tesTask.AddToSystemLog(batchInfo.SystemLogItems);
                 }
@@ -233,14 +233,10 @@ namespace TesApi.Web
         }
 
         private static string GetCromwellExecutionDirectoryPath(TesTask task)
-        {
-            return GetParentPath(task.Inputs?.FirstOrDefault(IsCromwellCommandScript)?.Path);
-        }
+            => GetParentPath(task.Inputs?.FirstOrDefault(IsCromwellCommandScript)?.Path);
 
         private static string GetBatchExecutionDirectoryPath(TesTask task)
-        {
-            return $"{GetCromwellExecutionDirectoryPath(task)}/{BatchExecutionDirectoryName}";
-        }
+            => $"{GetCromwellExecutionDirectoryPath(task)}/{BatchExecutionDirectoryName}";
 
         /// <summary>
         /// Get the parent path of the given path
@@ -265,9 +261,7 @@ namespace TesApi.Web
         /// <param name="inputFile"><see cref="TesInput"/> file</param>
         /// <returns>True if the file is a Cromwell command script</returns>
         private static bool IsCromwellCommandScript(TesInput inputFile)
-        {
-            return inputFile.Name.Equals("commandScript");
-        }
+            => inputFile.Name.Equals("commandScript");
 
         /// <summary>
         /// Verifies existence and translates local file URLs to absolute paths (e.g. file:///tmp/cwl_temp_dir_8026387118450035757/args.py becomes /tmp/cwl_temp_dir_8026387118450035757/args.py)
@@ -280,7 +274,7 @@ namespace TesApi.Web
         {
             localPath = Uri.TryCreate(fileUri, UriKind.Absolute, out var uri) && uri.IsFile && uri.AbsolutePath.StartsWith("/cromwell-tmp/") && this.azureProxy.LocalFileExists(uri.AbsolutePath) ? uri.AbsolutePath : null;
 
-            return localPath != null;
+            return localPath is not null;
         }
 
         /// <summary>
@@ -392,6 +386,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="tesTask"><see cref="TesTask"/></param>
         /// <returns>A higher-level abstraction of the current state of the Azure Batch task</returns>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1826:Do not use Enumerable methods on indexable collections", Justification = "FirstOrDefault() is straightforward, the alternative is less clear.")]
         private async Task<CombinedBatchTaskInfo> GetBatchTaskStateAsync(TesTask tesTask)
         {
             var azureBatchJobAndTaskState = await azureProxy.GetBatchJobAndTaskStateAsync(tesTask.Id);
@@ -400,12 +395,12 @@ namespace TesApi.Web
             {
                 var systemLogItems = new List<string>();
 
-                if (azureBatchJobAndTaskState.NodeErrorCode != null)
+                if (azureBatchJobAndTaskState.NodeErrorCode is not null)
                 {
                     systemLogItems.Add(azureBatchJobAndTaskState.NodeErrorCode);
                 }
 
-                if (azureBatchJobAndTaskState.NodeErrorDetails != null)
+                if (azureBatchJobAndTaskState.NodeErrorDetails is not null)
                 {
                     systemLogItems.AddRange(azureBatchJobAndTaskState.NodeErrorDetails);
                 }
@@ -447,7 +442,7 @@ namespace TesApi.Web
                             return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodePreempted, FailureReason = BatchTaskState.NodePreempted.ToString(), SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState) };
                         }
 
-                        if (azureBatchJobAndTaskState.NodeErrorCode != null)
+                        if (azureBatchJobAndTaskState.NodeErrorCode is not null)
                         {
                             if (azureBatchJobAndTaskState.NodeErrorCode == "DiskFull")
                             {
@@ -480,7 +475,7 @@ namespace TesApi.Web
                 case TaskState.Completed:
                     var batchJobInfo = JsonConvert.SerializeObject(azureBatchJobAndTaskState);
 
-                    if (azureBatchJobAndTaskState.TaskExitCode == 0 && azureBatchJobAndTaskState.TaskFailureInformation == null)
+                    if (azureBatchJobAndTaskState.TaskExitCode == 0 && azureBatchJobAndTaskState.TaskFailureInformation is null)
                     {
                         var metrics = await GetBatchNodeMetricsAndCromwellResultCodeAsync(tesTask);
 
@@ -535,17 +530,17 @@ namespace TesApi.Web
             var tesTaskChanged = false;
 
             var mapItem = tesTaskStateTransitions
-                .FirstOrDefault(m => (m.Condition == null || m.Condition(tesTask)) && (m.CurrentBatchTaskState == null || m.CurrentBatchTaskState == combinedBatchTaskInfo.BatchTaskState));
+                .FirstOrDefault(m => (m.Condition is null || m.Condition(tesTask)) && (m.CurrentBatchTaskState is null || m.CurrentBatchTaskState == combinedBatchTaskInfo.BatchTaskState));
 
-            if (mapItem != null)
+            if (mapItem is not null)
             {
-                if (mapItem.AsyncAction != null)
+                if (mapItem.AsyncAction is not null)
                 {
                     await mapItem.AsyncAction(tesTask, combinedBatchTaskInfo);
                     tesTaskChanged = true;
                 }
 
-                if (mapItem.Action != null)
+                if (mapItem.Action is not null)
                 {
                     mapItem.Action(tesTask, combinedBatchTaskInfo);
                     tesTaskChanged = true;
@@ -568,7 +563,7 @@ namespace TesApi.Web
             var queryStringsToRemoveFromLocalFilePaths = task.Inputs
                 .Select(i => i.Path)
                 .Concat(task.Outputs.Select(o => o.Path))
-                .Where(p => p != null)
+                .Where(p => p is not null)
                 .Select(p => queryStringRegex.Match(p).Groups[1].Value)
                 .Where(qs => !string.IsNullOrEmpty(qs))
                 .ToList();
@@ -581,7 +576,7 @@ namespace TesApi.Web
 
             var cromwellExecutionDirectoryPath = GetCromwellExecutionDirectoryPath(task);
 
-            if (cromwellExecutionDirectoryPath == null)
+            if (cromwellExecutionDirectoryPath is null)
             {
                 throw new TesException("NoCromwellExecutionDirectory", $"Could not identify Cromwell execution directory path for task {task.Id}. This TES instance supports Cromwell tasks only.");
             }
@@ -654,9 +649,9 @@ namespace TesApi.Web
 
             var volumeMountsOption = $"-v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash}";
 
-            var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) == null;
-            var dockerInDockerImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName)) == null;
-            var blobXferImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(blobxferImageName)) == null;
+            var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) is null;
+            var dockerInDockerImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName)) is null;
+            var blobXferImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(blobxferImageName)) is null;
 
             var sb = new StringBuilder();
 
@@ -767,17 +762,17 @@ namespace TesApi.Web
         /// <returns>List of modified <see cref="TesInput"/> files</returns>
         private async Task<TesInput> GetTesInputFileUrl(TesInput inputFile, string taskId, List<string> queryStringsToRemoveFromLocalFilePaths)
         {
-            if (inputFile.Path != null && !inputFile.Path.StartsWith(CromwellPathPrefix, StringComparison.OrdinalIgnoreCase))
+            if (inputFile.Path is not null && !inputFile.Path.StartsWith(CromwellPathPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 throw new TesException("InvalidInputFilePath", $"Unsupported input path '{inputFile.Path}' for task Id {taskId}. Must start with '{CromwellPathPrefix}'.");
             }
 
-            if (inputFile.Url != null && inputFile.Content != null)
+            if (inputFile.Url is not null && inputFile.Content is not null)
             {
                 throw new TesException("InvalidInputFilePath", "Input Url and Content cannot be both set");
             }
 
-            if (inputFile.Url == null && inputFile.Content == null)
+            if (inputFile.Url is null && inputFile.Content is null)
             {
                 throw new TesException("InvalidInputFilePath", "One of Input Url or Content must be set");
             }
@@ -789,7 +784,7 @@ namespace TesApi.Web
 
             string inputFileUrl;
 
-            if (inputFile.Content != null || IsCromwellCommandScript(inputFile))
+            if (inputFile.Content is not null || IsCromwellCommandScript(inputFile))
             {
                 inputFileUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(inputFile.Path);
 
@@ -811,17 +806,7 @@ namespace TesApi.Web
             {
                 // Convert file:///account/container/blob paths to /account/container/blob
                 var url = Uri.TryCreate(inputFile.Url, UriKind.Absolute, out var tempUrl) && tempUrl.IsFile ? tempUrl.AbsolutePath : inputFile.Url;
-
-                var mappedUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(url);
-
-                if (mappedUrl != null)
-                {
-                    inputFileUrl = mappedUrl;
-                }
-                else
-                {
-                    throw new TesException("InvalidInputFilePath", $"Unsupported input URL '{inputFile.Url}' for task Id {taskId}. Must start with 'http', '{CromwellPathPrefix}' or use '/accountName/containerName/blobName' pattern where TES service has Contributor access to the storage account.");
-                }
+                inputFileUrl = (await this.storageAccessProvider.MapLocalPathToSasUrlAsync(url)) ?? throw new TesException("InvalidInputFilePath", $"Unsupported input URL '{inputFile.Url}' for task Id {taskId}. Must start with 'http', '{CromwellPathPrefix}' or use '/accountName/containerName/blobName' pattern where TES service has Contributor access to the storage account.");
             }
 
             var path = RemoveQueryStringsFromLocalFilePaths(inputFile.Path, queryStringsToRemoveFromLocalFilePaths);
@@ -866,7 +851,7 @@ namespace TesApi.Web
 
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
 
-            if (containerRegistryInfo != null)
+            if (containerRegistryInfo is not null)
             {
                 var containerRegistry = new ContainerRegistry(
                     userName: containerRegistryInfo.Username,
@@ -883,7 +868,7 @@ namespace TesApi.Web
 
                 var containerRegistryInfoForDockerInDocker = await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName);
 
-                if (containerRegistryInfoForDockerInDocker != null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
+                if (containerRegistryInfoForDockerInDocker is not null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
                 {
                     var containerRegistryForDockerInDocker = new ContainerRegistry(
                         userName: containerRegistryInfoForDockerInDocker.Username,
@@ -895,7 +880,7 @@ namespace TesApi.Web
 
                 var containerRegistryInfoForBlobXfer = await azureProxy.GetContainerRegistryInfoAsync(blobxferImageName);
 
-                if (containerRegistryInfoForBlobXfer != null && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfo.RegistryServer && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfoForDockerInDocker.RegistryServer)
+                if (containerRegistryInfoForBlobXfer is not null && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfo.RegistryServer && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfoForDockerInDocker.RegistryServer)
                 {
                     var containerRegistryForBlobXfer = new ContainerRegistry(
                         userName: containerRegistryInfoForBlobXfer.Username,
@@ -1034,7 +1019,7 @@ namespace TesApi.Web
             var tesResources = tesTask.Resources;
 
             var previouslyFailedVmSizes = tesTask.Logs?
-                .Where(log => log.FailureReason == BatchTaskState.NodeAllocationFailed.ToString() && log.VirtualMachineInfo?.VmSize != null)
+                .Where(log => log.FailureReason == BatchTaskState.NodeAllocationFailed.ToString() && log.VirtualMachineInfo?.VmSize is not null)
                 .Select(log => log.VirtualMachineInfo.VmSize)
                 .Distinct()
                 .ToList();
@@ -1081,9 +1066,8 @@ namespace TesApi.Web
                 .Where(vm => !(previouslyFailedVmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? false))
                 .Where(vm => preemptible
                     ? batchQuotas.LowPriorityCoreQuota >= vm.NumberOfCores
-                    : batchQuotas.DedicatedCoreQuota >= vm.NumberOfCores && (batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced
-                        ? batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(x => vm.VmFamily.Equals(x.Name, StringComparison.OrdinalIgnoreCase))?.CoreQuota >= vm.NumberOfCores
-                        : true))
+                    : batchQuotas.DedicatedCoreQuota >= vm.NumberOfCores
+                        && (!batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced || batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(x => vm.VmFamily.Equals(x.Name, StringComparison.OrdinalIgnoreCase))?.CoreQuota >= vm.NumberOfCores))
                 .OrderBy(x => x.PricePerHour)
                 .FirstOrDefault();
 
@@ -1105,7 +1089,7 @@ namespace TesApi.Web
                 }
             }
 
-            if (selectedVm != null)
+            if (selectedVm is not null)
             {
                 return selectedVm;
             }
@@ -1115,7 +1099,7 @@ namespace TesApi.Web
                 noVmFoundMessage += $" There are no VM sizes that match the requirements. Review the task resources.";
             }
 
-            if (previouslyFailedVmSizes != null)
+            if (previouslyFailedVmSizes is not null)
             {
                 noVmFoundMessage += $" The following VM sizes were excluded from consideration because of {BatchTaskState.NodeAllocationFailed} error(s) on previous attempts: {string.Join(", ", previouslyFailedVmSizes)}";
             }
@@ -1166,14 +1150,14 @@ namespace TesApi.Web
             {
                 var cromwellRcContent = await this.storageAccessProvider.DownloadBlobAsync($"{GetCromwellExecutionDirectoryPath(tesTask)}/rc");
 
-                if (cromwellRcContent != null && int.TryParse(cromwellRcContent, out var temp))
+                if (cromwellRcContent is not null && int.TryParse(cromwellRcContent, out var temp))
                 {
                     cromwellRcCode = temp;
                 }
 
                 var metricsContent = await this.storageAccessProvider.DownloadBlobAsync($"{GetBatchExecutionDirectoryPath(tesTask)}/metrics.txt");
 
-                if (metricsContent != null)
+                if (metricsContent is not null)
                 {
                     try
                     {
@@ -1215,11 +1199,9 @@ namespace TesApi.Web
         }
 
         private static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
-        {
-            return text.Split(rowDelimiter)
+            => text.Split(rowDelimiter)
                 .Select(line => { var parts = line.Split(fieldDelimiter); return new KeyValuePair<string, string>(parts[0], parts[1]); })
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
-        }
 
         /// <summary>
         /// Class that captures how <see cref="TesTask"/> transitions from current state to the new state, given the current Batch task state and optional condition. 

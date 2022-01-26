@@ -80,28 +80,24 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("class TesExecutor {\n");
-            sb.Append("  Image: ").Append(Image).Append("\n");
-            sb.Append("  Command: ").Append(Command).Append("\n");
-            sb.Append("  Workdir: ").Append(Workdir).Append("\n");
-            sb.Append("  Stdin: ").Append(Stdin).Append("\n");
-            sb.Append("  Stdout: ").Append(Stdout).Append("\n");
-            sb.Append("  Stderr: ").Append(Stderr).Append("\n");
-            sb.Append("  Env: ").Append(Env).Append("\n");
-            sb.Append("}\n");
-            return sb.ToString();
-        }
+            => new StringBuilder()
+                .Append("class TesExecutor {\n")
+                .Append("  Image: ").Append(Image).Append('\n')
+                .Append("  Command: ").Append(Command).Append('\n')
+                .Append("  Workdir: ").Append(Workdir).Append('\n')
+                .Append("  Stdin: ").Append(Stdin).Append('\n')
+                .Append("  Stdout: ").Append(Stdout).Append('\n')
+                .Append("  Stderr: ").Append(Stderr).Append('\n')
+                .Append("  Env: ").Append(Env).Append('\n')
+                .Append("}\n")
+                .ToString();
 
         /// <summary>
         /// Returns the JSON string presentation of the object
         /// </summary>
         /// <returns>JSON string presentation of the object</returns>
         public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
+            => JsonConvert.SerializeObject(this, Formatting.Indented);
 
         /// <summary>
         /// Returns true if objects are equal
@@ -109,19 +105,12 @@ namespace Tes.Models
         /// <param name="obj">Object to be compared</param>
         /// <returns>Boolean</returns>
         public override bool Equals(object obj)
-        {
-            if (obj is null)
+            => obj switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-
-            return obj.GetType() == GetType() && Equals((TesExecutor)obj);
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ => obj.GetType() == GetType() && Equals((TesExecutor)obj),
+            };
 
         /// <summary>
         /// Returns true if TesExecutor instances are equal
@@ -129,54 +118,47 @@ namespace Tes.Models
         /// <param name="other">Instance of TesExecutor to be compared</param>
         /// <returns>Boolean</returns>
         public bool Equals(TesExecutor other)
-        {
-            if (other is null)
+            => other switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, other))
-            {
-                return true;
-            }
-
-            return
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ =>
                 (
                     Image == other.Image ||
-                    Image != null &&
+                    Image is not null &&
                     Image.Equals(other.Image)
                 ) &&
                 (
                     Command == other.Command ||
-                    Command != null &&
+                    Command is not null &&
                     Command.SequenceEqual(other.Command)
                 ) &&
                 (
                     Workdir == other.Workdir ||
-                    Workdir != null &&
+                    Workdir is not null &&
                     Workdir.Equals(other.Workdir)
                 ) &&
                 (
                     Stdin == other.Stdin ||
-                    Stdin != null &&
+                    Stdin is not null &&
                     Stdin.Equals(other.Stdin)
                 ) &&
                 (
                     Stdout == other.Stdout ||
-                    Stdout != null &&
+                    Stdout is not null &&
                     Stdout.Equals(other.Stdout)
                 ) &&
                 (
                     Stderr == other.Stderr ||
-                    Stderr != null &&
+                    Stderr is not null &&
                     Stderr.Equals(other.Stderr)
                 ) &&
                 (
                     Env == other.Env ||
-                    Env != null &&
+                    Env is not null &&
                     Env.SequenceEqual(other.Env)
-                );
-        }
+                ),
+            };
 
         /// <summary>
         /// Gets the hash code
@@ -188,37 +170,37 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Image != null)
+                if (Image is not null)
                 {
                     hashCode = hashCode * 59 + Image.GetHashCode();
                 }
 
-                if (Command != null)
+                if (Command is not null)
                 {
                     hashCode = hashCode * 59 + Command.GetHashCode();
                 }
 
-                if (Workdir != null)
+                if (Workdir is not null)
                 {
                     hashCode = hashCode * 59 + Workdir.GetHashCode();
                 }
 
-                if (Stdin != null)
+                if (Stdin is not null)
                 {
                     hashCode = hashCode * 59 + Stdin.GetHashCode();
                 }
 
-                if (Stdout != null)
+                if (Stdout is not null)
                 {
                     hashCode = hashCode * 59 + Stdout.GetHashCode();
                 }
 
-                if (Stderr != null)
+                if (Stderr is not null)
                 {
                     hashCode = hashCode * 59 + Stderr.GetHashCode();
                 }
 
-                if (Env != null)
+                if (Env is not null)
                 {
                     hashCode = hashCode * 59 + Env.GetHashCode();
                 }
@@ -231,14 +213,10 @@ namespace Tes.Models
 #pragma warning disable 1591
 
         public static bool operator ==(TesExecutor left, TesExecutor right)
-        {
-            return Equals(left, right);
-        }
+            => Equals(left, right);
 
         public static bool operator !=(TesExecutor left, TesExecutor right)
-        {
-            return !Equals(left, right);
-        }
+            => !Equals(left, right);
 
 #pragma warning restore 1591
         #endregion Operators

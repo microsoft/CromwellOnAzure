@@ -189,7 +189,7 @@ namespace TesApi.Tests
             azureProxy.Verify(mock => mock.GetBatchActiveJobCount(), Times.Exactly(4));
         }
 
-        private Mock<IAzureProxy> GetMockAzureProxy()
+        private static Mock<IAzureProxy> GetMockAzureProxy()
         {
             var azureProxy = new Mock<IAzureProxy>();
 

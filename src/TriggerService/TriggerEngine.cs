@@ -14,8 +14,8 @@ namespace TriggerService
         private readonly ICromwellOnAzureEnvironment environment;
         private readonly TimeSpan mainInterval;
         private readonly TimeSpan availabilityCheckInterval;
-        private AvailabilityTracker cromwellAvailability = new AvailabilityTracker();
-        private AvailabilityTracker azStorageAvailability = new AvailabilityTracker();
+        private readonly AvailabilityTracker cromwellAvailability = new();
+        private readonly AvailabilityTracker azStorageAvailability = new();
 
         public TriggerEngine(ILoggerFactory loggerFactory, ICromwellOnAzureEnvironment environment, TimeSpan mainInterval, TimeSpan availabilityCheckInterval)
         {

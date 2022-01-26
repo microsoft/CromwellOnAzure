@@ -82,49 +82,43 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("class TesResources {\n");
-            sb.Append("  CpuCores: ").Append(CpuCores).Append("\n");
-            sb.Append("  Preemptible: ").Append(Preemptible).Append("\n");
-            sb.Append("  RamGb: ").Append(RamGb).Append("\n");
-            sb.Append("  DiskGb: ").Append(DiskGb).Append("\n");
-            sb.Append("  Zones: ");
-            
-            if (Zones?.Count > 0)
-            {
-                sb.Append(string.Join(",", Zones));
-            }
+            => new StringBuilder()
+                .Append("class TesResources {\n")
+                .Append("  CpuCores: ").Append(CpuCores).Append('\n')
+                .Append("  Preemptible: ").Append(Preemptible).Append('\n')
+                .Append("  RamGb: ").Append(RamGb).Append('\n')
+                .Append("  DiskGb: ").Append(DiskGb).Append('\n')
+                .Append("  Zones: ")
+                .IfThenElse(
+                    Zones?.Count > 0,
+                    s => s.Append(string.Join(",", Zones)),
+                    s => s)
+                .Append('\n')
+                .IfThenElse(
+                    BackendParameters?.Keys.Count > 0,
+                    s =>
+                    {
+                        var keyValues = new List<string>();
 
-            sb.Append("\n");
-            sb.Append("  BackendParameters: ");
+                        foreach (var key in BackendParameters.Keys)
+                        {
+                            keyValues.Add($"({key},{BackendParameters[key]})");
+                        }
 
-            if (BackendParameters?.Keys.Count > 0)
-            {
-                var keyValues = new List<string>();
-
-                foreach (var key in BackendParameters.Keys)
-                {
-                    keyValues.Add($"({key},{BackendParameters[key]})");
-                }
-
-                sb.Append(string.Join(",", keyValues));
-            }
-
-            sb.Append("\n");
-            sb.Append("  BackendParametersStrict: ").Append(BackendParametersStrict).Append("\n");
-            sb.Append("}\n");
-            return sb.ToString();
-        }
+                        return s.Append(string.Join(",", keyValues));
+                    },
+                    s => s)
+                .Append('\n')
+                .Append("  BackendParametersStrict: ").Append(BackendParametersStrict).Append('\n')
+                .Append("}\n")
+                .ToString();
 
         /// <summary>
         /// Returns the JSON string presentation of the object
         /// </summary>
         /// <returns>JSON string presentation of the object</returns>
         public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
+            => JsonConvert.SerializeObject(this, Formatting.Indented);
 
         /// <summary>
         /// Returns true if objects are equal
@@ -132,19 +126,12 @@ namespace Tes.Models
         /// <param name="obj">Object to be compared</param>
         /// <returns>Boolean</returns>
         public override bool Equals(object obj)
-        {
-            if (obj is null)
+            => obj switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-
-            return obj.GetType() == GetType() && Equals((TesResources)obj);
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ => obj.GetType() == GetType() && Equals((TesResources)obj),
+            };
 
         /// <summary>
         /// Returns true if TesResources instances are equal
@@ -152,52 +139,45 @@ namespace Tes.Models
         /// <param name="other">Instance of TesResources to be compared</param>
         /// <returns>Boolean</returns>
         public bool Equals(TesResources other)
-        {
-            if (other is null)
+            => other switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, other))
-            {
-                return true;
-            }
-
-            return
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ =>
                 (
                     CpuCores == other.CpuCores ||
-                    CpuCores != null &&
+                    CpuCores is not null &&
                     CpuCores.Equals(other.CpuCores)
                 ) &&
                 (
                     Preemptible == other.Preemptible ||
-                    Preemptible != null &&
+                    Preemptible is not null &&
                     Preemptible.Equals(other.Preemptible)
                 ) &&
                 (
                     RamGb == other.RamGb ||
-                    RamGb != null &&
+                    RamGb is not null &&
                     RamGb.Equals(other.RamGb)
                 ) &&
                 (
                     DiskGb == other.DiskGb ||
-                    DiskGb != null &&
+                    DiskGb is not null &&
                     DiskGb.Equals(other.DiskGb)
                 ) &&
                 (
                     Zones == other.Zones ||
-                    Zones != null && other.Zones !=null &&
+                    Zones is not null &&
                     Zones.SequenceEqual(other.Zones)
                 ) &&
                 (
                     BackendParameters == other.BackendParameters ||
-                    BackendParameters != null && other.BackendParameters != null &&
+                    BackendParameters is not null && other.BackendParameters is not null &&
                     BackendParameters.SequenceEqual(other.BackendParameters)
                 ) &&
                 (
                     BackendParametersStrict == other?.BackendParametersStrict
-                );
-        }
+                )
+            };
 
         /// <summary>
         /// Gets the hash code
@@ -209,27 +189,27 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (CpuCores != null)
+                if (CpuCores is not null)
                 {
                     hashCode = hashCode * 59 + CpuCores.GetHashCode();
                 }
 
-                if (Preemptible != null)
+                if (Preemptible is not null)
                 {
                     hashCode = hashCode * 59 + Preemptible.GetHashCode();
                 }
 
-                if (RamGb != null)
+                if (RamGb is not null)
                 {
                     hashCode = hashCode * 59 + RamGb.GetHashCode();
                 }
 
-                if (DiskGb != null)
+                if (DiskGb is not null)
                 {
                     hashCode = hashCode * 59 + DiskGb.GetHashCode();
                 }
 
-                if (Zones != null)
+                if (Zones is not null)
                 {
                     hashCode = hashCode * 59 + Zones.GetHashCode();
                 }
@@ -252,16 +232,18 @@ namespace Tes.Models
 #pragma warning disable 1591
 
         public static bool operator ==(TesResources left, TesResources right)
-        {
-            return Equals(left, right);
-        }
+            => Equals(left, right);
 
         public static bool operator !=(TesResources left, TesResources right)
-        {
-            return !Equals(left, right);
-        }
+            => !Equals(left, right);
 
 #pragma warning restore 1591
         #endregion Operators
+    }
+
+    internal static class StringBuilderSelectorExtensions
+    {
+        public static StringBuilder IfThenElse(this StringBuilder builder, bool @if, Func<StringBuilder, StringBuilder> then, Func<StringBuilder, StringBuilder> @else)
+            => @if ? then(builder) : @else(builder);
     }
 }

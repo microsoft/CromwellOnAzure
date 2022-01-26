@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -25,8 +28,8 @@ namespace TesApi.Tests
             var azureProxy = await ArrangeTest(new[] { firstTesTask, secondTesTask, thirdTesTask });
 
             // Assert
-            azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge));
-            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1"));
+            azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
@@ -40,9 +43,9 @@ namespace TesApi.Tests
             var azureProxy = await ArrangeTest(new[] { firstTesTask, secondTesTask, thirdTesTask });
 
             // Assert
-            azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge));
-            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1"));
-            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId2"));
+            azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId2", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
@@ -56,8 +59,8 @@ namespace TesApi.Tests
             var azureProxy = await ArrangeTest(new[] { firstTesTask, secondTesTask, thirdTesTask });
 
             // Assert
-            azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge));
-            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1"));
+            azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
@@ -71,17 +74,17 @@ namespace TesApi.Tests
             var azureProxy = await ArrangeTest(new[] { firstTesTask, secondTesTask, thirdTesTask });
 
             // Assert
-            azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge));
-            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1"));
+            azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
-        private async Task<Mock<IAzureProxy>> ArrangeTest(TesTask[] tasks)
+        private static async Task<Mock<IAzureProxy>> ArrangeTest(TesTask[] tasks)
         {
             var azureProxy = new Mock<IAzureProxy>();
             var mockRepo = new Mock<IRepository<TesTask>>();
 
-            azureProxy.Setup(p => p.ListOrphanedJobsToDeleteAsync(minJobAge)).ReturnsAsync(tasks.Select(i => i.Id + "-1"));
+            azureProxy.Setup(p => p.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>())).ReturnsAsync(tasks.Select(i => i.Id + "-1"));
 
             foreach (var item in tasks)
             {

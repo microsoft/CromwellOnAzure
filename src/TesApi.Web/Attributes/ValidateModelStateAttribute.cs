@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System.ComponentModel.DataAnnotations;
@@ -22,8 +22,7 @@ namespace TesApi.Attributes
         public override void OnActionExecuting(ActionExecutingContext context)
         {
             // Per https://blog.markvincze.com/how-to-validate-action-parameters-with-dataannotation-attributes/
-            var descriptor = context.ActionDescriptor as ControllerActionDescriptor;
-            if (descriptor != null)
+            if (context.ActionDescriptor is ControllerActionDescriptor descriptor)
             {
                 foreach (var parameter in descriptor.MethodInfo.GetParameters())
                 {
@@ -43,14 +42,13 @@ namespace TesApi.Attributes
             }
         }
 
-        private void ValidateAttributes(ParameterInfo parameter, object args, ModelStateDictionary modelState)
+        private static void ValidateAttributes(ParameterInfo parameter, object args, ModelStateDictionary modelState)
         {
             foreach (var attributeData in parameter.CustomAttributes)
             {
                 var attributeInstance = parameter.GetCustomAttribute(attributeData.AttributeType);
 
-                var validationAttribute = attributeInstance as ValidationAttribute;
-                if (validationAttribute != null)
+                if (attributeInstance is ValidationAttribute validationAttribute)
                 {
                     var isValid = validationAttribute.IsValid(args);
                     if (!isValid)

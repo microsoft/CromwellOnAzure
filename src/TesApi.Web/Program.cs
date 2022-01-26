@@ -21,9 +21,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="args"></param>
         public static void Main(string[] args)
-        {
-            CreateWebHostBuilder(args).Build().Run();
-        }
+            => CreateWebHostBuilder(args).Build().Run();
 
         /// <summary>
         /// Create the web host builder.
@@ -31,10 +29,7 @@ namespace TesApi.Web
         /// <param name="args"></param>
         /// <returns><see cref="IWebHostBuilder"/></returns>
         public static IWebHostBuilder CreateWebHostBuilder(string[] args)
-        {
-            return WebHost.CreateDefaultBuilder(args)
-                .UseApplicationInsights()
-                .UseStartup<Startup>()
+            => WebHost.CreateDefaultBuilder<Startup>(args)
                 .UseUrls("http://0.0.0.0:80/")
                 .ConfigureAppConfiguration((context, config) =>
                 {
@@ -50,7 +45,7 @@ namespace TesApi.Web
                             Console.WriteLine($"ApplicationInsightsAccountName: {applicationInsightsAccountName}");
                             var instrumentationKey = AzureProxy.GetAppInsightsInstrumentationKeyAsync(applicationInsightsAccountName).Result;
 
-                            if (instrumentationKey != null)
+                            if (instrumentationKey is not null)
                             {
                                 logging.AddApplicationInsights(instrumentationKey);
                             }
@@ -76,10 +71,9 @@ namespace TesApi.Web
                     }
                     catch (Exception exc)
                     {
-                        Console.WriteLine($"Exception while configuring logging: {exc.ToString()}");
+                        Console.WriteLine($"Exception while configuring logging: {exc}");
                         throw;
                     }
                 });
-        }
     }
 }

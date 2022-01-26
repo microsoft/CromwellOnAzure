@@ -20,8 +20,8 @@ namespace TriggerService.Tests
             var loggerFactory = new TestLoggerFake();
             var environment = new Mock<ICromwellOnAzureEnvironment>();
             var logger = loggerFactory.CreateLogger<TriggerEngineTests>();
-            bool isStorageAvailable = false;
-            bool isCromwellAvailable = false;
+            var isStorageAvailable = false;
+            var isCromwellAvailable = false;
 
             environment.Setup(x => x.ProcessAndAbortWorkflowsAsync()).Returns(() =>
             {
@@ -79,18 +79,14 @@ namespace TriggerService.Tests
         /// <summary>
         /// Do not use this except for testing.  It is not actually a factory and only creates a single instance of a logger to facilitate verifying log messages
         /// </summary>
-        public class TestLoggerFake : ILoggerFactory
+        public sealed class TestLoggerFake : ILoggerFactory
         {
             public TestLogger TestLogger { get; set; } = new TestLogger();
             public void AddProvider(ILoggerProvider provider)
-            {
-                throw new NotImplementedException();
-            }
+                => throw new NotImplementedException();
 
             public ILogger CreateLogger(string categoryName)
-            {
-                return TestLogger;
-            }
+                => TestLogger;
 
             public void Dispose()
             {
@@ -98,13 +94,11 @@ namespace TriggerService.Tests
             }
         }
 
-        public class TestLogger : ILogger, IDisposable
+        public sealed class TestLogger : ILogger, IDisposable
         {
             public List<string> LogLines { get; set; } = new List<string>();
             public IDisposable BeginScope<TState>(TState state)
-            {
-                return null;
-            }
+                => null;
 
             public void Dispose()
             {
@@ -112,9 +106,7 @@ namespace TriggerService.Tests
             }
 
             public bool IsEnabled(LogLevel logLevel)
-            {
-                return true;
-            }
+                => true;
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
             {

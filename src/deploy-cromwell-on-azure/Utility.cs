@@ -42,20 +42,18 @@ namespace CromwellOnAzureDeployer
 
             while (true)
             {
-                using (var rng = new RNGCryptoServiceProvider())
+                using var rng = new RNGCryptoServiceProvider();
+                var buffer = new byte[length];
+                rng.GetBytes(buffer);
+
+                var password = Convert.ToBase64String(buffer)
+                    .Replace("+", "-")
+                    .Replace("/", "_")
+                    .Substring(0, length);
+
+                if (regex.IsMatch(password))
                 {
-                    var buffer = new byte[length];
-                    rng.GetBytes(buffer);
-
-                    var password = Convert.ToBase64String(buffer)
-                        .Replace("+", "-")
-                        .Replace("/", "_")
-                        .Substring(0, length);
-
-                    if (regex.IsMatch(password))
-                    {
-                        return password;
-                    }
+                    return password;
                 }
             }
         }
