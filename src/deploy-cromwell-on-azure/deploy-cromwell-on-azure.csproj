@@ -74,4 +74,8 @@
     <EmbeddedResource Include="testInputs.json" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Properties\PublishProfiles\" />
+  </ItemGroup>
+
 </Project>

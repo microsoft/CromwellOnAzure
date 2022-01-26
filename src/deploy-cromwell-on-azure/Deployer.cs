@@ -13,7 +13,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Azure.Storage;
 using Azure.Storage.Blobs;
-using Common;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
@@ -39,6 +38,7 @@ using Polly;
 using Polly.Retry;
 using Renci.SshNet;
 using Renci.SshNet.Common;
+using Common;
 
 namespace CromwellOnAzureDeployer
 {

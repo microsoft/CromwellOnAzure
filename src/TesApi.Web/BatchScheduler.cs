@@ -330,7 +330,7 @@ namespace TesApi.Web
                         startTaskPath: batchStartTaskLocalPathOnBatchNode
                     );
                         
-                    poolInformation = new Microsoft.Azure.Batch.PoolInformation { PoolId = poolName };
+                    poolInformation = new PoolInformation { PoolId = poolName };
                 }
                 else
                 {
