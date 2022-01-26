@@ -2,7 +2,7 @@
 ### Latest release
  * [Release 3.0.0](https://github.com/microsoft/CromwellOnAzure/releases/tag/3.0.0)<br/>
  [Release notes for version 3.0.0](docs/release-notes/3.0.0.md)
- 
+
 Check the "Update Instructions" section in the version 3.0.0 [release notes](docs/release-notes/3.0.0.md/#update-instructions) to learn how to update an existing Cromwell on Azure deployment to version 3.0.0. You can customize some parameters when updating. Please [see these customization instructions](docs/troubleshooting-guide.md/#Customize-your-Cromwell-on-Azure-deployment), specifically the "Used by update" and "Comment" columns in the table.<br/>
 
 #### Getting started
@@ -25,7 +25,7 @@ If you are running into an issue and cannot find any information in the troubles
 
 ![Logo](/docs/screenshots/logo.png)
 
-## Cromwell on Azure 
+## Cromwell on Azure
 
 [Cromwell](https://cromwell.readthedocs.io/en/stable/) is a workflow management system for scientific workflows, orchestrating the computing tasks needed for genomics analysis. Originally developed by the [Broad Institute](https://github.com/broadinstitute/cromwell), Cromwell is also used in the GATK Best Practices genome analysis pipeline. Cromwell supports running scripts at various scales, including your local machine, a local computing cluster, and on the cloud. <br />
 
@@ -54,7 +54,7 @@ Note: Build instructions only provided for the latest release.
 
 #### Linux
 *Preqrequisites*:<br/>
-.NET 5 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
+.NET 5 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK.
 
 For example, instructions for *Ubuntu 18.04* are available [here](https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu#1804-) and below for convenience:
 
@@ -81,7 +81,7 @@ VS 2019
 3. Run tests using `dotnet test` on bash or Powershell
 4. [Publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish#synopsis) the `deploy-cromwell-on-azure` project [as a self-contained deployment with your target runtime identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/deploying/#self-contained-deployments-scd) to produce the executable
 
-Example<br/> 
+Example<br/>
 Linux: `dotnet publish -r linux-x64`<br/>
 Windows: `dotnet publish -r win-x64`<br/>
 
@@ -100,15 +100,15 @@ Learn more about `dotnet` commands [here](https://docs.microsoft.com/en-us/dotne
       1. This string will be used to prefix the name of your Cromwell on Azure resource group and associated resources. If not specified, the default value of "coa" followed by random characters is used as a prefix for the resource group and all Azure resources created for your Cromwell on Azure instance. After installation, you can search for your resources using the `MainIdentifierPrefix` value.<br/>
    1. `ResourceGroupName` (*optional*, **required** when you only have owner-level access of the *resource group*)
       1. Specifies the name of a pre-existing resource group that you wish to deploy into.
-      
+
 Run the following at the command line or terminal after navigating to where your executable is saved:
 ```
-.\deploy-cromwell-on-azure.exe --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> 
+.\deploy-cromwell-on-azure.exe --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string>
 ```
 
 **Example:**
 ```
-.\deploy-cromwell-on-azure.exe --SubscriptionId 00000000-0000-0000-0000-000000000000 --RegionName westus2 --MainIdentifierPrefix coa 
+.\deploy-cromwell-on-azure.exe --SubscriptionId 00000000-0000-0000-0000-000000000000 --RegionName westus2 --MainIdentifierPrefix coa
 ```
 
 A [test workflow](#Hello-World-WDL-test) is run to ensure successful deployment. If your [Batch account does not have enough resource quotas](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas), you will see the error while deploying. You can request more quotas by following [these instructions](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#increase-a-quota).
@@ -137,7 +137,7 @@ You can [follow these steps](/docs/troubleshooting-guide.md/#Use-input-data-file
 
 Cromwell on Azure uses [managed identities](https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview) to allow the host VM to connect to Azure resources in a simple and secure manner.  
 
-At the time of installation, a managed identity is created and associated with the host VM. 
+At the time of installation, a managed identity is created and associated with the host VM.
 
 **Cromwell on Azure version 2.x**
 
@@ -167,7 +167,7 @@ For these changes to take effect, be sure to restart your Cromwell on Azure VM t
 
 ### Hello World WDL test
 
-As part of the Cromwell on Azure deployment, a "Hello World" workflow is automatically run as a check. The input files for this workflow are found in the `inputs` container, and the output files can be found in the `cromwell-executions` container of your default storage account. 
+As part of the Cromwell on Azure deployment, a "Hello World" workflow is automatically run as a check. The input files for this workflow are found in the `inputs` container, and the output files can be found in the `cromwell-executions` container of your default storage account.
 Once it runs to completion you can find the trigger JSON file that started the workflow in the `workflows` container in the `succeeded` directory, if it ran successfully.<br/>
 
 Hello World WDL file:
@@ -225,6 +225,8 @@ Run Broad Institute of MIT and Harvard's Best Practices Pipelines on Cromwell on
 [Variant-filtering with Convolutional Neural Networks](https://github.com/microsoft/gatk4-cnn-variant-filter-azure)<br/>
 
 [Sequence data format conversion](https://github.com/microsoft/seq-format-conversion-azure)<br/>
+
+[Illumina DRAGEN](https://github.com/microsoft/illumina-dragen-coa)<br/>
 
 ## Related Projects
 
