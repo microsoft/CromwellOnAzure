@@ -116,10 +116,10 @@ namespace TesApi.Web
         /// <summary>
         /// Combines the VM feature and price info with Batch quotas and produces the fixed-width list ready for uploading to .
         /// </summary>
-        /// <param name="vmInfos">List of <see cref="VirtualMachineInfo"/></param>
+        /// <param name="vmInfos">List of <see cref="VirtualMachineInformation"/></param>
         /// <param name="batchAccountQuotas">Batch quotas <see cref="AzureBatchAccountQuotas"/></param>
         /// <returns></returns>
-        private static string VirtualMachineInfoToFixedWidthColumns(IEnumerable<VirtualMachineInfo> vmInfos, AzureBatchAccountQuotas batchAccountQuotas)
+        private static string VirtualMachineInfoToFixedWidthColumns(IEnumerable<VirtualMachineInformation> vmInfos, AzureBatchAccountQuotas batchAccountQuotas)
         {
             var vmSizes = vmInfos.Where(v => !v.LowPriority).Select(v => v.VmSize);
 

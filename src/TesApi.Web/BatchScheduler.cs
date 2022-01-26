@@ -297,15 +297,16 @@ namespace TesApi.Web
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var dockerImage = tesTask.Executors.First().Image;
 
-                PoolInformation poolInformation = null;
+                Microsoft.Azure.Batch.PoolInformation poolInformation = null;
 
                 if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
                 {
                     // Only create manual pool if an identity was specified
                     
                     // By default, the pool will have the same name/ID as the job
-                    string poolName = jobId;
-                    string identityResourceId = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
+                    var poolName = jobId;
+                    var identityResourceId = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
+                    var isVmSizeXilinxFpga = xilinxFpgaVmSizePrefixes?.Any(prefix => virtualMachineInfo.VmSize.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) == true;
                     string startTaskSasUrl = null;
 
                     //if (useStartTask)
@@ -330,7 +331,7 @@ namespace TesApi.Web
                         startTaskPath: batchStartTaskLocalPathOnBatchNode
                     );
                         
-                    poolInformation = new PoolInformation { PoolId = poolName };
+                    poolInformation = new Microsoft.Azure.Batch.PoolInformation { PoolId = poolName };
                 }
                 else
                 {
@@ -367,7 +368,7 @@ namespace TesApi.Web
                 tesTask.SetFailureReason(exc);
                 logger.LogError(exc, exc.Message);
             }
-            catch (BatchClientException exc)
+            catch (Microsoft.Azure.Batch.BatchClientException exc)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
                 tesTask.SetFailureReason("BatchClientException", string.Join(",", exc.Data.Values), exc.Message, exc.StackTrace);
@@ -554,7 +555,7 @@ namespace TesApi.Web
         /// Returns job preparation and main Batch tasks that represents the given <see cref="TesTask"/>
         /// </summary>
         /// <param name="task">The <see cref="TesTask"/></param>
-        /// <param name="poolHasContainerConfig">Indicates that <see cref="TaskContainerSettings"/> must be set.</param>
+        /// <param name="poolHasContainerConfig">Indicates that <see cref="CloudTask.ContainerSettings"/> must be set.</param>
         /// <returns>Job preparation and main Batch tasks</returns>
         private async Task<CloudTask> ConvertTesTaskToBatchTaskAsync(TesTask task, bool poolHasContainerConfig)
         {
@@ -698,9 +699,9 @@ namespace TesApi.Web
 
                 foreach (var drsInputFile in drsInputFiles)
                 {
-                    string drsUrl = drsInputFile.Url;
-                    string localizedFilePath = drsInputFile.Path;
-                    string drsLocalizationCommand = $"docker run --rm {volumeMountsOption} -e MARTHA_URL=\"{marthaUrl}\" {cromwellDrsLocalizerImageName} {drsUrl} {localizedFilePath} --access-token-strategy azure{(!string.IsNullOrWhiteSpace(marthaKeyVaultName) ? " --vault-name " + marthaKeyVaultName : "")}{(!string.IsNullOrWhiteSpace(marthaSecretName) ? " --secret-name " + marthaSecretName : "")} && \\";
+                    var drsUrl = drsInputFile.Url;
+                    var localizedFilePath = drsInputFile.Path;
+                    var drsLocalizationCommand = $"docker run --rm {volumeMountsOption} -e MARTHA_URL=\"{marthaUrl}\" {cromwellDrsLocalizerImageName} {drsUrl} {localizedFilePath} --access-token-strategy azure{(!string.IsNullOrWhiteSpace(marthaKeyVaultName) ? " --vault-name " + marthaKeyVaultName : "")}{(!string.IsNullOrWhiteSpace(marthaSecretName) ? " --secret-name " + marthaSecretName : "")} && \\";
                     sb.AppendLine(drsLocalizationCommand);
                 }
 
@@ -727,15 +728,15 @@ namespace TesApi.Web
             var batchScriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(batchScriptPath);
             var batchExecutionDirectorySasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"{batchExecutionDirectoryPath}", getContainerSas: true);
 
-            var cloudTask = new CloudTask(taskId, $"/bin/sh /mnt{batchScriptPath}")
+            var cloudTask = new Microsoft.Azure.Batch.CloudTask(taskId, $"/bin/sh /mnt{batchScriptPath}")
             {
-                UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-                ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(batchScriptSasUrl, $"/mnt{batchScriptPath}"), ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptSasUrl, $"/mnt{uploadFilesScriptPath}") },
-                OutputFiles = new List<OutputFile> {
-                    new OutputFile(
+                UserIdentity = new Microsoft.Azure.Batch.UserIdentity(new Microsoft.Azure.Batch.AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                ResourceFiles = new List<Microsoft.Azure.Batch.ResourceFile> { Microsoft.Azure.Batch.ResourceFile.FromUrl(batchScriptSasUrl, $"/mnt{batchScriptPath}"), Microsoft.Azure.Batch.ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), Microsoft.Azure.Batch.ResourceFile.FromUrl(uploadFilesScriptSasUrl, $"/mnt{uploadFilesScriptPath}") },
+                OutputFiles = new List<Microsoft.Azure.Batch.OutputFile> {
+                    new Microsoft.Azure.Batch.OutputFile(
                         "../std*.txt",
-                        new OutputFileDestination(new OutputFileBlobContainerDestination(batchExecutionDirectorySasUrl)),
-                        new OutputFileUploadOptions(OutputFileUploadCondition.TaskFailure))
+                        new Microsoft.Azure.Batch.OutputFileDestination(new Microsoft.Azure.Batch.OutputFileBlobContainerDestination(batchExecutionDirectorySasUrl)),
+                        new Microsoft.Azure.Batch.OutputFileUploadOptions(OutputFileUploadCondition.TaskFailure))
                 }
             };
 
@@ -746,7 +747,7 @@ namespace TesApi.Web
                 // If the executor image is public, there is no need for pool ContainerConfiguration and task can run normally, without being wrapped in a docker container.
                 // Volume mapping for docker.sock below allows the docker client in the container to access host's docker daemon.
                 var containerRunOptions = $"--rm -v /var/run/docker.sock:/var/run/docker.sock -v /mnt:/mnt ";
-                cloudTask.ContainerSettings = new TaskContainerSettings(dockerInDockerImageName, containerRunOptions);
+                cloudTask.ContainerSettings = new Microsoft.Azure.Batch.TaskContainerSettings(dockerInDockerImageName, containerRunOptions);
             }
 
             return cloudTask;
@@ -823,10 +824,10 @@ namespace TesApi.Web
         /// <param name="useAutoPool">True if an Azure Batch AutoPool should be used</param>
         /// <param name="batchExecutionDirectoryPath">Relative path to the Batch execution location</param>
         /// <returns></returns>
-        private async Task<PoolInformation> CreateAutoPoolPoolInformation(string executorImage, string vmSize, bool preemptible, bool useAutoPool = true, string batchExecutionDirectoryPath = null)
+        private async Task<Microsoft.Azure.Batch.PoolInformation> CreateAutoPoolPoolInformation(string executorImage, string vmSize, bool preemptible, bool useAutoPool = true, string batchExecutionDirectoryPath = null)
         {
-            var vmConfig = new VirtualMachineConfiguration(
-                imageReference: new ImageReference(
+            var vmConfig = new Microsoft.Azure.Batch.VirtualMachineConfiguration(
+                imageReference: new Microsoft.Azure.Batch.ImageReference(
                     batchNodeInfo.BatchImageOffer,
                     batchNodeInfo.BatchImagePublisher,
                     batchNodeInfo.BatchImageSku,
@@ -854,24 +855,24 @@ namespace TesApi.Web
 
             if (containerRegistryInfo is not null)
             {
-                var containerRegistry = new ContainerRegistry(
+                var containerRegistry = new Microsoft.Azure.Batch.ContainerRegistry(
                     userName: containerRegistryInfo.Username,
                     registryServer: containerRegistryInfo.RegistryServer,
                     password: containerRegistryInfo.Password);
 
                 // Download private images at node startup, since those cannot be downloaded in the main task that runs multiple containers.
                 // Doing this also requires that the main task runs inside a container, hence downloading the "docker" image (contains docker client) as well.
-                vmConfig.ContainerConfiguration = new ContainerConfiguration
+                vmConfig.ContainerConfiguration = new Microsoft.Azure.Batch.ContainerConfiguration
                 {
                     ContainerImageNames = new List<string> { executorImage, dockerInDockerImageName, blobxferImageName },
-                    ContainerRegistries = new List<ContainerRegistry> { containerRegistry }
+                    ContainerRegistries = new List<Microsoft.Azure.Batch.ContainerRegistry> { containerRegistry }
                 };
 
                 var containerRegistryInfoForDockerInDocker = await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName);
 
                 if (containerRegistryInfoForDockerInDocker is not null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
                 {
-                    var containerRegistryForDockerInDocker = new ContainerRegistry(
+                    var containerRegistryForDockerInDocker = new Microsoft.Azure.Batch.ContainerRegistry(
                         userName: containerRegistryInfoForDockerInDocker.Username,
                         registryServer: containerRegistryInfoForDockerInDocker.RegistryServer,
                         password: containerRegistryInfoForDockerInDocker.Password);
@@ -883,7 +884,7 @@ namespace TesApi.Web
 
                 if (containerRegistryInfoForBlobXfer is not null && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfo.RegistryServer && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfoForDockerInDocker.RegistryServer)
                 {
-                    var containerRegistryForBlobXfer = new ContainerRegistry(
+                    var containerRegistryForBlobXfer = new Microsoft.Azure.Batch.ContainerRegistry(
                         userName: containerRegistryInfoForBlobXfer.Username,
                         registryServer: containerRegistryInfoForBlobXfer.RegistryServer,
                         password: containerRegistryInfoForBlobXfer.Password);
@@ -892,7 +893,7 @@ namespace TesApi.Web
                 }
             }
 
-            var poolSpecification = new PoolSpecification
+            var poolSpecification = new Microsoft.Azure.Batch.PoolSpecification
             {
                 VirtualMachineConfiguration = vmConfig,
                 VirtualMachineSize = vmSize,
@@ -914,16 +915,16 @@ namespace TesApi.Web
 
             if (!string.IsNullOrEmpty(this.batchNodesSubnetId))
             {
-                poolSpecification.NetworkConfiguration = new NetworkConfiguration
+                poolSpecification.NetworkConfiguration = new Microsoft.Azure.Batch.NetworkConfiguration
                 {
-                    PublicIPAddressConfiguration = new PublicIPAddressConfiguration(this.disableBatchNodesPublicIpAddress ? IPAddressProvisioningType.NoPublicIPAddresses : IPAddressProvisioningType.BatchManaged),
+                    PublicIPAddressConfiguration = new Microsoft.Azure.Batch.PublicIPAddressConfiguration(this.disableBatchNodesPublicIpAddress ? IPAddressProvisioningType.NoPublicIPAddresses : IPAddressProvisioningType.BatchManaged),
                     SubnetId = this.batchNodesSubnetId
                 };
             }
 
-            var poolInformation = new PoolInformation
+            var poolInformation = new Microsoft.Azure.Batch.PoolInformation
             {
-                AutoPoolSpecification = new AutoPoolSpecification
+                AutoPoolSpecification = new Microsoft.Azure.Batch.AutoPoolSpecification
                 {
                     AutoPoolIdPrefix = "TES",
                     PoolLifetimeOption = PoolLifetimeOption.Job,
@@ -962,7 +963,7 @@ namespace TesApi.Web
         /// Check quotas for available active jobs, pool and CPU cores.
         /// </summary>
         /// <param name="vmInfo">Dedicated virtual machine information.</param>
-        private async Task CheckBatchAccountQuotas(Tes.Models.VirtualMachineInfo vmInfo)
+        private async Task CheckBatchAccountQuotas(Tes.Models.VirtualMachineInformation vmInfo)
         {
             var workflowCoresRequirement = vmInfo.NumberOfCores.Value;
             var preemptible = vmInfo.LowPriority;
@@ -1025,7 +1026,7 @@ namespace TesApi.Web
         /// <param name="tesTask"><see cref="TesTask"/></param>
         /// <param name="forcePreemptibleVmsOnly">Force consideration of preemptible virtual machines only.</param>
         /// <returns>The virtual machine info</returns>
-        public async Task<Tes.Models.VirtualMachineInfo> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
+        public async Task<Tes.Models.VirtualMachineInformation> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
         {
             var tesResources = tesTask.Resources;
 
@@ -1038,10 +1039,10 @@ namespace TesApi.Web
             var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
             var preemptible = forcePreemptibleVmsOnly || usePreemptibleVmsOnly || tesResources.Preemptible.GetValueOrDefault(true);
 
-            var eligibleVms = new List<Tes.Models.VirtualMachineInfo>();
-            string noVmFoundMessage = string.Empty;
+            var eligibleVms = new List<Tes.Models.VirtualMachineInformation>();
+            var noVmFoundMessage = string.Empty;
 
-            string vmSize = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size);
+            var vmSize = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size);
 
             if (!string.IsNullOrWhiteSpace(vmSize))
             {

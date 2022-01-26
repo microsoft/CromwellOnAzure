@@ -810,12 +810,14 @@ namespace CromwellOnAzureDeployer
             => await UploadFilesToVirtualMachineAsync(
                 sshConnectionInfo,
                 new[] {
-                    (Utility.GetFileContent("scripts", "env-01-account-names.txt")
-                        .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
-                        .Replace("{CosmosDbAccountName}", configuration.CosmosDbAccountName)
-                        .Replace("{BatchAccountName}", configuration.BatchAccountName)
-                        .Replace("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName)
-                        .Replace("{ManagedIdentityClientId}", managedIdentity.ClientId),
+                    (Utility.PersonalizeContent(new []
+                    {
+                        new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
+                        new Utility.ConfigReplaceTextItem("{CosmosDbAccountName}", configuration.CosmosDbAccountName),
+                        new Utility.ConfigReplaceTextItem("{BatchAccountName}", configuration.BatchAccountName),
+                        new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
+                        new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
+                    }, "scripts", "env-01-account-names.txt"),
                     $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
                     (Utility.GetFileContent("scripts", "env-04-settings.txt"),
@@ -1063,18 +1065,26 @@ namespace CromwellOnAzureDeployer
                 });
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
-            => Execute(
+        {
+            var cromwellConfiguration = Utility.GetFileContent("scripts", CromwellConfigurationFileName);
+            if (!string.IsNullOrWhiteSpace(configuration.PrivateContainerRegistry) && !cromwellConfiguration.Contains("method = \"local\""))
+            {
+                cromwellConfiguration = Utility.PersonalizeContent(new[] { new Utility.ConfigReplaceTextItem("\nengine {\n", "\ndocker {\n  hash-lookup {\n    method = \"local\"\n  }\n}\n\nengine {\n") }, cromwellConfiguration);
+            }
+
+            return Execute(
                 $"Writing {ContainersToMountFileName} and {CromwellConfigurationFileName} files to '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var containersToMountFileContent = Utility.GetFileContent("scripts", ContainersToMountFileName)
-                        .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
-                        .Replace("{ManagedIdentityName}", managedIdentityName);
-
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountFileContent);
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.GetFileContent("scripts", CromwellConfigurationFileName));
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, Utility.PersonalizeContent(new[]
+                    {
+                        new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
+                        new Utility.ConfigReplaceTextItem("{ManagedIdentityName}", managedIdentityName)
+                    }, "scripts", ContainersToMountFileName));
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfiguration);
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
+        }
 
         private Task AssignVmAsContributorToBatchAccountAsync(IIdentity managedIdentity, BatchAccount batchAccount)
             => Task.WhenAll(
@@ -1346,11 +1356,14 @@ namespace CromwellOnAzureDeployer
                 {
                     var userManagedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
 
-                    var existingVmRoles =
-                        (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync(
+                    (await azureSubscriptionClient.AccessManagement.ServicePrincipals.GetByIdAsync((await azureSubscriptionClient.Identities.ListAsync(true)).FirstOrDefault(i => linuxVm.SystemAssignedManagedServiceIdentityPrincipalId.Equals(i.PrincipalId)).Id))
+                        .RoleAssignments
+                    
+
+                    var existingVmRoles = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync(
                             $"/subscriptions/{configuration.SubscriptionId}",
-                            new ODataQuery<RoleAssignmentFilter>($"assignedTo('{linuxVm.SystemAssignedManagedServiceIdentityPrincipalId}')")))
-                        .Body
+                            new ODataQuery<RoleAssignmentFilter>($"assignedTo('{linuxVm.SystemAssignedManagedServiceIdentityPrincipalId}')"))).Body
+                        .AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
                         .ToList();
 
                     foreach (var role in existingVmRoles)
@@ -1388,24 +1401,13 @@ namespace CromwellOnAzureDeployer
                 $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName);
-
-                    if (cromwellConfigText is null)
-                    {
-                        cromwellConfigText = Utility.GetFileContent("scripts", CromwellConfigurationFileName);
-                    }
-                    else
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
                         // Replace "enabled = true" with "enabled = false" in call-caching element
+                        (Utility.ConfigReplaceTextItemBase)new Utility.ConfigReplaceRegExItemText(@"^(\s*call-caching\s*{[^}]*enabled\s*[=:]{1}\s*)(true)$", "$1false", RegexOptions.Multiline),
                         // Add "preemptible: true" to default-runtime-attributes element, if preemptible is not already present
-                        var callCachingRegex = new Regex(@"^(\s*call-caching\s*{[^}]*enabled\s*[=:]{1}\s*)(true)$", RegexOptions.Multiline);
-                        var preemptibleRegex = new Regex(@"(?![\s\S]*preemptible)^(\s*default-runtime-attributes\s*{)([^}]*$)(\s*})$", RegexOptions.Multiline);
-
-                        cromwellConfigText = callCachingRegex.Replace(cromwellConfigText, "$1false");
-                        cromwellConfigText = preemptibleRegex.Replace(cromwellConfigText, match => $"{match.Groups[1].Value}{match.Groups[2].Value}\n          preemptible: true{match.Groups[3].Value}");
-                    }
-
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
+                        new Utility.ConfigReplaceRegExItemEvaluator(@"(?![\s\S]*preemptible)^(\s*default-runtime-attributes\s*{)([^}]*$)(\s*})$", match => $"{match.Groups[1].Value}{match.Groups[2].Value}\n          preemptible: true{match.Groups[3].Value}", RegexOptions.Multiline),
+                    }, (await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName)) ?? Utility.GetFileContent("scripts", CromwellConfigurationFileName)));
                 });
 
         private Task PatchContainersToMountFileV210Async(IStorageAccount storageAccount, string managedIdentityName)
@@ -1610,7 +1612,7 @@ namespace CromwellOnAzureDeployer
             var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
 
             var currentPrincipalSubscriptionRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
-                .Body
+                .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
                 .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
             var isuserAccessAdministrator = currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId);
@@ -1623,7 +1625,7 @@ namespace CromwellOnAzureDeployer
                 }
 
                 var currentPrincipalRgRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}/resourceGroups/{configuration.ResourceGroupName}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
-                    .Body
+                    .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
                     .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
                 if (!currentPrincipalRgRoleIds.Contains(ownerRoleId))

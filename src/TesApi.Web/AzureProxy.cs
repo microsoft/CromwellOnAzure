@@ -495,7 +495,7 @@ namespace TesApi.Web
                     SelectClause = "id"
                 };
 
-                var poolsToDelete = await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync();
+                var poolsToDelete = await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync(cancellationToken);
 
                 foreach (var pool in poolsToDelete)
                 {
@@ -646,8 +646,8 @@ namespace TesApi.Web
         /// <summary>
         /// Get/sets cached value for the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>.
         /// </summary>
-        /// <returns><see cref="Tes.Models.VirtualMachineInfo"/> for available VMs in a region.</returns>
-        public async Task<List<Tes.Models.VirtualMachineInfo>> GetVmSizesAndPricesAsync()
+        /// <returns><see cref="VirtualMachineInformation"/> for available VMs in a region.</returns>
+        public async Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync()
             => (await GetVmSizesAndPricesRawAsync()).ToList();
 
         /// <summary>
@@ -733,8 +733,8 @@ namespace TesApi.Web
         /// <summary>
         /// Get the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>.
         /// </summary>
-        /// <returns><see cref="Tes.Models.VirtualMachineInfo"/> for available VMs in a region.</returns>
-        private async Task<IEnumerable<Tes.Models.VirtualMachineInfo>> GetVmSizesAndPricesRawAsync()
+        /// <returns><see cref="VirtualMachineInformation"/> for available VMs in a region.</returns>
+        private async Task<IEnumerable<VirtualMachineInformation>> GetVmSizesAndPricesRawAsync()
         {
             static double ConvertMiBToGiB(int value) => Math.Round(value / 1024.0, 2);
 
@@ -756,7 +756,7 @@ namespace TesApi.Web
                 vmPrices = JsonConvert.DeserializeObject<IEnumerable<VmPrice>>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "DefaultVmPrices.json")));
             }
 
-            var vmInfos = new List<Tes.Models.VirtualMachineInfo>();
+            var vmInfos = new List<Tes.Models.VirtualMachineInformation>();
 
             foreach (var (VmSize, FamilyName, _, _) in supportedVmSizes)
             {
@@ -765,7 +765,7 @@ namespace TesApi.Web
 
                 if (vmSpecification is not null && vmPrice is not null)
                 {
-                    vmInfos.Add(new Tes.Models.VirtualMachineInfo
+                    vmInfos.Add(new Tes.Models.VirtualMachineInformation
                     {
                         VmSize = VmSize,
                         MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
@@ -779,7 +779,7 @@ namespace TesApi.Web
 
                     if(vmPrice.LowPriorityAvailable)
                     {
-                        vmInfos.Add(new Tes.Models.VirtualMachineInfo
+                        vmInfos.Add(new Tes.Models.VirtualMachineInformation
                         {
                             VmSize = VmSize,
                             MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),

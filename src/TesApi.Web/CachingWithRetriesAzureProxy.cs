@@ -120,7 +120,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public Task<List<Tes.Models.VirtualMachineInfo>> GetVmSizesAndPricesAsync()
+        public Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync()
             => cache.GetOrAddAsync("vmSizesAndPrices", () => azureProxy.GetVmSizesAndPricesAsync(), DateTimeOffset.MaxValue);
 
         /// <inheritdoc/>

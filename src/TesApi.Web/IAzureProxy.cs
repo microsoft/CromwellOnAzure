@@ -110,8 +110,8 @@ namespace TesApi.Web
         /// <summary>
         /// Gets the price and resource summary of all available VMs in a region
         /// </summary>
-        /// <returns><see cref="Tes.Models.VirtualMachineInfo"/> for available VMs in a region.</returns>
-        Task<List<Tes.Models.VirtualMachineInfo>> GetVmSizesAndPricesAsync();
+        /// <returns><see cref="Tes.Models.VirtualMachineInformation"/> for available VMs in a region.</returns>
+        Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync();
 
         /// <summary>
         /// Gets the primary key of the given storage account.
