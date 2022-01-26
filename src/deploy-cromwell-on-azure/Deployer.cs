@@ -183,7 +183,7 @@ namespace CromwellOnAzureDeployer
 
                         await WaitForSshConnectivityAsync(sshConnectionInfo);
 
-                        await ConfigureVmAsync(sshConnectionInfo, resourceGroup, managedIdentity);
+                        await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
 
                         var accountNames = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
 
@@ -429,7 +429,7 @@ namespace CromwellOnAzureDeployer
 
                                         sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
                                         await WaitForSshConnectivityAsync(sshConnectionInfo);
-                                        await ConfigureVmAsync(sshConnectionInfo, resourceGroup, managedIdentity);
+                                        await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
                                     },
                                     TaskContinuationOptions.OnlyOnRanToCompletion)
                                 .Unwrap())
@@ -719,7 +719,7 @@ namespace CromwellOnAzureDeployer
             return notRegisteredResourceProviders;
         }
 
-        private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo, IResourceGroup resourceGroup, IIdentity managedIdentity)
+        private async Task ConfigureVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
         {
             // If the user was added or password reset via Azure portal, assure that the user will not be prompted
             // for password on each command and make bash the default shell.
