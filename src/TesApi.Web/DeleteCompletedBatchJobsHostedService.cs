@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -58,7 +58,11 @@ namespace TesApi.Web
             return base.StopAsync(cancellationToken);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// The job clean up service that checks for old jobs on the Batch account that are safe to delete
+        /// </summary>
+        /// <param name="cancellationToken">Triggered when Microsoft.Extensions.Hosting.IHostedService.StopAsync(System.Threading.CancellationToken) is called.</param>
+        /// <returns>A System.Threading.Tasks.Task that represents the long running operations.</returns>
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             var runInterval = TimeSpan.FromDays(1);

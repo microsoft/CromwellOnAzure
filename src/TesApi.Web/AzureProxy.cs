@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -63,7 +63,7 @@ namespace TesApi.Web
             this.logger = logger;
             this.batchAccountName = batchAccountName;
             var (SubscriptionId, ResourceGroupName, Location, BatchAccountEndpoint) = FindBatchAccountAsync(batchAccountName).Result;
-			batchResourceGroupName = ResourceGroupName;
+            batchResourceGroupName = ResourceGroupName;
             subscriptionId = SubscriptionId;
             location = Location;
             batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{BatchAccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
