@@ -73,6 +73,7 @@ namespace Tes.Models
                     TesResourcesSupportedBackendParameters?.Count > 0,
                     s => s.Append(string.Join(",", Enum.GetNames(typeof(TesResources.SupportedBackendParameters)))),
                     s => s)
+                .Append('\n')
                 .Append("}\n")
                 .ToString();
 
