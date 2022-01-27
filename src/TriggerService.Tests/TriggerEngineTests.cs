@@ -65,15 +65,29 @@ namespace TriggerService.Tests
 
             var lines = loggerFactory.TestLogger.LogLines;
             var availableLines = lines.Where(line => line.Contains("is available", StringComparison.OrdinalIgnoreCase)).ToList();
+            var calledLines = lines.Where(IsCalledLine).ToList();
+            var interestedLines = lines.Where((line) => calledLines.Contains(line) || availableLines.Contains(line)).ToList();
 
+            Console.WriteLine($"interestedLines.Count: {interestedLines.Count}");
             Console.WriteLine($"availableLines.Count: {availableLines.Count}");
 
-            foreach (var line in availableLines)
+            foreach (var line in interestedLines)
             {
                 Console.WriteLine(line);
             }
 
+            //foreach (var line in availableLines)
+            //{
+            //    Console.WriteLine(line);
+            //}
+
             Assert.IsTrue(availableLines.Count == 4);
+
+            static bool IsCalledLine(string line)
+                => line.Contains(" ProcessAndAbortWorkflowsAsync ", StringComparison.OrdinalIgnoreCase)
+                || line.Contains(" UpdateExistingWorkflowsAsync ", StringComparison.OrdinalIgnoreCase)
+                || line.Contains(" IsAzureStorageAvailableAsync ", StringComparison.OrdinalIgnoreCase)
+                || line.Contains(" IsCromwellAvailableAsync ", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -96,6 +110,7 @@ namespace TriggerService.Tests
 
         public sealed class TestLogger : ILogger, IDisposable
         {
+            private readonly object _lock = new();
             public List<string> LogLines { get; set; } = new List<string>();
             public IDisposable BeginScope<TState>(TState state)
                 => null;
@@ -111,7 +126,10 @@ namespace TriggerService.Tests
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
             {
                 var now = DateTime.UtcNow;
-                LogLines.Add($"{now.Second}:{now.Millisecond} {logLevel} {eventId} {state?.ToString()} {exception?.ToString()}");
+                lock (_lock)
+                {
+                    LogLines.Add($"{now.Second}:{now.Millisecond} {logLevel} {eventId} {state?.ToString()} {exception?.ToString()}");
+                }
             }
         }
     }
