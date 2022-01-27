@@ -2,7 +2,7 @@
   "profiles": {
     "Setup": {
       "commandName": "Project",
-      "remoteDebugEnabled": false
+      "commandLineArgs": "--subscriptionid aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee --regionname westus2 --mainidentifierprefix coatest"
     }
   }
 }
