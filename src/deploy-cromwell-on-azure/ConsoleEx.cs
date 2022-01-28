@@ -17,7 +17,6 @@ namespace CromwellOnAzureDeployer
         private static object lockObj = default;
         private static Size offset = default;
         private static Point lastCursor = default;
-        private static readonly LinkedList<Line> lines = new();
         private static bool isRedirected = false;
 
         public static void Init()
@@ -112,7 +111,7 @@ namespace CromwellOnAzureDeployer
 
             public Line(string value, ConsoleColor? color, bool terminateLine)
             {
-                value = value.Normalize();
+                value = value?.Normalize();
                 if (!ShouldProcess(value, terminateLine))
                 {
                     this.contents += value;
@@ -121,13 +120,12 @@ namespace CromwellOnAzureDeployer
 
                 this.terminateLine = terminateLine;
                 Write(value, color);
-                ConsoleEx.lines.AddLast(this);
             }
 
             public void Write(string value = null, ConsoleColor? color = null)
             {
-                value = value.Normalize();
-                this.contents += value;
+                value = value?.Normalize();
+                this.contents += value ?? string.Empty;
                 if (!ShouldProcess(this.contents, false))
                 {
                     return;
@@ -161,7 +159,7 @@ namespace CromwellOnAzureDeployer
                         var wrapCol = pos.X;
 
                         // calculate position of new AppendPoint
-                        var shape = value.Split(Console.Out.NewLine).SelectMany(WrapString).ToList();
+                        var shape = (value?.Split(Console.Out.NewLine).SelectMany(WrapString) ?? Enumerable.Empty<string>()).ToList();
                         pos = new Point((shape.Count > 1 ? 0 : pos.X) + shape.LastOrDefault()?.Length ?? 0, shape.Count - 1 + pos.Y);
 
                         // Send output
