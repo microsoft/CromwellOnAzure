@@ -76,7 +76,7 @@ namespace CromwellOnAzureDeployer
             return new Point(left, top) + offset;
         }
 
-        private static bool ShouldProcess(string value, bool terminateLine)
+        private static bool ShouldProcess(string value, bool _1)
         {
             Init();
 
@@ -84,14 +84,7 @@ namespace CromwellOnAzureDeployer
             {
                 lock (lockObj)
                 {
-                    if (terminateLine)
-                    {
-                        Console.WriteLine(value);
-                    }
-                    else
-                    {
-                        Console.Write(value);
-                    }
+                    Console.WriteLine(value);
                 }
                 return false;
             }
