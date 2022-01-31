@@ -5,10 +5,13 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
-using static PInvoke.Kernel32;
+using System.Threading.Tasks;
 
 namespace CromwellOnAzureDeployer
 {
@@ -16,9 +19,11 @@ namespace CromwellOnAzureDeployer
     {
         private static object lockObj = default;
         private static Size offset = default;
-        private static Point lastCursor = default;
         private static bool isRedirected = false;
+        private static Writer writer = default;
 
+        // This method is reentrant and can safely be called multiple times
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Init()
         {
             if (Interlocked.CompareExchange(ref lockObj, new(), null) is not null)
@@ -34,57 +39,60 @@ namespace CromwellOnAzureDeployer
                     return;
                 }
 
-                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
-                {
-                    if (!GetConsoleMode(GetStdHandle(StdHandle.STD_OUTPUT_HANDLE), out var bufferMode))
-                    {
-                        Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
-                    }
-                    if (!SetConsoleMode(GetStdHandle(StdHandle.STD_OUTPUT_HANDLE), bufferMode | ConsoleBufferModes.ENABLE_VIRTUAL_TERMINAL_PROCESSING))
-                    {
-                        Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
-                    }
-                }
+                writer = new Writer(Console.Out);
+                Console.SetOut(writer);
 
-                lastCursor = GetOffsetCursorPosition();
+                // Possible extension point: use version of Writer that colorizes StdError
+                if (!Console.IsErrorRedirected)
+                {
+                    // Since the output is going to the same place ($CONOUT or its equivalent) we can just use the same writer
+                    Console.SetError(writer);
+                }
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Line WriteLine(string value = null, ConsoleColor? color = null)
             => new(value, color, true);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Line Write(string value = null, ConsoleColor? color = null)
             => new(value, color, false);
 
         public static string ReadLine()
         {
-            Init();
             var result = Console.ReadLine();
-            lock (lockObj)
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                if (Console.CursorTop == Console.BufferHeight - 1)
+                Init();
+                lock (lockObj)
                 {
-                    offset += new Size(0, 1);
+                    if (Console.CursorTop == Console.BufferHeight - 1)
+                    {
+                        offset += new Size(0, 1);
+                    }
                 }
             }
             return result;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Point GetOffsetCursorPosition()
-        {
-            var (left, top) = Console.GetCursorPosition();
-            return new Point(left, top) + offset;
-        }
+            => GetPoint(Console.GetCursorPosition()) + offset;
 
-        private static bool ShouldProcess(string value, bool _1)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Point GetPoint((int Left, int Top) position)
+            => new(position.Left, position.Top);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool ShouldProcess(string text)
         {
             Init();
-
             if (isRedirected)
             {
                 lock (lockObj)
                 {
-                    Console.WriteLine(value);
+                    writer.SystemWriter.WriteLine(text);
                 }
                 return false;
             }
@@ -94,32 +102,86 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        // Returns the expected end point of the rendered text if the rendering starts @ startPoint, given the terminals current WindowWidth
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Point GetEndPoint(string text, Point startPoint)
+        {
+            var shape = GetShape(text, startPoint.X);
+            return new(shape.Width, shape.Height - 1 + startPoint.Y);
+        }
+
+        // Returns the expected shape of the rendered text relative to the starting row (Width == left-most column, not width)
+        private static Size GetShape(string text, int firstLineColumn)
+        {
+            var windowWidth = Console.WindowWidth;
+            var startCol = firstLineColumn;
+
+            var shape = (text?.Split(Console.Out.NewLine).SelectMany(WrapString) ?? Enumerable.Empty<string>()).ToList();
+            return new((shape.Count > 1 ? 0 : firstLineColumn) + shape.LastOrDefault()?.Length ?? 0, shape.Count);
+
+            IEnumerable<string> WrapString(string value)
+            {
+                //while ()
+
+                for (var s = SplitString(ref value); !string.IsNullOrEmpty(s); s = SplitString(ref value))
+                {
+                    yield return s;
+                }
+            }
+
+            string SplitString(ref string value)
+            {
+                var width = windowWidth - startCol;
+                startCol = 0;
+
+                var s = new string(value.TakeWhile(TakeFunc).ToArray());
+                value = value[s.Length..];
+                return s;
+
+                bool TakeFunc(char c)
+                {
+                    width -= char.GetUnicodeCategory(c) switch
+                    {
+                        UnicodeCategory.Surrogate => char.IsLowSurrogate(c) ? 0 : 1,
+                        UnicodeCategory.NonSpacingMark => 0,
+                        UnicodeCategory.EnclosingMark => 0,
+                        _ => 1,
+                    };
+
+                    return 0 != width;
+                }
+            }
+        }
+
         internal sealed class Line
         {
             private string contents = string.Empty;
-            private bool terminateLine;
 
             internal ConsoleColor? ForegroundColor { get; private set; }
             internal Point? AppendPoint { get; private set; } = null;
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public Line(string value, ConsoleColor? color, bool terminateLine)
             {
                 value = value?.Normalize();
-                if (!ShouldProcess(value, terminateLine))
+                if (!ShouldProcess(value))
                 {
                     this.contents += value;
                     return;
                 }
 
-                this.terminateLine = terminateLine;
-                Write(value, color);
+                WriteImpl(value, color, terminateLine);
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Write(string value = null, ConsoleColor? color = null)
+                => WriteImpl(value, color, false);
+
+            private void WriteImpl(string value, ConsoleColor? color, bool terminateLine)
             {
                 value = value?.Normalize();
                 this.contents += value ?? string.Empty;
-                if (!ShouldProcess(this.contents, false))
+                if (!ShouldProcess(this.contents))
                 {
                     return;
                 }
@@ -136,87 +198,33 @@ namespace CromwellOnAzureDeployer
                         AppendPoint ??= GetOffsetCursorPosition();
                         var pos = AppendPoint.Value;
                         var curPos = pos - offset;
+
                         if (curPos.Y < 0) // This line has now scrolled out of reach
                         {
                             return; // TODO: print new line as if redirection were in place?
                         }
 
-                        if (pos.Y > lastCursor.Y)
-                        {
-                            offset += new Size(pos - new Size(lastCursor));
-                        }
-
-                        Console.SetCursorPosition(curPos.X, curPos.Y);
-
-                        var wrapWidth = Console.WindowWidth;
-                        var wrapCol = pos.X;
-
                         // calculate position of new AppendPoint
-                        var shape = (value?.Split(Console.Out.NewLine).SelectMany(WrapString) ?? Enumerable.Empty<string>()).ToList();
-                        pos = new Point((shape.Count > 1 ? 0 : pos.X) + shape.LastOrDefault()?.Length ?? 0, shape.Count - 1 + pos.Y);
+                        pos = GetEndPoint(value, pos);
 
                         // Send output
+                        Console.SetCursorPosition(curPos.X, curPos.Y);
                         if (color is not null)
                         {
                             Console.ForegroundColor = color.Value;
                         }
+                        writer.SystemWriter.Write(value);
 
-                        Console.Write(value);
-
-                        // Determine if screen/buffer is scrolling
+                        // Adjust state
                         AppendPoint = GetOffsetCursorPosition();
-                        Point finalPos = AppendPoint.Value;
+                        var finalPos = AppendPoint.Value;
                         if (terminateLine)
                         {
-                            Console.WriteLine();
+                            writer.SystemWriter.WriteLine();
                             finalPos = GetOffsetCursorPosition();
                         }
 
-                        var delta = (terminateLine ? new Size(0, pos.Y + 1) : new Size(pos)) - new Size(terminateLine ? 0 : finalPos.X, finalPos.Y);
-                        terminateLine = false;
-                        offset += delta;
-                        if (!restoreCursor)
-                        {
-                            lastCursor = finalPos + delta;
-                        }
-
-                        IEnumerable<string> WrapString(string value)
-                        {
-                            for (var s = GetSubstring(ref value); !string.IsNullOrEmpty(s); s = GetSubstring(ref value))
-                            {
-                                yield return s;
-                            }
-                        }
-
-                        string GetSubstring(ref string value)
-                        {
-                            var size = wrapWidth - wrapCol;
-                            wrapCol = 0;
-
-                            var surrogates = false;
-                            var s = new string(value.TakeWhile(TakeFunc).ToArray());
-                            value = value[s.Length..];
-                            return s;
-
-                            bool TakeFunc(char c, int i)
-                            {
-                                size -= char.GetUnicodeCategory(c) switch
-                                {
-                                    UnicodeCategory.Surrogate => SurrogateCount(),
-                                    UnicodeCategory.NonSpacingMark => 0,
-                                    UnicodeCategory.EnclosingMark => 0,
-                                    _ => 1,
-                                };
-
-                                return 0 != size;
-                            }
-
-                            int SurrogateCount()
-                            {
-                                surrogates = !surrogates;
-                                return surrogates ? 0 : 1;
-                            }
-                        }
+                        offset += (terminateLine ? new Size(0, pos.Y + 1) : new Size(pos)) - new Size(terminateLine ? 0 : finalPos.X, finalPos.Y);
                     }
                     finally
                     {
@@ -228,6 +236,55 @@ namespace CromwellOnAzureDeployer
                     }
                 }
             }
+        }
+
+        // Intercepts Console.Write~() calls to improve synchronization between actual terminal state and our representation of that state
+        // This isn't perfect, there are probably edge cases that will break this
+        private sealed class Writer : TextWriter
+        {
+            internal TextWriter SystemWriter { get; }
+
+            public override Encoding Encoding => SystemWriter.Encoding;
+
+            public override string NewLine { get => SystemWriter.NewLine; set => SystemWriter.NewLine = value; }
+
+            public override IFormatProvider FormatProvider => SystemWriter.FormatProvider;
+
+            public Writer(TextWriter writer)
+                => SystemWriter = writer;
+
+            public override void Write(char value)
+            {
+                Init();
+                lock (lockObj)
+                {
+                    SystemWriter.Write(value);
+                    if (value == '\n' && Console.CursorTop == Console.BufferHeight - 1)
+                    {
+                        offset += new Size(0, 1);
+                    }
+                }
+            }
+
+            public override void Flush()
+                => SystemWriter.Flush();
+
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    SystemWriter.Dispose();
+                }
+
+                base.Dispose(disposing);
+            }
+
+            public override ValueTask DisposeAsync()
+                => new(Task.WhenAll(new Task[]
+                {
+                    SystemWriter.DisposeAsync().AsTask(),
+                    base.DisposeAsync().AsTask()
+                }));
         }
     }
 }
