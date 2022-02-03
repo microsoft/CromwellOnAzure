@@ -92,7 +92,7 @@ namespace CromwellOnAzureDeployer
             {
                 lock (lockObj)
                 {
-                    writer.SystemWriter.WriteLine(text);
+                    Console.Out.WriteLine(text);
                 }
                 return false;
             }
@@ -121,11 +121,9 @@ namespace CromwellOnAzureDeployer
 
             IEnumerable<string> WrapString(string value)
             {
-                //while ()
-
-                for (var s = SplitString(ref value); !string.IsNullOrEmpty(s); s = SplitString(ref value))
+                while (!string.IsNullOrEmpty(value))
                 {
-                    yield return s;
+                    yield return SplitString(ref value);
                 }
             }
 
@@ -142,13 +140,13 @@ namespace CromwellOnAzureDeployer
                 {
                     width -= char.GetUnicodeCategory(c) switch
                     {
-                        UnicodeCategory.Surrogate => char.IsLowSurrogate(c) ? 0 : 1,
-                        UnicodeCategory.NonSpacingMark => 0,
-                        UnicodeCategory.EnclosingMark => 0,
-                        _ => 1,
-                    };
+                        UnicodeCategory.Surrogate => char.IsLowSurrogate(c),
+                        UnicodeCategory.NonSpacingMark => false,
+                        UnicodeCategory.EnclosingMark => false,
+                        _ => true,
+                    } ? 1 : 0;
 
-                    return 0 != width;
+                    return -1 != Math.Sign(width);
                 }
             }
         }
@@ -196,8 +194,8 @@ namespace CromwellOnAzureDeployer
                     try
                     {
                         AppendPoint ??= GetOffsetCursorPosition();
-                        var pos = AppendPoint.Value;
-                        var curPos = pos - offset;
+                        var startPos = AppendPoint.Value;
+                        var curPos = startPos - offset;
 
                         if (curPos.Y < 0) // This line has now scrolled out of reach
                         {
@@ -205,10 +203,14 @@ namespace CromwellOnAzureDeployer
                         }
 
                         // calculate position of new AppendPoint
-                        pos = GetEndPoint(value, pos);
+                        var endPos = GetEndPoint(value, startPos);
 
                         // Send output
                         Console.SetCursorPosition(curPos.X, curPos.Y);
+                        if (startPos.Y != endPos.Y && !terminateLine)
+                        {
+                            // TODO: insert (endPos.Y - startPos.Y) lines after current line (startPos.Y - offest.Height). This is done differently depending on the platform.
+                        }
                         if (color is not null)
                         {
                             Console.ForegroundColor = color.Value;
@@ -216,15 +218,28 @@ namespace CromwellOnAzureDeployer
                         writer.SystemWriter.Write(value);
 
                         // Adjust state
+                        if (Console.BufferHeight <= (endPos.Y - offset.Height))
+                        {
+                            offset += new Size(0, endPos.Y - offset.Height - Console.BufferHeight + 1);
+                        }
+
                         AppendPoint = GetOffsetCursorPosition();
                         var finalPos = AppendPoint.Value;
                         if (terminateLine)
                         {
+                            //offset += new Size(0, 1);
                             writer.SystemWriter.WriteLine();
                             finalPos = GetOffsetCursorPosition();
                         }
 
-                        offset += (terminateLine ? new Size(0, pos.Y + 1) : new Size(pos)) - new Size(terminateLine ? 0 : finalPos.X, finalPos.Y);
+                        if (endPos.X == Console.BufferWidth && !terminateLine) // Cursor is left at the last glyph written instead of right after the last glyph written when that last glyph is written into the right-most column.
+                        {
+                            endPos = new Point(0, endPos.Y + 1);
+                            AppendPoint = new Point(0, AppendPoint.Value.Y + 1);
+                            finalPos = new Point(0, finalPos.Y + 1);
+                        }
+
+                        offset += (terminateLine ? new Size(0, endPos.Y + 1) : new Size(endPos)) - new Size(terminateLine ? 0 : finalPos.X, finalPos.Y);
                     }
                     finally
                     {
