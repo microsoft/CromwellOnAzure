@@ -284,16 +284,26 @@ namespace CromwellOnAzureDeployer
                             await MitigateChaosDbV250Async(cosmosDb);
                         }
 
+                        var newSettingsAdded = false;
                         if (installedVersion is null || installedVersion < new Version(3, 0))
                         {
                             await PatchCromwellConfigurationFileV300Async(storageAccount);
-                            await AddNewSettingsV300Async(sshConnectionInfo);
+                            await AddNewSettingsAsync(sshConnectionInfo);
+                            newSettingsAdded = true;
                             await UpgradeBlobfuseV300Async(sshConnectionInfo);
                             await DisableDockerServiceV300Async(sshConnectionInfo);
 
                             ConsoleEx.WriteLine($"It's recommended to update the default CoA storage account to a General Purpose v2 account.", ConsoleColor.Yellow);
                             ConsoleEx.WriteLine($"To do that, navigate to the storage account in the Azure Portal,", ConsoleColor.Yellow);
                             ConsoleEx.WriteLine($"Configuration tab, and click 'Upgrade.'", ConsoleColor.Yellow);
+                        }
+
+                        if (installedVersion is null || installedVersion < new Version(3, 1))
+                        {
+                            if (!newSettingsAdded)
+                            {
+                                await AddNewSettingsAsync(sshConnectionInfo);
+                            }
                         }
                     }
 
@@ -1372,6 +1382,10 @@ namespace CromwellOnAzureDeployer
                     await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.DictionaryToDelimitedText(accountNames), $"{CromwellAzureRootDir}/env-01-account-names.txt", false));
                 });
 
+        private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
+            => await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)",
+                () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
+
         private Task PatchCromwellConfigurationFileV300Async(IStorageAccount storageAccount)
             => Execute(
                 $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
@@ -1389,7 +1403,15 @@ namespace CromwellOnAzureDeployer
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
                 });
 
-        private Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
+        private async Task UpgradeBlobfuseV300Async(ConnectionInfo sshConnectionInfo)
+            => await Execute("Upgrading blobfuse to 1.4.3...",
+                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo apt-get update ; sudo apt-get --only-upgrade install blobfuse=1.4.3"));
+
+        private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
+            => await Execute("Disabling auto-start of Docker service...",
+                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
+
+        private Task AddNewSettingsAsync(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Adding new settings to 'env-04-settings.txt' file on the VM...",
                 async () =>
@@ -1411,18 +1433,6 @@ namespace CromwellOnAzureDeployer
                             (newFileContent, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
                         });
                 });
-
-        private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
-            => await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)",
-                () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
-
-        private async Task UpgradeBlobfuseV300Async(ConnectionInfo sshConnectionInfo)
-            => await Execute("Upgrading blobfuse to 1.4.3...",
-                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo apt-get update ; sudo apt-get --only-upgrade install blobfuse=1.4.3"));
-
-        private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
-            => await Execute("Disabling auto-start of Docker service...",
-                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
 
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {

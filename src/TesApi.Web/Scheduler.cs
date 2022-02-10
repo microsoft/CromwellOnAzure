@@ -104,7 +104,7 @@ namespace TesApi.Web
         /// Retrieves all actionable TES tasks from the database, performs an action in the batch system, and updates the resultant state
         /// </summary>
         /// <returns></returns>
-        private async Task OrchestrateTesTasksOnBatch(CancellationToken cancellationToken) // TODO: implement
+        private async Task OrchestrateTesTasksOnBatch(CancellationToken cancellationToken)
         {
             var tesTasks = (await repository.GetItemsAsync(
                     predicate: t => t.State == TesState.QUEUEDEnum

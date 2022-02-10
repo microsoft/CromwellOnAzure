@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -96,7 +96,7 @@ namespace TesApi.Web
             logger.LogInformation("Batch Job cleanup gracefully stopped.");
         }
 
-        private async Task DeleteOldBatchJobs(CancellationToken cancellationToken) // TODO: implement
+        private async Task DeleteOldBatchJobs(CancellationToken cancellationToken)
         {
             var jobsToDelete = await azureProxy.ListOldJobsToDeleteAsync(oldestJobAge);
 
@@ -118,19 +118,6 @@ namespace TesApi.Web
                         tesTask.State == TesState.UNKNOWNEnum)
                     {
                         await azureProxy.DeleteBatchJobAsync(tesTaskId, cancellationToken);
-
-                        try
-                        {
-                            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
-                            {
-                                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTaskId, cancellationToken);
-                            }
-                        }
-                        catch (Exception exc)
-                        {
-                            logger.LogError(exc, $"Exception in DeleteOldBatchJobs when attempting to delete the manual batch pool {tesTaskId}");
-                            // Do not rethrow
-                        }
                     }
                 }
             }

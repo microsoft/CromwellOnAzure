@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -35,7 +35,8 @@ namespace TesApi.Web
         /// <param name="jobId"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
-        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation);
+        /// <param name="isLowPriority"></param>
+        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, bool isLowPriority);
 
         /// <summary>
         /// Gets the <see cref="ContainerRegistryInfo"/> for the given image name
@@ -54,19 +55,17 @@ namespace TesApi.Web
         /// <summary>
         /// Creates a Pool in Azure Batch that is NOT an AutoPool
         /// </summary>
-        Task CreateManualBatchPoolAsync(
+        Task<PoolInformation> CreateBatchPoolAsync(
             string poolName,
+            string displayName,
             string vmSize,
-            bool isLowPriority,
-            string executorImage,
             BatchNodeInfo nodeInfo,
-            string dockerInDockerImageName,
-            string blobxferImageName,
+            Microsoft.Azure.Management.Batch.Models.ContainerConfiguration containerConfiguration,
+            string batchExecutionDirectoryPath,
             string identityResourceId,
             bool disableBatchNodesPublicIpAddress,
             string batchNodesSubnetId,
-            string startTaskSasUrl,
-            string startTaskPath);
+            Microsoft.Azure.Management.Batch.Models.StartTask startTask);
 
 
         /// <summary>
@@ -180,9 +179,30 @@ namespace TesApi.Web
         Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Deletes the specified pool if it exists
+        /// TODO
         /// </summary>
-        Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default);
+        /// <param name="poolId"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        Task<Microsoft.Azure.Batch.Common.AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="poolId"></param>
+        /// <param name="targetLowPriorityComputeNodes"></param>
+        /// <param name="targetDedicatedComputeNodes"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="poolId"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Checks if a local file exists

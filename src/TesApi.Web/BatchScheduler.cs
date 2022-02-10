@@ -10,11 +10,15 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
+//using Microsoft.Azure.Management.ResourceManager.Fluent;
+//using Microsoft.Azure.Management.TrafficManager.Fluent;
+//using Microsoft.Azure.Batch.Protocol.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Tes.Extensions;
 using Tes.Models;
+using BatchModels = Microsoft.Azure.Management.Batch.Models;
 
 namespace TesApi.Web
 {
@@ -47,6 +51,7 @@ namespace TesApi.Web
         private readonly bool usePreemptibleVmsOnly;
         private readonly string batchNodesSubnetId;
         private readonly bool disableBatchNodesPublicIpAddress;
+        private readonly bool enableBatchAutopool;
         private readonly BatchNodeInfo batchNodeInfo;
         private readonly string marthaUrl;
         private readonly string marthaKeyVaultName;
@@ -76,6 +81,7 @@ namespace TesApi.Web
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
             this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
+            this.enableBatchAutopool = GetBoolValue(configuration, "BatchAutopool", false);
             //this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
@@ -126,26 +132,25 @@ namespace TesApi.Web
 
             async Task SetTaskCompleted(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteBatchJobAndPoolIfExists(azureProxy, tesTask);
+                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, TesState.COMPLETEEnum, batchInfo);
             }
 
             async Task SetTaskExecutorError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteBatchJobAndPoolIfExists(azureProxy, tesTask);
+                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             }
 
             async Task SetTaskSystemError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteBatchJobAndPoolIfExists(azureProxy, tesTask);
+                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, TesState.SYSTEMERROREnum, batchInfo);
             }
 
             async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
             { 
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
                 SetTaskStateAndLog(tesTask, newTaskState, batchInfo); 
             }
             Task DeleteBatchJobAndSetTaskExecutorErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.EXECUTORERROREnum, batchInfo);
@@ -158,7 +163,6 @@ namespace TesApi.Web
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             { 
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
                 tesTask.IsCancelRequested = false; 
             }
 
@@ -182,36 +186,6 @@ namespace TesApi.Web
             };
         }
 
-        private async Task DeleteBatchJobAndPoolIfExists(IAzureProxy azureProxy, TesTask tesTask)
-        {
-            var batchDeletionExceptions = new List<Exception>();
-
-            try
-            {
-                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
-            }
-            catch (Exception exc)
-            {
-                logger.LogError(exc, $"Exception deleting batch job with tesTask.Id: {tesTask?.Id}");
-                batchDeletionExceptions.Add(exc);
-            }
-
-            try
-            {
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
-            }
-            catch (Exception exc)
-            {
-                logger.LogError(exc, $"Exception deleting batch pool with tesTask.Id: {tesTask?.Id}");
-                batchDeletionExceptions.Add(exc);
-            }
-
-            if (batchDeletionExceptions.Any())
-            {
-                throw new AggregateException(batchDeletionExceptions);
-            }
-        }
-
         /// <summary>
         /// Iteratively manages execution of a <see cref="TesTask"/> on Azure Batch until completion or failure
         /// </summary>
@@ -222,14 +196,6 @@ namespace TesApi.Web
             var combinedBatchTaskInfo = await GetBatchTaskStateAsync(tesTask);
             var tesTaskChanged = await HandleTesTaskTransitionAsync(tesTask, combinedBatchTaskInfo);
             return tesTaskChanged;
-        }
-
-        private async Task DeleteManualBatchPoolIfExistsAsync(TesTask tesTask)
-        {
-            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
-            {
-                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
-            }
         }
 
         private static string GetCromwellExecutionDirectoryPath(TesTask task)
@@ -286,10 +252,12 @@ namespace TesApi.Web
         {
             try
             {
-                var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
+                var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id); // <-- TODO: should this be moved...
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
                 await CheckBatchAccountQuotas(virtualMachineInfo);
+
+                // <-- ... to here?
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
@@ -297,49 +265,54 @@ namespace TesApi.Web
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var dockerImage = tesTask.Executors.First().Image;
 
+                string startTaskSasUrl = null;
+
                 PoolInformation poolInformation = null;
+                var IsIdentityProvided = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true;
 
-                if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+                var (modelContainerConfiguration, containerConfiguration) = await ContainerConfigurationIfNeeded(dockerImage);
+                var (modelStartTask, startTask) = /*await*/ StartTaskIfNeeded(startTaskSasUrl, batchStartTaskLocalPathOnBatchNode);
+
+                if (IsIdentityProvided || !this.enableBatchAutopool)
                 {
-                    // Only create manual pool if an identity was specified
-                    
-                    // By default, the pool will have the same name/ID as the job
-                    var poolName = jobId;
                     var identityResourceId = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
-                    string startTaskSasUrl = null;
 
-                    //if (useStartTask)
-                    //{
-                    //    var scriptPath = $"{batchExecutionPath}/start-task.sh";
-                    //    await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.StartTaskScript);
-                    //    startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
-                    //}
+                    // By default, the pool will have the same name/ID as the job if the identity is provided and autopool is enabled, otherwise we default to the VmSize + identity if provided
+                    // TODO: -0-9A-Za-z_ <-- it would appear that both inputs are already constrained to this requirment, but it would be best to fully confirm or even better assume that one of the inputs may broaden in the future.
+                    var poolName = (this.enableBatchAutopool, IsIdentityProvided) switch
+                    {
+                        (false, true) => $"{virtualMachineInfo.VmSize}-{Path.GetFileName(identityResourceId)}",
+                        (true, _) => jobId,
+                        (_, false) => virtualMachineInfo.VmSize,
+                    };
 
-                    await azureProxy.CreateManualBatchPoolAsync(
-                        poolName: poolName,
+                    poolInformation = await (await BatchPools.GetOrAdd(azureProxy, poolName, id => azureProxy.CreateBatchPoolAsync(
+                        poolName: id,
+                        displayName: poolName,
                         vmSize: virtualMachineInfo.VmSize,
-                        isLowPriority: virtualMachineInfo.LowPriority,
-                        executorImage: dockerImage,
+                        containerConfiguration: modelContainerConfiguration,
+                        batchExecutionDirectoryPath: batchExecutionPath,
                         nodeInfo: batchNodeInfo,
-                        dockerInDockerImageName: dockerInDockerImageName,
-                        blobxferImageName: blobxferImageName,
                         identityResourceId: identityResourceId,
                         disableBatchNodesPublicIpAddress: disableBatchNodesPublicIpAddress,
                         batchNodesSubnetId: batchNodesSubnetId,
-                        startTaskSasUrl: startTaskSasUrl,
-                        startTaskPath: batchStartTaskLocalPathOnBatchNode
-                    );
-                        
-                    poolInformation = new PoolInformation { PoolId = poolName };
+                        startTask: modelStartTask))
+                    ).ReserveNode(virtualMachineInfo.LowPriority);
                 }
                 else
                 {
-                    poolInformation = await CreateAutoPoolPoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority, true, batchExecutionPath);
+                    poolInformation = /*await*/ CreateAutoPoolPoolInformation(
+                        dockerImage,
+                        virtualMachineInfo.VmSize,
+                        virtualMachineInfo.LowPriority,
+                        containerConfiguration,
+                        startTask,
+                        batchExecutionPath);
                 }
 
-                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, poolInformation?.AutoPoolSpecification?.PoolSpecification?.VirtualMachineConfiguration?.ContainerConfiguration is not null);
+                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, containerConfiguration is not null);
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
-                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
+                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, virtualMachineInfo.LowPriority);
 
                 tesTaskLog.StartTime = DateTimeOffset.UtcNow;
                 tesTask.State = TesState.INITIALIZINGEnum;
@@ -815,25 +788,21 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Constructs an Azure Batch PoolInformation instance
+        /// Constructs an Azure Batch Container Configuration instance
         /// </summary>
-        /// <param name="executorImage">The image name for the current <see cref="TesTask"/></param>
-        /// <param name="vmSize">The Azure VM sku</param>
-        /// <param name="preemptible">True if preemptible machine should be used</param>
-        /// <param name="useAutoPool">True if an Azure Batch AutoPool should be used</param>
-        /// <param name="batchExecutionDirectoryPath">Relative path to the Batch execution location</param>
+        /// <param name="startTaskSasUrl">SAS URL for the start task</param>
+        /// <param name="startTaskPath">Local path on the Azure Batch node for the script</param>
         /// <returns></returns>
-        private async Task<PoolInformation> CreateAutoPoolPoolInformation(string executorImage, string vmSize, bool preemptible, bool useAutoPool = true, string batchExecutionDirectoryPath = null)
+        private /*async Task<*/(BatchModels.StartTask, StartTask)/*>*/ StartTaskIfNeeded(string startTaskSasUrl = null, string startTaskPath = null)
         {
-            var vmConfig = new VirtualMachineConfiguration(
-                imageReference: new ImageReference(
-                    batchNodeInfo.BatchImageOffer,
-                    batchNodeInfo.BatchImagePublisher,
-                    batchNodeInfo.BatchImageSku,
-                    batchNodeInfo.BatchImageVersion),
-                nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
+            //BatchModels.StartTask result = default;
 
-            StartTask startTask = null;
+            //if (useStartTask)
+            //{
+            //    var scriptPath = $"{batchExecutionPath}/start-task.sh";
+            //    await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.StartTaskScript);
+            //    startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
+            //}
 
             //if (useStartTask)
             //{
@@ -850,45 +819,104 @@ namespace TesApi.Web
             //    };
             //}
 
+            //if (useStartTask)
+            //{
+            //    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
+            //    {
+            //        // Pool StartTask: install Docker as start task if it's not already
+            //        CommandLine = $"/bin/sh {startTaskPath}",
+            //        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
+            //        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
+            //    };
+            //}
+
+            return default;
+        }
+
+        /// <summary>
+        /// Constructs an Azure Batch Container Configuration instance
+        /// </summary>
+        /// <param name="executorImage">The image name for the current <see cref="TesTask"/></param>
+        /// <returns></returns>
+        private async Task<(BatchModels.ContainerConfiguration, ContainerConfiguration)> ContainerConfigurationIfNeeded(string executorImage)
+        {
+            BatchModels.ContainerConfiguration result = default;
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
 
             if (containerRegistryInfo is not null)
             {
-                var containerRegistry = new ContainerRegistry(
+                var containerRegistry = new BatchModels.ContainerRegistry(
                     userName: containerRegistryInfo.Username,
                     registryServer: containerRegistryInfo.RegistryServer,
                     password: containerRegistryInfo.Password);
 
                 // Download private images at node startup, since those cannot be downloaded in the main task that runs multiple containers.
                 // Doing this also requires that the main task runs inside a container, hence downloading the "docker" image (contains docker client) as well.
-                vmConfig.ContainerConfiguration = new ContainerConfiguration
+                result = new BatchModels.ContainerConfiguration
                 {
                     ContainerImageNames = new List<string> { executorImage, dockerInDockerImageName, blobxferImageName },
-                    ContainerRegistries = new List<ContainerRegistry> { containerRegistry }
+                    ContainerRegistries = new List<BatchModels.ContainerRegistry> { containerRegistry }
                 };
 
                 var containerRegistryInfoForDockerInDocker = await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName);
 
                 if (containerRegistryInfoForDockerInDocker is not null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
                 {
-                    var containerRegistryForDockerInDocker = new ContainerRegistry(
+                    var containerRegistryForDockerInDocker = new BatchModels.ContainerRegistry(
                         userName: containerRegistryInfoForDockerInDocker.Username,
                         registryServer: containerRegistryInfoForDockerInDocker.RegistryServer,
                         password: containerRegistryInfoForDockerInDocker.Password);
 
-                    vmConfig.ContainerConfiguration.ContainerRegistries.Add(containerRegistryForDockerInDocker);
+                    result.ContainerRegistries.Add(containerRegistryForDockerInDocker);
                 }
 
                 var containerRegistryInfoForBlobXfer = await azureProxy.GetContainerRegistryInfoAsync(blobxferImageName);
 
                 if (containerRegistryInfoForBlobXfer is not null && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfo.RegistryServer && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfoForDockerInDocker.RegistryServer)
                 {
-                    vmConfig.ContainerConfiguration.ContainerRegistries.Add(new(
+                    result.ContainerRegistries.Add(new(
                         userName: containerRegistryInfoForBlobXfer.Username,
                         registryServer: containerRegistryInfoForBlobXfer.RegistryServer,
                         password: containerRegistryInfoForBlobXfer.Password));
                 }
             }
+
+            return (result, result is null ? null : new()
+            {
+                ContainerImageNames = result.ContainerImageNames,
+                ContainerRegistries = result
+                                    .ContainerRegistries
+                                    .Select(r => new ContainerRegistry(
+                                        userName: r.UserName,
+                                        password: r.Password,
+                                        registryServer: r.RegistryServer,
+                                        identityReference: r.IdentityReference is null ? null : new() { ResourceId = r.IdentityReference.ResourceId }))
+                                    .ToList()
+            });
+        }
+
+        /// <summary>
+        /// Constructs an Azure Batch PoolInformation instance
+        /// </summary>
+        /// <param name="executorImage">The image name for the current <see cref="TesTask"/></param>
+        /// <param name="vmSize">The Azure VM sku</param>
+        /// <param name="preemptible">True if preemptible machine should be used</param>
+        /// <param name="containerConfiguration">The configuration to download private images</param>
+        /// <param name="startTask">The start task for all jobs/tasks in the pool</param>
+        /// <param name="batchExecutionDirectoryPath">Relative path to the Batch execution location</param>
+        /// <returns>An Azure Batch Pool specifier</returns>
+        private /*async Task<*/PoolInformation/*>*/ CreateAutoPoolPoolInformation(string executorImage, string vmSize, bool preemptible, ContainerConfiguration containerConfiguration, StartTask startTask, string batchExecutionDirectoryPath = null)
+        {
+            var vmConfig = new VirtualMachineConfiguration(
+                imageReference: new ImageReference(
+                    batchNodeInfo.BatchImageOffer,
+                    batchNodeInfo.BatchImagePublisher,
+                    batchNodeInfo.BatchImageSku,
+                    batchNodeInfo.BatchImageVersion),
+                nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId)
+            {
+                ContainerConfiguration = containerConfiguration
+            };
 
             var poolSpecification = new PoolSpecification
             {
@@ -1068,7 +1096,7 @@ namespace TesApi.Web
                 .OrderBy(x => x.PricePerHour)
                 .FirstOrDefault();
 
-            if (!preemptible && !(selectedVm is null))
+            if (!preemptible && selectedVm is not null)
             {
                 var idealVm = eligibleVms
                     .Where(vm => !(allowedVmSizes?.Any() ?? false) || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))

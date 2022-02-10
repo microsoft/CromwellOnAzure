@@ -41,7 +41,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
+        public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, bool isLowPriority) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, isLowPriority);
 
         /// <inheritdoc/>
         public Task DeleteBatchJobAsync(string taskId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.DeleteBatchJobAsync(taskId, ct), cancellationToken);
@@ -148,11 +148,18 @@ namespace TesApi.Web
         public bool TryReadCwlFile(string workflowId, out string content) => azureProxy.TryReadCwlFile(workflowId, out content);
 
         /// <inheritdoc/>
-        public Task CreateManualBatchPoolAsync(string poolName, string vmSize, bool isLowPriority, string executorImage, BatchNodeInfo nodeInfo, string dockerInDockerImageName, string blobxferImageName, string identityResourceId, bool disableBatchNodesPublicIpAddress, string batchNodesSubnetId, string startTaskSasUrl, string startTaskPath)
-            => azureProxy.CreateManualBatchPoolAsync(poolName, vmSize, isLowPriority, executorImage, nodeInfo, dockerInDockerImageName, blobxferImageName, identityResourceId, disableBatchNodesPublicIpAddress, batchNodesSubnetId, startTaskSasUrl, startTaskPath);
+        public Task<PoolInformation> CreateBatchPoolAsync(string poolName, string displayName, string vmSize, BatchNodeInfo nodeInfo, Microsoft.Azure.Management.Batch.Models.ContainerConfiguration containerConfiguration, string batchExecutionDirectoryPath, string identityResourceId, bool disableBatchNodesPublicIpAddress, string batchNodesSubnetId, Microsoft.Azure.Management.Batch.Models.StartTask startTask)
+            => azureProxy.CreateBatchPoolAsync(poolName, displayName, vmSize, nodeInfo, containerConfiguration, batchExecutionDirectoryPath, identityResourceId, disableBatchNodesPublicIpAddress, batchNodesSubnetId, startTask);
 
         /// <inheritdoc/>
-        public Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default)
-            => azureProxy.DeleteBatchPoolIfExistsAsync(poolId, cancellationToken);
+        public Task<Microsoft.Azure.Batch.Common.AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default) => azureProxy.GetAllocationStateAsync(poolId, cancellationToken);
+
+        /// <inheritdoc/>
+        public async Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default)
+            => await azureProxy.GetCurrentComputeNodesAsync(poolId, cancellationToken);
+
+        /// <inheritdoc/>
+        public Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default)
+            => azureProxy.SetComputeNodeTargetsAsync(poolId, targetLowPriorityComputeNodes, targetDedicatedComputeNodes, cancellationToken);
     }
 }

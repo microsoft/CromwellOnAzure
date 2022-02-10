@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -16,7 +17,6 @@ using Microsoft.Azure.Batch.Auth;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.Batch;
-using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
@@ -27,6 +27,7 @@ using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Tes.Models;
+using BatchModels = Microsoft.Azure.Management.Batch.Models;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TesApi.Web
@@ -42,7 +43,7 @@ namespace TesApi.Web
         private static readonly HttpClient httpClient = new();
 
         private readonly ILogger logger;
-        private readonly Func<Task<BatchAccount>> getBatchAccountFunc;
+        private readonly Func<Task<BatchModels.BatchAccount>> getBatchAccountFunc;
         private readonly BatchClient batchClient;
         private readonly string subscriptionId;
         private readonly string location;
@@ -241,8 +242,9 @@ namespace TesApi.Web
         /// <param name="jobId"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
+        /// <param name="isLowPriority"></param>
         /// <returns></returns>
-        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
+        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, bool isLowPriority)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
             await job.CommitAsync();
@@ -265,13 +267,15 @@ namespace TesApi.Web
                 if (!string.IsNullOrWhiteSpace(poolInformation?.PoolId))
                 {
                     // With manual pools, the PoolId property is set
-                    await DeleteBatchPoolIfExistsAsync(poolInformation.PoolId);
+                    if (BatchPools.TryGet(poolInformation.PoolId, out var batchPool))
+                    {
+                        await batchPool.RemoveNode(isLowPriority);
+                    }
                 }
 
                 throw;
             }
         }
-
 
         /// <summary>
         /// Gets the combined state of Azure Batch job, task and pool that corresponds to the given TES task
@@ -483,32 +487,36 @@ namespace TesApi.Web
             => batchClient.PoolOperations.DeletePoolAsync(poolId, cancellationToken: cancellationToken);
 
         /// <summary>
-        /// Deletes the specified pool
+        /// TODO
         /// </summary>
-        public async Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default)
+        /// <param name="poolId"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task<AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
+            => (await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState"), cancellationToken: cancellationToken)).AllocationState;
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="poolId"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default)
         {
-            try
-            {
-                var poolFilter = new ODATADetailLevel
-                {
-                    FilterClause = $"startswith(id,'{poolId}') and state ne 'deleting'",
-                    SelectClause = "id"
-                };
-
-                var poolsToDelete = await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync(cancellationToken);
-
-                foreach (var pool in poolsToDelete)
-                {
-                    logger.LogInformation($"Deleting pool {pool.Id}");
-                    await batchClient.PoolOperations.DeletePoolAsync(pool.Id, cancellationToken: cancellationToken);
-                }
-            }
-            catch (Exception exc)
-            {
-                logger.LogError(exc, $"Exception while attempting to delete pool starting with ID: {poolId}");
-                throw;
-            }
+            var pool = (await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "currentLowPriorityNodes,currentDedicatedNodes"), cancellationToken: cancellationToken));
+            return (pool.CurrentLowPriorityComputeNodes, pool.CurrentDedicatedComputeNodes);
         }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="poolId"></param>
+        /// <param name="targetLowPriorityComputeNodes"></param>
+        /// <param name="targetDedicatedComputeNodes"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default)
+            => await batchClient.PoolOperations.ResizePoolAsync(poolId, targetDedicatedComputeNodes: targetDedicatedComputeNodes, targetLowPriorityComputeNodes: targetLowPriorityComputeNodes, cancellationToken: cancellationToken);
 
         /// <summary>
         /// Gets the list of container registries that the TES server has access to
@@ -644,7 +652,7 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Get/sets cached value for the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>.
+        /// Get/sets cached value for the price and resource summary of all available VMs in a region for the <see cref="BatchModels.BatchAccount"/>.
         /// </summary>
         /// <returns><see cref="VirtualMachineInformation"/> for available VMs in a region.</returns>
         public async Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync()
@@ -731,7 +739,7 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Get the price and resource summary of all available VMs in a region for the <see cref="BatchAccount"/>.
+        /// Get the price and resource summary of all available VMs in a region for the <see cref="BatchModels.BatchAccount"/>.
         /// </summary>
         /// <returns><see cref="VirtualMachineInformation"/> for available VMs in a region.</returns>
         private async Task<IEnumerable<VirtualMachineInformation>> GetVmSizesAndPricesRawAsync()
@@ -818,146 +826,90 @@ namespace TesApi.Web
         /// Creates an Azure Batch pool that's lifecycle must be manually managed
         /// </summary>
         /// <param name="poolName">The name of the pool. This becomes the Pool.Id</param>
+        /// <param name="displayName">The display name of the pool.</param>
         /// <param name="vmSize">The Azure SKU for the VM of the pool</param>
-        /// <param name="isLowPriority">True if a low-priority VM should be used; false for a dedicated</param>
-        /// <param name="executorImage">The image required by the TesTask</param>
         /// <param name="nodeInfo">Information about the pool to be created</param>
-        /// <param name="dockerInDockerImageName">Image that contains Docker to download private images</param>
-        /// <param name="blobxferImageName">Image name for blobxfer, the Azure storage transfer tool</param>
+        /// <param name="containerConfiguration">The configuration to download private images</param>
+        /// <param name="batchExecutionDirectoryPath">Relative path to the Batch execution location</param>
         /// <param name="identityResourceId">The resource ID of a user-assigned managed identity to assign to the pool</param>
         /// <param name="disableBatchNodesPublicIpAddress">True to remove the public IP address of the Batch node</param>
         /// <param name="batchNodesSubnetId">The subnet ID of the Batch VM in the pool</param>
-        /// <param name="startTaskSasUrl">SAS URL for the start task</param>
-        /// <param name="startTaskPath">Local path on the Azure Batch node for the script</param>
-        /// <returns></returns>
-        public async Task CreateManualBatchPoolAsync(
-            string poolName, 
-            string vmSize, 
-            bool isLowPriority, 
-            string executorImage, 
+        /// <param name="startTask">The start task for all jobs/tasks in the pool</param>
+        /// <returns>An Azure Batch Pool specifier</returns>
+        public async Task<PoolInformation> CreateBatchPoolAsync(
+            string poolName,
+            string displayName,
+            string vmSize,
             BatchNodeInfo nodeInfo,
-            string dockerInDockerImageName, 
-            string blobxferImageName, 
+            BatchModels.ContainerConfiguration containerConfiguration,
+            string batchExecutionDirectoryPath,
             string identityResourceId, 
             bool disableBatchNodesPublicIpAddress, 
             string batchNodesSubnetId,
-            string startTaskSasUrl,
-            string startTaskPath
+            BatchModels.StartTask startTask
             )
         {
             try
             {
                 var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
 
-                var vmConfigManagement = new Microsoft.Azure.Management.Batch.Models.VirtualMachineConfiguration(
-                    new Microsoft.Azure.Management.Batch.Models.ImageReference(
-                    nodeInfo.BatchImagePublisher,
-                    nodeInfo.BatchImageOffer,
-                    nodeInfo.BatchImageSku,
-                    nodeInfo.BatchImageVersion),
-                    nodeInfo.BatchNodeAgentSkuId);
-
-                Microsoft.Azure.Management.Batch.Models.StartTask startTask = null;
-
-                //if (useStartTask)
-                //{
-                //    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
-                //    {
-                //        // Pool StartTask: install Docker as start task if it's not already
-                //        CommandLine = $"/bin/sh {startTaskPath}",
-                //        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
-                //        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
-                //    };
-                //}
-
-                var containerRegistryInfo = await GetContainerRegistryInfoAsync(executorImage);
-
-                if (containerRegistryInfo is not null)
-                {
-                    var containerRegistryMgmt = new Microsoft.Azure.Management.Batch.Models.ContainerRegistry(
-                        userName: containerRegistryInfo.Username,
-                        registryServer: containerRegistryInfo.RegistryServer,
-                        password: containerRegistryInfo.Password);
-
-                    // Download private images at node startup, since those cannot be downloaded in the main task that runs multiple containers.
-                    // Doing this also requires that the main task runs inside a container, hence downloading the "docker" image (contains docker client) as well.
-                    vmConfigManagement.ContainerConfiguration = new Microsoft.Azure.Management.Batch.Models.ContainerConfiguration
-                    {
-                        ContainerImageNames = new List<string> { executorImage, dockerInDockerImageName, blobxferImageName },
-                        ContainerRegistries = new List<Microsoft.Azure.Management.Batch.Models.ContainerRegistry> { containerRegistryMgmt }
-                    };
-
-                    var containerRegistryInfoForDockerInDocker = await GetContainerRegistryInfoAsync(dockerInDockerImageName);
-
-                    if (containerRegistryInfoForDockerInDocker is not null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
-                    {
-                        var containerRegistryForDockerInDockerMgmt = new Microsoft.Azure.Management.Batch.Models.ContainerRegistry(
-                            userName: containerRegistryInfoForDockerInDocker.Username,
-                            registryServer: containerRegistryInfoForDockerInDocker.RegistryServer,
-                            password: containerRegistryInfoForDockerInDocker.Password);
-
-                        vmConfigManagement.ContainerConfiguration.ContainerRegistries.Add(containerRegistryForDockerInDockerMgmt);
-                    }
-
-                    var containerRegistryInfoForBlobXfer = await GetContainerRegistryInfoAsync(blobxferImageName);
-
-                    if (containerRegistryInfoForBlobXfer is not null && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfo.RegistryServer && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfoForDockerInDocker.RegistryServer)
-                    {
-                        var containerRegistryForBlobXferMgmt = new Microsoft.Azure.Management.Batch.Models.ContainerRegistry(
-                            userName: containerRegistryInfoForBlobXfer.Username,
-                            registryServer: containerRegistryInfoForBlobXfer.RegistryServer,
-                            password: containerRegistryInfoForBlobXfer.Password);
-
-                        vmConfigManagement.ContainerConfiguration.ContainerRegistries.Add(containerRegistryForBlobXferMgmt);
-                    }
-                }
-
-                var poolInfo = new Microsoft.Azure.Management.Batch.Models.Pool(name: poolName)
+                var poolInfo = new BatchModels.Pool(name: poolName, displayName: displayName)
                 {
                     VmSize = vmSize,
-                    ScaleSettings = new Microsoft.Azure.Management.Batch.Models.ScaleSettings
+                    ScaleSettings = new BatchModels.ScaleSettings
                     {
-                        FixedScale = new Microsoft.Azure.Management.Batch.Models.FixedScaleSettings
+                        FixedScale = new BatchModels.FixedScaleSettings
                         {
-                            TargetDedicatedNodes = isLowPriority ? 0 : 1,
-                            TargetLowPriorityNodes = isLowPriority ? 1 : 0,
+                            TargetDedicatedNodes = 0,
+                            TargetLowPriorityNodes = 0,
                             ResizeTimeout = TimeSpan.FromMinutes(30), 
-                            // TODO does this do anything with fixed scale settings?
-                            NodeDeallocationOption = Microsoft.Azure.Management.Batch.Models.ComputeNodeDeallocationOption.TaskCompletion
+                            NodeDeallocationOption = BatchModels.ComputeNodeDeallocationOption.TaskCompletion
                         }
                     },
-                    DeploymentConfiguration = new Microsoft.Azure.Management.Batch.Models.DeploymentConfiguration
+                    DeploymentConfiguration = new BatchModels.DeploymentConfiguration
                     {
-                        VirtualMachineConfiguration = vmConfigManagement
-                    },
-                    Identity = new Microsoft.Azure.Management.Batch.Models.BatchPoolIdentity
-                    {
-                        Type = Microsoft.Azure.Management.Batch.Models.PoolIdentityType.UserAssigned,
-                        UserAssignedIdentities = new Dictionary<string, Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities>
-                        {
-                            [identityResourceId] = new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities()
-                        }
+                        VirtualMachineConfiguration = new BatchModels.VirtualMachineConfiguration(
+                            new BatchModels.ImageReference(
+                                nodeInfo.BatchImagePublisher,
+                                nodeInfo.BatchImageOffer,
+                                nodeInfo.BatchImageSku,
+                                nodeInfo.BatchImageVersion),
+                            nodeInfo.BatchNodeAgentSkuId,
+                            containerConfiguration: containerConfiguration)
                     },
                     StartTask = startTask
                 };
 
+                if (!string.IsNullOrEmpty(identityResourceId))
+                {
+                    poolInfo.Identity = new BatchModels.BatchPoolIdentity
+                    {
+                        Type = BatchModels.PoolIdentityType.UserAssigned,
+                        UserAssignedIdentities = new Dictionary<string, BatchModels.UserAssignedIdentities>
+                        {
+                            [identityResourceId] = new BatchModels.UserAssignedIdentities()
+                        }
+                    };
+                }
+
                 if (!string.IsNullOrEmpty(batchNodesSubnetId))
                 {
-                    poolInfo.NetworkConfiguration = new Microsoft.Azure.Management.Batch.Models.NetworkConfiguration
+                    poolInfo.NetworkConfiguration = new BatchModels.NetworkConfiguration
                     {
-                        PublicIPAddressConfiguration = new Microsoft.Azure.Management.Batch.Models.PublicIPAddressConfiguration(disableBatchNodesPublicIpAddress ? Microsoft.Azure.Management.Batch.Models.IPAddressProvisioningType.NoPublicIPAddresses : Microsoft.Azure.Management.Batch.Models.IPAddressProvisioningType.BatchManaged),
+                        PublicIPAddressConfiguration = new BatchModels.PublicIPAddressConfiguration(disableBatchNodesPublicIpAddress ? BatchModels.IPAddressProvisioningType.NoPublicIPAddresses : BatchModels.IPAddressProvisioningType.BatchManaged),
                         SubnetId = batchNodesSubnetId
                     };
                 }
 
                 var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
-                logger.LogInformation($"Creating manual batch pool named {poolName} with vmSize {vmSize} and low priority {isLowPriority}");
+                logger.LogInformation($"Creating manual batch pool named {poolName} with vmSize {vmSize}");
                 var pool = await batchManagementClient.Pool.CreateAsync(batchResourceGroupName, batchAccountName, poolInfo.Name, poolInfo);
-                logger.LogInformation($"Successfully created manual batch pool named {poolName} with vmSize {vmSize} and low priority {isLowPriority}");
+                logger.LogInformation($"Successfully created manual batch pool named {poolName} with vmSize {vmSize}");
+                return new() { PoolId = pool.Id };
             }
             catch (Exception exc)
             {
-                logger.LogError(exc, $"Error trying to create manual batch pool named {poolName} with vmSize {vmSize} and low priority {isLowPriority}");
+                logger.LogError(exc, $"Error trying to create manual batch pool named {poolName} with vmSize {vmSize}");
                 throw;
             }
         }
