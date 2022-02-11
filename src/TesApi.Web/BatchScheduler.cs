@@ -273,6 +273,7 @@ namespace TesApi.Web
                 var (modelContainerConfiguration, containerConfiguration) = await ContainerConfigurationIfNeeded(dockerImage);
                 var (modelStartTask, startTask) = /*await*/ StartTaskIfNeeded(startTaskSasUrl, batchStartTaskLocalPathOnBatchNode);
 
+                Func<AffinityInformation> getAffinity = () => default;
                 if (IsIdentityProvided || !this.enableBatchAutopool)
                 {
                     var identityResourceId = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
@@ -286,18 +287,20 @@ namespace TesApi.Web
                         (_, false) => virtualMachineInfo.VmSize,
                     };
 
-                    poolInformation = await (await BatchPools.GetOrAdd(azureProxy, poolName, id => azureProxy.CreateBatchPoolAsync(
-                        poolName: id,
-                        displayName: poolName,
-                        vmSize: virtualMachineInfo.VmSize,
-                        containerConfiguration: modelContainerConfiguration,
-                        batchExecutionDirectoryPath: batchExecutionPath,
-                        nodeInfo: batchNodeInfo,
-                        identityResourceId: identityResourceId,
-                        disableBatchNodesPublicIpAddress: disableBatchNodesPublicIpAddress,
-                        batchNodesSubnetId: batchNodesSubnetId,
-                        startTask: modelStartTask))
-                    ).ReserveNode(virtualMachineInfo.LowPriority);
+                    poolInformation = (await BatchPools.GetOrAdd(azureProxy, poolName, id => azureProxy.CreateBatchPoolAsync(
+                            poolName: id,
+                            displayName: poolName,
+                            vmSize: virtualMachineInfo.VmSize,
+                            containerConfiguration: modelContainerConfiguration,
+                            batchExecutionDirectoryPath: batchExecutionPath,
+                            nodeInfo: batchNodeInfo,
+                            identityResourceId: identityResourceId,
+                            disableBatchNodesPublicIpAddress: disableBatchNodesPublicIpAddress,
+                            batchNodesSubnetId: batchNodesSubnetId,
+                            startTask: modelStartTask)))
+                        .Pool;
+
+                    getAffinity = () => BatchPools.TryGet(poolInformation.PoolId, out var pool) ? pool.PrepareNodeAsync(virtualMachineInfo.LowPriority).Result : default;
                 }
                 else
                 {
@@ -310,9 +313,9 @@ namespace TesApi.Web
                         batchExecutionPath);
                 }
 
-                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, containerConfiguration is not null);
+                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, getAffinity, containerConfiguration is not null);
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
-                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, virtualMachineInfo.LowPriority);
+                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
                 tesTaskLog.StartTime = DateTimeOffset.UtcNow;
                 tesTask.State = TesState.INITIALIZINGEnum;
@@ -527,9 +530,10 @@ namespace TesApi.Web
         /// Returns job preparation and main Batch tasks that represents the given <see cref="TesTask"/>
         /// </summary>
         /// <param name="task">The <see cref="TesTask"/></param>
+        /// <param name="GetAffinityInfo"></param>
         /// <param name="poolHasContainerConfig">Indicates that <see cref="CloudTask.ContainerSettings"/> must be set.</param>
         /// <returns>Job preparation and main Batch tasks</returns>
-        private async Task<CloudTask> ConvertTesTaskToBatchTaskAsync(TesTask task, bool poolHasContainerConfig)
+        private async Task<CloudTask> ConvertTesTaskToBatchTaskAsync(TesTask task, Func<AffinityInformation> GetAffinityInfo, bool poolHasContainerConfig)
         {
             var cromwellPathPrefixWithoutEndSlash = CromwellPathPrefix.TrimEnd('/');
             var taskId = task.Id;
@@ -702,6 +706,7 @@ namespace TesApi.Web
 
             var cloudTask = new CloudTask(taskId, $"/bin/sh /mnt{batchScriptPath}")
             {
+                AffinityInformation = GetAffinityInfo(),
                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                 ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(batchScriptSasUrl, $"/mnt{batchScriptPath}"), ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptSasUrl, $"/mnt{uploadFilesScriptPath}") },
                 OutputFiles = new List<OutputFile> {

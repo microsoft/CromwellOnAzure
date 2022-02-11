@@ -41,7 +41,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, bool isLowPriority) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, isLowPriority);
+        public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
         /// <inheritdoc/>
         public Task DeleteBatchJobAsync(string taskId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.DeleteBatchJobAsync(taskId, ct), cancellationToken);
@@ -161,5 +161,9 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default)
             => azureProxy.SetComputeNodeTargetsAsync(poolId, targetLowPriorityComputeNodes, targetDedicatedComputeNodes, cancellationToken);
+
+        /// <inheritdoc/>
+        public Task ForEachComputeNodeAsync(string poolId, Action<ComputeNode> body, DetailLevel detailLevel = null, CancellationToken cancellationToken = default)
+            => azureProxy.ForEachComputeNodeAsync(poolId, body, detailLevel, cancellationToken);
     }
 }

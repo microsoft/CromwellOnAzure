@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -80,6 +81,7 @@ namespace TesApi.Web
         {
             private static readonly TimeSpan IdleNodeCheck = TimeSpan.FromMinutes(5); // TODO: set this to an appropriate value
             private static readonly TimeSpan IdlePoolCheck = TimeSpan.FromMinutes(30); // TODO: set this to an appropriate value
+            private static readonly TimeSpan ForcePoolRotationAge = TimeSpan.FromDays(60); // TODO: set this to an appropriate value
 
             /// <summary>
             /// TODO
@@ -104,7 +106,7 @@ namespace TesApi.Web
                 /// <summary>
                 /// TODO
                 /// </summary>
-                RemovePoolIfIdle,
+                RemovePoolIfEmpty,
             }
 
             /// <summary>
@@ -121,67 +123,71 @@ namespace TesApi.Web
             /// TODO
             /// </summary>
             /// <param name="isLowPriority"></param>
+            /// <param name="cancellationToken"></param>
             /// <returns></returns>
-            public async Task<PoolInformation> ReserveNode(bool isLowPriority)
+            public async Task<AffinityInformation> PrepareNodeAsync(bool isLowPriority, CancellationToken cancellationToken = default)
             {
-                try
+                Task rebootTask = default;
+                AffinityInformation result = default;
+                await _azureProxy.ForEachComputeNodeAsync(Pool.PoolId, ConsiderNode, cancellationToken: cancellationToken);
+                if (result is null)
                 {
                     lock (lockObj)
                     {
-                        if (isLowPriority)
+                        switch (isLowPriority)
                         {
-                            ++TargetLowPriority;
+                            case true: ++TargetLowPriority; break;
+                            case false: ++TargetDedicated; break;
                         }
-                        else
-                        {
-                            ++TargetDedicated;
-                        }
-
-                        ResizeDirty = true;
                     }
 
-                    if (Interlocked.Increment(ref _resizeGuard) == 1)
+                    try
                     {
-                        await ServicePool(ServiceKind.Resize);
+                        if (Interlocked.Increment(ref _resizeGuard) == 1)
+                        {
+                            await ServicePool(ServiceKind.Resize, cancellationToken);
+                        }
+                    }
+                    finally
+                    {
+                        Interlocked.Decrement(ref _resizeGuard);
                     }
                 }
-                finally
+                else
                 {
-                    Interlocked.Decrement(ref _resizeGuard);
+                    await rebootTask; // Can be null
                 }
 
-                return Pool;
+                return result;
+
+                void ConsiderNode(ComputeNode node)
+                {
+                    if (result is null && node.State == ComputeNodeState.Idle)
+                    {
+                        lock (lockObj)
+                        {
+                            if (ReservedComuteNodes.Any(n => n.AffinityId.Equals(node.AffinityId)))
+                            {
+                                return;
+                            }
+
+                            result = new AffinityInformation(node.AffinityId);
+                            ReservedComuteNodes.Add(result);
+                        }
+                        rebootTask = node.RebootAsync(cancellationToken: CancellationToken.None);
+                    }
+                }
             }
 
             /// <summary>
             /// TODO
             /// </summary>
-            /// <param name="isLowPriority"></param>
-            /// <returns></returns>
-            public async Task RemoveNode(bool isLowPriority)
+            /// <param name="affinity"></param>
+            public void ReleaseNode(AffinityInformation affinity)
             {
-                try
+                lock (lockObj)
                 {
-                    lock (lockObj)
-                    {
-                        if (isLowPriority)
-                        {
-                            --TargetLowPriority;
-                        }
-                        else
-                        {
-                            --TargetDedicated;
-                        }
-                    }
-
-                    if (Interlocked.Increment(ref _resizeGuard) == 1)
-                    {
-                        await ServicePool(ServiceKind.Resize);
-                    }
-                }
-                finally
-                {
-                    Interlocked.Decrement(ref _resizeGuard);
+                    ReservedComuteNodes.Remove(affinity);
                 }
             }
 
@@ -196,73 +202,94 @@ namespace TesApi.Web
                 switch (serviceKind)
                 {
                     case ServiceKind.Resize:
-                        (bool dirty, int lowPri, int dedicated) values = default;
-                        lock (lockObj)
                         {
-                            values = (ResizeDirty, TargetLowPriority, TargetDedicated);
-                        }
+                            (bool dirty, int lowPri, int dedicated) values = default;
+                            lock (lockObj)
+                            {
+                                values = (ResizeDirty, TargetLowPriority, TargetDedicated);
+                            }
 
-                        if (values.dirty)
-                        {
-                            var state = await _azureProxy.GetAllocationStateAsync(Pool.PoolId, cancellationToken);
-                            if (state == AllocationState.Steady)
+                            if (values.dirty && (await _azureProxy.GetAllocationStateAsync(Pool.PoolId, cancellationToken)) == AllocationState.Steady)
                             {
                                 await _azureProxy.SetComputeNodeTargetsAsync(Pool.PoolId, values.lowPri, values.dedicated, cancellationToken);
                                 lock (lockObj)
                                 {
-                                    ResizeDirty = TargetDedicated == values.dedicated && TargetLowPriority == values.lowPri;
+                                    ResizeDirty = TargetDedicated != values.dedicated || TargetLowPriority != values.lowPri;
                                 }
                             }
                         }
                         break;
 
                     case ServiceKind.RemoveNodeIfIdle:
-                        if (Changed + IdleNodeCheck > DateTime.UtcNow)
+                        if ((await _azureProxy.GetAllocationStateAsync(Pool.PoolId, cancellationToken)) == AllocationState.Steady)
                         {
-                            var state = await _azureProxy.GetAllocationStateAsync(Pool.PoolId, cancellationToken);
-                            if (state == AllocationState.Steady)
+                            var lowPriDecrementTarget = 0;
+                            var dedicatedDecrementTarget = 0;
+                            var nodesToRemove = Enumerable.Empty<ComputeNode>();
+                            await _azureProxy.ForEachComputeNodeAsync(Pool.PoolId, n =>
                             {
-                                var (lowPriorityNodes, dedicatedNodes) = await _azureProxy.GetCurrentComputeNodesAsync(Pool.PoolId, cancellationToken);
-                                lock (lockObj)
+                                if (n.StateTransitionTime + IdleNodeCheck < DateTime.UtcNow && n.State == ComputeNodeState.Idle /*&& ReservedComuteNodes.Any(r => r.AffinityId.Equals(n.AffinityId))*/)
                                 {
-                                    if (lowPriorityNodes != TargetLowPriority)
+                                    nodesToRemove = nodesToRemove.Append(n);
+                                    switch (n.IsDedicated)
                                     {
-                                        TargetLowPriority = lowPriorityNodes ?? 0;
-                                    }
+                                        case true:
+                                            ++dedicatedDecrementTarget;
+                                            break;
 
-                                    if (dedicatedNodes != TargetDedicated)
-                                    {
-                                        TargetDedicated = dedicatedNodes ?? 0;
+                                        case false:
+                                            ++lowPriDecrementTarget;
+                                            break;
                                     }
                                 }
+                            }, detailLevel: new ODATADetailLevel(selectClause: "id,affinityId,isDedicated,state,stateTransitionTime"), cancellationToken: cancellationToken);
+
+                            lock (lockObj)
+                            {
+                                foreach (var node in ReservedComuteNodes.Where(r => nodesToRemove.Any(n => n.AffinityId.Equals(r.AffinityId))).ToList())
+                                {
+                                    _ = ReservedComuteNodes.Remove(node);
+                                }
+
+                                TargetDedicated -= dedicatedDecrementTarget;
+                                TargetLowPriority -= lowPriDecrementTarget;
                             }
+
+                            await Task.WhenAll(nodesToRemove.Select(n => n.RemoveFromPoolAsync(cancellationToken: cancellationToken)).ToArray());
                         }
                         break;
 
                     case ServiceKind.Rotate:
-                        if (IsAvailable && Creation + IdlePoolCheck > DateTime.UtcNow)
+                        if (IsAvailable)
                         {
-                            IsAvailable = false;
-                            // TODO: "duplicate" current pool
+                            IsAvailable = Creation + ForcePoolRotationAge >= DateTime.UtcNow &&
+                                !(Changed + IdlePoolCheck < DateTime.UtcNow && TargetDedicated == 0 && TargetLowPriority == 0);
                         }
                         break;
 
-                    case ServiceKind.RemovePoolIfIdle:
+                    case ServiceKind.RemovePoolIfEmpty:
                         if (!IsAvailable)
                         {
                             var (lowPriorityNodes, dedicatedNodes) = await _azureProxy.GetCurrentComputeNodesAsync(Pool.PoolId, cancellationToken);
                             if ((lowPriorityNodes is null || lowPriorityNodes == 0) && (dedicatedNodes is null || dedicatedNodes == 0))
                             {
-                                var queue = ManagedBatchPools.GetOrAdd(Pool.PoolId, k => new());
-                                while (queue.TryDequeue(out var pool))
+                                foreach (var queue in ManagedBatchPools.Values)
                                 {
-                                    if (ReferenceEquals(this, pool))
+                                    if (queue.Contains(this))
                                     {
-                                        await _azureProxy.DeleteBatchPoolAsync(Pool.PoolId, cancellationToken);
-                                        break;
+                                        lock (lockObj)
+                                        {
+                                            while (queue.TryDequeue(out var pool))
+                                            {
+                                                if (!ReferenceEquals(this, pool))
+                                                {
+                                                    queue.Enqueue(pool);
+                                                }
+                                            }
+                                        }
                                     }
-                                    queue.Enqueue(pool);
                                 }
+                                await _azureProxy.DeleteBatchPoolAsync(Pool.PoolId, cancellationToken);
                             }
                         }
                         break;
@@ -296,6 +323,8 @@ namespace TesApi.Web
             private readonly IAzureProxy _azureProxy;
             private readonly object lockObj = new();
             private volatile int _resizeGuard = 0;
+
+            private List<AffinityInformation> ReservedComuteNodes { get; } = new();
         }
 
         private static readonly object syncObject = new();
@@ -327,16 +356,46 @@ namespace TesApi.Web
             /// <inheritdoc/>
             protected override async Task ExecuteAsync(CancellationToken stoppingToken)
             {
-                logger.LogInformation("BatchPool task started.");
+                logger.LogInformation("BatchPool service started.");
+                await Task.WhenAll(new[] { ResizeAsync(stoppingToken), RemoveNodeIfIdleAsync(stoppingToken), RotateAsync(stoppingToken), RemovePoolIfEmptyAsync(stoppingToken) }).ConfigureAwait(false);
+                logger.LogInformation("BatchPool service gracefully stopped.");
+            }
 
+            private async Task ResizeAsync(CancellationToken stoppingToken)
+            {
+                logger.LogInformation("Resize BatchPool task started.");
+                await ProcessPoolsAsync(BatchPool.ServiceKind.Resize, stoppingToken).ConfigureAwait(false);
+                logger.LogInformation("Resize BatchPool task gracefully stopped.");
+            }
+
+            private async Task RemoveNodeIfIdleAsync(CancellationToken stoppingToken)
+            {
+                logger.LogInformation("RemoveNodeIfIdle BatchPool task started.");
+                await ProcessPoolsAsync(BatchPool.ServiceKind.RemoveNodeIfIdle, stoppingToken).ConfigureAwait(false);
+                logger.LogInformation("RemoveNodeIfIdle BatchPool task gracefully stopped.");
+            }
+
+            private async Task RotateAsync(CancellationToken stoppingToken)
+            {
+                logger.LogInformation("Rotate BatchPool task started.");
+                await ProcessPoolsAsync(BatchPool.ServiceKind.Rotate, stoppingToken).ConfigureAwait(false);
+                logger.LogInformation("Rotate BatchPool task gracefully stopped.");
+            }
+
+            private async Task RemovePoolIfEmptyAsync(CancellationToken stoppingToken)
+            {
+                logger.LogInformation("RemovePoolIfEmpty BatchPool task started.");
+                await ProcessPoolsAsync(BatchPool.ServiceKind.RemovePoolIfEmpty, stoppingToken).ConfigureAwait(false);
+                logger.LogInformation("RemovePoolIfEmpty BatchPool task gracefully stopped.");
+            }
+
+            private async Task ProcessPoolsAsync(BatchPool.ServiceKind service, CancellationToken stoppingToken)
+            {
                 while (!stoppingToken.IsCancellationRequested)
                 {
                     try
                     {
-                        await ProcessPools(BatchPool.ServiceKind.Resize, stoppingToken);
-                        await ProcessPools(BatchPool.ServiceKind.RemoveNodeIfIdle, stoppingToken);
-                        await ProcessPools(BatchPool.ServiceKind.Rotate, stoppingToken);
-                        await ProcessPools(BatchPool.ServiceKind.RemovePoolIfIdle, stoppingToken);
+                        await Task.WhenAll(ManagedBatchPools.Values.SelectMany(q => q).Select(p => p.ServicePool(service, stoppingToken)).ToArray());
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                     {
@@ -356,12 +415,7 @@ namespace TesApi.Web
                         break;
                     }
                 }
-
-                logger.LogInformation("BatchPool task gracefully stopped.");
             }
-
-            private static async Task ProcessPools(BatchPool.ServiceKind serviceKind, CancellationToken stoppingToken)
-                => await Task.WhenAll(ManagedBatchPools.Values.SelectMany(q => q).Select(p => p.ServicePool(serviceKind, stoppingToken)).ToArray());
         }
     }
 }

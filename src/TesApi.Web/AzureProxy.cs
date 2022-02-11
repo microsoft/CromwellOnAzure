@@ -242,9 +242,8 @@ namespace TesApi.Web
         /// <param name="jobId"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
-        /// <param name="isLowPriority"></param>
         /// <returns></returns>
-        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, bool isLowPriority)
+        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
             await job.CommitAsync();
@@ -269,7 +268,7 @@ namespace TesApi.Web
                     // With manual pools, the PoolId property is set
                     if (BatchPools.TryGet(poolInformation.PoolId, out var batchPool))
                     {
-                        await batchPool.RemoveNode(isLowPriority);
+                        batchPool.ReleaseNode(cloudTask.AffinityInformation);
                     }
                 }
 
@@ -496,6 +495,17 @@ namespace TesApi.Web
             => (await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState"), cancellationToken: cancellationToken)).AllocationState;
 
         /// <summary>
+        /// Iterates over the compute nodes of the specified pool, invoking a synchronous delegate for each compute node.
+        /// </summary>
+        /// <param name="poolId">The id of the pool.</param>
+        /// <param name="body">The delegate to execute for each compute node in the specified pool.</param>
+        /// <param name="detailLevel">A Microsoft.Azure.Batch.DetailLevel used for filtering the list and for controlling which properties are retrieved from the service.</param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
+        /// <returns></returns>
+        public async Task ForEachComputeNodeAsync(string poolId, Action<ComputeNode> body, DetailLevel detailLevel = null, CancellationToken cancellationToken = default)
+            => await batchClient.PoolOperations.ListComputeNodes(poolId, detailLevel: detailLevel).ForEachAsync(body, cancellationToken);
+
+        /// <summary>
         /// TODO
         /// </summary>
         /// <param name="poolId"></param>
@@ -503,7 +513,7 @@ namespace TesApi.Web
         /// <returns></returns>
         public async Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default)
         {
-            var pool = (await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "currentLowPriorityNodes,currentDedicatedNodes"), cancellationToken: cancellationToken));
+            var pool = await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "currentLowPriorityNodes,currentDedicatedNodes"), cancellationToken: cancellationToken);
             return (pool.CurrentLowPriorityComputeNodes, pool.CurrentDedicatedComputeNodes);
         }
 
@@ -905,7 +915,7 @@ namespace TesApi.Web
                 logger.LogInformation($"Creating manual batch pool named {poolName} with vmSize {vmSize}");
                 var pool = await batchManagementClient.Pool.CreateAsync(batchResourceGroupName, batchAccountName, poolInfo.Name, poolInfo);
                 logger.LogInformation($"Successfully created manual batch pool named {poolName} with vmSize {vmSize}");
-                return new() { PoolId = pool.Id };
+                return new() { PoolId = pool.Name };
             }
             catch (Exception exc)
             {
