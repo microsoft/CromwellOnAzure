@@ -307,7 +307,6 @@ namespace TesApi.Web
                 var startTask = await StartTaskIfNeeded(tesTask);
 
                 var poolInformation = await CreateAutoPoolModePoolInformation(
-                    dockerImage,
                     virtualMachineInfo.VmSize,
                     virtualMachineInfo.LowPriority,
                     containerConfiguration,
@@ -905,46 +904,6 @@ namespace TesApi.Web
                                         identityReference: r.IdentityReference is null ? null : new() { ResourceId = r.IdentityReference.ResourceId }))
                                     .ToList()
             };
-        }
-
-        /// <summary>
-        /// Constructs an Azure Batch PoolInformation instance
-        /// </summary>
-        /// <param name="executorImage">The image name for the current <see cref="TesTask"/></param>
-        /// <param name="vmSize">The Azure VM sku</param>
-        /// <param name="preemptible">True if preemptible machine should be used</param>
-        /// <param name="containerConfiguration">The configuration to download private images</param>
-        /// <param name="startTask">The start task for all jobs/tasks in the pool</param>
-        /// <param name="jobId"></param>
-        /// <param name="identityResourceId"></param>
-        /// <returns>An Azure Batch Pool specifier</returns>
-        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(string vmSize, bool preemptible, ContainerConfiguration containerConfiguration, StartTask startTask, string jobId = null, string identityResourceId = null)
-        {
-            if (!string.IsNullOrWhiteSpace(identityResourceId))
-            {
-                _ = jobId ?? throw new ArgumentNullException(nameof(jobId));
-            }
-
-            var poolSpecification = GetPoolSpecification(vmSize, preemptible, containerConfiguration, startTask);
-
-            // By default, the pool will have the same name/ID as the job if the identity is provided, otherwise we return an actual autopool.
-            return string.IsNullOrWhiteSpace(identityResourceId)
-                ? new()
-                {
-                    AutoPoolSpecification = new()
-                    {
-                        AutoPoolIdPrefix = "TES",
-                        PoolLifetimeOption = PoolLifetimeOption.Job,
-                        PoolSpecification = poolSpecification,
-                        KeepAlive = false
-                    }
-                }
-                : await azureProxy.CreateBatchPoolAsync(
-                    ConvertPoolSpecificationTomODELSPool(
-                        jobId,
-                        jobId,
-                        GetBatchPoolIdentity(identityResourceId),
-                        poolSpecification));
         }
 
         /// <summary>
