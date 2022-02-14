@@ -275,58 +275,32 @@ namespace TesApi.Web
                 var containerConfiguration = await ContainerConfigurationIfNeeded(dockerImage);
                 var startTask = await StartTaskIfNeeded(tesTask);
 
-<<<<<<< HEAD
                 Func<AffinityInformation> getAffinity = () => default;
                 if (this.enableBatchAutopool)
-                {
-                    poolInformation = await CreateAutoPoolPoolInformation(
-                        dockerImage,
-                        virtualMachineInfo.VmSize,
-                        virtualMachineInfo.LowPriority,
-                        containerConfiguration,
-                        startTask,
-                        batchExecutionPath,
-                        jobId,
-                        identityResourceId);
-                }
-                else
-                {
-                    // By default, the pool will have the same name/ID as the job if the identity is provided and autopool is enabled, otherwise we default to the VmSize + identity if provided
-                    // TODO: -0-9A-Za-z_ <-- it would appear that both inputs are already constrained to this requirment, but it would be best to fully confirm or even better assume that one of the inputs may broaden in the future.
-                    var poolName = (this.enableBatchAutopool, IsIdentityProvided) switch
-                    {
-                        (false, true) => $"{virtualMachineInfo.VmSize}-{Path.GetFileName(identityResourceId)}",
-                        (true, _) => jobId,
-                        (_, false) => virtualMachineInfo.VmSize,
-                    };
-=======
-                var poolInformation = await CreateAutoPoolModePoolInformation(
-                    virtualMachineInfo.VmSize,
-                    virtualMachineInfo.LowPriority,
-                    containerConfiguration,
-                    startTask,
-                    jobId,
-                    identityResourceId);
->>>>>>> b262a7b (Fix website edits)
-
-                    poolInformation = (await batchPools.GetOrAdd(poolName, id => azureProxy.CreateBatchPoolAsync(ConvertPoolSpecificationToModelsPool(
-                            poolName: id,
-                            displayName: poolName,
-                            GetBatchPoolIdentity(identityResourceId),
-                            GetPoolSpecification(virtualMachineInfo.VmSize, null, containerConfiguration, startTask)))))
-                        .Pool;
-
-                    getAffinity = () => batchPools.TryGet(poolInformation.PoolId, out var pool) ? pool.PrepareNodeAsync(virtualMachineInfo.LowPriority).Result : default;
-                }
-                else
                 {
                     poolInformation = await CreateAutoPoolModePoolInformation(
                         virtualMachineInfo.VmSize,
                         virtualMachineInfo.LowPriority,
                         containerConfiguration,
                         startTask,
-	                    jobId,
-    	                identityResourceId);
+                        jobId,
+                        identityResourceId);
+                }
+                else
+                {
+                    // TODO: -_0-9A-Za-z <-- it would appear that both inputs are already constrained to this requirment, but it would be best to fully confirm or even better assume that one of the inputs may broaden in the future.
+                    var poolName = IsIdentityProvided
+                        ? $"{virtualMachineInfo.VmSize}-{Path.GetFileName(identityResourceId)}"
+                        : virtualMachineInfo.VmSize;
+
+                    poolInformation = (await batchPools.GetOrAdd(poolName, id => azureProxy.CreateBatchPoolAsync(ConvertPoolSpecificationToModelsPool(
+                            name: id,
+                            displayName: poolName,
+                            GetBatchPoolIdentity(identityResourceId),
+                            GetPoolSpecification(virtualMachineInfo.VmSize, null, containerConfiguration, startTask)))))
+                        .Pool;
+
+                    getAffinity = () => batchPools.TryGet(poolInformation.PoolId, out var pool) ? pool.PrepareNodeAsync(virtualMachineInfo.LowPriority).Result : default;
                 }
 
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, getAffinity, containerConfiguration is not null);
@@ -969,7 +943,7 @@ namespace TesApi.Web
         /// <param name="identityResourceId"></param>
         /// <returns></returns>
         private static BatchModels.BatchPoolIdentity GetBatchPoolIdentity(string identityResourceId)
-            => new(BatchModels.PoolIdentityType.UserAssigned, new Dictionary<string, BatchModels.UserAssignedIdentities>() { [identityResourceId] = new() });
+            => string.IsNullOrWhiteSpace(identityResourceId) ? null : new(BatchModels.PoolIdentityType.UserAssigned, new Dictionary<string, BatchModels.UserAssignedIdentities>() { [identityResourceId] = new() });
 
         /// <summary>
         /// Generate the PoolSpecification object
@@ -981,11 +955,6 @@ namespace TesApi.Web
         /// <returns></returns>
         private PoolSpecification GetPoolSpecification(string vmSize, bool? preemptible, ContainerConfiguration containerConfiguration, StartTask startTask)
         {
-            if (!string.IsNullOrWhiteSpace(identityResourceId))
-            {
-                _ = jobId ?? throw new ArgumentNullException(nameof(jobId));
-            }
-
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
                     batchNodeInfo.BatchImageOffer,
