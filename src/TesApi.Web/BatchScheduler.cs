@@ -940,7 +940,7 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// 
+        /// Generate the BatchPoolIdentity object
         /// </summary>
         /// <param name="identityResourceId"></param>
         /// <returns></returns>
@@ -948,7 +948,7 @@ namespace TesApi.Web
             => new(BatchModels.PoolIdentityType.UserAssigned, new Dictionary<string, BatchModels.UserAssignedIdentities>() { [identityResourceId] = new() });
 
         /// <summary>
-        /// 
+        /// Generate the PoolSpecification object
         /// </summary>
         /// <param name="vmSize"></param>
         /// <param name="preemptible"></param>
@@ -991,7 +991,7 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// 
+        /// Convert PoolSpecification to Models.Pool, including any BatchPoolIdentity
         /// </summary>
         /// <param name="name"></param>
         /// <param name="displayName"></param>
