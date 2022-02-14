@@ -43,6 +43,7 @@ namespace TesApi.Web
         private static readonly HttpClient httpClient = new();
 
         private readonly ILogger logger;
+        private readonly Lazy<IBatchPools> batchPools;
         private readonly Func<Task<BatchModels.BatchAccount>> getBatchAccountFunc;
         private readonly BatchClient batchClient;
         private readonly string subscriptionId;
@@ -58,10 +59,12 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="batchAccountName">Batch account name</param>
         /// <param name="azureOfferDurableId">Azure offer id</param>
+        /// <param name="batchPools">Managed Azure Batch Pools service</param>
         /// <param name="logger">The logger</param>
-        public AzureProxy(string batchAccountName, string azureOfferDurableId, ILogger logger)
+        public AzureProxy(string batchAccountName, string azureOfferDurableId, Lazy<IBatchPools> batchPools, ILogger logger)
         {
             this.logger = logger;
+            this.batchPools = batchPools;
             this.batchAccountName = batchAccountName;
             var (SubscriptionId, ResourceGroupName, Location, BatchAccountEndpoint) = FindBatchAccountAsync(batchAccountName).Result;
             batchResourceGroupName = ResourceGroupName;
@@ -266,7 +269,7 @@ namespace TesApi.Web
                 if (!string.IsNullOrWhiteSpace(poolInformation?.PoolId))
                 {
                     // With manual pools, the PoolId property is set
-                    if (BatchPools.TryGet(poolInformation.PoolId, out var batchPool))
+                    if (batchPools.Value.TryGet(poolInformation.PoolId, out var batchPool))
                     {
                         batchPool.ReleaseNode(cloudTask.AffinityInformation);
                     }

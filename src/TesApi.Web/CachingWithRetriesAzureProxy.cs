@@ -153,15 +153,16 @@ namespace TesApi.Web
             => azureProxy.CreateBatchPoolAsync(poolInfo);
 
         /// <inheritdoc/>
-        public Task<Microsoft.Azure.Batch.Common.AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default) => azureProxy.GetAllocationStateAsync(poolId, cancellationToken);
+        public Task<Microsoft.Azure.Batch.Common.AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
+            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetAllocationStateAsync(poolId, cancellationToken));
 
         /// <inheritdoc/>
-        public async Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default)
-            => await azureProxy.GetCurrentComputeNodesAsync(poolId, cancellationToken);
+        public Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default)
+            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetCurrentComputeNodesAsync(poolId, cancellationToken));
 
         /// <inheritdoc/>
         public Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default)
-            => azureProxy.SetComputeNodeTargetsAsync(poolId, targetLowPriorityComputeNodes, targetDedicatedComputeNodes, cancellationToken);
+            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.SetComputeNodeTargetsAsync(poolId, targetLowPriorityComputeNodes, targetDedicatedComputeNodes, cancellationToken));
 
         /// <inheritdoc/>
         public Task ForEachComputeNodeAsync(string poolId, Action<ComputeNode> body, DetailLevel detailLevel = null, CancellationToken cancellationToken = default)
