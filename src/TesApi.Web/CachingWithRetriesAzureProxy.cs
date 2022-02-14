@@ -10,6 +10,7 @@ using Microsoft.Azure.Batch;
 using Polly;
 using Polly.Retry;
 using Tes.Models;
+using BatchModels = Microsoft.Azure.Management.Batch.Models;
 
 namespace TesApi.Web
 {
@@ -148,8 +149,8 @@ namespace TesApi.Web
         public bool TryReadCwlFile(string workflowId, out string content) => azureProxy.TryReadCwlFile(workflowId, out content);
 
         /// <inheritdoc/>
-        public Task CreateManualBatchPoolAsync(string poolName, string vmSize, bool isLowPriority, string executorImage, BatchNodeInfo nodeInfo, string dockerInDockerImageName, string blobxferImageName, string identityResourceId, bool disableBatchNodesPublicIpAddress, string batchNodesSubnetId, string startTaskSasUrl, string startTaskPath)
-            => azureProxy.CreateManualBatchPoolAsync(poolName, vmSize, isLowPriority, executorImage, nodeInfo, dockerInDockerImageName, blobxferImageName, identityResourceId, disableBatchNodesPublicIpAddress, batchNodesSubnetId, startTaskSasUrl, startTaskPath);
+        public Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo)
+            => azureProxy.CreateBatchPoolAsync(poolInfo);
 
         /// <inheritdoc/>
         public Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default)

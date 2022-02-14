@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Tes.Models;
+using BatchModels = Microsoft.Azure.Management.Batch.Models;
 
 namespace TesApi.Web
 {
@@ -54,20 +55,7 @@ namespace TesApi.Web
         /// <summary>
         /// Creates a Pool in Azure Batch that is NOT an AutoPool
         /// </summary>
-        Task CreateManualBatchPoolAsync(
-            string poolName,
-            string vmSize,
-            bool isLowPriority,
-            string executorImage,
-            BatchNodeInfo nodeInfo,
-            string dockerInDockerImageName,
-            string blobxferImageName,
-            string identityResourceId,
-            bool disableBatchNodesPublicIpAddress,
-            string batchNodesSubnetId,
-            string startTaskSasUrl,
-            string startTaskPath);
-
+        Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo);
 
         /// <summary>
         /// Get the current states of the Azure Batch job and task corresponding to the given TES task
