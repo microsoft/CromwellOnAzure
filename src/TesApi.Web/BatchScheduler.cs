@@ -306,7 +306,6 @@ namespace TesApi.Web
                 var containerConfiguration = await ContainerConfigurationIfNeeded(dockerImage);
                 var startTask = await StartTaskIfNeeded(tesTask);
 
-                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, containerConfiguration is not null);
                 var poolInformation = await CreateAutoPoolModePoolInformation(
                     dockerImage,
                     virtualMachineInfo.VmSize,
@@ -316,6 +315,7 @@ namespace TesApi.Web
                     jobId,
                     identityResourceId);
 
+                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, containerConfiguration is not null);
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
                 await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
@@ -918,13 +918,92 @@ namespace TesApi.Web
         /// <param name="jobId"></param>
         /// <param name="identityResourceId"></param>
         /// <returns>An Azure Batch Pool specifier</returns>
-        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(string executorImage, string vmSize, bool preemptible, ContainerConfiguration containerConfiguration, StartTask startTask, string jobId = null, string identityResourceId = null)
+        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(string vmSize, bool preemptible, ContainerConfiguration containerConfiguration, StartTask startTask, string jobId = null, string identityResourceId = null)
         {
             if (!string.IsNullOrWhiteSpace(identityResourceId))
             {
                 _ = jobId ?? throw new ArgumentNullException(nameof(jobId));
             }
 
+            var poolSpecification = GetPoolSpecification(vmSize, preemptible, containerConfiguration, startTask);
+
+            // By default, the pool will have the same name/ID as the job if the identity is provided, otherwise we return an actual autopool.
+            return string.IsNullOrWhiteSpace(identityResourceId)
+                ? new()
+                {
+                    AutoPoolSpecification = new()
+                    {
+                        AutoPoolIdPrefix = "TES",
+                        PoolLifetimeOption = PoolLifetimeOption.Job,
+                        PoolSpecification = poolSpecification,
+                        KeepAlive = false
+                    }
+                }
+                : await azureProxy.CreateBatchPoolAsync(
+                    ConvertPoolSpecificationTomODELSPool(
+                        jobId,
+                        jobId,
+                        GetBatchPoolIdentity(identityResourceId),
+                        poolSpecification));
+        }
+
+        /// <summary>
+        /// Constructs an Azure Batch PoolInformation instance
+        /// </summary>
+        /// <param name="vmSize">The Azure VM sku</param>
+        /// <param name="preemptible">True if preemptible machine should be used</param>
+        /// <param name="containerConfiguration">The configuration to download private images</param>
+        /// <param name="startTask">The start task for all jobs/tasks in the pool</param>
+        /// <param name="jobId"></param>
+        /// <param name="identityResourceId"></param>
+        /// <returns>An Azure Batch Pool specifier</returns>
+        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(string vmSize, bool preemptible, ContainerConfiguration containerConfiguration, StartTask startTask, string jobId = null, string identityResourceId = null)
+        {
+            if (!string.IsNullOrWhiteSpace(identityResourceId))
+            {
+                _ = jobId ?? throw new ArgumentNullException(nameof(jobId));
+            }
+
+            var poolSpecification = GetPoolSpecification(vmSize, preemptible, containerConfiguration, startTask);
+
+            // By default, the pool will have the same name/ID as the job if the identity is provided, otherwise we return an actual autopool.
+            return string.IsNullOrWhiteSpace(identityResourceId)
+                ? new()
+                {
+                    AutoPoolSpecification = new()
+                    {
+                        AutoPoolIdPrefix = "TES",
+                        PoolLifetimeOption = PoolLifetimeOption.Job,
+                        PoolSpecification = poolSpecification,
+                        KeepAlive = false
+                    }
+                }
+                : await azureProxy.CreateBatchPoolAsync(
+                    ConvertPoolSpecificationToModelsPool(
+                        jobId,
+                        jobId,
+                        GetBatchPoolIdentity(identityResourceId),
+                        poolSpecification));
+        }
+
+        /// <summary>
+        /// Generate the BatchPoolIdentity object
+        /// </summary>
+        /// <param name="identityResourceId"></param>
+        /// <returns></returns>
+        private static BatchModels.BatchPoolIdentity GetBatchPoolIdentity(string identityResourceId)
+            => new(BatchModels.PoolIdentityType.UserAssigned, new Dictionary<string, BatchModels.UserAssignedIdentities>() { [identityResourceId] = new() });
+
+        /// <summary>
+        /// Generate the PoolSpecification object
+        /// </summary>
+        /// <param name="vmSize"></param>
+        /// <param name="preemptible"></param>
+        /// <param name="containerConfiguration"></param>
+        /// <param name="startTask"></param>
+        /// <returns></returns>
+        private PoolSpecification GetPoolSpecification(string vmSize, bool? preemptible, ContainerConfiguration containerConfiguration, StartTask startTask)
+        {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
                     batchNodeInfo.BatchImageOffer,
@@ -941,8 +1020,8 @@ namespace TesApi.Web
                 VirtualMachineConfiguration = vmConfig,
                 VirtualMachineSize = vmSize,
                 ResizeTimeout = TimeSpan.FromMinutes(30),
-                TargetLowPriorityComputeNodes = preemptible ? 1 : 0,
-                TargetDedicatedComputeNodes = preemptible ? 0 : 1,
+                TargetLowPriorityComputeNodes = preemptible == true ? 1 : 0,
+                TargetDedicatedComputeNodes = preemptible == false ? 1 : 0,
                 StartTask = startTask
             };
 
@@ -955,46 +1034,39 @@ namespace TesApi.Web
                 };
             }
 
-            // By default, the pool will have the same name/ID as the job if the identity is provided, otherwise we return an actual autopool.
-            return string.IsNullOrWhiteSpace(identityResourceId)
-                ? new()
-                {
-                    AutoPoolSpecification = new()
-                    {
-                        AutoPoolIdPrefix = "TES",
-                        PoolLifetimeOption = PoolLifetimeOption.Job,
-                        PoolSpecification = poolSpecification,
-                        KeepAlive = false
-                    }
-                }
-                : await azureProxy.CreateBatchPoolAsync(
-                    ConvertPoolSpecificationToPool(
-                        jobId,
-                        jobId,
-                        new(BatchModels.PoolIdentityType.UserAssigned, new Dictionary<string, BatchModels.UserAssignedIdentities>() { [identityResourceId] = new() }),
-                        poolSpecification));
+            return poolSpecification;
+        }
 
-            static BatchModels.Pool ConvertPoolSpecificationToPool(string name, string displayName, BatchModels.BatchPoolIdentity poolIdentity, PoolSpecification pool)
-                => new(name: name, displayName: displayName, identity: poolIdentity)
+        /// <summary>
+        /// Convert PoolSpecification to Models.Pool, including any BatchPoolIdentity
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="displayName"></param>
+        /// <param name="poolIdentity"></param>
+        /// <param name="pool"></param>
+        /// <returns></returns>
+        private static BatchModels.Pool ConvertPoolSpecificationToModelsPool(string name, string displayName, BatchModels.BatchPoolIdentity poolIdentity, PoolSpecification pool)
+        {
+            return new(name: name, displayName: displayName, identity: poolIdentity)
+            {
+                VmSize = pool.VirtualMachineSize,
+                ScaleSettings = new()
                 {
-                    VmSize = pool.VirtualMachineSize,
-                    ScaleSettings = new()
+                    FixedScale = new()
                     {
-                        FixedScale = new()
-                        {
-                            TargetDedicatedNodes = pool.TargetDedicatedComputeNodes,
-                            TargetLowPriorityNodes = pool.TargetLowPriorityComputeNodes,
-                            ResizeTimeout = pool.ResizeTimeout,
-                            NodeDeallocationOption = BatchModels.ComputeNodeDeallocationOption.TaskCompletion
-                        }
-                    },
-                    DeploymentConfiguration = new()
-                    {
-                        VirtualMachineConfiguration = new(ConvertImageReference(pool.VirtualMachineConfiguration.ImageReference), pool.VirtualMachineConfiguration.NodeAgentSkuId, containerConfiguration: ConvertContainerConfiguration(pool.VirtualMachineConfiguration.ContainerConfiguration))
-                    },
-                    NetworkConfiguration = ConvertNetworkConfiguration(pool.NetworkConfiguration),
-                    StartTask = ConvertStartTask(pool.StartTask)
-                };
+                        TargetDedicatedNodes = pool.TargetDedicatedComputeNodes,
+                        TargetLowPriorityNodes = pool.TargetLowPriorityComputeNodes,
+                        ResizeTimeout = pool.ResizeTimeout,
+                        NodeDeallocationOption = BatchModels.ComputeNodeDeallocationOption.TaskCompletion
+                    }
+                },
+                DeploymentConfiguration = new()
+                {
+                    VirtualMachineConfiguration = new(ConvertImageReference(pool.VirtualMachineConfiguration.ImageReference), pool.VirtualMachineConfiguration.NodeAgentSkuId, containerConfiguration: ConvertContainerConfiguration(pool.VirtualMachineConfiguration.ContainerConfiguration))
+                },
+                NetworkConfiguration = ConvertNetworkConfiguration(pool.NetworkConfiguration),
+                StartTask = ConvertStartTask(pool.StartTask)
+            };
 
             static BatchModels.ContainerConfiguration ConvertContainerConfiguration(ContainerConfiguration containerConfiguration)
                 => containerConfiguration is null ? default : new(containerConfiguration.ContainerImageNames, containerConfiguration.ContainerRegistries?.Select(ConvertContainerRegistry).ToList());
@@ -1010,7 +1082,7 @@ namespace TesApi.Web
 
             static BatchModels.TaskContainerSettings ConvertTaskContainerSettings(TaskContainerSettings containerSettings)
                 => containerSettings is null ? default : new(containerSettings.ImageName, containerSettings.ContainerRunOptions, ConvertContainerRegistry(containerSettings.Registry), (BatchModels.ContainerWorkingDirectory?)containerSettings.WorkingDirectory);
- 
+
             static BatchModels.ContainerRegistry ConvertContainerRegistry(ContainerRegistry containerRegistry)
                 => containerRegistry is null ? default : new(containerRegistry.UserName, containerRegistry.Password, containerRegistry.RegistryServer, ConvertComputeNodeIdentityReference(containerRegistry.IdentityReference));
 
