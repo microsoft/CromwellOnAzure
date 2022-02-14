@@ -835,91 +835,23 @@ namespace TesApi.Web
         /// <summary>
         /// Creates an Azure Batch pool that's lifecycle must be manually managed
         /// </summary>
-        /// <param name="poolName">The name of the pool. This becomes the Pool.Id</param>
-        /// <param name="displayName">The display name of the pool.</param>
-        /// <param name="vmSize">The Azure SKU for the VM of the pool</param>
-        /// <param name="nodeInfo">Information about the pool to be created</param>
-        /// <param name="containerConfiguration">The configuration to download private images</param>
-        /// <param name="batchExecutionDirectoryPath">Relative path to the Batch execution location</param>
-        /// <param name="identityResourceId">The resource ID of a user-assigned managed identity to assign to the pool</param>
-        /// <param name="disableBatchNodesPublicIpAddress">True to remove the public IP address of the Batch node</param>
-        /// <param name="batchNodesSubnetId">The subnet ID of the Batch VM in the pool</param>
-        /// <param name="startTask">The start task for all jobs/tasks in the pool</param>
-        /// <returns>An Azure Batch Pool specifier</returns>
-        public async Task<PoolInformation> CreateBatchPoolAsync(
-            string poolName,
-            string displayName,
-            string vmSize,
-            BatchNodeInfo nodeInfo,
-            BatchModels.ContainerConfiguration containerConfiguration,
-            string batchExecutionDirectoryPath,
-            string identityResourceId, 
-            bool disableBatchNodesPublicIpAddress, 
-            string batchNodesSubnetId,
-            BatchModels.StartTask startTask
-            )
+        /// <param name="poolInfo">Contains information about a pool. poolInfo.Name becomes the Pool.Id</param>
+        /// <returns></returns>
+        public async Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo)
         {
             try
             {
                 var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
 
-                var poolInfo = new BatchModels.Pool(name: poolName, displayName: displayName)
-                {
-                    VmSize = vmSize,
-                    ScaleSettings = new BatchModels.ScaleSettings
-                    {
-                        FixedScale = new BatchModels.FixedScaleSettings
-                        {
-                            TargetDedicatedNodes = 0,
-                            TargetLowPriorityNodes = 0,
-                            ResizeTimeout = TimeSpan.FromMinutes(30), 
-                            NodeDeallocationOption = BatchModels.ComputeNodeDeallocationOption.TaskCompletion
-                        }
-                    },
-                    DeploymentConfiguration = new BatchModels.DeploymentConfiguration
-                    {
-                        VirtualMachineConfiguration = new BatchModels.VirtualMachineConfiguration(
-                            new BatchModels.ImageReference(
-                                nodeInfo.BatchImagePublisher,
-                                nodeInfo.BatchImageOffer,
-                                nodeInfo.BatchImageSku,
-                                nodeInfo.BatchImageVersion),
-                            nodeInfo.BatchNodeAgentSkuId,
-                            containerConfiguration: containerConfiguration)
-                    },
-                    StartTask = startTask
-                };
-
-                if (!string.IsNullOrEmpty(identityResourceId))
-                {
-                    poolInfo.Identity = new BatchModels.BatchPoolIdentity
-                    {
-                        Type = BatchModels.PoolIdentityType.UserAssigned,
-                        UserAssignedIdentities = new Dictionary<string, BatchModels.UserAssignedIdentities>
-                        {
-                            [identityResourceId] = new BatchModels.UserAssignedIdentities()
-                        }
-                    };
-                }
-
-                if (!string.IsNullOrEmpty(batchNodesSubnetId))
-                {
-                    poolInfo.NetworkConfiguration = new BatchModels.NetworkConfiguration
-                    {
-                        PublicIPAddressConfiguration = new BatchModels.PublicIPAddressConfiguration(disableBatchNodesPublicIpAddress ? BatchModels.IPAddressProvisioningType.NoPublicIPAddresses : BatchModels.IPAddressProvisioningType.BatchManaged),
-                        SubnetId = batchNodesSubnetId
-                    };
-                }
-
                 var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
-                logger.LogInformation($"Creating manual batch pool named {poolName} with vmSize {vmSize}");
+                logger.LogInformation($"Creating manual batch pool named {poolInfo.Name} with vmSize {poolInfo.VmSize}");
                 var pool = await batchManagementClient.Pool.CreateAsync(batchResourceGroupName, batchAccountName, poolInfo.Name, poolInfo);
-                logger.LogInformation($"Successfully created manual batch pool named {poolName} with vmSize {vmSize}");
+                logger.LogInformation($"Successfully created manual batch pool named {poolInfo.Name} with vmSize {poolInfo.VmSize}");
                 return new() { PoolId = pool.Name };
             }
             catch (Exception exc)
             {
-                logger.LogError(exc, $"Error trying to create manual batch pool named {poolName} with vmSize {vmSize}");
+                logger.LogError(exc, $"Error trying to create manual batch pool named {poolInfo.Name} with vmSize {poolInfo.VmSize}");
                 throw;
             }
         }

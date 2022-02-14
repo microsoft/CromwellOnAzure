@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Tes.Models;
+using BatchModels = Microsoft.Azure.Management.Batch.Models;
 
 namespace TesApi.Web
 {
@@ -54,18 +55,7 @@ namespace TesApi.Web
         /// <summary>
         /// Creates a Pool in Azure Batch that is NOT an AutoPool
         /// </summary>
-        Task<PoolInformation> CreateBatchPoolAsync(
-            string poolName,
-            string displayName,
-            string vmSize,
-            BatchNodeInfo nodeInfo,
-            Microsoft.Azure.Management.Batch.Models.ContainerConfiguration containerConfiguration,
-            string batchExecutionDirectoryPath,
-            string identityResourceId,
-            bool disableBatchNodesPublicIpAddress,
-            string batchNodesSubnetId,
-            Microsoft.Azure.Management.Batch.Models.StartTask startTask);
-
+        Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo);
 
         /// <summary>
         /// Get the current states of the Azure Batch job and task corresponding to the given TES task
