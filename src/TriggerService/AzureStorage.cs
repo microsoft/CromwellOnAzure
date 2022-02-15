@@ -7,13 +7,11 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Services.AppAuthentication;
-using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
@@ -27,6 +25,7 @@ namespace TriggerService
         private readonly CloudStorageAccount account;
         private readonly CloudBlobClient blobClient;
         private readonly HttpClient httpClient;
+        private readonly HashSet<string> createdContainers = new HashSet<string>();
 
         public AzureStorage(CloudStorageAccount account, HttpClient httpClient)
         {
@@ -58,7 +57,7 @@ namespace TriggerService
                     var app = (await new ApplicationInsightsManagementClient(credentials) { SubscriptionId = subscriptionId }.Components.ListAsync())
                         .FirstOrDefault(a => a.ApplicationId.Equals(appInsightsApplicationId, StringComparison.OrdinalIgnoreCase));
 
-                    if (app != null)
+                    if (app is not null)
                     {
                         return app.InstrumentationKey;
                     }
@@ -103,7 +102,14 @@ namespace TriggerService
         public async Task<string> UploadFileTextAsync(string content, string container, string blobName)
         {
             var containerReference = blobClient.GetContainerReference(container);
-            await containerReference.CreateIfNotExistsAsync();
+
+            if (!createdContainers.Contains(container.ToLowerInvariant()))
+            {
+                // Only attempt to create the container once per lifetime of the process
+                await containerReference.CreateIfNotExistsAsync();
+                createdContainers.Add(container.ToLowerInvariant());
+            }
+
             var blob = containerReference.GetBlockBlobReference(blobName);
             await blob.UploadTextAsync(content);
             return blob.Uri.AbsoluteUri;
@@ -127,30 +133,22 @@ namespace TriggerService
 
             var context = new OperationContext();
 
-            using (var memoryStream = new MemoryStream())
-            {
-                await blob.DownloadToStreamAsync(memoryStream, null, options, context);
-                return memoryStream.ToArray();
-            }
+            using var memoryStream = new MemoryStream();
+            await blob.DownloadToStreamAsync(memoryStream, null, options, context);
+            return memoryStream.ToArray();
         }
 
         /// <inheritdoc />
         public async Task<byte[]> DownloadFileUsingHttpClientAsync(string url)
-        {
-            return await httpClient.GetByteArrayAsync(url);
-        }
+            => await httpClient.GetByteArrayAsync(url);
 
         /// <inheritdoc />
         public Task<string> DownloadBlobTextAsync(string container, string blobName)
-        {
-            return blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DownloadTextAsync();
-        }
+            => blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DownloadTextAsync();
 
         /// <inheritdoc />
         public Task DeleteBlobIfExistsAsync(string container, string blobName)
-        {
-			return blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DeleteIfExistsAsync();
-        }
+            => blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DeleteIfExistsAsync();
 
         private class StorageAccountInfo
         {
@@ -194,7 +192,7 @@ namespace TriggerService
 
                 blobList.AddRange(partialResult.Results.OfType<CloudBlockBlob>());
             }
-            while (continuationToken != null);
+            while (continuationToken is not null);
 
             return blobList;
         }
@@ -236,9 +234,7 @@ namespace TriggerService
         }
 
         private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
-        {
-            return new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
-        }
+            => new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
 
         private static async Task<List<StorageAccountInfo>> GetAccessibleStorageAccountsAsync()
         {
@@ -259,7 +255,7 @@ namespace TriggerService
             var azureClient = await GetAzureManagementClientAsync();
             var storageAccount = await azureClient.WithSubscription(storageAccountInfo.SubscriptionId).StorageAccounts.GetByIdAsync(storageAccountInfo.Id);
 
-            return (await storageAccount.GetKeysAsync()).First().Value;
+            return (await storageAccount.GetKeysAsync())[0].Value;
         }
     }
 }

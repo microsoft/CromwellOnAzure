@@ -23,14 +23,14 @@ namespace Tes.Models
             .Append(typeof(TesTaskLog))
             .SelectMany(t => t.GetProperties())
             .Select(prop => new { MetadataKey = prop.GetCustomAttribute<TesTaskLogMetadataKeyAttribute>(false)?.Name, PropertyInfo = prop })
-            .Where(kp => kp.MetadataKey != null)
+            .Where(kp => kp.MetadataKey is not null)
             .Select(kp => (kp.MetadataKey, kp.PropertyInfo)).ToList();
 
         /// <summary>
         /// Virtual Machine used by Azure Batch to handle the task
         /// </summary>
         [JsonIgnore]
-        public VirtualMachineInfo VirtualMachineInfo { get; set; }
+        public VirtualMachineInformation VirtualMachineInfo { get; set; }
 
         /// <summary>
         /// Contains task execution metrics when task is handled by Azure Batch
@@ -79,7 +79,7 @@ namespace Tes.Models
         internal void LoadObjectsFromMetadata(StreamingContext context)
         {
             LoadObjectFromMetadata(this);
-            this.VirtualMachineInfo = TryGetObjectFromMetadata<VirtualMachineInfo>(out var vmInfo) ? vmInfo : null;
+            this.VirtualMachineInfo = TryGetObjectFromMetadata<VirtualMachineInformation>(out var vmInfo) ? vmInfo : null;
             this.BatchNodeMetrics = TryGetObjectFromMetadata<BatchNodeMetrics>(out var metrics) ? metrics : null;
         }
 
@@ -92,7 +92,7 @@ namespace Tes.Models
         {
             foreach (var property in propertiesBackedByMetadata.Where(prop => prop.PropertyInfo.ReflectedType == typeof(T)))
             {
-                var propertyValue = obj != null ? property.PropertyInfo.GetValue(obj) : null;
+                var propertyValue = obj is not null ? property.PropertyInfo.GetValue(obj) : null;
                 AddOrUpdateMetadataItem(property.MetadataKey, propertyValue);
             }
         }
@@ -120,7 +120,7 @@ namespace Tes.Models
         /// <returns>Populated object</returns>
         private bool TryGetObjectFromMetadata<T>(out T obj) where T : new()
         {
-            if(this.Metadata == null)
+            if(this.Metadata is null)
             {
                 obj = default;
                 return false;
@@ -150,7 +150,7 @@ namespace Tes.Models
         private bool TryGetMetadataValue(string key, Type type, out object result)
         {
             string value = null;
-            var hasValue = this.Metadata != null && this.Metadata.TryGetValue(key, out value);
+            var hasValue = this.Metadata is not null && this.Metadata.TryGetValue(key, out value);
             result = hasValue ? JsonConvert.DeserializeObject($"\"{value}\"", type) : default;
             return hasValue;
         }
@@ -163,11 +163,11 @@ namespace Tes.Models
         /// <param name="value">Metadata item value</param>
         private void AddOrUpdateMetadataItem<T>(string key, T value)
         {
-            if (value != null)
+            if (value is not null)
             {
                 this.GetOrAddMetadata()[key] = JsonConvert.SerializeObject(value).Trim('"');
             }
-            else if (this.Metadata != null && this.Metadata.ContainsKey(key))
+            else if (this.Metadata is not null && this.Metadata.ContainsKey(key))
             {
                 this.Metadata.Remove(key);
             }

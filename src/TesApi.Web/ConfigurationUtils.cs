@@ -1,4 +1,7 @@
-﻿using System;
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -59,7 +62,7 @@ namespace TesApi.Web
 
             var allowedVmSizesFileContent = await storageAccessProvider.DownloadBlobAsync(allowedVmSizesFilePath);
 
-            if (allowedVmSizesFileContent == null)
+            if (allowedVmSizesFileContent is null)
             {
                 logger.LogWarning($"Unable to read from {allowedVmSizesFilePath}. All supported VM sizes will be eligible for Azure Batch task scheduling.");
                 return;
@@ -113,10 +116,10 @@ namespace TesApi.Web
         /// <summary>
         /// Combines the VM feature and price info with Batch quotas and produces the fixed-width list ready for uploading to .
         /// </summary>
-        /// <param name="vmInfos">List of <see cref="VirtualMachineInfo"/></param>
+        /// <param name="vmInfos">List of <see cref="VirtualMachineInformation"/></param>
         /// <param name="batchAccountQuotas">Batch quotas <see cref="AzureBatchAccountQuotas"/></param>
         /// <returns></returns>
-        private static string VirtualMachineInfoToFixedWidthColumns(IEnumerable<VirtualMachineInfo> vmInfos, AzureBatchAccountQuotas batchAccountQuotas)
+        private static string VirtualMachineInfoToFixedWidthColumns(IEnumerable<VirtualMachineInformation> vmInfos, AzureBatchAccountQuotas batchAccountQuotas)
         {
             var vmSizes = vmInfos.Where(v => !v.LowPriority).Select(v => v.VmSize);
 
@@ -127,7 +130,7 @@ namespace TesApi.Web
                     v.VmInfoWithDedicatedPrice.VmSize,
                     v.VmInfoWithDedicatedPrice.VmFamily,
                     PricePerHourDedicated = v.VmInfoWithDedicatedPrice.PricePerHour?.ToString("###0.000"),
-                    PricePerHourLowPri = v.PricePerHourLowPri != null ? v.PricePerHourLowPri?.ToString("###0.000") : "N/A",
+                    PricePerHourLowPri = v.PricePerHourLowPri is not null ? v.PricePerHourLowPri?.ToString("###0.000") : "N/A",
                     MemoryInGiB = v.VmInfoWithDedicatedPrice.MemoryInGB?.ToString(),
                     NumberOfCores = v.VmInfoWithDedicatedPrice.NumberOfCores.ToString(),
                     ResourceDiskSizeInGiB = v.VmInfoWithDedicatedPrice.ResourceDiskSizeInGB.ToString(),
@@ -136,7 +139,7 @@ namespace TesApi.Web
                         : batchAccountQuotas.DedicatedCoreQuota.ToString()
                 });
 
-            vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = "", VmFamily = "", PricePerHourDedicated = "dedicated", PricePerHourLowPri = "low pri", MemoryInGiB = "(GiB)", NumberOfCores = "", ResourceDiskSizeInGiB = "(GiB)", DedicatedQuota = $"quota {(batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? "(per fam.)" : "(total)")}" });
+            vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = string.Empty, VmFamily = string.Empty, PricePerHourDedicated = "dedicated", PricePerHourLowPri = "low pri", MemoryInGiB = "(GiB)", NumberOfCores = string.Empty, ResourceDiskSizeInGiB = "(GiB)", DedicatedQuota = $"quota {(batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? "(per fam.)" : "(total)")}" });
             vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = "VM Size", VmFamily = "Family", PricePerHourDedicated = "$/hour", PricePerHourLowPri = "$/hour", MemoryInGiB = "Memory", NumberOfCores = "CPUs", ResourceDiskSizeInGiB = "Disk", DedicatedQuota = "Dedicated CPU" });
 
             var sizeColWidth = vmInfosAsStrings.Max(v => v.VmSize.Length);

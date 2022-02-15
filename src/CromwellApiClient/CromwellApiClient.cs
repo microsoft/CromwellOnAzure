@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -16,53 +16,39 @@ namespace CromwellApiClient
     {
         private const string Version = "v1";
         private static readonly string basePath = $"/api/workflows/{Version}";
-        private static readonly HttpClient httpClient = new HttpClient();
+        private static readonly HttpClient httpClient = new();
         private readonly string url;
 
         public CromwellApiClient(string baseUrl)
         {
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
-                throw new ArgumentException(nameof(baseUrl));
+                throw new ArgumentException(null, nameof(baseUrl));
             }
 
             url = $"{baseUrl.TrimEnd('/')}{basePath}";
         }
 
         public string GetUrl()
-        {
-            return url;
-        }
+            => url;
 
         public async Task<GetLogsResponse> GetLogsAsync(Guid id)
-        {
-            return await GetAsync<GetLogsResponse>($"/{id}/logs");
-        }
+            => await GetAsync<GetLogsResponse>($"/{id}/logs");
 
         public async Task<GetOutputsResponse> GetOutputsAsync(Guid id)
-        {
-            return new GetOutputsResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json") };
-        }
+            => new GetOutputsResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json") };
 
         public async Task<GetMetadataResponse> GetMetadataAsync(Guid id)
-        {
-            return new GetMetadataResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json") };
-        }
+            => new GetMetadataResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json") };
 
         public async Task<GetStatusResponse> GetStatusAsync(Guid id)
-        {
-            return await GetAsync<GetStatusResponse>($"/{id}/status");
-        }
+            => await GetAsync<GetStatusResponse>($"/{id}/status");
 
         public async Task<GetTimingResponse> GetTimingAsync(Guid id)
-        {
-            return new GetTimingResponse { Id = id, Html = await GetAsyncWithMediaType($"/{id}/timing", "text/html") };
-        }
+            => new GetTimingResponse { Id = id, Html = await GetAsyncWithMediaType($"/{id}/timing", "text/html") };
 
         public async Task<PostAbortResponse> PostAbortAsync(Guid id)
-        {
-            return await PostAsync<PostAbortResponse>($"/{id}/abort", id);
-        }
+            => await PostAsync<PostAbortResponse>($"/{id}/abort", id);
 
         public async Task<PostWorkflowResponse> PostWorkflowAsync(
             string workflowSourceFilename,
@@ -86,7 +72,7 @@ namespace CromwellApiClient
             return await PostAsync<PostWorkflowResponse>(string.Empty, files);
         }
 
-        internal List<FileToPost> AccumulatePostFiles(
+        internal static List<FileToPost> AccumulatePostFiles(
             string workflowSourceFilename,
             byte[] workflowSourceData,
             List<string> workflowInputsFilename,
@@ -106,12 +92,12 @@ namespace CromwellApiClient
                 files.Add(new FileToPost(workflowInputsFilename[i], workflowInputsData[i], parameterName, removeTabs: true));
             }
 
-            if (workflowOptionsFilename != null && workflowOptionsData != null)
+            if (workflowOptionsFilename is not null && workflowOptionsData is not null)
             {
                 files.Add(new FileToPost(workflowOptionsFilename, workflowOptionsData, "workflowOptions", removeTabs: true));
             }
 
-            if (workflowDependenciesFilename != null && workflowDependenciesData != null)
+            if (workflowDependenciesFilename is not null && workflowDependenciesData is not null)
             {
                 files.Add(new FileToPost(workflowDependenciesFilename, workflowDependenciesData, "workflowDependencies"));
             }
@@ -120,14 +106,10 @@ namespace CromwellApiClient
         }
 
         public async Task<PostQueryResponse> PostQueryAsync(string queryJson)
-        {
-            return await PostAsync<PostQueryResponse>("/query", queryJson);
-        }
+            => await PostAsync<PostQueryResponse>("/query", queryJson);
 
         private string GetApiUrl(string path)
-        {
-            return $"{url}{path}";
-        }
+            => $"{url}{path}";
 
         private async Task<T> GetAsync<T>(string path)
         {
@@ -291,7 +273,7 @@ namespace CromwellApiClient
             }
         }
 
-        private async Task AppendResponseBodyAsync(HttpResponseMessage response, StringBuilder messageBuilder)
+        private static async Task AppendResponseBodyAsync(HttpResponseMessage response, StringBuilder messageBuilder)
         {
             try
             {
@@ -326,14 +308,14 @@ namespace CromwellApiClient
             /// </summary>
             /// <param name="data">The byte array of the file</param>
             /// <returns>A new byte array of the file</returns>
-            private byte[] EncodeToUtf8AndRemoveTabsAndDecode(byte[] data)
+            private static byte[] EncodeToUtf8AndRemoveTabsAndDecode(byte[] data)
             {
                 if (data?.Length == 0)
                 {
                     return data;
                 }
 
-                return Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(data).Replace("\t", ""));
+                return Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(data).Replace("\t", " ")); // Simply removing an embedded tab may change the meaning and break JSON. The safest option is to replace one kind of whitespace with another.
             }
         }
     }

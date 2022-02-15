@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -61,26 +61,22 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("class TesOutput {\n");
-            sb.Append("  Name: ").Append(Name).Append("\n");
-            sb.Append("  Description: ").Append(Description).Append("\n");
-            sb.Append("  Url: ").Append(Url).Append("\n");
-            sb.Append("  Path: ").Append(Path).Append("\n");
-            sb.Append("  Type: ").Append(Type).Append("\n");
-            sb.Append("}\n");
-            return sb.ToString();
-        }
+            => new StringBuilder()
+                .Append("class TesOutput {\n")
+                .Append("  Name: ").Append(Name).Append('\n')
+                .Append("  Description: ").Append(Description).Append('\n')
+                .Append("  Url: ").Append(Url).Append('\n')
+                .Append("  Path: ").Append(Path).Append('\n')
+                .Append("  Type: ").Append(Type).Append('\n')
+                .Append("}\n")
+                .ToString();
 
         /// <summary>
         /// Returns the JSON string presentation of the object
         /// </summary>
         /// <returns>JSON string presentation of the object</returns>
         public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
+            => JsonConvert.SerializeObject(this, Formatting.Indented);
 
         /// <summary>
         /// Returns true if objects are equal
@@ -88,19 +84,12 @@ namespace Tes.Models
         /// <param name="obj">Object to be compared</param>
         /// <returns>Boolean</returns>
         public override bool Equals(object obj)
-        {
-            if (obj is null)
+            => obj switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-
-            return obj.GetType() == GetType() && Equals((TesOutput)obj);
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ => obj.GetType() == GetType() && Equals((TesOutput)obj),
+            };
 
         /// <summary>
         /// Returns true if TesOutput instances are equal
@@ -108,43 +97,36 @@ namespace Tes.Models
         /// <param name="other">Instance of TesOutput to be compared</param>
         /// <returns>Boolean</returns>
         public bool Equals(TesOutput other)
-        {
-            if (other is null)
+            => other switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, other))
-            {
-                return true;
-            }
-
-            return
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ =>
                 (
                     Name == other.Name ||
-                    Name != null &&
+                    Name is not null &&
                     Name.Equals(other.Name)
                 ) &&
                 (
                     Description == other.Description ||
-                    Description != null &&
+                    Description is not null &&
                     Description.Equals(other.Description)
                 ) &&
                 (
                     Url == other.Url ||
-                    Url != null &&
+                    Url is not null &&
                     Url.Equals(other.Url)
                 ) &&
                 (
                     Path == other.Path ||
-                    Path != null &&
+                    Path is not null &&
                     Path.Equals(other.Path)
                 ) &&
                 (
                     Type == other.Type ||
                     Type.Equals(other.Type)
-                );
-        }
+                ),
+            };
 
         /// <summary>
         /// Gets the hash code
@@ -156,22 +138,22 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Name != null)
+                if (Name is not null)
                 {
                     hashCode = hashCode * 59 + Name.GetHashCode();
                 }
 
-                if (Description != null)
+                if (Description is not null)
                 {
                     hashCode = hashCode * 59 + Description.GetHashCode();
                 }
 
-                if (Url != null)
+                if (Url is not null)
                 {
                     hashCode = hashCode * 59 + Url.GetHashCode();
                 }
 
-                if (Path != null)
+                if (Path is not null)
                 {
                     hashCode = hashCode * 59 + Path.GetHashCode();
                 }
@@ -185,14 +167,10 @@ namespace Tes.Models
 #pragma warning disable 1591
 
         public static bool operator ==(TesOutput left, TesOutput right)
-        {
-            return Equals(left, right);
-        }
+            => Equals(left, right);
 
         public static bool operator !=(TesOutput left, TesOutput right)
-        {
-            return !Equals(left, right);
-        }
+            => !Equals(left, right);
 
 #pragma warning restore 1591
         #endregion Operators

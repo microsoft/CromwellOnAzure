@@ -73,27 +73,23 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("class TesTaskLog {\n");
-            sb.Append("  Logs: ").Append(Logs).Append("\n");
-            sb.Append("  Metadata: ").Append(Metadata).Append("\n");
-            sb.Append("  StartTime: ").Append(StartTime).Append("\n");
-            sb.Append("  EndTime: ").Append(EndTime).Append("\n");
-            sb.Append("  Outputs: ").Append(Outputs).Append("\n");
-            sb.Append("  SystemLogs: ").Append(SystemLogs).Append("\n");
-            sb.Append("}\n");
-            return sb.ToString();
-        }
+            => new StringBuilder()
+                .Append("class TesTaskLog {\n")
+                .Append("  Logs: ").Append(Logs).Append('\n')
+                .Append("  Metadata: ").Append(Metadata).Append('\n')
+                .Append("  StartTime: ").Append(StartTime).Append('\n')
+                .Append("  EndTime: ").Append(EndTime).Append('\n')
+                .Append("  Outputs: ").Append(Outputs).Append('\n')
+                .Append("  SystemLogs: ").Append(SystemLogs).Append('\n')
+                .Append("}\n")
+                .ToString();
 
         /// <summary>
         /// Returns the JSON string presentation of the object
         /// </summary>
         /// <returns>JSON string presentation of the object</returns>
         public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
+            => JsonConvert.SerializeObject(this, Formatting.Indented);
 
         /// <summary>
         /// Returns true if objects are equal
@@ -101,19 +97,12 @@ namespace Tes.Models
         /// <param name="obj">Object to be compared</param>
         /// <returns>Boolean</returns>
         public override bool Equals(object obj)
-        {
-            if (obj is null)
+            => obj switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-
-            return obj.GetType() == GetType() && Equals((TesTaskLog)obj);
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ => obj.GetType() == GetType() && Equals((TesTaskLog)obj),
+            };
 
         /// <summary>
         /// Returns true if TesTaskLog instances are equal
@@ -121,49 +110,42 @@ namespace Tes.Models
         /// <param name="other">Instance of TesTaskLog to be compared</param>
         /// <returns>Boolean</returns>
         public bool Equals(TesTaskLog other)
-        {
-            if (other is null)
+            => other switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, other))
-            {
-                return true;
-            }
-
-            return
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ =>
                 (
                     Logs == other.Logs ||
-                    Logs != null &&
+                    Logs is not null &&
                     Logs.SequenceEqual(other.Logs)
                 ) &&
                 (
                     Metadata == other.Metadata ||
-                    Metadata != null &&
+                    Metadata is not null &&
                     Metadata.SequenceEqual(other.Metadata)
                 ) &&
                 (
                     StartTime == other.StartTime ||
-                    StartTime != null &&
+                    StartTime is not null &&
                     StartTime.Equals(other.StartTime)
                 ) &&
                 (
                     EndTime == other.EndTime ||
-                    EndTime != null &&
+                    EndTime is not null &&
                     EndTime.Equals(other.EndTime)
                 ) &&
                 (
                     Outputs == other.Outputs ||
-                    Outputs != null &&
+                    Outputs is not null &&
                     Outputs.SequenceEqual(other.Outputs)
                 ) &&
                 (
                     SystemLogs == other.SystemLogs ||
-                    SystemLogs != null &&
+                    SystemLogs is not null &&
                     SystemLogs.SequenceEqual(other.SystemLogs)
-                );
-        }
+                ),
+            };
 
         /// <summary>
         /// Gets the hash code
@@ -175,32 +157,32 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Logs != null)
+                if (Logs is not null)
                 {
                     hashCode = hashCode * 59 + Logs.GetHashCode();
                 }
 
-                if (Metadata != null)
+                if (Metadata is not null)
                 {
                     hashCode = hashCode * 59 + Metadata.GetHashCode();
                 }
 
-                if (StartTime != null)
+                if (StartTime is not null)
                 {
                     hashCode = hashCode * 59 + StartTime.GetHashCode();
                 }
 
-                if (EndTime != null)
+                if (EndTime is not null)
                 {
                     hashCode = hashCode * 59 + EndTime.GetHashCode();
                 }
 
-                if (Outputs != null)
+                if (Outputs is not null)
                 {
                     hashCode = hashCode * 59 + Outputs.GetHashCode();
                 }
 
-                if (SystemLogs != null)
+                if (SystemLogs is not null)
                 {
                     hashCode = hashCode * 59 + SystemLogs.GetHashCode();
                 }
@@ -213,14 +195,10 @@ namespace Tes.Models
 #pragma warning disable 1591
 
         public static bool operator ==(TesTaskLog left, TesTaskLog right)
-        {
-            return Equals(left, right);
-        }
+            => Equals(left, right);
 
         public static bool operator !=(TesTaskLog left, TesTaskLog right)
-        {
-            return !Equals(left, right);
-        }
+            => !Equals(left, right);
 
 #pragma warning restore 1591
         #endregion Operators

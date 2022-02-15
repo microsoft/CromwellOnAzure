@@ -189,16 +189,16 @@ namespace TesApi.Tests
             azureProxy.Verify(mock => mock.GetBatchActiveJobCount(), Times.Exactly(4));
         }
 
-        private Mock<IAzureProxy> GetMockAzureProxy()
+        private static Mock<IAzureProxy> GetMockAzureProxy()
         {
             var azureProxy = new Mock<IAzureProxy>();
 
             azureProxy.Setup(a => a.GetVmSizesAndPricesAsync()).Returns(Task.FromResult(
-                new List<VirtualMachineInfo> {
-                    new VirtualMachineInfo { VmSize = "VmSizeLowPri1", LowPriority = true, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 1 },
-                    new VirtualMachineInfo { VmSize = "VmSizeLowPri2", LowPriority = true, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 2 },
-                    new VirtualMachineInfo { VmSize = "VmSizeDedicated1", LowPriority = false, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 11 },
-                    new VirtualMachineInfo { VmSize = "VmSizeDedicated2", LowPriority = false, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 22 }
+                new List<VirtualMachineInformation> {
+                    new VirtualMachineInformation { VmSize = "VmSizeLowPri1", LowPriority = true, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 1 },
+                    new VirtualMachineInformation { VmSize = "VmSizeLowPri2", LowPriority = true, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 2 },
+                    new VirtualMachineInformation { VmSize = "VmSizeDedicated1", LowPriority = false, NumberOfCores = 1, MemoryInGB = 4, ResourceDiskSizeInGB = 20, PricePerHour = 11 },
+                    new VirtualMachineInformation { VmSize = "VmSizeDedicated2", LowPriority = false, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 22 }
                 }));
 
             return azureProxy;

@@ -13,7 +13,7 @@ namespace Common
     public class AvailabilityTracker
     {
         private bool hasBeenAvailable = false;
-        private SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1, 1);
+        private readonly SemaphoreSlim semaphoreSlim = new(1, 1);
 
         public static string GetAvailabilityMessage(string systemName) => $"{systemName} is available.";
 

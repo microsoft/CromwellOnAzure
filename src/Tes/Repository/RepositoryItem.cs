@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -51,7 +51,7 @@ namespace Tes.Repository
                     || (info.GetCustomAttribute<JsonPropertyAttribute>(false)?.PropertyName.Equals(IdFieldName) ?? false)
                     || info.Name.Equals(IdFieldName));
 
-            if (idProperty != null)
+            if (idProperty is not null)
             {
                 return obj => idProperty.GetValue(obj)?.ToString();
             }
@@ -62,7 +62,7 @@ namespace Tes.Repository
                     || (info.GetCustomAttribute<JsonPropertyAttribute>(false)?.PropertyName.Equals(IdFieldName) ?? false)
                     || info.Name.Equals(IdFieldName));
 
-            if (idField != null)
+            if (idField is not null)
             {
                 return obj => idField.GetValue(obj)?.ToString();
             }

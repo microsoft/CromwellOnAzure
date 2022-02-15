@@ -20,11 +20,160 @@ namespace TesApi.Tests
     [TestClass]
     public class TaskServiceApiControllerTests
     {
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task TES_Supports_BackendParameter_vmsize()
+        {
+            const string backend_parameter_key = "vm_size";
+
+            var backendParameters = new Dictionary<string, string>
+            {
+                { backend_parameter_key, "VmSize1" }
+            };
+
+            var tesTask = new TesTask
+            {
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Resources = new TesResources { BackendParameters = backendParameters, BackendParametersStrict = true }
+            };
+
+            var repository = new Mock<IRepository<TesTask>>();
+            var controller = GetTaskServiceApiController(repository.Object);
+
+            var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
+
+            Assert.IsNotNull(result);
+            repository.Verify(x => x.CreateItemAsync(tesTask));
+            Assert.AreEqual(32, tesTask.Id.Length);
+            Assert.AreEqual(TesState.QUEUEDEnum, tesTask.State);
+            Assert.IsTrue(tesTask.Resources.BackendParameters.ContainsKey(backend_parameter_key));
+            Assert.AreEqual(200, result.StatusCode);
+        }
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task TES_Supports_BackendParameter_workflow_execution_identity()
+        {
+            const string backend_parameter_key = "workflow_execution_identity";
+
+            var backendParameters = new Dictionary<string, string>
+            {
+                { backend_parameter_key, "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/coa/providers/Microsoft.ManagedIdentity/userAssignedIdentities/coa-test-uami" }
+            };
+
+            var tesTask = new TesTask
+            {
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Resources = new TesResources { BackendParameters = backendParameters, BackendParametersStrict = true }
+            };
+
+            var repository = new Mock<IRepository<TesTask>>();
+            var controller = GetTaskServiceApiController(repository.Object);
+
+            var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
+
+            Assert.IsNotNull(result);
+            repository.Verify(x => x.CreateItemAsync(tesTask));
+            Assert.AreEqual(32, tesTask.Id.Length);
+            Assert.AreEqual(TesState.QUEUEDEnum, tesTask.State);
+            Assert.IsTrue(tesTask.Resources.BackendParameters.ContainsKey(backend_parameter_key));
+            Assert.AreEqual(200, result.StatusCode);
+        }
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task CreateTaskAsync_ReturnsTesCreateTaskResponseWithBackendParameters_UnsupportedKey()
+        {
+            const string unsupportedKey = "unsupported_key_2021";
+
+            var backendParameters = new Dictionary<string, string>
+            {
+                { unsupportedKey, Guid.NewGuid().ToString() }
+            };
+
+            var tesTask = new TesTask
+            {
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Resources = new TesResources { BackendParameters = backendParameters }
+            };
+
+            var repository = new Mock<IRepository<TesTask>>();
+            var controller = GetTaskServiceApiController(repository.Object);
+
+            var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
+
+            Assert.IsNotNull(result);
+            repository.Verify(x => x.CreateItemAsync(tesTask));
+            Assert.AreEqual(32, tesTask.Id.Length);
+            Assert.AreEqual(TesState.QUEUEDEnum, tesTask.State);
+
+            // Unsupported keys should not be persisted
+            Assert.IsFalse(tesTask?.Resources?.BackendParameters?.ContainsKey(unsupportedKey));
+            Assert.AreEqual(200, result.StatusCode);
+        }
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task CreateTaskAsync_ReturnsBadRequest_ForBackendParametersStrict_UnsupportedKey()
+        {
+            const string unsupportedKey = "unsupported_key_2021";
+
+            var backendParameters = new Dictionary<string, string>
+            {
+                { unsupportedKey, Guid.NewGuid().ToString() }
+            };
+
+            var tesTask = new TesTask
+            {
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Resources = new TesResources { BackendParameters = backendParameters, BackendParametersStrict = true }
+            };
+
+            var controller = GetTaskServiceApiController();
+
+            var result = await controller.CreateTaskAsync(tesTask) as BadRequestObjectResult;
+
+            Assert.IsNotNull(result);
+
+            // Unsupported keys should cause a bad request when BackendParametersStrict = true
+            Assert.AreEqual(400, result.StatusCode);
+
+            // Unsupported keys should be returned in the warning message
+            Assert.IsTrue(result.Value.ToString().Contains(unsupportedKey));
+        }
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task CreateTaskAsync_ReturnsBadRequest_ForBackendParametersStrict_DuplicateKeys()
+        {
+            const string backend_parameter_key = "vmsize";
+
+            var backendParameters = new Dictionary<string, string>
+            {
+                { backend_parameter_key, Guid.NewGuid().ToString() },
+                { "VmSize", Guid.NewGuid().ToString() }
+            };
+
+            var tesTask = new TesTask
+            {
+                Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } },
+                Resources = new TesResources { BackendParameters = backendParameters, BackendParametersStrict = true }
+            };
+
+            var controller = GetTaskServiceApiController();
+
+            var result = await controller.CreateTaskAsync(tesTask) as BadRequestObjectResult;
+
+            Assert.IsNotNull(result);
+
+            Assert.AreEqual(400, result.StatusCode);
+        }
+
         [TestMethod]
         public async Task CreateTaskAsync_ReturnsBadRequest_ForInvalidId()
         {
             var tesTask = new TesTask { Id = "ClientProvidedId", Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } } };
-            var controller = this.GetTaskServiceApiController();
+            var controller = GetTaskServiceApiController();
 
             var result = await controller.CreateTaskAsync(tesTask) as BadRequestObjectResult;
 
@@ -36,7 +185,7 @@ namespace TesApi.Tests
         public async Task CreateTaskAsync_ReturnsBadRequest_ForMissingDockerImage()
         {
             var tesTask = new TesTask();
-            var controller = this.GetTaskServiceApiController();
+            var controller = GetTaskServiceApiController();
 
             var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
 
@@ -50,7 +199,7 @@ namespace TesApi.Tests
             var tesTask = new TesTask() { Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } } };
 
             var repository = new Mock<IRepository<TesTask>>();
-            var controller = this.GetTaskServiceApiController(repository.Object);
+            var controller = GetTaskServiceApiController(repository.Object);
 
             var result = await controller.CreateTaskAsync(tesTask) as ObjectResult;
 
@@ -75,7 +224,7 @@ namespace TesApi.Tests
                 Inputs = new List<TesInput> { new TesInput { Name = "commandScript", Path = $"/cromwell-executions/test/{cromwellWorkflowId}/call-hello/test-subworkflow/{cromwellSubWorkflowId}/call-subworkflow/shard-8/execution/script" } }
             };
 
-            var controller = this.GetTaskServiceApiController();
+            var controller = GetTaskServiceApiController();
 
             await controller.CreateTaskAsync(tesTask);
 
@@ -96,7 +245,7 @@ namespace TesApi.Tests
                 })
                 .ReturnsAsync(false);
 
-            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+            var controller = GetTaskServiceApiController(mockRepo.Object);
 
             var result = await controller.CancelTask(tesTaskId) as NotFoundObjectResult;
 
@@ -117,7 +266,7 @@ namespace TesApi.Tests
                 })
                 .ReturnsAsync(true);
 
-            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+            var controller = GetTaskServiceApiController(mockRepo.Object);
 
             var result = await controller.CancelTask(tesTask.Id) as ObjectResult;
 
@@ -130,7 +279,7 @@ namespace TesApi.Tests
         [TestMethod]
         public void GetServiceInfo_ReturnsInfo()
         {
-            var controller = this.GetTaskServiceApiController();
+            var controller = GetTaskServiceApiController();
 
             var result = controller.GetServiceInfo() as ObjectResult;
 
@@ -148,7 +297,7 @@ namespace TesApi.Tests
             mockRepo.Setup(repo => repo.TryGetItemAsync(tesTaskId, It.IsAny<Action<TesTask>>()))
                 .ReturnsAsync(false);
 
-            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+            var controller = GetTaskServiceApiController(mockRepo.Object);
 
             var result = await controller.GetTaskAsync(tesTaskId, "MINIMAL") as NotFoundObjectResult;
 
@@ -170,7 +319,7 @@ namespace TesApi.Tests
                 })
                 .ReturnsAsync(true);
 
-            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+            var controller = GetTaskServiceApiController(mockRepo.Object);
 
             var result = await controller.GetTaskAsync(tesTask.Id, "INVALID") as BadRequestObjectResult;
 
@@ -195,7 +344,7 @@ namespace TesApi.Tests
                 })
                 .ReturnsAsync(true);
 
-            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+            var controller = GetTaskServiceApiController(mockRepo.Object);
 
             var result = await controller.GetTaskAsync(tesTask.Id, "MINIMAL") as JsonResult;
 
@@ -208,7 +357,7 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ListTasks_ReturnsBadRequest_ForInvalidPageSize()
         {
-            var controller = this.GetTaskServiceApiController();
+            var controller = GetTaskServiceApiController();
 
             var result = await controller.ListTasks(null, 0, null, "BASIC") as BadRequestObjectResult;
 
@@ -231,9 +380,9 @@ namespace TesApi.Tests
             mockRepo.Setup(repo => repo
                 .GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>(), It.IsAny<int>(), It.IsAny<string>()))
                 .ReturnsAsync((Expression<Func<TesTask, bool>> predicate, int pageSize, string continuationToken) =>
-                    ("", tesTasks.Where(i => predicate.Compile().Invoke(i)).Take(pageSize)));
+                    (string.Empty, tesTasks.Where(i => predicate.Compile().Invoke(i)).Take(pageSize)));
 
-            var controller = this.GetTaskServiceApiController(mockRepo.Object);
+            var controller = GetTaskServiceApiController(mockRepo.Object);
 
             var result = await controller.ListTasks(namePrefix, 1, null, "BASIC") as JsonResult;
             var listOfTesTasks = (TesListTasksResponse)result.Value;
@@ -257,7 +406,7 @@ namespace TesApi.Tests
                 Inputs = new List<TesInput> { new TesInput { Name = "commandScript", Path = $"/cromwell-executions/test/{cromwellWorkflowId}/call-hello/test-subworkflow/{cromwellSubWorkflowId}/call-subworkflow/shard-8/execution/script" } }
             };
 
-            var controller = this.GetTaskServiceApiController();
+            var controller = GetTaskServiceApiController();
 
             await controller.CreateTaskAsync(tesTask);
 
@@ -276,7 +425,7 @@ namespace TesApi.Tests
                 Executors = new List<TesExecutor> { new TesExecutor { Image = "ubuntu" } }
             };
 
-            var controller = this.GetTaskServiceApiController();
+            var controller = GetTaskServiceApiController();
 
             await controller.CreateTaskAsync(tesTask1);
 
@@ -440,18 +589,19 @@ namespace TesApi.Tests
             Assert.AreEqual(true, tesTask.Resources.Preemptible);
         }
 
-        private TaskServiceApiController GetTaskServiceApiController() => GetTaskServiceApiController(new Mock<IRepository<TesTask>>().Object, new Mock<IAzureProxy>().Object);
+        private static TaskServiceApiController GetTaskServiceApiController()
+            => GetTaskServiceApiController(new Mock<IRepository<TesTask>>().Object, new Mock<IAzureProxy>().Object);
 
-        private TaskServiceApiController GetTaskServiceApiController(IRepository<TesTask> repository) => GetTaskServiceApiController(repository, new Mock<IAzureProxy>().Object);
+        private static TaskServiceApiController GetTaskServiceApiController(IRepository<TesTask> repository)
+            => GetTaskServiceApiController(repository, new Mock<IAzureProxy>().Object);
 
-        private TaskServiceApiController GetTaskServiceApiController(IAzureProxy azureProxy) => GetTaskServiceApiController(new Mock<IRepository<TesTask>>().Object, azureProxy);
+        private static TaskServiceApiController GetTaskServiceApiController(IAzureProxy azureProxy)
+            => GetTaskServiceApiController(new Mock<IRepository<TesTask>>().Object, azureProxy);
 
-        private TaskServiceApiController GetTaskServiceApiController(IRepository<TesTask> repository, IAzureProxy azureProxy)
-        {
-            return new TaskServiceApiController(repository, new NullLogger<TaskServiceApiController>(), azureProxy);
-        }
+        private static TaskServiceApiController GetTaskServiceApiController(IRepository<TesTask> repository, IAzureProxy azureProxy)
+            => new(repository, new NullLogger<TaskServiceApiController>(), azureProxy);
 
-        private async Task<TesTask> CreateCwlTesTaskAsync(string cwlFileContent, TesResources tesResourcesReceivedFromCromwell)
+        private static async Task<TesTask> CreateCwlTesTaskAsync(string cwlFileContent, TesResources tesResourcesReceivedFromCromwell)
         {
             var tesTask = new TesTask()
             {
@@ -463,7 +613,7 @@ namespace TesApi.Tests
 
             var azureProxy = new Mock<IAzureProxy>();
             azureProxy.Setup(a => a.TryReadCwlFile(It.IsAny<string>(), out cwlFileContent)).Returns(true);
-            var controller = this.GetTaskServiceApiController(azureProxy.Object);
+            var controller = GetTaskServiceApiController(azureProxy.Object);
 
             await controller.CreateTaskAsync(tesTask);
 

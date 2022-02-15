@@ -34,12 +34,12 @@ namespace TesApi.Controllers
     /// </summary>
     public class TaskServiceApiController : ControllerBase
     {
-        private const string rootExecutionPath = "/cromwell-executions";
+        //private const string rootExecutionPath = "/cromwell-executions";
         private readonly IRepository<TesTask> repository;
         private readonly ILogger<TaskServiceApiController> logger;
         private readonly IAzureProxy azureProxy;
 
-        private static readonly Dictionary<TesView, JsonSerializerSettings> TesJsonSerializerSettings = new Dictionary<TesView, JsonSerializerSettings>
+        private static readonly Dictionary<TesView, JsonSerializerSettings> TesJsonSerializerSettings = new()
         {
             { TesView.MINIMAL, new JsonSerializerSettings{ ContractResolver = MinimalTesTaskContractResolver.Instance } },
             { TesView.BASIC, new JsonSerializerSettings{ ContractResolver = BasicTesTaskContractResolver.Instance } },
@@ -51,6 +51,7 @@ namespace TesApi.Controllers
         /// </summary>
         /// <param name="repository">The main <see cref="TesTask"/> database repository</param>
         /// <param name="logger">The logger instance</param>
+        /// <param name="azureProxy">The Azure Proxy instance</param>
         public TaskServiceApiController(IRepository<TesTask> repository, ILogger<TaskServiceApiController> logger, IAzureProxy azureProxy)
         {
             this.repository = repository;
@@ -132,18 +133,18 @@ namespace TesApi.Controllers
                 ?.FirstOrDefault();
 
             // Prefix the TES task id with first eight characters of root Cromwell job id to facilitate easier debugging
-            var tesTaskIdPrefix = tesTask.WorkflowId != null && Guid.TryParse(tesTask.WorkflowId, out _) ? $"{tesTask.WorkflowId.Substring(0, 8)}_" : "";
-            tesTask.Id = $"{tesTaskIdPrefix}{Guid.NewGuid().ToString("N")}";
+            var tesTaskIdPrefix = tesTask.WorkflowId is not null && Guid.TryParse(tesTask.WorkflowId, out _) ? $"{tesTask.WorkflowId.Substring(0, 8)}_" : string.Empty;
+            tesTask.Id = $"{tesTaskIdPrefix}{Guid.NewGuid():N}";
 
             // For CWL workflows, if disk size is not specified in TES object (always), try to retrieve it from the corresponding workflow stored by Cromwell in /cromwell-tmp directory
             // Also allow for TES-style "memory" and "cpu" hints in CWL.
-            if (tesTask.Name != null 
+            if (tesTask.Name is not null
                 && tesTask.Inputs.Any(i => i.Path.Contains(".cwl/"))
-                && tesTask.WorkflowId != null
+                && tesTask.WorkflowId is not null
                 && azureProxy.TryReadCwlFile(tesTask.WorkflowId, out var cwlContent) 
                 && CwlDocument.TryCreate(cwlContent, out var cwlDocument))
             {
-                tesTask.Resources = tesTask.Resources ?? new TesResources();
+                tesTask.Resources ??= new TesResources();
                 tesTask.Resources.DiskGb = tesTask.Resources.DiskGb ?? cwlDocument.DiskGb;
                 tesTask.Resources.CpuCores = tesTask.Resources.CpuCores ?? cwlDocument.Cpu;
                 tesTask.Resources.RamGb = tesTask.Resources.RamGb ?? cwlDocument.MemoryGb;
@@ -153,6 +154,44 @@ namespace TesApi.Controllers
                 // If CWL document has it specified, override the value sent by Cromwell
                 tesTask.Resources.Preemptible = cwlDocument.Preemptible ?? tesTask.Resources.Preemptible;
             }
+
+            if (tesTask?.Resources?.BackendParameters is not null)
+            {
+                var keys = tesTask.Resources.BackendParameters.Keys.Select(k => k).ToList();
+
+                if (keys.Count > 1 && keys.Select(k => k?.ToLowerInvariant()).Distinct().Count() != keys.Count)
+                {
+                    return BadRequest("Duplicate backend_parameters were specified");
+                }
+
+                // Force all keys to be lowercase
+                tesTask.Resources.BackendParameters = new Dictionary<string, string>(
+                    tesTask.Resources.BackendParameters.Select(k => new KeyValuePair<string, string> (k.Key?.ToLowerInvariant(), k.Value)));
+
+                keys = tesTask.Resources.BackendParameters.Keys.Select(k => k).ToList();
+
+                // Backends shall log system warnings if a key is passed that is unsupported.
+                var unsupportedKeys = keys.Except(Enum.GetNames(typeof(TesResources.SupportedBackendParameters))).ToList();
+
+                if (unsupportedKeys.Count > 0)
+                {
+                    logger.LogWarning($"Unsupported keys were passed to TesResources.backend_parameters: {string.Join(",", unsupportedKeys)}");
+                }
+
+                // If backend_parameters_strict equals true, backends should fail the task if any key / values are unsupported
+                if (tesTask.Resources?.BackendParametersStrict == true 
+                    && unsupportedKeys.Count > 0)
+                {
+                    return BadRequest($"backend_parameters_strict is set to true and unsupported backend_parameters were specified: {string.Join(",", unsupportedKeys)}");                   
+                }
+
+                // Backends shall not store or return unsupported keys if included in a task.
+                foreach (var key in unsupportedKeys)
+                {
+                    tesTask.Resources.BackendParameters.Remove(key);
+                }
+            }
+
             logger.LogDebug($"Creating task with id {tesTask.Id} state {tesTask.State}");
             await repository.CreateItemAsync(tesTask);
             return StatusCode(200, new TesCreateTaskResponse { Id = tesTask.Id });
@@ -169,8 +208,14 @@ namespace TesApi.Controllers
         [SwaggerResponse(statusCode: 200, type: typeof(TesServiceInfo), description: "")]
         public virtual IActionResult GetServiceInfo()
         {
-            var serviceInfo = new TesServiceInfo { Name = "Microsoft Genomics Task Execution Service", Doc = "", Storage = new List<string>() };
-            logger.LogInformation($"Name: {serviceInfo.Name} Doc: {serviceInfo.Doc} Storage: {serviceInfo.Storage}");
+            var serviceInfo = new TesServiceInfo {
+                Name = "Microsoft Genomics Task Execution Service",
+                Doc = string.Empty,
+                Storage = new List<string>(),
+                TesResourcesSupportedBackendParameters = Enum.GetNames(typeof(TesResources.SupportedBackendParameters)).ToList()
+            };
+
+            logger.LogInformation($"Name: {serviceInfo.Name} Doc: {serviceInfo.Doc} Storage: {serviceInfo.Storage} TesResourcesSupportedBackendParameters: {string.Join(",",serviceInfo.TesResourcesSupportedBackendParameters)}");
             return StatusCode(200, serviceInfo);
         }
 
@@ -209,7 +254,7 @@ namespace TesApi.Controllers
         public virtual async Task<IActionResult> ListTasks([FromQuery]string namePrefix, [FromQuery]long? pageSize, [FromQuery]string pageToken, [FromQuery]string view)
         {
             var decodedPageToken =
-                pageToken != null ? Encoding.UTF8.GetString(Base64UrlTextEncoder.Decode(pageToken)) : null;
+                pageToken is not null ? Encoding.UTF8.GetString(Base64UrlTextEncoder.Decode(pageToken)) : null;
 
             if (pageSize < 1 || pageSize > 2047)
             {
@@ -222,7 +267,7 @@ namespace TesApi.Controllers
                 pageSize.HasValue ? (int)pageSize : 256,
                 decodedPageToken);
 
-            var encodedNextPageToken = nextPageToken != null ? Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(nextPageToken)) : null;
+            var encodedNextPageToken = nextPageToken is not null ? Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(nextPageToken)) : null;
             var response = new TesListTasksResponse { Tasks = tasks.ToList(), NextPageToken = encodedNextPageToken };
 
             return TesJsonResult(response, view);

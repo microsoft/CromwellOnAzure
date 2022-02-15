@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -20,15 +20,15 @@ namespace TriggerService.Tests
     public class CromwellOnAzureEnvironmentTests
     {
         private const string azureName = "test";
-        private byte[] blobData = new byte[3] { 1, 2, 3 };
-        private byte[] httpClientData = new byte[4] { 4, 3, 2, 1 };
-        private string fakeAzureWdl = $"https://fake.azure.storage.account/{azureName}/test.wdl";
-        private string fakeAzureInput = $"https://fake.azure.storage.account/{azureName}/test.input.json";
-        private List<string> fakeAzureInputs = new List<string>() { 
+        private readonly byte[] blobData = new byte[3] { 1, 2, 3 };
+        private readonly byte[] httpClientData = new byte[4] { 4, 3, 2, 1 };
+        private readonly string fakeAzureWdl = $"https://fake.azure.storage.account/{azureName}/test.wdl";
+        private readonly string fakeAzureInput = $"https://fake.azure.storage.account/{azureName}/test.input.json";
+        private readonly List<string> fakeAzureInputs = new() {
             $"https://fake.azure.storage.account/{azureName}/test.input1.json",
             $"https://fake.azure.storage.account/{azureName}/test.input_2.json"
         };
-        private string fakeAzureWdlWithSas = "https://fake.azure.storage.account/{azureName}/test.wdl?sp=r&st=2019-12-18T18:55:41Z&se=2019-12-19T02:55:41Z&spr=https&sv=2019-02-02&sr=b&sig=EMJyBMOxdG2NvBqiwUsg71ZdYqwqMWda9242KU43%2F5Y%3D";
+        private readonly string fakeAzureWdlWithSas = @"https://fake.azure.storage.account/{azureName}/test.wdl?sp=r&st=2019-12-18T18:55:41Z&se=2019-12-19T02:55:41Z&spr=https&sv=2019-02-02&sr=b&sig=EMJyBMOxdG2NvBqiwUsg71ZdYqwqMWda9242KU43%2F5Y%3D";
 
         [TestMethod]
         public async Task GetBlobFileNameAndDataWithDefaultStorageAccountUsingUrl()
@@ -100,10 +100,7 @@ namespace TriggerService.Tests
         }
 
         private async Task<ProcessedWorkflowItem> GetBlobFileNameAndDataUsingMocksAsync(string url, string accountAuthority, IEnumerable<IAzureStorage> azureStorages = default)
-        {
-            var environment = SetCromwellOnAzureEnvironment(accountAuthority, azureStorages);
-            return await environment.GetBlobFileNameAndData(url);
-        }
+            => await SetCromwellOnAzureEnvironment(accountAuthority, azureStorages).GetBlobFileNameAndData(url);
 
         private IAzureStorage MockAzureStorage(string accountAuthority)
         {
@@ -168,70 +165,56 @@ namespace TriggerService.Tests
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException), "must have data in the Trigger File")]
         public async Task ProcessBlobTrigger_Empty()
-        {
-            await ProcessBlobTriggerWithMocksAsync("");
-        }
+            => await ProcessBlobTriggerWithMocksAsync(string.Empty);
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException), "must have data in the Trigger File")]
         public async Task ProcessBlobTrigger_Null()
-        {
-            await ProcessBlobTriggerWithMocksAsync(null);
-        }
+            => await ProcessBlobTriggerWithMocksAsync(null);
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException), "must specify a WorkflowUrl in the Trigger File")]
         public async Task ProcessBlobTrigger_WorkflowUrlMissing()
-        {
-            await ProcessBlobTriggerWithMocksAsync(
+            => await ProcessBlobTriggerWithMocksAsync(
                 @"{
                 }"
             );
-        }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException), "must specify a WorkflowUrl in the Trigger File")]
         public async Task ProcessBlobTrigger_WorkflowUrlEmpty()
-        {
-            await ProcessBlobTriggerWithMocksAsync(
+            => await ProcessBlobTriggerWithMocksAsync(
                 @"{
                     ""WorkflowUrl"":""""
                 }"
             );
-        }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException), "must specify a WorkflowUrl in the Trigger File")]
         public async Task ProcessBlobTrigger_WorkflowUrlWhitespace()
-        {
-            await ProcessBlobTriggerWithMocksAsync(
+            => await ProcessBlobTriggerWithMocksAsync(
                 @"{
                     ""WorkflowUrl"":"" ""
                 }"
             );
-        }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentException))]
         public async Task ProcessBlobTrigger_WorkflowUrlNotUrl()
-        {
-            await ProcessBlobTriggerWithMocksAsync(
+            => await ProcessBlobTriggerWithMocksAsync(
                 @"{
                     ""WorkflowUrl"":""not url""
                 }"
             );
-        }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException), "'must specify a WorkflowUrl in the Trigger File")]
         public async Task ProcessBlobTrigger_WorkflowUrlNull()
-        {
-            await ProcessBlobTriggerWithMocksAsync(
+            => await ProcessBlobTriggerWithMocksAsync(
                 @"{
                     ""WorkflowUrl"":null
                 }"
             );
-        }
 
         [TestMethod]
         public async Task ProcessBlobTrigger_NoInput()
@@ -337,9 +320,9 @@ namespace TriggerService.Tests
 
         private async Task ExecuteTriggerFileTest(string triggerFileContent, int inputFilesCount)
         {
-            (var processedTriggerInfo, var environment) = await ProcessBlobTriggerWithMocksAsync(triggerFileContent);
+            (var processedTriggerInfo, _) = await ProcessBlobTriggerWithMocksAsync(triggerFileContent);
             VerifyTriggerFileProcessing(processedTriggerInfo, inputFilesCount);
-            VerifyPostFiles(processedTriggerInfo, environment);
+            VerifyPostFiles(processedTriggerInfo);
         }
 
         private void VerifyTriggerFileProcessing(ProcessedTriggerInfo processedTriggerInfo, int inputFilesCount)
@@ -372,7 +355,7 @@ namespace TriggerService.Tests
             }
         }
 
-        private void AssertBytesEqual(List<byte[]> data, int expectedLength, byte[] expectedData, string dataName)
+        private static void AssertBytesEqual(List<byte[]> data, int expectedLength, byte[] expectedData, string dataName)
         {
             Assert.IsNotNull(data, dataName);
             Assert.AreEqual(expectedLength, data.Count, $"comparing expectedLength to the length of {dataName}");
@@ -383,7 +366,7 @@ namespace TriggerService.Tests
             }
         }
 
-        private void AssertBytesEqual(byte[] data, byte[] expectedData, string dataName)
+        private static void AssertBytesEqual(byte[] data, byte[] expectedData, string dataName)
         {
             Assert.IsNotNull(data, dataName);
             Assert.AreEqual(expectedData.Length, data.Length, $"unexpected length of {dataName}");
@@ -394,23 +377,20 @@ namespace TriggerService.Tests
             }
         }
 
-        private static List<CromwellApiClient.CromwellApiClient.FileToPost> RetrievePostFiles(ProcessedTriggerInfo processedTriggerInfo, CromwellOnAzureEnvironment environment)
-        {
-            var cromwellApiClient = (CromwellApiClient.CromwellApiClient)environment.cromwellApiClient;
-            return cromwellApiClient.AccumulatePostFiles(
-                processedTriggerInfo.WorkflowSource.Filename, 
+        private static List<CromwellApiClient.CromwellApiClient.FileToPost> RetrievePostFiles(ProcessedTriggerInfo processedTriggerInfo)
+            => CromwellApiClient.CromwellApiClient.AccumulatePostFiles(
+                processedTriggerInfo.WorkflowSource.Filename,
                 processedTriggerInfo.WorkflowSource.Data,
                 processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
                 processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
-                processedTriggerInfo.WorkflowOptions.Filename, 
+                processedTriggerInfo.WorkflowOptions.Filename,
                 processedTriggerInfo.WorkflowOptions.Data,
-                processedTriggerInfo.WorkflowDependencies.Filename, 
+                processedTriggerInfo.WorkflowDependencies.Filename,
                 processedTriggerInfo.WorkflowDependencies.Data);
-        }
 
-        private void VerifyPostFiles(ProcessedTriggerInfo processedTriggerInfo, CromwellOnAzureEnvironment environment)
+        private static void VerifyPostFiles(ProcessedTriggerInfo processedTriggerInfo)
         {
-            var files = RetrievePostFiles(processedTriggerInfo, environment);
+            var files = RetrievePostFiles(processedTriggerInfo);
          
             Assert.AreEqual(processedTriggerInfo.WorkflowInputs.Count + 1, files.Count, "unexpected number of files");
 

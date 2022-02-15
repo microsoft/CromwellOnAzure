@@ -19,13 +19,12 @@ namespace TesApi.Web
     /// This should only be used as a system-wide singleton service.  This class does not support scale-out on multiple machines,
     /// nor does it implement a leasing mechanism.  In the future, consider using the Lease Blob operation.
     /// </summary>
-    public class Scheduler : IHostedService
+    public class Scheduler : BackgroundService
     {
         private readonly IRepository<TesTask> repository;
         private readonly IBatchScheduler batchScheduler;
         private readonly ILogger<Scheduler> logger;
-        private readonly CancellationTokenSource mainProcess = new CancellationTokenSource();
-        private bool isStopped;
+        private readonly bool isDisabled;
         private readonly TimeSpan runInterval = TimeSpan.FromSeconds(5);
 
         /// <summary>
@@ -40,69 +39,72 @@ namespace TesApi.Web
             this.repository = repository;
             this.batchScheduler = batchScheduler;
             this.logger = logger;
-            isStopped = configuration.GetValue("DisableBatchScheduling", false);
+            isDisabled = configuration.GetValue("DisableBatchScheduling", false);
         }
 
         /// <summary>
         /// Start the service
         /// </summary>
         /// <param name="cancellationToken">Not used</param>
-        public async Task StartAsync(CancellationToken cancellationToken)
+        public override Task StartAsync(CancellationToken cancellationToken)
         {
-            if (isStopped)
+            if (isDisabled)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            await Task.Factory.StartNew(() => RunAsync(), TaskCreationOptions.LongRunning);
+            return base.StartAsync(cancellationToken);
         }
 
-        /// <summary>
-        /// Attempt to gracefully stop the service
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation token to stop waiting for graceful exit</param>
-        public async Task StopAsync(CancellationToken cancellationToken)
+        /// <inheritdoc />
+        public override Task StopAsync(CancellationToken cancellationToken)
         {
-            mainProcess.Cancel();
             logger.LogInformation("Scheduler stopping...");
-
-            while (!cancellationToken.IsCancellationRequested && !isStopped)
-            {
-                await Task.Delay(100);
-            }
-
-            logger.LogInformation("Scheduler gracefully stopped.");
+            return base.StopAsync(cancellationToken);
         }
 
         /// <summary>
         /// The main thread that continuously schedules TES tasks in the batch system
         /// </summary>
-        private async Task RunAsync()
+        /// <param name="stoppingToken">Triggered when Microsoft.Extensions.Hosting.IHostedService.StopAsync(System.Threading.CancellationToken) is called.</param>
+        /// <returns>A System.Threading.Tasks.Task that represents the long running operations.</returns>
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             logger.LogInformation("Scheduler started.");
 
-            while (!mainProcess.IsCancellationRequested)
+            while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    await OrchestrateTesTasksOnBatch();
+                    await OrchestrateTesTasksOnBatch(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
                 }
                 catch (Exception exc)
                 {
                     logger.LogError(exc, exc.Message);
                 }
 
-                await Task.Delay(this.runInterval);
+                try
+                {
+                    await Task.Delay(runInterval, stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
             }
 
-            isStopped = true;
+            logger.LogInformation("Scheduler gracefully stopped.");
         }
 
         /// <summary>
         /// Retrieves all actionable TES tasks from the database, performs an action in the batch system, and updates the resultant state
         /// </summary>
         /// <returns></returns>
-        private async Task OrchestrateTesTasksOnBatch()
+        private async Task OrchestrateTesTasksOnBatch(CancellationToken cancellationToken) // TODO: implement
         {
             var tesTasks = (await repository.GetItemsAsync(
                     predicate: t => t.State == TesState.QUEUEDEnum
@@ -157,7 +159,7 @@ namespace TesApi.Web
                 }
             }
 
-            logger.LogDebug($"OrchestrateTesTasksOnBatch for {tesTasks.Count()} tasks completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
+            logger.LogDebug($"OrchestrateTesTasksOnBatch for {tesTasks.Count} tasks completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
         }
     }
 }

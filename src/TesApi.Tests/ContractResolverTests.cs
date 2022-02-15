@@ -17,9 +17,7 @@ namespace TesApi.Tests
 
         [TestInitialize]
         public void Init()
-        {
-            tesTask = JsonConvert.DeserializeObject<TesTask>(File.ReadAllText("tesTaskExample.json"));
-        }
+            => tesTask = JsonConvert.DeserializeObject<TesTask>(File.ReadAllText("tesTaskExample.json"));
 
         [TestMethod]
         public void MinimalContractResolver_ReturnsMinimalJsonResult()
@@ -57,7 +55,7 @@ namespace TesApi.Tests
             tesTask.Inputs[0].Content = "test content";
 
             // Act
-            var jsonResult = JsonConvert.SerializeObject(tesTask, new JsonSerializerSettings { ContractResolver = BasicTesTaskContractResolver.Instance });
+            var jsonResult = JsonConvert.SerializeObject(tesTask, new JsonSerializerSettings { ContractResolver = BasicTesTaskContractResolver.Instance});
             var jsonObjectResult = JObject.Parse(jsonResult);
 
             // Assert

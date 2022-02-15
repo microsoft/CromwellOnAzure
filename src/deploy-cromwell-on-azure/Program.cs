@@ -9,9 +9,7 @@ namespace CromwellOnAzureDeployer
     internal class Program
     {
         public static async Task Main(string[] args)
-        {
-            await InitializeAndDeployAsync(args);
-        }
+            => await InitializeAndDeployAsync(args);
 
         private static async Task InitializeAndDeployAsync(string[] args)
         {
