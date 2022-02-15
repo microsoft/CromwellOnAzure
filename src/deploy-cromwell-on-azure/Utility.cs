@@ -96,6 +96,27 @@ namespace CromwellOnAzureDeployer
         private static Stream GetBinaryFileContent(params string[] pathComponentsRelativeToAppBase)
             => typeof(Deployer).Assembly.GetManifestResourceStream($"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}");
 
+        private static EmbeddedResourceName TransformHostConfigBlobResourceNames(string name)
+            => new(name, name.Replace("$Blobs$", ".Blobs.").Replace("_Blobs_", ".Blobs."));
+
+        public static IEnumerable<EmbeddedResourceName> GetEmbeddedHostConfigBlobResources()
+            => typeof(Deployer).Assembly.GetManifestResourceNames().Select(TransformHostConfigBlobResourceNames).Where(n => n.Name.StartsWith("HostConfigs."));
+
+        public static Stream GetBinaryHostConfigBlobContent(EmbeddedResourceName embeddedResourceName)
+            => typeof(Deployer).Assembly.GetManifestResourceStream(embeddedResourceName.ManifestName);
+
+        public struct EmbeddedResourceName
+        {
+            public string Name { get; }
+            public string ManifestName { get; }
+
+            public EmbeddedResourceName(string name, string manifestName)
+            {
+                Name = name;
+                ManifestName = manifestName;
+            }
+        }
+
         /// <summary>
         /// Generates a secure password with one lowercase letter, one uppercase letter, and one number
         /// </summary>

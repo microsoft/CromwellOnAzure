@@ -1,0 +1,19 @@
+{
+  "batch": {
+    "image": {
+      "offer": "centos-container",
+      "publisher": "microsoft-azure-batch",
+      "sku": "7-8",
+      "version": "latest"
+    },
+    "node_agent_sku_id": "batch.node.centos 7"
+  },
+  "start_task": {
+    "script": "install-xilinx-drivers.sh",
+    "url": ""
+  },
+  "docker_run": {
+    "parameters": "-v /dev/shm:/dev/shm --pid host --device /dev/dri --ulimit nofile=65535:65535 --ulimit nproc=16384:16384",
+    "start_task": ["/opt/edico/bin/dragen_reset"]
+  }
+}

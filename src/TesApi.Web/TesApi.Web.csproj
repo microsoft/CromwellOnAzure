@@ -9,7 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Scripts\start-task.sh" />
+    <Content Include="..\..\HostConfigs\*\Config\**\*">
+      <Link>HostConfigs\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>False</Visible>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -42,6 +46,9 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>TesApi.Tests</_Parameter1>
     </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Scripts\start-task.sh" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Scripts\start-task.sh">

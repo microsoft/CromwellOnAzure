@@ -3,6 +3,8 @@
 
 using System;
 using System.IO;
+using System.Linq;
+using Microsoft.Azure.Batch;
 
 namespace TesApi.Web
 {
@@ -24,5 +26,21 @@ namespace TesApi.Web
         {
             return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Scripts/start-task.sh"));
         }
+
+        /// <summary>
+        /// Returns the host config file.
+        /// </summary>
+        /// <param name="host">The <seealso cref="Tes.Models.TesResources.SupportedBackendParameters.docker_host_configuration"/> <see cref="Tes.Models.TesResources.BackendParameters"/> value</param>
+        /// <returns><see cref="Stream"/></returns>
+        public static Stream GetHostConfig(string host)
+            => GetHostConfigFile(host, "config.json")?.OpenRead();
+
+        /// <summary>
+        /// Returns a file from the Config section of the indicated HostConfigs
+        /// </summary>
+        /// <param name="parts">Path directories. First directory name is the docker_host_configuration label value.</param>
+        /// <returns><see cref="FileInfo"/></returns>
+        public static FileInfo GetHostConfigFile(params string[] parts)
+            => parts?.Length <= 1 ? default : new(Path.Combine(AppContext.BaseDirectory, $"HostConfigs/{parts[0]}/Config/{string.Join('/', parts.Skip(1))}"));
     }
 }

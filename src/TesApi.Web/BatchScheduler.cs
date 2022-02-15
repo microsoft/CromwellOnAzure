@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -304,17 +305,18 @@ namespace TesApi.Web
                 var identityResourceId = IsIdentityProvided ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
 
                 var containerConfiguration = await ContainerConfigurationIfNeeded(dockerImage);
-                var startTask = await StartTaskIfNeeded(tesTask);
+                var (startTask, nodeInfo, dockerParams, preCommand) = await StartTaskIfNeeded(tesTask);
 
                 var poolInformation = await CreateAutoPoolModePoolInformation(
                     virtualMachineInfo.VmSize,
                     virtualMachineInfo.LowPriority,
+                    nodeInfo ?? batchNodeInfo,
                     containerConfiguration,
                     startTask,
                     jobId,
                     identityResourceId);
 
-                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, containerConfiguration is not null);
+                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, dockerParams, preCommand, containerConfiguration is not null);
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
                 await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
@@ -531,10 +533,13 @@ namespace TesApi.Web
         /// Returns job preparation and main Batch tasks that represents the given <see cref="TesTask"/>
         /// </summary>
         /// <param name="task">The <see cref="TesTask"/></param>
+        /// <param name="dockerRunParams">Additional docker run parameters, if any.</param>
+        /// <param name="preCommandCommand">Command run before task script, if any.</param>
         /// <param name="poolHasContainerConfig">Indicates that <see cref="CloudTask.ContainerSettings"/> must be set.</param>
         /// <returns>Job preparation and main Batch tasks</returns>
-        private async Task<CloudTask> ConvertTesTaskToBatchTaskAsync(TesTask task, bool poolHasContainerConfig)
+        private async Task<CloudTask> ConvertTesTaskToBatchTaskAsync(TesTask task, string dockerRunParams, string[] preCommandCommand, bool poolHasContainerConfig)
         {
+            dockerRunParams ??= string.Empty;
             var cromwellPathPrefixWithoutEndSlash = CromwellPathPrefix.TrimEnd('/');
             var taskId = task.Id;
 
@@ -689,7 +694,16 @@ namespace TesApi.Web
             sb.AppendLine($"write_ts DownloadEnd && \\");
             sb.AppendLine($"chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \\");
             sb.AppendLine($"write_ts ExecutorStart && \\");
-            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{ string.Join(" && ", executor.Command.Skip(1))}\" && \\");
+            if (preCommandCommand is not null)
+            {
+                sb.Append($"docker run {dockerRunParams} --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {preCommandCommand[0]}");
+                if (preCommandCommand.Length > 1)
+                {
+                    sb.AppendLine($" -c \"{ string.Join(" && ", preCommandCommand.Skip(1))}\"");
+                }
+                sb.AppendLine(" && \\");
+            }
+            sb.AppendLine($"docker run {dockerRunParams} --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{ string.Join(" && ", executor.Command.Skip(1))}\" && \\");
             sb.AppendLine($"write_ts ExecutorEnd && \\");
             sb.AppendLine($"write_ts UploadStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} {uploadFilesScriptPath} && \\");
@@ -796,53 +810,103 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="tesTask">The <see cref="TesTask"/> to schedule on Azure Batch</param>
         /// <returns></returns>
-        private async Task<StartTask> StartTaskIfNeeded(TesTask tesTask)
+        private async Task<(StartTask startTask, BatchNodeInfo nodeInfo, string dockerParams, string[] preCommand)> StartTaskIfNeeded(TesTask tesTask)
         {
-            await Task.Delay(1);
-            // <param name="batchExecutionDirectoryPath">Relative path to the Batch execution location</param>
-            // <param name="startTaskSasUrl">SAS URL for the start task</param>
-            // <param name="startTaskPath">Local path on the Azure Batch node for the script</param>
-            //var batchExecutionPath = GetBatchExecutionDirectoryPath(tesTask);
-            //string startTaskSasUrl = null;
+            StartTask taskResult = default;
+            BatchNodeInfo batchResult = default;
+            string dockerParams = null;
+            string[] preCommand = null;
 
-            // string startTaskSasUrl = null, string startTaskPath = null
+            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) == true)
+            {
+                var hostConfigName = tesTask.Resources.GetBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration);
+                using var hostConfigJson = new JsonTextReader(new StreamReader(BatchUtils.GetHostConfig(hostConfigName)));
+                var serializer = JsonSerializer.CreateDefault();
+                var hostConfig = serializer.Deserialize<HostConfig>(hostConfigJson);
+                batchResult = new()
+                {
+                    BatchImageOffer = hostConfig.Batch.Image.Offer,
+                    BatchImagePublisher = hostConfig.Batch.Image.Publisher,
+                    BatchImageSku = hostConfig.Batch.Image.Sku,
+                    BatchImageVersion = hostConfig.Batch.Image.Version,
+                    BatchNodeAgentSkuId = hostConfig.Batch.NodeAgentSkuId
+                };
 
-            //BatchModels.StartTask result = default;
+                dockerParams = hostConfig.DockerRun?.Parameters;
+                preCommand = hostConfig.DockerRun?.StartTask;
 
-            //if (useStartTask)
-            //{
-            //    var scriptPath = $"{batchExecutionPath}/start-task.sh";
-            //    await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.StartTaskScript);
-            //    startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
-            //}
+                if (hostConfig.StartTask is not null)
+                {
+                    var scriptPath = $"{GetBatchExecutionDirectoryPath(tesTask)}/{hostConfig.StartTask.Script}";
+                    await this.storageAccessProvider.UploadBlobAsync(scriptPath, File.ReadAllText(BatchUtils.GetHostConfigFile(hostConfigName, hostConfig.StartTask.Script).FullName));
+                    var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
 
-            //if (useStartTask)
-            //{
-            //    var scriptPath = $"{batchExecutionDirectoryPath}/{startTaskScriptFilename}";
-            //    await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.StartTaskScript);
-            //    var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
+                    taskResult = new()
+                    {
+                        // Pool StartTask: install Docker as start task if it's not already
+                        CommandLine = $"/bin/sh {batchStartTaskLocalPathOnBatchNode}",
+                        UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                        ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchStartTaskLocalPathOnBatchNode) }
+                    };
+                }
+            }
 
-            //    startTask = new Microsoft.Azure.Batch.StartTask
-            //    {
-            //        // Pool StartTask: install Docker as start task if it's not already
-            //        CommandLine = $"sudo /bin/sh {batchStartTaskLocalPathOnBatchNode}",
-            //        UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-            //        ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchStartTaskLocalPathOnBatchNode) }
-            //    };
-            //}
+            return (taskResult, batchResult, dockerParams, preCommand);
+        }
 
-            //if (useStartTask)
-            //{
-            //    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
-            //    {
-            //        // Pool StartTask: install Docker as start task if it's not already
-            //        CommandLine = $"/bin/sh {startTaskPath}",
-            //        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
-            //        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
-            //    };
-            //}
+        [DataContract]
+        public class HostConfig
+        {
+            [DataMember(Name = "batch")]
+            public BatchImpl Batch { get; set; }
 
-            return default;
+            [DataContract]
+            public class BatchImpl
+            {
+                [DataMember(Name = "image")]
+                public ImageImpl Image { get; set; }
+                [DataMember(Name = "node_agent_sku_id")]
+                public string NodeAgentSkuId { get; set; }
+
+                [DataContract]
+                public class ImageImpl
+                {
+                    [DataMember(Name = "offer")]
+                    public string Offer { get; set; }
+                    [DataMember(Name = "publisher")]
+                    public string Publisher { get; set; }
+                    [DataMember(Name = "sku")]
+                    public string Sku { get; set; }
+                    [DataMember(Name = "version")]
+                    public string Version { get; set; }
+                }
+            }
+
+            [DataMember(Name = "start_task")]
+            public StartTaskImpl StartTask { get; set; }
+
+            [DataContract]
+            public class StartTaskImpl
+            {
+                [DataMember(Name = "script")]
+                public string Script { get; set; }
+
+                [DataMember(Name = "url")]
+                public string Url { get; set; }
+            }
+
+            [DataMember(Name = "docker_run")]
+            public DockerRunImpl DockerRun { get; set; }
+
+            [DataContract]
+            public class DockerRunImpl
+            {
+                [DataMember(Name = "parameters")]
+                public string Parameters { get; set; }
+
+                [DataMember(Name = "start_task")]
+                public string[] StartTask { get; set; }
+            }
         }
 
         /// <summary>
@@ -916,14 +980,14 @@ namespace TesApi.Web
         /// <param name="jobId"></param>
         /// <param name="identityResourceId"></param>
         /// <returns>An Azure Batch Pool specifier</returns>
-        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(string vmSize, bool preemptible, ContainerConfiguration containerConfiguration, StartTask startTask, string jobId = null, string identityResourceId = null)
+        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(string vmSize, bool preemptible, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration, StartTask startTask, string jobId = null, string identityResourceId = null)
         {
             if (!string.IsNullOrWhiteSpace(identityResourceId))
             {
                 _ = jobId ?? throw new ArgumentNullException(nameof(jobId));
             }
 
-            var poolSpecification = GetPoolSpecification(vmSize, preemptible, containerConfiguration, startTask);
+            var poolSpecification = GetPoolSpecification(vmSize, preemptible, nodeInfo, containerConfiguration, startTask);
 
             // By default, the pool will have the same name/ID as the job if the identity is provided, otherwise we return an actual autopool.
             return string.IsNullOrWhiteSpace(identityResourceId)
@@ -961,15 +1025,15 @@ namespace TesApi.Web
         /// <param name="containerConfiguration"></param>
         /// <param name="startTask"></param>
         /// <returns></returns>
-        private PoolSpecification GetPoolSpecification(string vmSize, bool? preemptible, ContainerConfiguration containerConfiguration, StartTask startTask)
+        private PoolSpecification GetPoolSpecification(string vmSize, bool? preemptible, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration, StartTask startTask)
         {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
-                    batchNodeInfo.BatchImageOffer,
-                    batchNodeInfo.BatchImagePublisher,
-                    batchNodeInfo.BatchImageSku,
-                    batchNodeInfo.BatchImageVersion),
-                nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId)
+                    nodeInfo.BatchImageOffer,
+                    nodeInfo.BatchImagePublisher,
+                    nodeInfo.BatchImageSku,
+                    nodeInfo.BatchImageVersion),
+                nodeAgentSkuId: nodeInfo.BatchNodeAgentSkuId)
             {
                 ContainerConfiguration = containerConfiguration
             };

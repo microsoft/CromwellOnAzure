@@ -973,13 +973,17 @@ namespace CromwellOnAzureDeployer
         }
 
         private Task WriteNonPersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount)
-            => Execute(
-                $"Writing readme.txt files to '{WorkflowsContainerName}' storage container...",
-                async () =>
-                {
-                    await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
-                    await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
-                });
+            => Task.WhenAll(
+                Execute(
+                    $"Writing readme.txt files to '{WorkflowsContainerName}' storage container...",
+                    async () =>
+                    {
+                        await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
+                        await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
+                    }),
+                Execute(
+                    $"Writing docker host resource blobs to '{InputsContainerName}' storage container...",
+                    async () => await Task.WhenAll(Utility.GetEmbeddedHostConfigBlobResources().Select(c => UploadBinaryToStorageAccountAsync(storageAccount, InputsContainerName, c.Name.Replace('.', '/'), BinaryData.FromStream(Utility.GetBinaryHostConfigBlobContent(c)))).ToArray())));
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
             => Execute(
@@ -1984,13 +1988,16 @@ namespace CromwellOnAzureDeployer
             return (await container.GetBlobClient(blobName).DownloadContentAsync(cts.Token)).ToString();
         }
 
-        private async Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
+        private Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
+            => UploadBinaryToStorageAccountAsync(storageAccount, containerName, blobName, BinaryData.FromString(content));
+
+        private async Task UploadBinaryToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, BinaryData content)
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
             await container.CreateIfNotExistsAsync();
-            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), cts.Token);
+            await container.GetBlobClient(blobName).UploadAsync(content, cts.Token);
         }
 
         private static string GetLinuxParentPath(string path)

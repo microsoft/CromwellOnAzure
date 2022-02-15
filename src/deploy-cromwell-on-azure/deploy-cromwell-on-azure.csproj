@@ -22,6 +22,22 @@
   </ItemGroup>
 
   <ItemGroup>
+    <HostConfigBlob Include="..\..\HostConfigs\*\Blobs\**\*">
+      <!--LogicalName>HostConfigs.%(RecursiveDir.Replace('\\','.').Replace('/','.'))%(Filename)%(Extension)</LogicalName>
+      <LogicalName>HostConfigs.%(RecursiveDir)%(Filename)%(Extension)</LogicalName-->
+      <Visible>False</Visible>
+    </HostConfigBlob>
+  </ItemGroup>
+
+  <Target Name="IncludeHostConfigBlobs" BeforeTargets="ResolveReferences">
+    <ItemGroup>
+      <EmbeddedResource Include="@(HostConfigBlob)">
+        <LogicalName>HostConfigs.%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" Version="12.10.0" />
     <PackageReference Include="Microsoft.Azure.Management.Batch" Version="14.0.0" />
     <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.38.0" />
