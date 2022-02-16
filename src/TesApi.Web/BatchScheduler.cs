@@ -865,14 +865,14 @@ namespace TesApi.Web
 
             return (taskResult, batchResult, dockerParams, preCommand);
 
-	        async Task<ResourceFile> MakeResourceFile(string source, string hostConfig = null, string name = null, bool isBlob = false, string relativeTargetDir = null, string mode = null)
-	        {
+            async Task<ResourceFile> MakeResourceFile(string source, string hostConfig = null, string name = null, bool isBlob = false, string relativeTargetDir = null, string mode = null)
+            {
                 string file;
                 if (!Uri.TryCreate(source, UriKind.Absolute, out var uri))
                 {
                     file = name ?? Path.GetFileName(source);
                     source = isBlob ? await storageAccessProvider.MapLocalPathToSasUrlAsync($"{HostConfigBlobsPrefix}{hostConfig}/{source}") : await storageAccessProvider.MapLocalPathToSasUrlAsync(source);
-	    	    }
+                }
                 else if (Uri.UriSchemeHttps.Equals(uri.Scheme, StringComparison.OrdinalIgnoreCase) || Uri.UriSchemeHttp.Equals(uri.Scheme, StringComparison.OrdinalIgnoreCase))
                 {
                     file = name ?? Path.GetFileName(new Uri(source, UriKind.Absolute).LocalPath);
@@ -970,8 +970,8 @@ namespace TesApi.Web
                 /// <summary>
                 /// Access to <see cref="ResourceImpl"/>
                 /// </summary>
-		        [DataMember(Name = "resources")]
-		        public ResourceImpl[] Resources { get; set; }
+                [DataMember(Name = "resources")]
+                public ResourceImpl[] Resources { get; set; }
 
                 /// <summary>
                 /// Configures <see cref="ResourceFile"/>
