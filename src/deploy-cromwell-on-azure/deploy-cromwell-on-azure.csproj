@@ -23,17 +23,19 @@
 
   <ItemGroup>
     <HostConfigBlob Include="..\..\HostConfigs\*\Blobs\**\*">
-      <!--LogicalName>HostConfigs.%(RecursiveDir.Replace('\\','.').Replace('/','.'))%(Filename)%(Extension)</LogicalName>
-      <LogicalName>HostConfigs.%(RecursiveDir)%(Filename)%(Extension)</LogicalName-->
       <Visible>False</Visible>
     </HostConfigBlob>
   </ItemGroup>
 
   <Target Name="IncludeHostConfigBlobs" BeforeTargets="ResolveReferences">
     <ItemGroup>
-      <EmbeddedResource Include="@(HostConfigBlob)">
-        <LogicalName>HostConfigs.%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
-      </EmbeddedResource>
+      <_HostConfigBlobDir Include="HostConfigs$%(RecursiveDir)%(Filename)%(Extension)">
+        <_FP>@(HostConfigBlob->'%(FullPath)')</_FP>
+      </_HostConfigBlobDir>
+      <_HostConfigBlob Include="%(_FP)" RemoveMetadata="_FP">
+        <LogicalName>@(_HostConfigBlobDir->Replace('\','$')->Replace('/','$'))</LogicalName>
+      </_HostConfigBlob>
+      <EmbeddedResource Include="@(_HostConfigBlob)"/>
     </ItemGroup>
   </Target>
 

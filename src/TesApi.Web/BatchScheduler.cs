@@ -30,6 +30,7 @@ namespace TesApi.Web
         private const int DefaultCoreCount = 1;
         private const int DefaultMemoryGb = 2;
         private const int DefaultDiskGb = 10;
+        private const string HostConfigBlobsPrefix = "/host-config-blobs/";
         private const string CromwellPathPrefix = "/cromwell-executions/";
         private const string CromwellScriptFileName = "script";
         private const string BatchExecutionDirectoryName = "__batch";
@@ -833,25 +834,56 @@ namespace TesApi.Web
                 };
 
                 dockerParams = hostConfig.DockerRun?.Parameters;
-                preCommand = hostConfig.DockerRun?.StartTask;
+                preCommand = hostConfig.DockerRun?.PreTaskCmd;
 
                 if (hostConfig.StartTask is not null)
                 {
-                    var scriptPath = $"{GetBatchExecutionDirectoryPath(tesTask)}/{hostConfig.StartTask.Script}";
-                    await this.storageAccessProvider.UploadBlobAsync(scriptPath, File.ReadAllText(BatchUtils.GetHostConfigFile(hostConfigName, hostConfig.StartTask.Script).FullName));
-                    var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
+                    var resources = Enumerable.Empty<ResourceFile>();
+
+                    if (hostConfig.StartTask.Resources is not null)
+                    {
+                        foreach (var resource in hostConfig.StartTask.Resources)
+                        {
+                            resources = resources.Append((string.IsNullOrEmpty(resource.Url), string.IsNullOrEmpty(resource.Blob)) switch
+                            {
+                                (false, true) => await MakeResourceFile(resource.Url, relativeTargetDir: resource.Path, mode: resource.Mode),
+                                (true, false) => await MakeResourceFile(resource.Blob, hostConfig: hostConfigName, isBlob: true, relativeTargetDir: resource.Path, mode: resource.Mode),
+                                (false, false) => throw new Exception(), // cannot set both
+                                (true, true) => throw new Exception() // must set one
+                            });
+                        }
+                    }
 
                     taskResult = new()
                     {
-                        // Pool StartTask: install Docker as start task if it's not already
                         CommandLine = $"/bin/sh {batchStartTaskLocalPathOnBatchNode}",
                         UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-                        ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchStartTaskLocalPathOnBatchNode) }
+                        ResourceFiles = resources.ToList()
                     };
                 }
             }
 
             return (taskResult, batchResult, dockerParams, preCommand);
+
+	        async Task<ResourceFile> MakeResourceFile(string source, string hostConfig = null, string name = null, bool isBlob = false, string relativeTargetDir = null, string mode = null)
+	        {
+                string file;
+                if (!Uri.TryCreate(source, UriKind.Absolute, out var uri))
+                {
+                    file = name ?? Path.GetFileName(source);
+                    source = isBlob ? await storageAccessProvider.MapLocalPathToSasUrlAsync($"{HostConfigBlobsPrefix}{hostConfig}/{source}") : await storageAccessProvider.MapLocalPathToSasUrlAsync(source);
+	    	    }
+                else if (Uri.UriSchemeHttps.Equals(uri.Scheme, StringComparison.OrdinalIgnoreCase) || Uri.UriSchemeHttp.Equals(uri.Scheme, StringComparison.OrdinalIgnoreCase))
+                {
+                    file = name ?? Path.GetFileName(new Uri(source, UriKind.Absolute).LocalPath);
+                }
+                else
+                {
+                    throw new Exception();
+                }
+                var filePath = Path.Combine(Path.GetDirectoryName(batchStartTaskLocalPathOnBatchNode), relativeTargetDir ?? string.Empty, file);
+                return ResourceFile.FromUrl(source, filePath, mode);
+            }
         }
 
         [DataContract]
@@ -888,11 +920,27 @@ namespace TesApi.Web
             [DataContract]
             public class StartTaskImpl
             {
-                [DataMember(Name = "script")]
-                public string Script { get; set; }
+                [DataMember(Name = "command")]
+                public string[] Command { get; set; }
 
-                [DataMember(Name = "url")]
-                public string Url { get; set; }
+		        [DataMember(Name = "resources")]
+		        public ResourceImpl[] Resources { get; set; }
+
+                [DataContract]
+                public class ResourceImpl
+                {
+                    [DataMember(Name = "url")]
+                    public string Url { get; set; }
+
+                    [DataMember(Name = "blob")]
+                    public string Blob { get; set; }
+
+                    [DataMember(Name = "mode")]
+                    public string Mode { get; set; }
+
+                    [DataMember(Name = "path")]
+                    public string Path { get; set; }
+                }
             }
 
             [DataMember(Name = "docker_run")]
@@ -904,8 +952,8 @@ namespace TesApi.Web
                 [DataMember(Name = "parameters")]
                 public string Parameters { get; set; }
 
-                [DataMember(Name = "start_task")]
-                public string[] StartTask { get; set; }
+                [DataMember(Name = "pretask_command")]
+                public string[] PreTaskCmd { get; set; }
             }
         }
 

@@ -58,6 +58,7 @@ namespace CromwellOnAzureDeployer
         private const string ContainersToMountFileName = "containers-to-mount";
         private const string AllowedVmSizesFileName = "allowed-vm-sizes";
         private const string InputsContainerName = "inputs";
+        private const string HostConfigBlobsContainerName = "host-config-blobs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
         private const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
 
@@ -968,7 +969,7 @@ namespace CromwellOnAzureDeployer
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
 
-            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
+            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName, HostConfigBlobsContainerName };
             await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
         }
 
@@ -982,8 +983,8 @@ namespace CromwellOnAzureDeployer
                         await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
                     }),
                 Execute(
-                    $"Writing docker host resource blobs to '{InputsContainerName}' storage container...",
-                    async () => await Task.WhenAll(Utility.GetEmbeddedHostConfigBlobResources().Select(c => UploadBinaryToStorageAccountAsync(storageAccount, InputsContainerName, c.Name.Replace('.', '/'), BinaryData.FromStream(Utility.GetBinaryHostConfigBlobContent(c)))).ToArray())));
+                    $"Writing docker host resource blobs to '{HostConfigBlobsContainerName}' storage container...",
+                    async () => await Task.WhenAll(Utility.GetEmbeddedHostConfigBlobResources().Select(c => UploadBinaryToStorageAccountAsync(storageAccount, HostConfigBlobsContainerName, c.Name, BinaryData.FromStream(Utility.GetBinaryHostConfigBlobContent(c)))).ToArray())));
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
             => Execute(

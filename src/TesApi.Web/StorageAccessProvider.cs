@@ -22,6 +22,7 @@ namespace TesApi.Web
         private readonly ILogger logger;
         private readonly IAzureProxy azureProxy;
         private const string CromwellPathPrefix = "/cromwell-executions/";
+        private const string HostConfigBlobsPrefix = "/host-config-blobs/";
         private readonly string defaultStorageAccountName;
         private static readonly TimeSpan sasTokenDuration = TimeSpan.FromDays(3);
         private readonly List<ExternalStorageContainerInfo> externalStorageContainers;
@@ -130,7 +131,7 @@ namespace TesApi.Web
             // This would allow the user to omit the account name for files stored in the default storage account
 
             // /cromwell-executions/... URLs become /defaultStorageAccountName/cromwell-executions/... to unify how URLs starting with /acct/container/... pattern are handled.
-            if (path.StartsWith(CromwellPathPrefix, StringComparison.OrdinalIgnoreCase))
+            if (path.StartsWith(CromwellPathPrefix, StringComparison.OrdinalIgnoreCase) || path.StartsWith(HostConfigBlobsPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 path = $"/{defaultStorageAccountName}{path}";
             }
