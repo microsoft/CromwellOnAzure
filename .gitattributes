@@ -1,0 +1,12 @@
+*		        text=auto
+*.			text eol=lf
+*.txt			text eol=lf
+*.md			-text
+*.sln			text eol=crlf
+*.sql			text eol=crlf
+*.yml			text eol=lf
+*.sh			text eol=lf
+*.service		 text eol=lf
+CODE_OF_CONDUCT.md	-text
+LICENSE README.md	-text
+SECURITY.md		-text
