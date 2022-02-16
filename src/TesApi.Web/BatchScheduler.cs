@@ -856,7 +856,7 @@ namespace TesApi.Web
 
                     taskResult = new()
                     {
-                        CommandLine = $"/bin/sh {batchStartTaskLocalPathOnBatchNode}",
+                        CommandLine = hostConfig.StartTask.Command[0] + (hostConfig.StartTask.Command.Length > 1 ? $" \"{string.Join("\" \"", hostConfig.StartTask.Command.Skip(1))}\"" : string.Empty),
                         UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                         ResourceFiles = resources.ToList()
                     };
@@ -886,72 +886,148 @@ namespace TesApi.Web
             }
         }
 
+        /// <summary>
+        /// Pool host configuration for <see cref="TesResources.SupportedBackendParameters.docker_host_configuration"/>
+        /// </summary>
         [DataContract]
         public class HostConfig
         {
+            /// <summary>
+            /// Access to <see cref="BatchImpl"/>
+            /// </summary>
             [DataMember(Name = "batch")]
             public BatchImpl Batch { get; set; }
 
+            /// <summary>
+            /// Configuration for <see cref="BatchNodeInfo"/>. <seealso cref="VirtualMachineConfiguration"/>
+            /// </summary>
             [DataContract]
             public class BatchImpl
             {
+                /// <summary>
+                /// Access to <see cref="ImageImpl"/>
+                /// </summary>
                 [DataMember(Name = "image")]
                 public ImageImpl Image { get; set; }
+
+                /// <summary>
+                /// Configures the SKU of Batch Node Agent to be provisioned on the compute node.
+                /// </summary>
                 [DataMember(Name = "node_agent_sku_id")]
                 public string NodeAgentSkuId { get; set; }
 
+                /// <summary>
+                /// Configuration for <see cref="ImageReference"/>
+                /// </summary>
                 [DataContract]
                 public class ImageImpl
                 {
+                    /// <summary>
+                    /// Configures the offer type of the Azure Virtual Machines Marketplace Image.
+                    /// </summary>
                     [DataMember(Name = "offer")]
                     public string Offer { get; set; }
+
+                    /// <summary>
+                    /// Configures the publisher of the Azure Virtual Machines Marketplace Image.
+                    /// </summary>
                     [DataMember(Name = "publisher")]
                     public string Publisher { get; set; }
+
+                    /// <summary>
+                    /// Configures the SKU of the Azure Virtual Machines Marketplace Image.
+                    /// </summary>
                     [DataMember(Name = "sku")]
                     public string Sku { get; set; }
+
+                    /// <summary>
+                    /// Configures the version of the Azure Virtual Machines Marketplace Image.
+                    /// </summary>
                     [DataMember(Name = "version")]
                     public string Version { get; set; }
                 }
             }
 
+            /// <summary>
+            /// Access to <see cref="StartTaskImpl"/>
+            /// </summary>
             [DataMember(Name = "start_task")]
             public StartTaskImpl StartTask { get; set; }
 
+            /// <summary>
+            /// Configures <see cref="Microsoft.Azure.Batch.StartTask"/>
+            /// </summary>
             [DataContract]
             public class StartTaskImpl
             {
+                /// <summary>
+                /// Sets the command line of the task.
+                /// </summary>
+                /// <remarks>This does not supply a shell nor does it insert a &apos;-c&apos; between the first and additional elements. It does, however, quote all except the first element.</remarks>
                 [DataMember(Name = "command")]
                 public string[] Command { get; set; }
 
+                /// <summary>
+                /// Access to <see cref="ResourceImpl"/>
+                /// </summary>
 		        [DataMember(Name = "resources")]
 		        public ResourceImpl[] Resources { get; set; }
 
+                /// <summary>
+                /// Configures <see cref="ResourceFile"/>
+                /// </summary>
                 [DataContract]
                 public class ResourceImpl
                 {
+                    /// <summary>
+                    /// URL to download the file.
+                    /// </summary>
+                    /// <remarks>Either Url or Blob must be set. It's an error for both to be set.</remarks>
                     [DataMember(Name = "url")]
                     public string Url { get; set; }
 
+                    /// <summary>
+                    /// Path of file within the Blobs directory of the Host Configuration in the source repository.
+                    /// </summary>
                     [DataMember(Name = "blob")]
                     public string Blob { get; set; }
 
+                    /// <summary>
+                    /// The file permission mode attribute in octal format.
+                    /// </summary>
+                    /// <remarks>The default value is 0770 (aka rw ug).</remarks>
                     [DataMember(Name = "mode")]
                     public string Mode { get; set; }
 
+                    /// <summary>
+                    /// Directory within the working directory to place file.
+                    /// </summary>
                     [DataMember(Name = "path")]
                     public string Path { get; set; }
                 }
             }
 
+            /// <summary>
+            /// Access to <see cref="DockerRunImpl"/>
+            /// </summary>
             [DataMember(Name = "docker_run")]
             public DockerRunImpl DockerRun { get; set; }
 
+            /// <summary>
+            /// Configures the built-in task command builder for each task in the pool.
+            /// </summary>
             [DataContract]
             public class DockerRunImpl
             {
+                /// <summary>
+                /// Provides additional parameters to the &quot;docker run&quot; that runs each task's command.
+                /// </summary>
                 [DataMember(Name = "parameters")]
                 public string Parameters { get; set; }
 
+                /// <summary>
+                /// Provides an additional command run in the same docker container as the task's command, in a separate invocation. It's treated the same as <see cref="StartTaskImpl.Command"/>.
+                /// </summary>
                 [DataMember(Name = "pretask_command")]
                 public string[] PreTaskCmd { get; set; }
             }
@@ -1023,6 +1099,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="vmSize">The Azure VM sku</param>
         /// <param name="preemptible">True if preemptible machine should be used</param>
+        /// <param name="nodeInfo"></param>
         /// <param name="containerConfiguration">The configuration to download private images</param>
         /// <param name="startTask">The start task for all jobs/tasks in the pool</param>
         /// <param name="jobId"></param>
@@ -1070,6 +1147,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="vmSize"></param>
         /// <param name="preemptible"></param>
+        /// <param name="nodeInfo"></param>
         /// <param name="containerConfiguration"></param>
         /// <param name="startTask"></param>
         /// <returns></returns>

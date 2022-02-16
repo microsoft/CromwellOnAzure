@@ -9,17 +9,17 @@
     "node_agent_sku_id": "batch.node.centos 7"
   },
   "start_task": {
-    "command": ["install-xilinx-drivers.sh"],
+    "command": ["./install-xilinx-drivers.sh"],
     "resources":[
-      {"blob": "install-xilinx-drivers.sh", "mode": "755"},
-      {"blob": "xilinx-cmc-u200-u250-1.2.5-2956667.noarch.rpm", "mode": "644"},
-      {"blob": "xilinx-sc-fw-u200-u250-4.5.0-1.1e55661.noarch.rpm", "mode": "644"},
-      {"blob": "xilinx-u250-gen3x16-base-2-2947128.noarch.rpm", "mode": "644"},
-      {"blob": "xilinx-u250-gen3x16-xdma-shell-2.1-3127789.noarch.rpm", "mode": "644"},
-      {"blob": "xilinx-u250-gen3x16-xdma-validate-2.1-2948414.noarch.rpm", "mode": "644"},
-      {"blob": "xilinx-u250-gen3x16-xdma-validate-2.1-3005608.1.noarch.rpm", "mode": "644"},
-      {"blob": "xrt_202020.2.8.832_7.4.1708-x86_64-azure.rpm", "mode": "644"},
-      {"blob": "xrt_202020.2.8.832_7.4.1708-x86_64-xrt.rpm", "mode": "644"}
+      {"blob": "install-xilinx-drivers.sh", "mode": "0755"},
+      {"blob": "xilinx-cmc-u200-u250-1.2.5-2956667.noarch.rpm", "mode": "0644"},
+      {"blob": "xilinx-sc-fw-u200-u250-4.5.0-1.1e55661.noarch.rpm", "mode": "0644"},
+      {"blob": "xilinx-u250-gen3x16-base-2-2947128.noarch.rpm", "mode": "0644"},
+      {"blob": "xilinx-u250-gen3x16-xdma-shell-2.1-3127789.noarch.rpm", "mode": "0644"},
+      {"blob": "xilinx-u250-gen3x16-xdma-validate-2.1-2948414.noarch.rpm", "mode": "0644"},
+      {"blob": "xilinx-u250-gen3x16-xdma-validate-2.1-3005608.1.noarch.rpm", "mode": "0644"},
+      {"blob": "xrt_202020.2.8.832_7.4.1708-x86_64-azure.rpm", "mode": "0644"},
+      {"blob": "xrt_202020.2.8.832_7.4.1708-x86_64-xrt.rpm", "mode": "0644"}
     ]
   },
   "docker_run": {
