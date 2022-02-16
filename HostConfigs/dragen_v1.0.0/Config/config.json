@@ -9,7 +9,7 @@
     "node_agent_sku_id": "batch.node.centos 7"
   },
   "start_task": {
-    "command": ["install-xilinx-drivers.sh"],
+    "command": ["/usr/bin/sh","$(AZ_BATCH_TASK_WORKING_DIR)/install-xilinx-drivers.sh"],
     "resources":[
       {"blob": "install-xilinx-drivers.sh", "mode": "0755"},
       {"blob": "xilinx-cmc-u200-u250-1.2.5-2956667.noarch.rpm", "mode": "0644"},
