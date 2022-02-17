@@ -846,10 +846,11 @@ namespace TesApi.Web
                         {
                             resources = resources.Append((string.IsNullOrEmpty(resource.Url), string.IsNullOrEmpty(resource.Blob)) switch
                             {
-                                (false, true) => await MakeResourceFile(resource.Url, relativeTargetDir: resource.Path, mode: resource.Mode),
-                                (true, false) => await MakeResourceFile(resource.Blob, hostConfig: hostConfigName, isBlob: true, relativeTargetDir: resource.Path, mode: resource.Mode),
-                                (false, false) => throw new Exception(), // cannot set both
-                                (true, true) => throw new Exception() // must set one
+                                (true, false) => ResourceFile.FromAutoStorageContainer("host-config-blobs", resource.Path, $"{hostConfig}/{resource.Blob}", resource.Mode),
+                                (false, true) => await MakeResourceFile(resource.Url, resource.Path, resource.Mode),
+                                //(false, false) => throw new Exception(), // cannot set both
+                                //(true, true) => throw new Exception(), // must set one
+                                _ => throw new Exception() // must set only one
                             });
                         }
                     }
@@ -865,24 +866,19 @@ namespace TesApi.Web
 
             return (taskResult, batchResult, dockerParams, preCommand);
 
-            async Task<ResourceFile> MakeResourceFile(string source, string hostConfig = null, string name = null, bool isBlob = false, string relativeTargetDir = null, string mode = null)
+            async Task<ResourceFile> MakeResourceFile(string source, string relativeTargetDir, string mode = null)
             {
-                string file;
+                var filePath = string.IsNullOrWhiteSpace(relativeTargetDir) ? null : relativeTargetDir;
                 if (!Uri.TryCreate(source, UriKind.Absolute, out var uri))
                 {
-                    file = name ?? Path.GetFileName(source);
-                    source = isBlob ? await storageAccessProvider.MapLocalPathToSasUrlAsync($"{HostConfigBlobsPrefix}{hostConfig}/{source}") : await storageAccessProvider.MapLocalPathToSasUrlAsync(source);
+                    filePath ??= Path.GetFileName(source);
+                    source = await storageAccessProvider.MapLocalPathToSasUrlAsync(source);
                 }
-                else if (Uri.UriSchemeHttps.Equals(uri.Scheme, StringComparison.OrdinalIgnoreCase) || Uri.UriSchemeHttp.Equals(uri.Scheme, StringComparison.OrdinalIgnoreCase))
-                {
-                    file = name ?? Path.GetFileName(new Uri(source, UriKind.Absolute).LocalPath);
-                }
-                else
+                else if (!Uri.UriSchemeHttps.Equals(uri.Scheme, StringComparison.OrdinalIgnoreCase) && !Uri.UriSchemeHttp.Equals(uri.Scheme, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new Exception();
                 }
-                var filePath = Path.Combine(Path.GetDirectoryName(batchStartTaskLocalPathOnBatchNode), relativeTargetDir ?? string.Empty, file);
-                return ResourceFile.FromUrl(source, filePath, mode);
+                return ResourceFile.FromUrl(source, filePath ?? throw new Exception(), mode);
             }
         }
 
@@ -982,7 +978,7 @@ namespace TesApi.Web
                     /// <summary>
                     /// URL to download the file.
                     /// </summary>
-                    /// <remarks>Either Url or Blob must be set. It's an error for both to be set.</remarks>
+                    /// <remarks>If Url is set, Path must also be set, and it must include the filename..</remarks>
                     [DataMember(Name = "url")]
                     public string Url { get; set; }
 

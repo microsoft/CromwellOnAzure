@@ -296,6 +296,11 @@ namespace CromwellOnAzureDeployer
                             ConsoleEx.WriteLine($"To do that, navigate to the storage account in the Azure Portal,", ConsoleColor.Yellow);
                             ConsoleEx.WriteLine($"Configuration tab, and click 'Upgrade.'", ConsoleColor.Yellow);
                         }
+
+                        if (installedVersion is null || installedVersion < new Version(3, 1))
+                        {
+                            await AttachStorageToBatchV310Async(storageAccount.Id);
+                        }
                     }
 
                     if (!configuration.Update)
@@ -1228,7 +1233,7 @@ namespace CromwellOnAzureDeployer
                         configuration.BatchAccountName,
                         new BatchAccountCreateParameters(
                             configuration.RegionName,
-                            autoStorage: configuration.PrivateNetworking.GetValueOrDefault() ? new AutoStorageBaseProperties { StorageAccountId = storageAccountId } : null),
+                            autoStorage: new(storageAccountId)),
                         cts.Token));
 
         private Task<IResourceGroup> CreateResourceGroupAsync()
@@ -1436,6 +1441,12 @@ namespace CromwellOnAzureDeployer
         private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
             => await Execute("Disabling auto-start of Docker service...",
                 () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
+
+        private async Task AttachStorageToBatchV310Async(string storageAccountId)
+            => await Execute("Linking storage account to batch account...",
+                () => new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
+                    .BatchAccount
+                    .UpdateAsync(configuration.ResourceGroupName, configuration.BatchAccountName, new(autoStorage: new(storageAccountId))));
 
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
