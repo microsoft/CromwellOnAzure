@@ -595,7 +595,8 @@ namespace TesApi.Web
                 + string.Join(" && ", filesToDownload.Select(f => {
                     var setVariables = $"path='{f.Path}' && url='{f.Url}'";
 
-                    var downloadSingleFile = f.Url.Contains(".blob.core.") && f.Url.Contains("sig=")
+                    var downloadSingleFile = f.Url.Contains(".blob.core.")
+                                             && UrlContainsSas(f.Url)
                         ? $"blobxfer download --storage-url \"$url\" --local-path \"$path\" --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
                         : "mkdir -p $(dirname \"$path\") && wget -O \"$path\" \"$url\"";
 
@@ -740,6 +741,22 @@ namespace TesApi.Web
             }
 
             return cloudTask;
+
+            static bool UrlContainsSas(string url)
+            {
+                var uri = new Uri(url, UriKind.Absolute);
+                var query = uri.Query;
+                return query?.Length > 1 && query[1..].Split('&').Any(QueryContainsSas);
+
+                static bool QueryContainsSas(string arg)
+                    => arg switch
+                    {
+                        var x when x.Split('=', 2)[0] == "sig" => true,
+                        var x when x.Contains('=') => false,
+                        var x when x.Contains("sas") => true, // PrivatePathsAndUrlsGetSasToken() uses this as a "sas" token
+                        _ => false,
+                    };
+            }
         }
 
         /// <summary>
