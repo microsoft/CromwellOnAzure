@@ -595,7 +595,7 @@ namespace TesApi.Web
                 + string.Join(" && ", filesToDownload.Select(f => {
                     var setVariables = $"path='{f.Path}' && url='{f.Url}'";
 
-                    var downloadSingleFile = f.Url.Contains(".blob.core.")
+                    var downloadSingleFile = f.Url.Contains(".blob.core.") && f.Url.Contains("sig=")
                         ? $"blobxfer download --storage-url \"$url\" --local-path \"$path\" --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
                         : "mkdir -p $(dirname \"$path\") && wget -O \"$path\" \"$url\"";
 
