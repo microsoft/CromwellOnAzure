@@ -9,7 +9,6 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Microsoft.ApplicationInsights.WindowsServer;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Extensions.Configuration;
@@ -30,15 +29,14 @@ namespace TesApi.Web
         private const int DefaultCoreCount = 1;
         private const int DefaultMemoryGb = 2;
         private const int DefaultDiskGb = 10;
-        private const string HostConfigBlobsPrefix = "/host-config-blobs/";
+        private const string HostConfigBlobsName = "host-config-blobs";
         private const string CromwellPathPrefix = "/cromwell-executions/";
         private const string CromwellScriptFileName = "script";
         private const string BatchExecutionDirectoryName = "__batch";
         private const string BatchScriptFileName = "batch_script";
         private const string UploadFilesScriptFileName = "upload_files_script";
         private const string DownloadFilesScriptFileName = "download_files_script";
-        private const string startTaskScriptFilename = "start-task.sh";
-        private static readonly string batchStartTaskLocalPathOnBatchNode = $"/mnt/batch/tasks/startup/wd/{startTaskScriptFilename}";
+        private const string StartTaskScriptFilename = "start-task.sh";
         private static readonly Regex queryStringRegex = new(@"[^\?.]*(\?.*)");
         private readonly string dockerInDockerImageName;
         private readonly string blobxferImageName;
@@ -55,7 +53,7 @@ namespace TesApi.Web
         private readonly string marthaUrl;
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
-        //private readonly string defaultStorageAccountName;
+        private readonly string defaultStorageAccountName;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -80,7 +78,7 @@ namespace TesApi.Web
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
             this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
-            //this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
+            this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);  // This account contains the HostConfigBlobsName container
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
@@ -305,8 +303,8 @@ namespace TesApi.Web
                 var IsIdentityProvided = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true;
                 var identityResourceId = IsIdentityProvided ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
 
-                var containerConfiguration = await ContainerConfigurationIfNeeded(dockerImage);
-                var (startTask, nodeInfo, dockerParams, preCommand) = await StartTaskIfNeeded(tesTask);
+                var containerConfiguration = await GetContainerConfigurationIfNeeded(dockerImage);
+                var (startTask, nodeInfo, dockerParams, preCommand) = await GetDockerHostConfiguration(tesTask);
 
                 var poolInformation = await CreateAutoPoolModePoolInformation(
                     virtualMachineInfo.VmSize,
@@ -807,11 +805,11 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Constructs an Azure Batch Container Configuration instance
+        /// Gets the DockerHost configuration
         /// </summary>
         /// <param name="tesTask">The <see cref="TesTask"/> to schedule on Azure Batch</param>
         /// <returns></returns>
-        private async Task<(StartTask startTask, BatchNodeInfo nodeInfo, string dockerParams, string[] preCommand)> StartTaskIfNeeded(TesTask tesTask)
+        private async Task<(StartTask startTask, BatchNodeInfo nodeInfo, string dockerParams, string[] preCommand)> GetDockerHostConfiguration(TesTask tesTask)
         {
             StartTask taskResult = default;
             BatchNodeInfo batchResult = default;
@@ -822,8 +820,7 @@ namespace TesApi.Web
             {
                 var hostConfigName = tesTask.Resources.GetBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration);
                 using var hostConfigJson = new JsonTextReader(new StreamReader(BatchUtils.GetHostConfig(hostConfigName)));
-                var serializer = JsonSerializer.CreateDefault();
-                var hostConfig = serializer.Deserialize<HostConfig>(hostConfigJson);
+                var hostConfig = JsonSerializer.CreateDefault().Deserialize<HostConfig>(hostConfigJson);
                 batchResult = new()
                 {
                     BatchImageOffer = hostConfig.Batch.Image.Offer,
@@ -838,33 +835,32 @@ namespace TesApi.Web
 
                 if (hostConfig.StartTask is not null)
                 {
-                    var resources = Enumerable.Empty<ResourceFile>();
+                    var resources = (await azureProxy.ListBlobsAsync(
+                            new Uri(await storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{hostConfigName}", true), UriKind.Absolute)))
+                        .Select(MakeBlobResourceFile);
 
-                    if (hostConfig.StartTask.Resources is not null)
+                    foreach (var resource in hostConfig.StartTask.Resources ?? Array.Empty<HostConfig.StartTaskImpl.ResourceImpl>())
                     {
-                        foreach (var resource in hostConfig.StartTask.Resources)
-                        {
-                            resources = resources.Append((string.IsNullOrEmpty(resource.Url), string.IsNullOrEmpty(resource.Blob)) switch
-                            {
-                                (true, false) => ResourceFile.FromAutoStorageContainer("host-config-blobs", resource.Path, $"{hostConfig}/{resource.Blob}", resource.Mode),
-                                (false, true) => await MakeResourceFile(resource.Url, resource.Path, resource.Mode),
-                                //(false, false) => throw new Exception(), // cannot set both
-                                //(true, true) => throw new Exception(), // must set one
-                                _ => throw new Exception() // must set only one
-                            });
-                        }
+                        resources = resources.Append(await MakeResourceFile(resource.Url, resource.Path, resource.Mode));
                     }
 
-                    taskResult = new()
+                    taskResult = new($"/bin/env {hostConfigName}/{StartTaskScriptFilename}")
                     {
-                        CommandLine = hostConfig.StartTask.Command[0] + (hostConfig.StartTask.Command.Length > 1 ? $" \"{string.Join("\" \"", hostConfig.StartTask.Command.Skip(1))}\"" : string.Empty),
                         UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-                        ResourceFiles = resources.ToList()
+                        ResourceFiles = resources.ToList(),
+                        EnvironmentSettings = Enumerable.Empty<EnvironmentSetting>().Append(new("docker_host_configuration", hostConfigName)).ToList()
                     };
                 }
             }
 
             return (taskResult, batchResult, dockerParams, preCommand);
+
+            ResourceFile MakeBlobResourceFile(string blob)
+                => ResourceFile.FromAutoStorageContainer(HostConfigBlobsName, blobPrefix: blob, fileMode: Path.GetFileName(blob) switch
+                {
+                    StartTaskScriptFilename => "0755",
+                    _ => "0644",
+                });
 
             async Task<ResourceFile> MakeResourceFile(string source, string relativeTargetDir, string mode = null)
             {
@@ -957,13 +953,6 @@ namespace TesApi.Web
             public class StartTaskImpl
             {
                 /// <summary>
-                /// Sets the command line of the task.
-                /// </summary>
-                /// <remarks>This does not supply a shell nor does it insert a &apos;-c&apos; between the first and additional elements. It does, however, quote all except the first element.</remarks>
-                [DataMember(Name = "command")]
-                public string[] Command { get; set; }
-
-                /// <summary>
                 /// Access to <see cref="ResourceImpl"/>
                 /// </summary>
                 [DataMember(Name = "resources")]
@@ -978,28 +967,22 @@ namespace TesApi.Web
                     /// <summary>
                     /// URL to download the file.
                     /// </summary>
-                    /// <remarks>If Url is set, Path must also be set, and it must include the filename..</remarks>
                     [DataMember(Name = "url")]
                     public string Url { get; set; }
 
                     /// <summary>
-                    /// Path of file within the Blobs directory of the Host Configuration in the source repository.
+                    /// Directory within the working directory to place file.
                     /// </summary>
-                    [DataMember(Name = "blob")]
-                    public string Blob { get; set; }
+                    /// <remarks>Must be set, and must include the filename</remarks>
+                    [DataMember(Name = "path")]
+                    public string Path { get; set; }
 
                     /// <summary>
                     /// The file permission mode attribute in octal format.
                     /// </summary>
-                    /// <remarks>The default value is 0770 (aka rw ug).</remarks>
+                    /// <remarks>The default value is 0770 (aka ug rw).</remarks>
                     [DataMember(Name = "mode")]
                     public string Mode { get; set; }
-
-                    /// <summary>
-                    /// Directory within the working directory to place file.
-                    /// </summary>
-                    [DataMember(Name = "path")]
-                    public string Path { get; set; }
                 }
             }
 
@@ -1022,8 +1005,9 @@ namespace TesApi.Web
                 public string Parameters { get; set; }
 
                 /// <summary>
-                /// Provides an additional command run in the same docker container as the task's command, in a separate invocation. It's treated the same as <see cref="StartTaskImpl.Command"/>.
+                /// Provides an additional command run in the same docker container as the task's command, in a separate invocation, called right before the task's own script.
                 /// </summary>
+                /// <remarks>This does not supply a shell nor does it insert a &apos;-c&apos; between the first and additional elements. It does, however, quote all except the first element.</remarks>
                 [DataMember(Name = "pretask_command")]
                 public string[] PreTaskCmd { get; set; }
             }
@@ -1034,7 +1018,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="executorImage">The image name for the current <see cref="TesTask"/></param>
         /// <returns></returns>
-        private async Task<ContainerConfiguration> ContainerConfigurationIfNeeded(string executorImage)
+        private async Task<ContainerConfiguration> GetContainerConfigurationIfNeeded(string executorImage)
         {
             BatchModels.ContainerConfiguration result = default;
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
@@ -1397,7 +1381,7 @@ namespace TesApi.Web
                 .OrderBy(x => x.PricePerHour)
                 .FirstOrDefault();
 
-            if (!preemptible && !(selectedVm is null))
+            if (!preemptible && selectedVm is not null)
             {
                 var idealVm = eligibleVms
                     .Where(vm => !(allowedVmSizes?.Any() ?? false) || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
