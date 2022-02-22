@@ -25,18 +25,15 @@ spec:
         io.kompose.service: mysqldb
     spec:
       containers:
-        - args:
-            - ln -sf /cromwellazure/mysql-init/init-user.sql /docker-entrypoint-initdb.d/init_user.sql && docker-entrypoint.sh mysqld --init-file /cromwellazure/mysql-init/unlock-change-log.sql --disable-log-bin
-          command:
-            - /bin/sh
-            - -c
-          env:
+        - env:
             - name: MYSQL_DATABASE
               value: cromwell_db
             - name: MYSQL_ROOT_PASSWORD
               value: cromwell
           image: mysql:latest
           name: mysqldb
+          stdin: true
+          tty: true
           ports:
             - containerPort: 3306
           resources: {}
@@ -45,6 +42,8 @@ spec:
               name: mysqldb-data-claim3
             - mountPath: /cromwellazure
               name: cromwellazure-claim1
+            - mountPath: /configuration
+              name: configuration-pvc-blob
       restartPolicy: Always
       volumes:
         - name: mysqldb-data-claim3
@@ -53,4 +52,7 @@ spec:
         - name: cromwellazure-claim1
           persistentVolumeClaim:
             claimName: cromwellazure-claim1
+        - name: configuration-pvc-blob
+          persistentVolumeClaim:
+            claimName: configuration-pvc-blob
 status: {}

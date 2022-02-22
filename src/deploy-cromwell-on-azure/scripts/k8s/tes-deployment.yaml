@@ -26,39 +26,22 @@ spec:
     spec:
       containers:
         - env:
-            - name: ApplicationInsightsAccountName
-            - name: AzureOfferDurableId
-            - name: AzureServicesAuthConnectionString
-              value: RunAs=App;AppId=
-            - name: BatchAccountName
-            - name: BatchNodesSubnetId
-            - name: BlobxferImageName
-            - name: CosmosDbAccountName
-            - name: CromwellImageName
-            - name: CromwellImageSha
-            - name: CromwellOnAzureVersion
-            - name: DefaultStorageAccountName
-            - name: DisableBatchNodesPublicIpAddress
-            - name: DisableBatchScheduling
-            - name: DockerInDockerImageName
-            - name: MySqlImageName
-            - name: MySqlImageSha
-            - name: TesImageName
-            - name: TesImageSha
-            - name: TriggerServiceImageName
-            - name: TriggerServiceImageSha
-            - name: UsePreemptibleVmsOnly
           image: mcr.microsoft.com/cromwellonazure/tes:2
           name: tes
           ports:
             - containerPort: 80
           resources: {}
           volumeMounts:
-            - mountPath: /cromwell-tmp
-              name: cromwell-tmp-claim2
+            - mountPath: /datasettestinputs/dataset
+              name: dataset-claim1
+            - mountPath: /outputs
+              name: outputs-claim1
       restartPolicy: Always
       volumes:
-        - name: cromwell-tmp-claim2
+        - name: outputs-claim1
           persistentVolumeClaim:
-            claimName: cromwell-tmp-claim2
+            claimName: outputs-claim1
+        - name: dataset-claim1
+          persistentVolumeClaim:
+            claimName: pvc-blob-dataset
 status: {}

@@ -26,26 +26,58 @@ spec:
     spec:
       containers:
         - args:
-            - /cromwellazure/wait-for-it.sh mysqldb:3306 -t 255 -- java -Djava.io.tmpdir=/cromwell-tmp/ -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server
+            -  java -Djava.io.tmpdir=/cromwell-tmp/ -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server
           command:
             - /bin/sh
             - -c
           image: broadinstitute/cromwell:70
           name: cromwell
+          stdin: true
+          tty: true
           ports:
             - containerPort: 8000
           resources: {}
           volumeMounts:
-            - mountPath: /cromwellazure
-              name: cromwellazure-claim1
             - mountPath: /cromwell-tmp
               name: cromwell-tmp-claim2
+            - mountPath: /configuration
+              name: configuration-claim1
+            - mountPath: /cromwell-executions
+              name: cromwell-executions-claim1
+            - mountPath: /cromwell-workflow-logs
+              name: cromwell-workflow-logs-claim1
+            - mountPath: /workflows
+              name: workflows-claim1
+            - mountPath: /inputs
+              name: inputs-claim1
+            - mountPath: /outputs
+              name: outputs-claim1
+            - mountPath: /datasettestinputs/dataset
+              name: dataset-claim1
       restartPolicy: Always
       volumes:
-        - name: cromwellazure-claim1
-          persistentVolumeClaim:
-            claimName: cromwellazure-claim1
         - name: cromwell-tmp-claim2
           persistentVolumeClaim:
             claimName: cromwell-tmp-claim2
+        - name: configuration-claim1
+          persistentVolumeClaim:
+            claimName: configuration-claim1
+        - name: cromwell-executions-claim1
+          persistentVolumeClaim:
+            claimName: cromwell-executions-claim1
+        - name: cromwell-workflow-logs-claim1
+          persistentVolumeClaim:
+            claimName: cromwell-workflow-logs-claim1
+        - name: workflows-claim1
+          persistentVolumeClaim:
+            claimName: workflows-claim1
+        - name: inputs-claim1
+          persistentVolumeClaim:
+            claimName: inputs-claim1
+        - name: outputs-claim1
+          persistentVolumeClaim:
+            claimName: outputs-claim1
+        - name: dataset-claim1
+          persistentVolumeClaim:
+            claimName: pvc-blob-dataset
 status: {}

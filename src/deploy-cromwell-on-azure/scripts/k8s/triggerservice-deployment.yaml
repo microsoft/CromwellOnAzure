@@ -25,11 +25,6 @@ spec:
     spec:
       containers:
         - env:
-            - name: ApplicationInsightsAccountName
-            - name: AzureServicesAuthConnectionString
-              value: RunAs=App;AppId=
-            - name: CosmosDbAccountName
-            - name: DefaultStorageAccountName
           image: mcr.microsoft.com/cromwellonazure/triggerservice:2
           name: triggerservice
           resources: {}
