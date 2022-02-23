@@ -726,8 +726,9 @@ namespace TesApi.Tests
 
             Assert.IsNotNull(poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration);
             Assert.AreEqual("registryServer1", poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.FirstOrDefault()?.RegistryServer);
-            Assert.AreEqual(2, Regex.Matches(batchScript, tesTask.Executors.First().Image, RegexOptions.IgnoreCase).Count);
-            Assert.IsFalse(batchScript.Contains($"docker pull --quiet {tesTask.Executors.First().Image}"));
+            Assert.AreEqual(1, Regex.Matches(batchScript, $"\\nEXECUTOR_IMAGE={tesTask.Executors.First().Image} ", RegexOptions.IgnoreCase).Count);
+            Assert.AreEqual(2, Regex.Matches(batchScript, "\\$EXECUTOR_IMAGE", RegexOptions.IgnoreCase).Count);
+            Assert.IsFalse(batchScript.Contains($"docker pull --quiet $EXECUTOR_IMAGE"));
         }
 
         [TestMethod]
@@ -741,8 +742,9 @@ namespace TesApi.Tests
             var batchScript = (string)azureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.UploadBlobAsync) && i.Arguments[0].ToString().Contains("/batch_script"))?.Arguments[1];
 
             Assert.IsNull(poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration);
-            Assert.AreEqual(3, Regex.Matches(batchScript, tesTask.Executors.First().Image, RegexOptions.IgnoreCase).Count);
-            Assert.IsTrue(batchScript.Contains("docker pull --quiet ubuntu"));
+            Assert.AreEqual(1, Regex.Matches(batchScript, $"\\nEXECUTOR_IMAGE={tesTask.Executors.First().Image} ", RegexOptions.IgnoreCase).Count);
+            Assert.AreEqual(3, Regex.Matches(batchScript, "\\$EXECUTOR_IMAGE", RegexOptions.IgnoreCase).Count);
+            Assert.IsTrue(batchScript.Contains("docker pull --quiet $EXECUTOR_IMAGE"));
         }
 
         [TestMethod]

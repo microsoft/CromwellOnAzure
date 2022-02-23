@@ -596,7 +596,7 @@ namespace TesApi.Web
                     var setVariables = $"path='{f.Path}' && url='{f.Url}'";
 
                     var downloadSingleFile = f.Url.Contains(".blob.core.")
-                                             && UrlContainsSas(f.Url)
+                                             && UrlContainsSas(f.Url) // Workaround for https://github.com/Azure/blobxfer/issues/132
                         ? $"blobxfer download --storage-url \"$url\" --local-path \"$path\" --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
                         : "mkdir -p $(dirname \"$path\") && wget -O \"$path\" \"$url\"";
 
@@ -663,15 +663,23 @@ namespace TesApi.Web
                 sb.AppendLine($"write_ts BlobXferPullEnd && \\");
             }
 
-            if (executorImageIsPublic)
+            if (executor.Image.StartsWith("coa:65536/"))
+            {
+                sb.AppendLine($"write_ts ExecutorPullStart && EXECUTOR_IMAGE=$(docker load -i $(echo $(echo {executor.Image} | cut -d ':' -f 3).tar) | grep -Pxo 'Loaded image ID: (.*)' | cut -d ' ' -f 4)  && write_ts ExecutorPullEnd && \\");
+            }
+            else if (executorImageIsPublic)
             {
                 // Private executor images are pulled via pool ContainerConfiguration
-                sb.AppendLine($"write_ts ExecutorPullStart && docker pull --quiet {executor.Image} && write_ts ExecutorPullEnd && \\");
+                sb.AppendLine($"EXECUTOR_IMAGE={executor.Image} && write_ts ExecutorPullStart && docker pull --quiet $EXECUTOR_IMAGE && write_ts ExecutorPullEnd && \\");
+            }
+            else
+            {
+                sb.AppendLine($"EXECUTOR_IMAGE={executor.Image} && \\");
             }
 
             // The remainder of the script downloads the inputs, runs the main executor container, and uploads the outputs, including the metrics.txt file
             // After task completion, metrics file is downloaded and used to populate the BatchNodeMetrics object
-            sb.AppendLine($"write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \\\"Size\\\" | grep -Po '(?i)\\\"Size\\\":\\K([^,]*)') && \\");
+            sb.AppendLine($"write_kv ExecutorImageSizeInBytes $(docker inspect $EXECUTOR_IMAGE | grep \\\"Size\\\" | grep -Po '(?i)\\\"Size\\\":\\K([^,]*)') && \\");
 
             if (drsInputFiles.Count > 0)
             {
@@ -694,16 +702,16 @@ namespace TesApi.Web
             sb.AppendLine($"write_ts DownloadEnd && \\");
             sb.AppendLine($"chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \\");
             sb.AppendLine($"write_ts ExecutorStart && \\");
-            if (preCommandCommand is not null)
-            {
-                sb.Append($"docker run {dockerRunParams} --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {preCommandCommand[0]}");
-                if (preCommandCommand.Length > 1)
-                {
-                    sb.AppendLine($" -c \"{ string.Join(" && ", preCommandCommand.Skip(1))}\"");
-                }
-                sb.AppendLine(" && \\");
-            }
-            sb.AppendLine($"docker run {dockerRunParams} --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{ string.Join(" && ", executor.Command.Skip(1))}\" && \\");
+            //if (preCommandCommand is not null)
+            //{
+            //    sb.Append($"docker run {dockerRunParams} --rm {volumeMountsOption} --entrypoint= --workdir / $EXECUTOR_IMAGE {preCommandCommand[0]}");
+            //    if (preCommandCommand.Length > 1)
+            //    {
+            //        sb.AppendLine($" -c \"{ string.Join(" && ", preCommandCommand.Skip(1))}\"");
+            //    }
+            //    sb.AppendLine(" && \\");
+            //}
+            sb.AppendLine($"docker run {dockerRunParams} --rm {volumeMountsOption} --entrypoint= --workdir / $EXECUTOR_IMAGE {executor.Command[0]} -c \"{ string.Join(" && ", executor.Command.Skip(1))}\" && \\");
             sb.AppendLine($"write_ts ExecutorEnd && \\");
             sb.AppendLine($"write_ts UploadStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} {uploadFilesScriptPath} && \\");
@@ -718,10 +726,20 @@ namespace TesApi.Web
             var batchScriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(batchScriptPath);
             var batchExecutionDirectorySasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"{batchExecutionDirectoryPath}", getContainerSas: true);
 
+            var resourceFiles = Enumerable.Empty<ResourceFile>()
+                .Append(ResourceFile.FromUrl(batchScriptSasUrl, $"/mnt{batchScriptPath}"))
+                .Append(ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"))
+                .Append(ResourceFile.FromUrl(uploadFilesScriptSasUrl, $"/mnt{uploadFilesScriptPath}"));
+            if (executor.Image.StartsWith("coa:65536/"))
+            {
+                var parts = executor.Image.Split('/')[2].Split(':');
+                resourceFiles = resourceFiles.Append(ResourceFile.FromAutoStorageContainer(HostConfigBlobsName, $"{batchExecutionDirectoryPath}/{parts[1]}.tar", $"{parts[0]}/task/{parts[1]}.tar"));
+            }
+
             var cloudTask = new CloudTask(taskId, $"/bin/sh /mnt{batchScriptPath}")
             {
                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-                ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(batchScriptSasUrl, $"/mnt{batchScriptPath}"), ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptSasUrl, $"/mnt{uploadFilesScriptPath}") },
+                ResourceFiles = resourceFiles.ToList(),
                 OutputFiles = new List<OutputFile> {
                     new OutputFile(
                         "../std*.txt",
@@ -853,7 +871,7 @@ namespace TesApi.Web
                 if (hostConfig.StartTask is not null)
                 {
                     var resources = (await azureProxy.ListBlobsAsync(
-                            new Uri(await storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{hostConfigName}", true), UriKind.Absolute)))
+                            new Uri(await storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{hostConfigName}/start", true), UriKind.Absolute)))
                         .Select(MakeBlobResourceFile);
 
                     foreach (var resource in hostConfig.StartTask.Resources ?? Array.Empty<HostConfig.StartTaskImpl.ResourceImpl>())
