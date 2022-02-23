@@ -18,11 +18,34 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="scripts\k8s\cromwell-deployment.yaml" />
+    <None Remove="scripts\k8s\cromwell-service.yaml" />
+    <None Remove="scripts\k8s\cromwell-tmp-claim2.yaml" />
+    <None Remove="scripts\k8s\cromwellazure-claim1.yaml" />
+    <None Remove="scripts\k8s\csi\blobfuse-proxy.yaml" />
+    <None Remove="scripts\k8s\csi\csi-blob-controller.yaml" />
+    <None Remove="scripts\k8s\csi\csi-blob-driver.yaml" />
+    <None Remove="scripts\k8s\csi\csi-blob-node.yaml" />
+    <None Remove="scripts\k8s\csi\pv-blobfuse-csi-dataset.yaml" />
+    <None Remove="scripts\k8s\csi\pvc-blob-csi-dataset.yaml" />
+    <None Remove="scripts\k8s\csi\rbac-csi-blob-controller.yaml" />
+    <None Remove="scripts\k8s\csi\rbac-csi-blob-node.yaml" />
+    <None Remove="scripts\k8s\mysqldb-data-claim3.yaml" />
+    <None Remove="scripts\k8s\mysqldb-deployment.yaml" />
+    <None Remove="scripts\k8s\mysqldb-service.yaml" />
+    <None Remove="scripts\k8s\tes-deployment.yaml" />
+    <None Remove="scripts\k8s\tes-service.yaml" />
+    <None Remove="scripts\k8s\triggerservice-deployment.yaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="..\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="KubernetesClient" Version="7.0.9" />
     <PackageReference Include="Microsoft.Azure.Management.Batch" Version="13.0.0" />
+    <PackageReference Include="Microsoft.Azure.Management.ContainerService" Version="1.2.0" />
     <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.37.1" />
     <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.6.1" />
     <PackageReference Include="Microsoft.Azure.Storage.Blob" Version="11.2.3" />
@@ -37,8 +60,9 @@
     <PackageReference Include="Microsoft.IdentityModel.Clients.ActiveDirectory" Version="5.2.9" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="Polly" Version="7.2.2" />
+    <PackageReference Include="SharpZipLib" Version="1.3.3" />
     <PackageReference Include="SSH.NET" Version="2020.0.1" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.10.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.13.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -63,6 +87,24 @@
     <EmbeddedResource Include="scripts\env-03-external-images.txt" />
     <EmbeddedResource Include="scripts\env-04-settings.txt" />
     <EmbeddedResource Include="scripts\install-cromwellazure.sh" />
+    <EmbeddedResource Include="scripts\k8s\cromwell-deployment.yaml" />
+    <EmbeddedResource Include="scripts\k8s\cromwell-service.yaml" />
+    <EmbeddedResource Include="scripts\k8s\cromwell-tmp-claim2.yaml" />
+    <EmbeddedResource Include="scripts\k8s\cromwellazure-claim1.yaml" />
+    <EmbeddedResource Include="scripts\k8s\csi\blobfuse-proxy.yaml" />
+    <EmbeddedResource Include="scripts\k8s\csi\csi-blob-controller.yaml" />
+    <EmbeddedResource Include="scripts\k8s\csi\csi-blob-driver.yaml" />
+    <EmbeddedResource Include="scripts\k8s\csi\csi-blob-node.yaml" />
+    <EmbeddedResource Include="scripts\k8s\csi\pv-blobfuse-csi-dataset.yaml" />
+    <EmbeddedResource Include="scripts\k8s\csi\pvc-blob-csi-dataset.yaml" />
+    <EmbeddedResource Include="scripts\k8s\csi\rbac-csi-blob-controller.yaml" />
+    <EmbeddedResource Include="scripts\k8s\csi\rbac-csi-blob-node.yaml" />
+    <EmbeddedResource Include="scripts\k8s\mysqldb-data-claim3.yaml" />
+    <EmbeddedResource Include="scripts\k8s\mysqldb-deployment.yaml" />
+    <EmbeddedResource Include="scripts\k8s\mysqldb-service.yaml" />
+    <EmbeddedResource Include="scripts\k8s\tes-deployment.yaml" />
+    <EmbeddedResource Include="scripts\k8s\tes-service.yaml" />
+    <EmbeddedResource Include="scripts\k8s\triggerservice-deployment.yaml" />
     <EmbeddedResource Include="scripts\mount-data-disk.sh" />
     <EmbeddedResource Include="scripts\mount.blobfuse" />
     <EmbeddedResource Include="scripts\mount_containers.sh" />

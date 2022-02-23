@@ -649,15 +649,9 @@ namespace CromwellOnAzureDeployer
             // Install CSI driver. 
             await InstallCSIBlobDriver(client);
 
-            var storageBlobSecretBody = Yaml.LoadFromString<V1StorageClass>(Utility.GetFileContent("scripts", "k8s", "storageclass-blob-secret.yaml"));
-            var storageBlobfuseBody = Yaml.LoadFromString<V1StorageClass>(Utility.GetFileContent("scripts", "k8s", "storageclass-blobfuse.yaml"));
-            var storageBlobNFSBody = Yaml.LoadFromString<V1StorageClass>(Utility.GetFileContent("scripts", "k8s", "storageclass-blob-nfs.yaml"));
-
             var claim1Body = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "cromwellazure-claim1.yaml"));
             var claim2Body = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "cromwell-tmp-claim2.yaml"));
             var claim3Body = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "mysqldb-data-claim3.yaml"));
-
-            var configClaimBody = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "config-blob-claim.yaml"));
 
             var tesDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "tes-deployment.yaml"));
             var triggerDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "triggerservice-deployment.yaml"));
@@ -668,7 +662,7 @@ namespace CromwellOnAzureDeployer
             var mysqlServiceBody = Yaml.LoadFromString<V1Service>(Utility.GetFileContent("scripts", "k8s", "mysqldb-service.yaml"));
             var cromwellServiceBody = Yaml.LoadFromString<V1Service>(Utility.GetFileContent("scripts", "k8s", "cromwell-service.yaml"));
 
-            // Example to set Environment Variables for trigger service. TODO add env for the remaining containers.
+            // Example to set Environment Variables for trigger service.
             var triggerEnv = new List<V1EnvVar>();
             triggerEnv.Add(new V1EnvVar("DefaultStorageAccountName", configuration.StorageAccountName));
             triggerEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", $"RunAs=App;AppId={poolIdentity.ClientId}"));
@@ -784,11 +778,6 @@ namespace CromwellOnAzureDeployer
             var datasetClaimBody = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "csi", "pvc-blob-csi-dataset.yaml"));
             await client.CreatePersistentVolumeAsync(datasetPvBody);
             await client.CreateNamespacedPersistentVolumeClaimAsync(datasetClaimBody, "default");
-
-            await client.CreateStorageClassAsync(storageBlobfuseBody);
-            await client.CreateStorageClassAsync(storageBlobNFSBody);
-
-            await client.CreateNamespacedPersistentVolumeClaimAsync(configClaimBody, "default");
 
             var tesDeployment = await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, "default");
             var tesService = await client.CreateNamespacedServiceAsync(tesServiceBody, "default");
