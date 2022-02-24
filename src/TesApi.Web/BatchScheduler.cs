@@ -231,18 +231,27 @@ namespace TesApi.Web
                 var tasks = Enumerable.Empty<Task>();
                 foreach (var path in blobsToAddOrUpdate)
                 {
-                    tasks = tasks.Append(storageAccessProvider.UploadBlobFromFileAsync(path, Path.Combine(AppContext.BaseDirectory, path)));
+                    tasks = tasks.Append(storageAccessProvider.UploadBlobFromFileAsync(ConvertToBlobName(path), Path.Combine(AppContext.BaseDirectory, path)));
                 }
 
-                foreach (var path in blobsToAddOrUpdate)
+                foreach (var path in blobsToRemove)
                 {
-                    tasks = tasks.Append(storageAccessProvider.DeleteBlobAsync(path));
+                    tasks = tasks.Append(storageAccessProvider.DeleteBlobAsync(ConvertToBlobName(path)));
                 }
 
                 await Task.WhenAll(tasks.ToArray());
+
+                string ConvertToBlobName(string path)
+                {
+                    var parts = path.Split(new char[] { '\\', '/'});
+                    return $"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{parts[1]}/{string.Join('/', parts.Skip(3))}";
+                }
             });
 
-            InitializeHostBlobs.Start();
+            if (!string.IsNullOrWhiteSpace(batchNodeInfo.BatchNodeAgentSkuId)) // When not testing, or when testing HostConfigs
+            {
+                InitializeHostBlobs.Start();
+            }
         }
 
         private async Task DeleteBatchJobAndPoolIfExists(IAzureProxy azureProxy, TesTask tesTask)

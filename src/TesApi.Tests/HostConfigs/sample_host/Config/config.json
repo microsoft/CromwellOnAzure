@@ -1,0 +1,11 @@
+{
+  "batch": {
+    "image": {
+      "offer": "specific-offer",
+      "publisher": "microsoft-azure-batch",
+      "sku": "specific-sku",
+      "version": "latest"
+    },
+    "node_agent_sku_id": "batch.node.specific"
+  }
+}

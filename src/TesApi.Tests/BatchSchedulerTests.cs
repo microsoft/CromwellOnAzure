@@ -83,6 +83,30 @@ namespace TesApi.Tests
             Assert.IsFalse(string.IsNullOrWhiteSpace(poolInformation.PoolId));
         }
 
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task BackendParametersHostConfiguration()
+        {
+            var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
+            azureProxyReturnValues.BatchJobAndTaskState = new AzureBatchJobAndTaskState { JobState = null };
+
+            var backendParameters = new Dictionary<string, string>
+            {
+                { "docker_host_configuration", "sample_host" }
+            };
+
+            var task = GetTesTask();
+            task.Resources.BackendParameters = backendParameters;
+            var configuration = GetMockConfig();
+            configuration["BatchNodeAgentSkuId"] = "batch.node.default";
+
+            (_, _, var poolInformation) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(task, configuration, GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+
+            Assert.IsNotNull(poolInformation.AutoPoolSpecification);
+            Assert.AreNotEqual(poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.NodeAgentSkuId, configuration["BatchNodeAgentSkuId"]);
+            Assert.AreEqual(poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.NodeAgentSkuId, "batch.node.specific");
+        }
+
 
         [TestCategory("TES 1.1")]
         [DataRow("VmSizeLowPri1", true)]
