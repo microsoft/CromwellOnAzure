@@ -240,6 +240,7 @@ namespace TesApi.Web
                 }
 
                 await Task.WhenAll(tasks.ToArray());
+                logger.LogInformation("Completed checking for changes to HostConfig files.");
 
                 string ConvertToBlobName(string path)
                 {
@@ -926,6 +927,7 @@ namespace TesApi.Web
                 await InitializeHostBlobs;
 
                 var parts = tesTask.Executors.First().Image.Split('/', 3)[2].Split(':', 2);
+                logger.LogInformation($"Verifying loadable container from docker host configuration '{parts[0]}'/'{parts[1]}.tar'");
                 if (!(await azureProxy.ListBlobsAsync(new(await storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{parts[0]}/task", true))))
                     .Any(n => n.EndsWith($"/{parts[1]}.tar")))
                 {
@@ -938,6 +940,7 @@ namespace TesApi.Web
                 await InitializeHostBlobs;
 
                 var hostConfigName = tesTask.Resources.GetBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration);
+                logger.LogInformation($"Preparing pool and task using docker host configuration '{hostConfigName}'");
                 using var hostConfigJson = new JsonTextReader(new StreamReader(BatchUtils.GetHostConfig(hostConfigName)));
                 var hostConfig = JsonSerializer.CreateDefault().Deserialize<HostConfig>(hostConfigJson);
                 batchResult = new()
