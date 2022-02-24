@@ -644,6 +644,14 @@ namespace TesApi.Web
         }
 
         /// <summary>
+        /// Removes a blob
+        /// </summary>
+        /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
+        /// <returns>A task to await</returns>
+        public Task DeleteBlobAsync(Uri blobAbsoluteUri)
+            => new CloudBlockBlob(blobAbsoluteUri).DeleteIfExistsAsync();
+
+        /// <summary>
         /// Get/sets cached value for the price and resource summary of all available VMs in a region for the <see cref="BatchModels.BatchAccount"/>.
         /// </summary>
         /// <returns><see cref="VirtualMachineInformation"/> for available VMs in a region.</returns>

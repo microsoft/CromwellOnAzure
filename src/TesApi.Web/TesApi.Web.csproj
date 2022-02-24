@@ -1,4 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <UsingTask TaskName="Microsoft.Build.Tasks.GetFileHash" AssemblyName="Microsoft.Build.Tasks.Core, Version=15.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" Condition="'$(MSBuildVersion)' &lt; '16.0.360'" />
 
   <PropertyGroup>
     <Description>TES API</Description>
@@ -9,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="..\..\HostConfigs\*\Config\**\*">
+    <Content Include="..\..\HostConfigs\**\*">
       <Link>HostConfigs\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Visible>False</Visible>
@@ -48,15 +49,30 @@
     </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
-    <None Remove="Scripts\start-task.sh" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Scripts\start-task.sh">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
     <ProjectReference Include="..\Tes\Tes.csproj" />
   </ItemGroup>
+
+  <Target Name="GenerateHostConfigsHashes" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <!-- Condition="$([System.String]::Copy(&quot;%(Content.Link)&quot;).StartsWith('HostConfigs\\'))"-->
+      <__CandidateFilesToHash Include="@(Content->HasMetadata(&quot;Link&quot;))"/>
+      <__CandidateFilesWithLink Include="@(__CandidateFilesToHash)">
+        <__IsBlob>$([System.String]::Copy("%(Link)").Contains('\Blobs\'))</__IsBlob>
+      </__CandidateFilesWithLink>
+      <__FilesToHash Include="@(__CandidateFilesWithLink)" Condition=" '%(__CandidateFilesWithLink.__IsBlob)' == 'true' "/>
+      <__HashesFile Include="$(IntermediateOutputPath)Hashes.txt">
+        <Link>HostConfigs\Hashes.txt</Link>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </__HashesFile>
+      <Content Include="@(__HashesFile)" />
+    </ItemGroup>
+    <GetFileHash Files="@(__FilesToHash)">
+      <Output TaskParameter="Items" ItemName="__FilesWithHashes" />
+    </GetFileHash>
+    <ItemGroup>
+      <__FileHashes Include="@(__FilesWithHashes->'%(Link): %(FileHash)')" />
+    </ItemGroup>
+    <WriteLinesToFile File="@(__HashesFile)" Lines="@(__FileHashes)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
 </Project>

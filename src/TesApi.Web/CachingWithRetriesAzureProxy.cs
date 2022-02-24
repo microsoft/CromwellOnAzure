@@ -155,5 +155,9 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default)
             => azureProxy.DeleteBatchPoolIfExistsAsync(poolId, cancellationToken);
+
+        /// <inheritdoc/>
+        public Task DeleteBlobAsync(Uri blobAbsoluteUri)
+            => azureProxy.DeleteBlobAsync(blobAbsoluteUri);
     }
 }

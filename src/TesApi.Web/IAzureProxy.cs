@@ -139,6 +139,13 @@ namespace TesApi.Web
         Task<IEnumerable<string>> ListBlobsAsync(Uri directoryUri);
 
         /// <summary>
+        /// Removes a blob
+        /// </summary>
+        /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
+        /// <returns>A task to await</returns>
+        Task DeleteBlobAsync(Uri blobAbsoluteUri);
+
+        /// <summary>
         /// Gets the ids of completed Batch jobs older than specified timespan
         /// </summary>
         /// <returns>List of Batch job ids</returns>

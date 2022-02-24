@@ -93,6 +93,10 @@ namespace TesApi.Web
             => await this.azureProxy.UploadBlobFromFileAsync(new Uri(await MapLocalPathToSasUrlAsync(blobRelativePath, true)), sourceLocalFilePath);
 
         /// <inheritdoc />
+        public async Task DeleteBlobAsync(string blobRelativePath)
+            => await this.azureProxy.DeleteBlobAsync(new Uri(await MapLocalPathToSasUrlAsync(blobRelativePath, true)));
+
+        /// <inheritdoc />
         public async Task<bool> IsPublicHttpUrl(string uriString)
         {
             var isHttpUrl = Uri.TryCreate(uriString, UriKind.Absolute, out var uri) && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));

@@ -96,15 +96,6 @@ namespace CromwellOnAzureDeployer
         private static Stream GetBinaryFileContent(params string[] pathComponentsRelativeToAppBase)
             => typeof(Deployer).Assembly.GetManifestResourceStream($"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}");
 
-        private static EmbeddedResourceName TransformHostConfigBlobResourceNames(string name)
-            => new(name, name.Replace('$', '/'));
-
-        public static IEnumerable<EmbeddedResourceName> GetEmbeddedHostConfigBlobResources()
-            => typeof(Deployer).Assembly.GetManifestResourceNames().Select(TransformHostConfigBlobResourceNames).Where(n => n.Name.StartsWith("HostConfigs/"));
-
-        public static Stream GetBinaryHostConfigBlobContent(EmbeddedResourceName embeddedResourceName)
-            => typeof(Deployer).Assembly.GetManifestResourceStream(embeddedResourceName.ManifestName);
-
         public struct EmbeddedResourceName
         {
             public string Name { get; }
@@ -136,7 +127,7 @@ namespace CromwellOnAzureDeployer
                 var password = Convert.ToBase64String(buffer)
                     .Replace("+", "-")
                     .Replace("/", "_")
-                    .Substring(0, length);
+                    [..length];
 
                 if (regex.IsMatch(password))
                 {

@@ -22,24 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <HostConfigBlob Include="..\..\HostConfigs\*\Blobs\**\*">
-      <Visible>False</Visible>
-    </HostConfigBlob>
-  </ItemGroup>
-
-  <Target Name="IncludeHostConfigBlobs" BeforeTargets="ResolveReferences">
-    <ItemGroup>
-      <_HostConfigBlobDir Include="HostConfigs$%(RecursiveDir)%(Filename)%(Extension)">
-        <_FP>@(HostConfigBlob->'%(FullPath)')</_FP>
-      </_HostConfigBlobDir>
-      <_HostConfigBlob Include="%(_FP)" RemoveMetadata="_FP">
-        <LogicalName>@(_HostConfigBlobDir->Replace('\','$')->Replace('/','$'))</LogicalName>
-      </_HostConfigBlob>
-      <EmbeddedResource Include="@(_HostConfigBlob)"/>
-    </ItemGroup>
-  </Target>
-
-  <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" Version="12.10.0" />
     <PackageReference Include="Microsoft.Azure.Management.Batch" Version="14.0.0" />
     <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.38.0" />

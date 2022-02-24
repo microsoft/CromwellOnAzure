@@ -54,6 +54,7 @@ namespace TesApi.Web
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
         private readonly string defaultStorageAccountName;
+        private readonly Task InitializeHostBlobs;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -182,6 +183,66 @@ namespace TesApi.Web
                 new TesTaskStateTransition(tesTaskIsInitializingOrRunning, BatchTaskState.MissingBatchTask, DeleteBatchJobAndSetTaskSystemErrorAsync),
                 new TesTaskStateTransition(tesTaskIsInitializingOrRunning, BatchTaskState.NodePreempted, DeleteBatchJobAndRequeueTaskAsync)
             };
+
+            InitializeHostBlobs = new Task(async () =>
+            {
+                var blobsToAddOrUpdate = Enumerable.Empty<string>();
+                var numBlobsToAddOrUpdate = 0;
+                var blobsToRemove = Enumerable.Empty<string>();
+                var numBlobsToRemove = 0;
+
+                logger.LogInformation("Checking for changes to HostConfig files.");
+                IDictionary<string, byte[]> remoteHashes = default;
+                try
+                {
+                    remoteHashes = BatchUtils.GetBlobHashes(await storageAccessProvider.DownloadBlobAsync($"{defaultStorageAccountName}/{HostConfigBlobsName}/Hashes.txt"));
+                }
+                catch { }
+
+                var localHashes = BatchUtils.GetBlobHashes();
+
+                if (remoteHashes is null)
+                {
+                    blobsToAddOrUpdate = localHashes.Select(p => p.Key);
+                    numBlobsToAddOrUpdate = localHashes.Count;
+                }
+                else
+                {
+                    foreach (var kp in localHashes)
+                    {
+                        if ((remoteHashes.ContainsKey(kp.Key) && !kp.Value.SequenceEqual(remoteHashes[kp.Key])) || !remoteHashes.ContainsKey(kp.Key))
+                        {
+                            blobsToAddOrUpdate = blobsToAddOrUpdate.Append(kp.Key);
+                            ++numBlobsToAddOrUpdate;
+                        }
+                    }
+
+                    foreach (var path in remoteHashes.Select(p => p.Key))
+                    {
+                        if (!localHashes.ContainsKey(path))
+                        {
+                            blobsToRemove = blobsToRemove.Append(path);
+                            ++numBlobsToRemove;
+                        }
+                    }
+                }
+
+                logger.LogInformation($"Adding/updating {numBlobsToAddOrUpdate} files and removing {numBlobsToRemove} files from attached storage.");
+                var tasks = Enumerable.Empty<Task>();
+                foreach (var path in blobsToAddOrUpdate)
+                {
+                    tasks = tasks.Append(storageAccessProvider.UploadBlobFromFileAsync(path, Path.Combine(AppContext.BaseDirectory, path)));
+                }
+
+                foreach (var path in blobsToAddOrUpdate)
+                {
+                    tasks = tasks.Append(storageAccessProvider.DeleteBlobAsync(path));
+                }
+
+                await Task.WhenAll(tasks.ToArray());
+            });
+
+            InitializeHostBlobs.Start();
         }
 
         private async Task DeleteBatchJobAndPoolIfExists(IAzureProxy azureProxy, TesTask tesTask)
@@ -732,7 +793,7 @@ namespace TesApi.Web
                 .Append(ResourceFile.FromUrl(uploadFilesScriptSasUrl, $"/mnt{uploadFilesScriptPath}"));
             if (executor.Image.StartsWith("coa:65536/"))
             {
-                var parts = executor.Image.Split('/')[2].Split(':');
+                var parts = executor.Image.Split('/', 3)[2].Split(':', 2);
                 resourceFiles = resourceFiles.Append(ResourceFile.FromAutoStorageContainer(HostConfigBlobsName, $"{batchExecutionDirectoryPath}/{parts[1]}.tar", $"{parts[0]}/task/{parts[1]}.tar"));
             }
 
@@ -851,8 +912,22 @@ namespace TesApi.Web
             string dockerParams = null;
             string[] preCommand = null;
 
+            if (tesTask.Executors.First().Image.StartsWith("coa:65536/"))
+            {
+                await InitializeHostBlobs;
+
+                var parts = tesTask.Executors.First().Image.Split('/', 3)[2].Split(':', 2);
+                if (!(await azureProxy.ListBlobsAsync(new(await storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{parts[0]}/task", true))))
+                    .Any(n => n.EndsWith($"/{parts[1]}.tar")))
+                {
+                    throw new Exception();
+                }
+            }
+
             if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) == true)
             {
+                await InitializeHostBlobs;
+
                 var hostConfigName = tesTask.Resources.GetBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration);
                 using var hostConfigJson = new JsonTextReader(new StreamReader(BatchUtils.GetHostConfig(hostConfigName)));
                 var hostConfig = JsonSerializer.CreateDefault().Deserialize<HostConfig>(hostConfigJson);
