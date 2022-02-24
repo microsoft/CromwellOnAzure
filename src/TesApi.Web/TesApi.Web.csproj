@@ -4,6 +4,8 @@
   <PropertyGroup>
     <Description>TES API</Description>
     <TargetFramework>net5.0</TargetFramework>
+    <CreateHardLinksForAdditionalFilesIfPossible>true</CreateHardLinksForAdditionalFilesIfPossible>
+    <!--CreateSymbolicLinksForAdditionalFilesIfPossible>true</CreateSymbolicLinksForAdditionalFilesIfPossible-->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PreserveCompilationContext>true</PreserveCompilationContext>
     <AssemblyName>tesapi</AssemblyName>
@@ -55,7 +57,6 @@
 
   <Target Name="GenerateHostConfigsHashes" BeforeTargets="AssignTargetPaths">
     <ItemGroup>
-      <!-- Condition="$([System.String]::Copy(&quot;%(Content.Link)&quot;).StartsWith('HostConfigs\\'))"-->
       <__CandidateFilesToHash Include="@(Content->HasMetadata(&quot;Link&quot;))"/>
       <__CandidateFilesWithLink Include="@(__CandidateFilesToHash)">
         <__IsBlob>$([System.String]::Copy("%(Link)").Contains('\Blobs\'))</__IsBlob>
