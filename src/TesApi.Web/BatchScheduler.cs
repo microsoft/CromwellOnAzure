@@ -190,28 +190,38 @@ namespace TesApi.Web
                 var numBlobsToAddOrUpdate = 0;
                 var blobsToRemove = Enumerable.Empty<string>();
                 var numBlobsToRemove = 0;
+                var hashesFile = $"{defaultStorageAccountName}/{HostConfigBlobsName}/Hashes.txt";
+
+                logger.LogDebug(@"Hashes:\n{Hashes}", BatchUtils.GetBlobHashFileContent());
 
                 logger.LogInformation("Checking for changes to HostConfig files.");
-                IDictionary<string, byte[]> remoteHashes = default;
+                Dictionary<string, byte[]> remoteHashes = default;
                 try
                 {
-                    remoteHashes = BatchUtils.GetBlobHashes(await storageAccessProvider.DownloadBlobAsync($"{defaultStorageAccountName}/{HostConfigBlobsName}/Hashes.txt"));
+                    var hashes = BatchUtils.GetBlobHashes(await storageAccessProvider.DownloadBlobAsync(hashesFile));
+                    remoteHashes = hashes is Dictionary<string, byte[]> dicionaryOfHashes ? dicionaryOfHashes : new(hashes);
                 }
                 catch { }
 
                 var localHashes = BatchUtils.GetBlobHashes();
 
+                logger.LogDebug(@"Local HostConfigs:\n{Hashes}.", string.Join('\n', localHashes.Select(p => $"{p.Key}: {Convert.ToHexString(p.Value)}")));
+
                 if (remoteHashes is null)
                 {
+                    logger.LogDebug(@"Storage not yet populated with HostConfigs files.");
                     blobsToAddOrUpdate = localHashes.Select(p => p.Key);
                     numBlobsToAddOrUpdate = localHashes.Count;
+                    remoteHashes = localHashes is Dictionary<string, byte[]> dicionaryOfHashes ? dicionaryOfHashes : new(localHashes);
                 }
                 else
                 {
+                    logger.LogDebug(@"Verifying HostConfigs files in storage.");
                     foreach (var kp in localHashes)
                     {
                         if ((remoteHashes.ContainsKey(kp.Key) && !kp.Value.SequenceEqual(remoteHashes[kp.Key])) || !remoteHashes.ContainsKey(kp.Key))
                         {
+                            remoteHashes[kp.Key] = kp.Value;
                             blobsToAddOrUpdate = blobsToAddOrUpdate.Append(kp.Key);
                             ++numBlobsToAddOrUpdate;
                         }
@@ -221,6 +231,7 @@ namespace TesApi.Web
                     {
                         if (!localHashes.ContainsKey(path))
                         {
+                            remoteHashes.Remove(path);
                             blobsToRemove = blobsToRemove.Append(path);
                             ++numBlobsToRemove;
                         }
@@ -228,7 +239,7 @@ namespace TesApi.Web
                 }
 
                 logger.LogInformation($"Adding/updating {numBlobsToAddOrUpdate} files and removing {numBlobsToRemove} files from attached storage.");
-                var tasks = Enumerable.Empty<Task>();
+                var tasks = Enumerable.Empty<Task>().Append(storageAccessProvider.UploadBlobAsync(hashesFile, string.Join('\n', remoteHashes.Select(p => $"{p.Key}: {Convert.ToHexString(p.Value)}"))));
                 foreach (var path in blobsToAddOrUpdate)
                 {
                     tasks = tasks.Append(storageAccessProvider.UploadBlobFromFileAsync(ConvertToBlobName(path), Path.Combine(AppContext.BaseDirectory, path)));
@@ -249,7 +260,7 @@ namespace TesApi.Web
                 }
             });
 
-            if (!string.IsNullOrWhiteSpace(batchNodeInfo.BatchNodeAgentSkuId)) // When not testing, or when testing HostConfigs
+            if (!string.IsNullOrWhiteSpace(batchNodeInfo.BatchNodeAgentSkuId)) // When not testing (e.g. Production) or when testing HostConfigs
             {
                 InitializeHostBlobs.Start();
             }

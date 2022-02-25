@@ -28,15 +28,15 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="hashFileContent">Content of the Hashes.txt file to parse. If is 'null' then reads the file in the container.</param>
         /// <returns>Dictionary of hashes where they keys are file paths starting with 'HostConfigs/'.</returns>
-        public static IDictionary<string, byte[]> GetBlobHashes(string hashFileContent = null)
-            => new Dictionary<string, byte[]>((hashFileContent ?? GetBlobHashFileContent()).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Split(':', 2)).Select(p => new KeyValuePair<string, byte[]>(p[0].Trim(), Convert.FromHexString(p[1].Trim()))));
+        public static IReadOnlyDictionary<string, byte[]> GetBlobHashes(string hashFileContent = null)
+            => new Dictionary<string, byte[]>((hashFileContent ?? GetBlobHashFileContent())?.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Split(':', 2)).Select(p => new KeyValuePair<string, byte[]>(p[0].Trim(), Convert.FromHexString(p[1].Trim()))) ?? Enumerable.Empty<KeyValuePair<string, byte[]>>());
 
         /// <summary>
         /// Gets the content of the 'HostConfigs/Hashes.txt' file.
         /// </summary>
         /// <returns>File content as text.</returns>
         public static string GetBlobHashFileContent()
-            => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "HostConfigs/Hashes.txt").Replace("\r\n", "\n").Replace('\\', '/'));
+            => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "HostConfigs/Hashes.txt")).Replace('\\', '/').Replace("\r\n", "\n");
 
         /// <summary>
         /// Returns a file from the Config section of the indicated HostConfigs
