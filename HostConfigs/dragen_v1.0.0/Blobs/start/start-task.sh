@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-cd $docker_host_configuration
-
 # This script should be executed on VM host in the directly as the rpm packages
 # the host will be mounted at /host, the debs will be copied to /mnt
 # then the container will nsenter and install everything against the host.

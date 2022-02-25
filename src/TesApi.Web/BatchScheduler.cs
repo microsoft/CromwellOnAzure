@@ -977,7 +977,7 @@ namespace TesApi.Web
                         resources = resources.Append(await MakeResourceFile(resource.Url, resource.Path, resource.Mode));
                     }
 
-                    taskResult = new($"/bin/env {hostConfigName}/{StartTaskScriptFilename}")
+                    taskResult = new($"/bin/env {StartTaskScriptFilename}")
                     {
                         UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                         ResourceFiles = resources.ToList(),
@@ -989,7 +989,7 @@ namespace TesApi.Web
             return (taskResult, batchResult, dockerParams, preCommand);
 
             ResourceFile MakeBlobResourceFile(string blob)
-                => ResourceFile.FromAutoStorageContainer(HostConfigBlobsName, blobPrefix: blob, fileMode: Path.GetFileName(blob) switch
+                => ResourceFile.FromAutoStorageContainer(HostConfigBlobsName, blobPrefix: blob, filePath: string.Join('/', blob.Split('/').Skip(2)), fileMode: Path.GetFileName(blob) switch
                 {
                     StartTaskScriptFilename => "0755",
                     _ => "0644",
