@@ -192,27 +192,20 @@ namespace TesApi.Web
                 var numBlobsToRemove = 0;
                 var hashesFile = $"{defaultStorageAccountName}/{HostConfigBlobsName}/Hashes.txt";
 
-                logger.LogDebug(@"Hashes:\n{Hashes}", BatchUtils.GetBlobHashFileContent());
-
                 logger.LogInformation("Checking for changes to HostConfig files.");
-                Dictionary<string, byte[]> remoteHashes = default;
-                try
-                {
-                    var hashes = BatchUtils.GetBlobHashes(await storageAccessProvider.DownloadBlobAsync(hashesFile));
-                    remoteHashes = hashes is Dictionary<string, byte[]> dicionaryOfHashes ? dicionaryOfHashes : new(hashes);
-                }
-                catch { }
+                var remoteHashes = await GetRemoteHashes();
 
                 var localHashes = BatchUtils.GetBlobHashes();
 
-                logger.LogDebug(@"Local HostConfigs:\n{Hashes}.", string.Join('\n', localHashes.Select(p => $"{p.Key}: {Convert.ToHexString(p.Value)}")));
+                logger.LogDebug("Local HostConfigs:\n{Hashes}.", string.Join('\n', localHashes.Select(p => $"{p.Key}: {Convert.ToHexString(p.Value)}")));
+                logger.LogDebug("Storage HostConfigs:\n{Hashes}.", string.Join('\n', remoteHashes.Select(p => $"{p.Key}: {Convert.ToHexString(p.Value)}")));
 
-                if (remoteHashes is null)
+                if (remoteHashes.Count == 0)
                 {
                     logger.LogDebug(@"Storage not yet populated with HostConfigs files.");
+                    remoteHashes = new(localHashes);
                     blobsToAddOrUpdate = localHashes.Select(p => p.Key);
                     numBlobsToAddOrUpdate = localHashes.Count;
-                    remoteHashes = localHashes is Dictionary<string, byte[]> dicionaryOfHashes ? dicionaryOfHashes : new(localHashes);
                 }
                 else
                 {
@@ -257,6 +250,13 @@ namespace TesApi.Web
                 {
                     var parts = path.Split(new char[] { '\\', '/'});
                     return $"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{parts[1]}/{string.Join('/', parts.Skip(3))}";
+                }
+
+                async Task<Dictionary<string, byte[]>> GetRemoteHashes()
+                {
+                    var remoteHashesBlob = await storageAccessProvider.DownloadBlobAsync(hashesFile);
+                    var hashes = remoteHashesBlob is null ? new Dictionary<string, byte[]>() : BatchUtils.GetBlobHashes(remoteHashesBlob);
+                    return hashes is Dictionary<string, byte[]> dictionaryOfHashes ? dictionaryOfHashes : new(hashes);
                 }
             });
 
