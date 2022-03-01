@@ -390,23 +390,20 @@ namespace CromwellOnAzureDeployer
                             ConsoleEx.WriteLine($"Using existing Batch Account {batchAccount.Name}");
                         }
 
-                        if (vnetAndSubnet is null)
-                        {
-                            configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                            vnetAndSubnet = await CreateVnetAsync(resourceGroup, configuration.VnetName, configuration.VnetAddressSpace);
-                        }
-
-                        if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
-                        {
-                            var workspaceName = SdkContext.RandomResourceName(configuration.MainIdentifierPrefix, 15);
-                            logAnalyticsWorkspace = await CreateLogAnalyticsWorkspaceResourceAsync(workspaceName);
-                            configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
-                        }
-
                         await Task.WhenAll(new Task[]
                         {
-                        	Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
-                        	Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
+                            Task.Run(async () =>
+                            {
+                                if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
+                                {
+                                    var workspaceName = SdkContext.RandomResourceName(configuration.MainIdentifierPrefix, 15);
+                                    logAnalyticsWorkspace = await CreateLogAnalyticsWorkspaceResourceAsync(workspaceName);
+                                    configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
+                                }
+
+                                appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId);
+                            }),
+                            Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
 
                             Task.Run(async () =>
                             {
@@ -423,23 +420,32 @@ namespace CromwellOnAzureDeployer
                                 });
                             }),
 
-                            Task.Run(() => CreateVirtualMachineAsync(managedIdentity, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName)
-                                .ContinueWith(async t =>
-                                    {
-                                        linuxVm = t.Result;
+                            Task.Run(async () =>
+                            {
+                                if (vnetAndSubnet is null)
+                                {
+                                    configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                                    vnetAndSubnet = await CreateVnetAsync(resourceGroup, configuration.VnetName, configuration.VnetAddressSpace);
+                                }
 
-                                        if (!configuration.PrivateNetworking.GetValueOrDefault())
+                                await (_ = CreateVirtualMachineAsync(managedIdentity, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName)
+                                    .ContinueWith(async t =>
                                         {
-                                            networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
-                                            await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
-                                        }
+                                            linuxVm = t.Result;
 
-                                        sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
-                                        await WaitForSshConnectivityAsync(sshConnectionInfo);
-                                        await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
-                                    },
-                                    TaskContinuationOptions.OnlyOnRanToCompletion)
-                                .Unwrap())
+                                            if (!configuration.PrivateNetworking.GetValueOrDefault())
+                                            {
+                                                networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
+                                                await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
+                                            }
+
+                                            sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
+                                            await WaitForSshConnectivityAsync(sshConnectionInfo);
+                                            await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
+                                        },
+                                        TaskContinuationOptions.OnlyOnRanToCompletion)
+                                    .Unwrap());
+                                })
                         });
 
                         await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);

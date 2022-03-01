@@ -159,5 +159,21 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public Task DeleteBlobAsync(Uri blobAbsoluteUri)
             => azureProxy.DeleteBlobAsync(blobAbsoluteUri);
+
+        /// <inheritdoc/>
+        public Task<IEnumerable<BatchModels.ApplicationPackage>> ListApplicationPackages(BatchModels.Application application)
+            => azureProxy.ListApplicationPackages(application);
+
+        /// <inheritdoc/>
+        public Task<IEnumerable<BatchModels.Application>> ListApplications()
+            => azureProxy.ListApplications();
+
+        /// <inheritdoc/>
+        public Task<BatchModels.ApplicationPackage> CreateAndActivateBatchApplication(string name, string hash, string version, System.IO.Stream package)
+            => azureProxy.CreateAndActivateBatchApplication(name, hash, version, package);
+
+        /// <inheritdoc/>
+        public Task<string> GetStorageBlobMetadataHash(string uri)
+            => azureProxy.GetStorageBlobMetadataHash(uri);
     }
 }

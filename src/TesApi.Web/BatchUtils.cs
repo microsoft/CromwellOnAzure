@@ -6,7 +6,13 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.Azure.Batch;
+using Microsoft.Azure.Cosmos.Core;
+using Microsoft.Azure.Management.Compute.Models;
+using Newtonsoft.Json;
 
 namespace TesApi.Web
 {
@@ -15,35 +21,122 @@ namespace TesApi.Web
     /// </summary>
     public class BatchUtils
     {
+        private static readonly string HostConfigsDirectory = AppContext.BaseDirectory + @"/HostConfigs";
+
         /// <summary>
         /// Returns the host config file.
         /// </summary>
         /// <param name="host">The <seealso cref="Tes.Models.TesResources.BackendParameters"/> <see cref="Tes.Models.TesResources.SupportedBackendParameters.docker_host_configuration"/> value</param>
         /// <returns><see cref="Stream"/></returns>
         public static Stream GetHostConfig(string host)
-            => GetHostConfigFile(host, "config.json")?.OpenRead();
+        {
+            try
+            {
+                return File.OpenRead(Path.Combine(HostConfigsDirectory, host, @"config.json"));
+            }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+            return default;
+        }
+
+        /// <summary>
+        /// Returns the batch application payload
+        /// </summary>
+        /// <param name="name">Application name</param>
+        /// <returns></returns>
+        public static Stream GetApplicationPayload(string name)
+            => File.OpenRead(Path.Combine(HostConfigsDirectory, $"{FilenameFromBatchAppName(name)}.zip"));
+
+        private static string FilenameFromBatchAppName(string name)
+        {
+            var idx = name.LastIndexOf('_');
+            return $"{name[..(idx-1)]}/{name[(idx+1)..]}";
+        }
 
         /// <summary>
         /// Parses the Hashes.txt file
         /// </summary>
-        /// <param name="hashFileContent">Content of the Hashes.txt file to parse. If is 'null' then reads the file in the container.</param>
-        /// <returns>Dictionary of hashes where they keys are file paths starting with 'HostConfigs/'.</returns>
-        public static IReadOnlyDictionary<string, byte[]> GetBlobHashes(string hashFileContent = null)
-            => new Dictionary<string, byte[]>((hashFileContent ?? GetBlobHashFileContent())?.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Split(':', 2)).Select(p => new KeyValuePair<string, byte[]>(p[0].Trim(), Convert.FromHexString(p[1].Trim()))) ?? Enumerable.Empty<KeyValuePair<string, byte[]>>());
+        /// <returns>Dictionary of hashes where the keys are the batch application names.</returns>
+        public static IReadOnlyDictionary<string, byte[]> GetApplicationPayloadHashes()
+        {
+            var hashes = new FileInfo(Path.Combine(HostConfigsDirectory, @"Hashes.txt"));
+            using var reader = hashes.Exists ? hashes.OpenText() : default;
+            return hashes.Exists ? new Dictionary<string, byte[]>(
+                           reader.ReadToEnd()
+                               .Replace('\\', '/').Replace("\r\n", "\n")
+                               .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                               .Select(l => l.Split(':', 2, StringSplitOptions.TrimEntries))
+                               .Select(p => new KeyValuePair<string, byte[]>(BatchAppNameFromFilename(p[0]), Convert.FromHexString(p[1]))))
+                : new Dictionary<string, byte[]>();
+        }
+
+        private static string BatchAppNameFromFilename(string path)
+        {
+            var parts = path.Split('/', 3, StringSplitOptions.TrimEntries);
+            return $"{parts[1]}_{Path.GetFileNameWithoutExtension(parts[2])}";
+        }
 
         /// <summary>
-        /// Gets the content of the 'HostConfigs/Hashes.txt' file.
+        /// Indicates if the well-known named task script is included in the application content.
         /// </summary>
-        /// <returns>File content as text.</returns>
-        public static string GetBlobHashFileContent()
-            => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "HostConfigs/Hashes.txt")).Replace('\\', '/').Replace("\r\n", "\n");
+        /// <param name="host">The <seealso cref="Tes.Models.TesResources.BackendParameters"/> <see cref="Tes.Models.TesResources.SupportedBackendParameters.docker_host_configuration"/> value</param>
+        /// <param name="task">The task type where the application is first consumed.</param>
+        /// <returns></returns>
+        public static bool DoesHostConfigTaskIncludeTaskScript(string host, string task)
+            => FindMetadata($"{host}_{task}").Item2;
 
         /// <summary>
-        /// Returns a file from the Config section of the indicated HostConfigs
+        /// Gets the environment variable on the compute node where the application's contents will be provided.
         /// </summary>
-        /// <param name="parts">Path directories. First directory name is the docker_host_configuration label value.</param>
-        /// <returns><see cref="FileInfo"/></returns>
-        public static FileInfo GetHostConfigFile(params string[] parts)
-            => parts?.Length <= 1 ? default : new(Path.Combine(AppContext.BaseDirectory, $"HostConfigs/{parts[0]}/Config/{string.Join('/', parts.Skip(1))}"));
+        /// <param name="host">The <seealso cref="Tes.Models.TesResources.BackendParameters"/> <see cref="Tes.Models.TesResources.SupportedBackendParameters.docker_host_configuration"/> value</param>
+        /// <param name="task">The task type where the application is first consumed.</param>
+        /// <returns></returns>
+        public static string GetApplicationDirectoryForHostConfigTask(string host, string task)
+        {
+            var name = $"{host}_{task}";
+            var version = FindMetadata(name).Item1;
+            if (version == -1) { throw new KeyNotFoundException(); }
+            var variable = $"AZ_BATCH_APP_PACKAGE_{name}#{version:G}";
+            return OperatingSystem.IsWindows() ? variable.ToUpperInvariant() : variable.Replace('.', '_').Replace('-', '_').Replace('#', '_');
+        }
+
+        private static (int, bool) FindMetadata(string host)
+            => ReadApplicationVersions()
+                .TryGetValue(host, out var hashes)
+                    ? hashes.TryGetValue(GetApplicationPayloadHashes()
+                        .TryGetValue(host, out var hashVal)
+                            ? Convert.ToHexString(hashVal)
+                            : string.Empty, out var value)
+                        ? value
+                        : (-1, false)
+                    : (-1, false);
+
+        /// <summary>
+        /// Retrieves the current registered batch application versions
+        /// </summary>
+        /// <returns>Application version values. host -> hash -> version.</returns>
+        public static Dictionary<string, Dictionary<string, (int, bool)>> ReadApplicationVersions()
+        {
+            var versionsFile = new FileInfo(Path.Combine(HostConfigsDirectory, @"Versions.json"));
+            return versionsFile.Exists
+                ? ReadFile()
+                : new Dictionary<string, Dictionary<string, (int, bool)>>();
+
+            Dictionary<string, Dictionary<string, (int, bool)>> ReadFile()
+            {
+                using var reader = new JsonTextReader(versionsFile.OpenText());
+                return JsonSerializer.CreateDefault().Deserialize<Dictionary<string, Dictionary<string, (int, bool)>>>(reader);
+            }
+        }
+
+        /// <summary>
+        /// Stores the current registered batch application versions
+        /// </summary>
+        /// <param name="versions">Application version values. host -> hash -> version.</param>
+        public static void WriteApplicationVersions(Dictionary<string, Dictionary<string, (int, bool)>> versions)
+        {
+            using var writer = new JsonTextWriter(File.CreateText(Path.Combine(HostConfigsDirectory, @"Versions.json")));
+            JsonSerializer.CreateDefault().Serialize(writer, versions);
+        }
     }
 }

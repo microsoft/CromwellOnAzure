@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
@@ -10,11 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="HostConfigs\sample_host\Config\config.json" />
+    <None Remove="HostConfigs\sample_host\config.json" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="HostConfigs\sample_host\Config\config.json">
+    <Content Include="HostConfigs\sample_host\config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
@@ -52,5 +52,34 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="RemoveHostConfigs" AfterTargets="GetCopyToOutputDirectoryItems" Condition=" '' != '$(DOTNET_HOST_PATH)' ">
+    <ItemGroup>
+      <__HostConfigDir Include="..\..\HostConfigs\" />
+      <__NotHostConfigs Remove="@(__NotHostConfigs)" />
+      <__HashesTxt Include="@(AllItemsFullPathWithTargetPath)" Condition=" '%(Filename)%(Extension)' == 'Hashes.txt' "/>
+    </ItemGroup>
+    <PropertyGroup>
+      <__HostConfigDir>%(__HostConfigDir.FullPath)</__HostConfigDir>
+    </PropertyGroup>
+    <ItemGroup Condition=" '@(AllItemsFullPathWithTargetPath)' != '' ">
+      <__NotHostConfigs Include="@(AllItemsFullPathWithTargetPath)" Exclude="@(__HashesTxt)" Condition="$([System.IO.Path]::GetRelativePath($(__HostConfigDir), %(AllItemsFullPathWithTargetPath.FullPath)).StartsWith('..'))" />
+      <AllItemsFullPathWithTargetPath Remove="@(AllItemsFullPathWithTargetPath)" />
+      <AllItemsFullPathWithTargetPath Include="@(__NotHostConfigs)" />
+      <__NotHostConfigs Remove="@(__NotHostConfigs)" />
+    </ItemGroup>
+    <ItemGroup Condition=" '@(_SourceItemsToCopyToOutputDirectory)' != '' ">
+      <__NotHostConfigs Include="@(_SourceItemsToCopyToOutputDirectory)" Exclude="@(__HashesTxt)" Condition="$([System.IO.Path]::GetRelativePath($(__HostConfigDir), %(_SourceItemsToCopyToOutputDirectory.FullPath)).StartsWith('..'))" />
+      <_SourceItemsToCopyToOutputDirectory Remove="@(_SourceItemsToCopyToOutputDirectory)" />
+      <_SourceItemsToCopyToOutputDirectory Include="@(__NotHostConfigs)" />
+      <__NotHostConfigs Remove="@(__NotHostConfigs)" />
+    </ItemGroup>
+    <ItemGroup Condition=" '@(_SourceItemsToCopyToOutputDirectoryAlways)' != '' ">
+      <__NotHostConfigs Include="@(_SourceItemsToCopyToOutputDirectoryAlways)" Exclude="@(__HashesTxt)" Condition="$([System.IO.Path]::GetRelativePath($(__HostConfigDir), %(_SourceItemsToCopyToOutputDirectoryAlways.FullPath)).StartsWith('..'))" />
+      <_SourceItemsToCopyToOutputDirectoryAlways Remove="@(_SourceItemsToCopyToOutputDirectoryAlways)" />
+      <_SourceItemsToCopyToOutputDirectoryAlways Include="@(__NotHostConfigs)" />
+      <__NotHostConfigs Remove="@(__NotHostConfigs)" />
+    </ItemGroup>
+  </Target>
 
 </Project>

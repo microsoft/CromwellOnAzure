@@ -19,6 +19,7 @@ using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
@@ -27,6 +28,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Tes.Models;
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
+using Extensions = Microsoft.Azure.Management.ResourceManager.Fluent.Core.Extensions;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TesApi.Web
@@ -880,6 +882,66 @@ namespace TesApi.Web
         public async Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName)
             => (await GetAccessibleStorageAccountsAsync())
                 .FirstOrDefault(storageAccount => storageAccount.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// Gets the application packages currently present in the Batch Account
+        /// </summary>
+        /// <returns><see cref="BatchModels.Application"/></returns>
+        public async Task<IEnumerable<BatchModels.Application>> ListApplications()
+        {
+            var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
+
+            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
+            return (await batchManagementClient.Application.ListAsync(batchResourceGroupName, batchAccountName))
+                .AsContinuousCollection(link => Extensions.Synchronize(() => batchManagementClient.Application.ListNextAsync(link)));
+        }
+
+        /// <summary>
+        /// Gets the application packages currently present in the Batch Account
+        /// </summary>
+        /// <returns><see cref="BatchModels.ApplicationPackage"/></returns>
+        public async Task<IEnumerable<BatchModels.ApplicationPackage>> ListApplicationPackages(BatchModels.Application application)
+        {
+            var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
+
+            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
+            return (await batchManagementClient.ApplicationPackage.ListAsync(batchResourceGroupName, batchAccountName, application.Name))
+                .AsContinuousCollection(link => Extensions.Synchronize(() => batchManagementClient.ApplicationPackage.ListNextAsync(link)));
+        }
+
+        /// <summary>
+        /// Creates, activates, and loads a versioned package into a new Batch Application
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="hash"></param>
+        /// <param name="version"></param>
+        /// <param name="package"></param>
+        /// <returns></returns>
+        public async Task<BatchModels.ApplicationPackage> CreateAndActivateBatchApplication(string name, string hash, string version, Stream package)
+        {
+            var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
+
+            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
+            _ = await batchManagementClient.Application.CreateAsync(batchResourceGroupName, batchAccountName, name, new BatchModels.Application(allowUpdates: false));
+            var applicationPackage = await batchManagementClient.ApplicationPackage.CreateAsync(batchResourceGroupName, batchAccountName, name, version);
+            var blob = new CloudBlockBlob(new Uri(applicationPackage.StorageUrl, UriKind.Absolute));
+            blob.Metadata["OriginHash"] = hash;
+            await blob.SetMetadataAsync();
+            await blob.UploadFromStreamAsync(package);
+            return await batchManagementClient.ApplicationPackage.ActivateAsync(batchResourceGroupName, batchAccountName, name, version, "zip");
+        }
+
+        /// <summary>
+        /// Gets the metadata associated with the origninal hash of the blob.
+        /// </summary>
+        /// <param name="uri">Url to access the blob.</param>
+        /// <returns></returns>
+        public async Task<string> GetStorageBlobMetadataHash(string uri)
+        {
+            var blob = new CloudBlob(new Uri(uri, UriKind.Absolute));
+            await blob.FetchAttributesAsync();
+            return blob.Metadata["OriginHash"];
+        }
 
         private class VmPrice
         {

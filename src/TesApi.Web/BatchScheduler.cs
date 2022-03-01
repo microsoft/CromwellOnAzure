@@ -3,12 +3,19 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
+using System.Security.Cryptography;
+using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Extensions.Configuration;
@@ -29,7 +36,7 @@ namespace TesApi.Web
         private const int DefaultCoreCount = 1;
         private const int DefaultMemoryGb = 2;
         private const int DefaultDiskGb = 10;
-        private const string HostConfigBlobsName = "host-config-blobs";
+        //private const string HostConfigBlobsName = "host-config-blobs";
         private const string CromwellPathPrefix = "/cromwell-executions/";
         private const string CromwellScriptFileName = "script";
         private const string BatchExecutionDirectoryName = "__batch";
@@ -53,7 +60,7 @@ namespace TesApi.Web
         private readonly string marthaUrl;
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
-        private readonly string defaultStorageAccountName;
+        //private readonly string defaultStorageAccountName;
         private readonly Task InitializeHostBlobs;
 
         /// <summary>
@@ -79,7 +86,7 @@ namespace TesApi.Web
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
             this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
-            this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);  // This account contains the HostConfigBlobsName container
+            //this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);  // This account contains the HostConfigBlobsName container
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
@@ -186,77 +193,98 @@ namespace TesApi.Web
 
             InitializeHostBlobs = new Task(async () =>
             {
-                var blobsToAddOrUpdate = Enumerable.Empty<string>();
-                var numBlobsToAddOrUpdate = 0;
-                var blobsToRemove = Enumerable.Empty<string>();
-                var numBlobsToRemove = 0;
-                var hashesFile = $"{defaultStorageAccountName}/{HostConfigBlobsName}/Hashes.txt";
-
-                logger.LogInformation("Checking for changes to HostConfig files.");
-                var remoteHashes = await GetRemoteHashes();
-
-                var localHashes = BatchUtils.GetBlobHashes();
-
-                logger.LogDebug("Local HostConfigs:\n{Hashes}.", string.Join('\n', localHashes.Select(p => $"{p.Key}: {Convert.ToHexString(p.Value)}")));
-                logger.LogDebug("Storage HostConfigs:\n{Hashes}.", string.Join('\n', remoteHashes.Select(p => $"{p.Key}: {Convert.ToHexString(p.Value)}")));
-
-                if (remoteHashes.Count == 0)
+                var writeStoredVersions = false;
+                var storedVersions = BatchUtils.ReadApplicationVersions();
+                try
                 {
-                    logger.LogDebug(@"Storage not yet populated with HostConfigs files.");
-                    remoteHashes = new(localHashes);
-                    blobsToAddOrUpdate = localHashes.Select(p => p.Key);
-                    numBlobsToAddOrUpdate = localHashes.Count;
-                }
-                else
-                {
-                    logger.LogDebug(@"Verifying HostConfigs files in storage.");
-                    foreach (var kp in localHashes)
+                    var knownExtant = Enumerable.Empty<(string, string)>();
+                    foreach (var hash in BatchUtils.GetApplicationPayloadHashes().Select(p => (Name: p.Key, Hash: Convert.ToHexString(p.Value))))
                     {
-                        if ((remoteHashes.ContainsKey(kp.Key) && !kp.Value.SequenceEqual(remoteHashes[kp.Key])) || !remoteHashes.ContainsKey(kp.Key))
+                        if (storedVersions.TryGetValue(hash.Name, out var keyMetadata))
                         {
-                            remoteHashes[kp.Key] = kp.Value;
-                            blobsToAddOrUpdate = blobsToAddOrUpdate.Append(kp.Key);
-                            ++numBlobsToAddOrUpdate;
+                            if (keyMetadata.TryGetValue(hash.Hash, out var hashMetadata))
+                            {
+                                knownExtant = knownExtant.Append((hash.Name, hash.Hash));
+                            }
+                            else
+                            {
+                                keyMetadata.Add(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name)));
+                                writeStoredVersions = true;
+                            }
+                        }
+                        else
+                        {
+                            storedVersions.Add(hash.Name, new(Enumerable.Empty<KeyValuePair<string, (int, bool)>>().Append(new(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name))))));
+                            writeStoredVersions = true;
                         }
                     }
 
-                    foreach (var path in remoteHashes.Select(p => p.Key))
+                    var serverAppList = Enumerable.Empty<(BatchModels.ApplicationPackage Package, string Hash)>();
+                    foreach (var appVersion in (await azureProxy.ListApplications()).SelectMany(a => azureProxy.ListApplicationPackages(a).Result).Select(async p => (p, Hash: await azureProxy.GetStorageBlobMetadataHash(p.StorageUrl))))
                     {
-                        if (!localHashes.ContainsKey(path))
+                        serverAppList = serverAppList.Append(await appVersion);
+                    }
+
+                    var appsToRemove = Enumerable.Empty<(BatchModels.ApplicationPackage Package, string Hash)>();
+                    var storedVersionsFoundBuilder = Enumerable.Empty<(string Name, string Hash)>();
+                    foreach (var app in serverAppList)
+                    {
+                        if (storedVersions.TryGetValue(app.Package.Name, out var keyMetadata))
                         {
-                            remoteHashes.Remove(path);
-                            blobsToRemove = blobsToRemove.Append(path);
-                            ++numBlobsToRemove;
+                            var storedHashes = new List<string>(keyMetadata.Keys);
+
+                            var serverHash = app.Hash;
+                            foreach (var hash in keyMetadata)
+                            {
+                                if (hash.Key.Equals(serverHash, StringComparison.InvariantCulture))
+                                {
+                                    storedVersionsFoundBuilder = storedVersionsFoundBuilder.Append(new(app.Package.Name, serverHash));
+                                }
+                                else
+                                {
+                                    appsToRemove = appsToRemove.Append(new(app.Package, serverHash));
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Unknown app. Ignore. TODO: Warn?
+                        }
+                    }
+
+                    foreach (var app in appsToRemove)
+                    {
+                        //TODO: Remove(app.Package)
+                    }
+
+                    var storedVersionsFound = storedVersionsFoundBuilder.ToList();
+                    foreach (var app in storedVersions)
+                    {
+                        foreach (var version in app.Value)
+                        {
+                            if (!storedVersionsFound.Contains(new (app.Key, version.Key)))
+                            {
+                                var newVersion = version.Value.Item1 + 1;
+                                storedVersions[app.Key][version.Key] = new(newVersion, version.Value.Item2);
+                                writeStoredVersions = true;
+                                using var payload = BatchUtils.GetApplicationPayload(app.Key);
+                                await azureProxy.CreateAndActivateBatchApplication(app.Key, version.Key, newVersion.ToString("G"), payload);
+                            }
                         }
                     }
                 }
-
-                logger.LogInformation($"Adding/updating {numBlobsToAddOrUpdate} files and removing {numBlobsToRemove} files from attached storage.");
-                var tasks = Enumerable.Empty<Task>().Append(storageAccessProvider.UploadBlobAsync(hashesFile, string.Join('\n', remoteHashes.Select(p => $"{p.Key}: {Convert.ToHexString(p.Value)}"))));
-                foreach (var path in blobsToAddOrUpdate)
+                finally
                 {
-                    tasks = tasks.Append(storageAccessProvider.UploadBlobFromFileAsync(ConvertToBlobName(path), Path.Combine(AppContext.BaseDirectory, path)));
+                    if (writeStoredVersions)
+                    {
+                        BatchUtils.WriteApplicationVersions(storedVersions);
+                    }
                 }
 
-                foreach (var path in blobsToRemove)
+                bool DoesPayloadContainStartScript(string name)
                 {
-                    tasks = tasks.Append(storageAccessProvider.DeleteBlobAsync(ConvertToBlobName(path)));
-                }
-
-                await Task.WhenAll(tasks.ToArray());
-                logger.LogInformation("Completed checking for changes to HostConfig files.");
-
-                string ConvertToBlobName(string path)
-                {
-                    var parts = path.Split(new char[] { '\\', '/'});
-                    return $"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{parts[1]}/{string.Join('/', parts.Skip(3))}";
-                }
-
-                async Task<Dictionary<string, byte[]>> GetRemoteHashes()
-                {
-                    var remoteHashesBlob = await storageAccessProvider.DownloadBlobAsync(hashesFile);
-                    var hashes = remoteHashesBlob is null ? new Dictionary<string, byte[]>() : BatchUtils.GetBlobHashes(remoteHashesBlob);
-                    return hashes is Dictionary<string, byte[]> dictionaryOfHashes ? dictionaryOfHashes : new(hashes);
+                    using var zip = new ZipArchive(BatchUtils.GetApplicationPayload(name));
+                    return zip.Entries.Any(e => e.Name.Equals(StartTaskScriptFilename, StringComparison.InvariantCulture));
                 }
             });
 
@@ -265,6 +293,7 @@ namespace TesApi.Web
                 InitializeHostBlobs.Start();
             }
         }
+
 
         private async Task DeleteBatchJobAndPoolIfExists(IAzureProxy azureProxy, TesTask tesTask)
         {
@@ -815,7 +844,7 @@ namespace TesApi.Web
             if (executor.Image.StartsWith("coa:65536/"))
             {
                 var parts = executor.Image.Split('/', 3)[2].Split(':', 2);
-                resourceFiles = resourceFiles.Append(ResourceFile.FromAutoStorageContainer(HostConfigBlobsName, $"{batchExecutionDirectoryPath}/{parts[1]}.tar", $"{parts[0]}/task/{parts[1]}.tar"));
+                //resourceFiles = resourceFiles.Append(ResourceFile.FromAutoStorageContainer(HostConfigBlobsName, $"{batchExecutionDirectoryPath}/{parts[1]}.tar", $"{parts[0]}/task/{parts[1]}.tar"));
             }
 
             var cloudTask = new CloudTask(taskId, $"/bin/sh /mnt{batchScriptPath}")
@@ -937,13 +966,19 @@ namespace TesApi.Web
             {
                 await InitializeHostBlobs;
 
-                var parts = tesTask.Executors.First().Image.Split('/', 3)[2].Split(':', 2);
-                logger.LogInformation($"Verifying loadable container from docker host configuration '{parts[0]}'/'{parts[1]}.tar'");
-                if (!(await azureProxy.ListBlobsAsync(new(await storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{parts[0]}/task", true))))
-                    .Any(n => n.EndsWith($"/{parts[1]}.tar")))
-                {
-                    throw new Exception();
-                }
+                //var parts = tesTask.Executors.First().Image.Split('/', 3)[2].Split(':', 2);
+                //logger.LogInformation($"Verifying loadable container from docker host configuration '{parts[0]}'/'{parts[1]}.tar'");
+                ////if (!(await azureProxy.ListBlobsAsync(new(await storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{parts[0]}/task", true))))
+                ////    .Any(n => n.EndsWith($"/{parts[1]}.tar")))
+                ////{
+                ////    throw new Exception();
+                ////}
+                //try
+                //{
+                //    appDir = BatchUtils.GetApplicationDirectoryForHostConfigTask(hostConfigName, "start");
+                //    isScriptInApp = BatchUtils.DoesHostConfigTaskIncludeTaskScript(hostConfigName, "start");
+                //}
+                //catch (KeyNotFoundException) { }
             }
 
             if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) == true)
@@ -952,8 +987,15 @@ namespace TesApi.Web
 
                 var hostConfigName = tesTask.Resources.GetBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration);
                 logger.LogInformation($"Preparing pool and task using docker host configuration '{hostConfigName}'");
-                using var hostConfigJson = new JsonTextReader(new StreamReader(BatchUtils.GetHostConfig(hostConfigName)));
-                var hostConfig = JsonSerializer.CreateDefault().Deserialize<HostConfig>(hostConfigJson);
+                HostConfig hostConfig = default;
+                try
+                {
+                    using var hostConfigJson = new JsonTextReader(new StreamReader(BatchUtils.GetHostConfig(hostConfigName)));
+                    hostConfig = JsonSerializer.CreateDefault().Deserialize<HostConfig>(hostConfigJson);
+                }
+                catch (FileNotFoundException e) { ThrowHostConfigNotFound(hostConfigName, e); }
+                catch (DirectoryNotFoundException e) { ThrowHostConfigNotFound(hostConfigName, e); }
+
                 batchResult = new()
                 {
                     BatchImageOffer = hostConfig.Batch.Image.Offer,
@@ -968,16 +1010,22 @@ namespace TesApi.Web
 
                 if (hostConfig.StartTask is not null)
                 {
-                    var resources = (await azureProxy.ListBlobsAsync(
-                            new Uri(await storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{hostConfigName}/start", true), UriKind.Absolute)))
-                        .Select(MakeBlobResourceFile);
+                    string appDir = default;
+                    var isScriptInApp = false;
+                    try
+                    {
+                        appDir = BatchUtils.GetApplicationDirectoryForHostConfigTask(hostConfigName, "start");
+                        isScriptInApp = BatchUtils.DoesHostConfigTaskIncludeTaskScript(hostConfigName, "start");
+                    }
+                    catch (KeyNotFoundException) { }
 
+                    var resources = Enumerable.Empty<ResourceFile>();
                     foreach (var resource in hostConfig.StartTask.Resources ?? Array.Empty<HostConfig.StartTaskImpl.ResourceImpl>())
                     {
                         resources = resources.Append(await MakeResourceFile(resource.Url, resource.Path, resource.Mode));
                     }
 
-                    taskResult = new($"/bin/env {StartTaskScriptFilename}")
+                    taskResult = new(isScriptInApp ? $"/usr/bin/sh -c 'cd ${appDir} && ./{StartTaskScriptFilename}'" : $"/bin/env ./{StartTaskScriptFilename}")
                     {
                         UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                         ResourceFiles = resources.ToList(),
@@ -988,12 +1036,8 @@ namespace TesApi.Web
 
             return (taskResult, batchResult, dockerParams, preCommand);
 
-            ResourceFile MakeBlobResourceFile(string blob)
-                => ResourceFile.FromAutoStorageContainer(HostConfigBlobsName, blobPrefix: blob, filePath: string.Join('/', blob.Split('/').Skip(2)), fileMode: Path.GetFileName(blob) switch
-                {
-                    StartTaskScriptFilename => "0755",
-                    _ => "0644",
-                });
+            void ThrowHostConfigNotFound(string name, Exception e)
+                => throw new TesException("NoHostConfig", $"Could not identify the configuration for the host config {name} for task {tesTask.Id}", e);
 
             async Task<ResourceFile> MakeResourceFile(string source, string relativeTargetDir, string mode = null)
             {

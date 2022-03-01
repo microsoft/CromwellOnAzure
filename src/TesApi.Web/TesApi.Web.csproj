@@ -59,17 +59,18 @@
 
   <Target Name="GenerateHostConfigsHashes" BeforeTargets="AssignTargetPaths">
     <ItemGroup>
-      <__CandidateFilesToHash Include="@(Content->HasMetadata(&quot;Link&quot;))"/>
+      <__CandidateFilesToHash Include="@(Content-&gt;HasMetadata(&quot;Link&quot;))" />
       <__CandidateFilesWithLink Include="@(__CandidateFilesToHash)">
-        <__IsBlob>$([System.String]::Copy("%(Link)").Contains('\Blobs\'))</__IsBlob>
+        <__IsConfig>$([System.String]::Copy("%(Link)").EndsWith('\config.json'))</__IsConfig>
       </__CandidateFilesWithLink>
-      <__FilesToHash Include="@(__CandidateFilesWithLink)" Condition=" '%(__CandidateFilesWithLink.__IsBlob)' == 'true' "/>
+      <__FilesToHash Include="@(__CandidateFilesWithLink)" Condition=" '%(__CandidateFilesWithLink.__IsConfig)' == 'false' " />
       <__HashesFile Include="$(IntermediateOutputPath)Hashes.txt">
         <Link>HostConfigs\Hashes.txt</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </__HashesFile>
       <Content Include="@(__HashesFile)" />
     </ItemGroup>
+    <Error Condition=" '%(Extension)' != '.zip' " Text="@(__FilesToHash) must be a zip file."/>
     <GetFileHash Files="@(__FilesToHash)">
       <Output TaskParameter="Items" ItemName="__FilesWithHashes" />
     </GetFileHash>

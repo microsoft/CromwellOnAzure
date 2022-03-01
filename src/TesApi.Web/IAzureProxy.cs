@@ -180,6 +180,35 @@ namespace TesApi.Web
         Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Gets the application packages currently present in the Batch Account
+        /// </summary>
+        /// <returns><see cref="BatchModels.ApplicationPackage"/></returns>
+        Task<IEnumerable<BatchModels.ApplicationPackage>> ListApplicationPackages(BatchModels.Application application);
+
+        /// <summary>
+        /// Gets the applications currently present in the Batch Account
+        /// </summary>
+        /// <returns><see cref="BatchModels.Application"/></returns>
+        Task<IEnumerable<BatchModels.Application>> ListApplications();
+
+        /// <summary>
+        /// Creates, activates, and loads a versioned package into a new Batch Application
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="hash"></param>
+        /// <param name="version"></param>
+        /// <param name="package"></param>
+        /// <returns></returns>
+        Task<BatchModels.ApplicationPackage> CreateAndActivateBatchApplication(string name, string hash, string version, System.IO.Stream package);
+
+        /// <summary>
+        /// Gets the metadata associated with the origninal hash of the blob.
+        /// </summary>
+        /// <param name="uri">Url to access the blob.</param>
+        /// <returns></returns>
+        Task<string> GetStorageBlobMetadataHash(string uri);
+
+        /// <summary>
         /// Checks if a local file exists
         /// </summary>
         bool LocalFileExists(string path);
