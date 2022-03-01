@@ -4,6 +4,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -22,6 +23,44 @@ namespace TesApi.Web
     public class BatchUtils
     {
         private static readonly string HostConfigsDirectory = AppContext.BaseDirectory + @"/HostConfigs";
+
+        /// <summary>
+        /// Makes an acceptable batch application name out of the internal calculated name
+        /// </summary>
+        /// <param name="host"></param>
+        /// <returns></returns>
+        public static string BatchAppFromHostConfigName(string host)
+        {
+            const char dash = '-';
+            return new string(host.Normalize().Select(Mangle).ToArray());
+
+            static char Mangle(char c)
+                => char.GetUnicodeCategory(c) switch
+                {
+                    UnicodeCategory.UppercaseLetter => MangleLetter(c),
+                    UnicodeCategory.LowercaseLetter => MangleLetter(c),
+                    UnicodeCategory.TitlecaseLetter => MangleLetter(c),
+                    UnicodeCategory.DecimalDigitNumber => c,
+                    UnicodeCategory.LetterNumber => MangleNumber(c),
+                    UnicodeCategory.OtherNumber => MangleNumber(c),
+                    UnicodeCategory.PrivateUse => dash,
+                    UnicodeCategory.ConnectorPunctuation => dash,
+                    UnicodeCategory.DashPunctuation => dash,
+                    UnicodeCategory.MathSymbol => dash,
+                    UnicodeCategory.CurrencySymbol => dash,
+                    _ => '_',
+                };
+
+            static char MangleLetter(char c)
+                => char.IsLetterOrDigit(c) && /*char.IsAscii(c)*/(c >= 0x0000 && c <= 0x007f) ? c : dash;
+
+            static char MangleNumber(char c)
+                => char.GetNumericValue(c) switch
+                {
+                    (>= 0) and (<= 9) => (char)('0' + char.GetNumericValue(c)),
+                    _ => dash,
+                };
+        }
 
         /// <summary>
         /// Returns the host config file.
@@ -83,7 +122,7 @@ namespace TesApi.Web
         /// <param name="task">The task type where the application is first consumed.</param>
         /// <returns></returns>
         public static bool DoesHostConfigTaskIncludeTaskScript(string host, string task)
-            => FindMetadata($"{host}_{task}").Item2;
+            => FindMetadata($"{host}_{task}").ContainsTaskScript;
 
         /// <summary>
         /// Gets the environment variable on the compute node where the application's contents will be provided.
@@ -93,14 +132,14 @@ namespace TesApi.Web
         /// <returns></returns>
         public static string GetApplicationDirectoryForHostConfigTask(string host, string task)
         {
-            var name = $"{host}_{task}";
-            var version = FindMetadata(name).Item1;
+            var metadata = FindMetadata($"{host}_{task}");
+            var version = metadata.Version;
             if (version == -1) { throw new KeyNotFoundException(); }
-            var variable = $"AZ_BATCH_APP_PACKAGE_{name}#{version:G}";
+            var variable = $"AZ_BATCH_APP_PACKAGE_{metadata.ServerAppName}#{version:G}";
             return OperatingSystem.IsWindows() ? variable.ToUpperInvariant() : variable.Replace('.', '_').Replace('-', '_').Replace('#', '_');
         }
 
-        private static (int, bool) FindMetadata(string host)
+        private static (int Version, bool ContainsTaskScript, string ServerAppName) FindMetadata(string host)
             => ReadApplicationVersions()
                 .TryGetValue(host, out var hashes)
                     ? hashes.TryGetValue(GetApplicationPayloadHashes()
@@ -108,24 +147,24 @@ namespace TesApi.Web
                             ? Convert.ToHexString(hashVal)
                             : string.Empty, out var value)
                         ? value
-                        : (-1, false)
-                    : (-1, false);
+                        : (-1, false, default)
+                    : (-1, false, default);
 
         /// <summary>
         /// Retrieves the current registered batch application versions
         /// </summary>
-        /// <returns>Application version values. host -> hash -> version.</returns>
-        public static Dictionary<string, Dictionary<string, (int, bool)>> ReadApplicationVersions()
+        /// <returns>Application version values. host -> hash -> metadata.</returns>
+        public static Dictionary<string, Dictionary<string, (int Version, bool ContainsTaskScript, string ServerAppName)>> ReadApplicationVersions()
         {
             var versionsFile = new FileInfo(Path.Combine(HostConfigsDirectory, @"Versions.json"));
             return versionsFile.Exists
                 ? ReadFile()
-                : new Dictionary<string, Dictionary<string, (int, bool)>>();
+                : new Dictionary<string, Dictionary<string, (int, bool, string)>>();
 
-            Dictionary<string, Dictionary<string, (int, bool)>> ReadFile()
+            Dictionary<string, Dictionary<string, (int, bool, string)>> ReadFile()
             {
                 using var reader = new JsonTextReader(versionsFile.OpenText());
-                return JsonSerializer.CreateDefault().Deserialize<Dictionary<string, Dictionary<string, (int, bool)>>>(reader);
+                return JsonSerializer.CreateDefault().Deserialize<Dictionary<string, Dictionary<string, (int Version, bool ContainsTaskScript, string ServerAppName)>>>(reader);
             }
         }
 
@@ -133,7 +172,7 @@ namespace TesApi.Web
         /// Stores the current registered batch application versions
         /// </summary>
         /// <param name="versions">Application version values. host -> hash -> version.</param>
-        public static void WriteApplicationVersions(Dictionary<string, Dictionary<string, (int, bool)>> versions)
+        public static void WriteApplicationVersions(Dictionary<string, Dictionary<string, (int Version, bool ContainsTaskScript, string ServerAppName)>> versions)
         {
             using var writer = new JsonTextWriter(File.CreateText(Path.Combine(HostConfigsDirectory, @"Versions.json")));
             JsonSerializer.CreateDefault().Serialize(writer, versions);

@@ -208,13 +208,13 @@ namespace TesApi.Web
                             }
                             else
                             {
-                                keyMetadata.Add(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name)));
+                                keyMetadata.Add(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name), BatchUtils.BatchAppFromHostConfigName(hash.Name)));
                                 writeStoredVersions = true;
                             }
                         }
                         else
                         {
-                            storedVersions.Add(hash.Name, new(Enumerable.Empty<KeyValuePair<string, (int, bool)>>().Append(new(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name))))));
+                            storedVersions.Add(hash.Name, new(Enumerable.Empty<KeyValuePair<string, (int, bool, string)>>().Append(new(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name), BatchUtils.BatchAppFromHostConfigName(hash.Name))))));
                             writeStoredVersions = true;
                         }
                     }
@@ -262,13 +262,13 @@ namespace TesApi.Web
                     {
                         foreach (var version in app.Value)
                         {
-                            if (!storedVersionsFound.Contains(new (app.Key, version.Key)))
+                            if (!storedVersionsFound.Contains((app.Key, version.Key)))
                             {
-                                var newVersion = version.Value.Item1 + 1;
-                                storedVersions[app.Key][version.Key] = new(newVersion, version.Value.Item2);
+                                var newVersion = version.Value.Version + 1;
+                                storedVersions[app.Key][version.Key] = new(newVersion, version.Value.ContainsTaskScript, version.Value.ServerAppName);
                                 writeStoredVersions = true;
                                 using var payload = BatchUtils.GetApplicationPayload(app.Key);
-                                await azureProxy.CreateAndActivateBatchApplication(app.Key, version.Key, newVersion.ToString("G"), payload);
+                                await azureProxy.CreateAndActivateBatchApplication(version.Value.ServerAppName, version.Key, newVersion.ToString("G"), payload);
                             }
                         }
                     }
