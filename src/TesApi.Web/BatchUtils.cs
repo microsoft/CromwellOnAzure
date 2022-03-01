@@ -50,7 +50,7 @@ namespace TesApi.Web
         private static string FilenameFromBatchAppName(string name)
         {
             var idx = name.LastIndexOf('_');
-            return $"{name[..(idx-1)]}/{name[(idx+1)..]}";
+            return $"{name[..idx]}/{name[(idx+1)..]}";
         }
 
         /// <summary>

@@ -966,19 +966,13 @@ namespace TesApi.Web
             {
                 await InitializeHostBlobs;
 
-                //var parts = tesTask.Executors.First().Image.Split('/', 3)[2].Split(':', 2);
-                //logger.LogInformation($"Verifying loadable container from docker host configuration '{parts[0]}'/'{parts[1]}.tar'");
-                ////if (!(await azureProxy.ListBlobsAsync(new(await storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/{HostConfigBlobsName}/{parts[0]}/task", true))))
-                ////    .Any(n => n.EndsWith($"/{parts[1]}.tar")))
-                ////{
-                ////    throw new Exception();
-                ////}
-                //try
-                //{
-                //    appDir = BatchUtils.GetApplicationDirectoryForHostConfigTask(hostConfigName, "start");
-                //    isScriptInApp = BatchUtils.DoesHostConfigTaskIncludeTaskScript(hostConfigName, "start");
-                //}
-                //catch (KeyNotFoundException) { }
+                var parts = tesTask.Executors.First().Image.Split('/', 3)[2].Split(':', 2);
+                logger.LogInformation($"Verifying loadable container from docker host configuration '{parts[0]}'/'{parts[1]}.tar'");
+                using var zip = new ZipArchive(BatchUtils.GetApplicationPayload($"{parts[0]}_task"));
+                if (!zip.Entries.Any(e => e.Name.Equals($"{parts[1]}.tar", StringComparison.InvariantCulture)))
+                {
+                    throw new Exception();
+                }
             }
 
             if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) == true)
