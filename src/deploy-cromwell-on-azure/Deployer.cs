@@ -24,6 +24,8 @@ using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
+using Microsoft.Azure.Management.MySQL;
+using Microsoft.Azure.Management.MySQL.Models;
 using Microsoft.Azure.Management.Network.Fluent;
 using Microsoft.Azure.Management.Network.Fluent.Models;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
@@ -118,6 +120,7 @@ namespace CromwellOnAzureDeployer
                 IGenericResource logAnalyticsWorkspace = null;
                 IGenericResource appInsights = null;
                 ICosmosDBAccount cosmosDb = null;
+                Server mySQLServer = null;
                 IStorageAccount storageAccount = null;
                 IVirtualMachine linuxVm = null;
                 INetworkSecurityGroup networkSecurityGroup = null;
@@ -252,6 +255,13 @@ namespace CromwellOnAzureDeployer
 
                         configuration.CosmosDbAccountName = cosmosDbAccountName;
 
+                        if (!accountNames.TryGetValue("MySQLServerName", out var mySQLServerName))
+                        {
+                            throw new ValidationException($"Could not retrieve the MySQL Server name from virtual machine {configuration.VmName}.");
+                        }
+                        mySQLServer = await new MySQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId }.Servers.GetAsync(configuration.ResourceGroupName, mySQLServerName)
+                            ?? throw new ValidationException($"MySQL server {mySQLServerName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
 
                         var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
@@ -322,6 +332,11 @@ namespace CromwellOnAzureDeployer
                         if (string.IsNullOrWhiteSpace(configuration.CosmosDbAccountName))
                         {
                             configuration.CosmosDbAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                        }
+
+                        if (string.IsNullOrWhiteSpace(configuration.MySQLServerName))
+                        {
+                            configuration.MySQLServerName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
                         }
 
                         if (string.IsNullOrWhiteSpace(configuration.ApplicationInsightsAccountName))
@@ -400,6 +415,10 @@ namespace CromwellOnAzureDeployer
                         {
                         	Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
                         	Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
+                        	Task.Run(async () => mySQLServer = await CreateMySQLServerAsync()),
+                        	Task.Run(async () => await CreateMySQLDbAndProvisionAsync()),
+
+                            // TODO (adinas): This is likely where I need to make an Azure MySQL instance
 
                             Task.Run(async () =>
                             {
@@ -1028,6 +1047,34 @@ namespace CromwellOnAzureDeployer
                     .WithSessionConsistency()
                     .WithWriteReplication(Region.Create(configuration.RegionName))
                     .CreateAsync(cts.Token));
+
+        // TODO (adinas): Func for creating MySQLServer
+        private Task<Server> CreateMySQLServerAsync()
+            => Execute(
+                $"Creating MySQL On Azure Server Instance: {configuration.MySQLServerName}...",
+                () => new MySQLManagementClient(azureCredentials) 
+                { SubscriptionId = configuration.SubscriptionId }.Servers.BeginCreateAsync(
+                     configuration.ResourceGroupName, configuration.MySQLServerName,
+                     new ServerForCreate(
+                         new ServerPropertiesForDefaultCreate(
+                             administratorLogin: "cromwell",
+                             administratorLoginPassword: "Pa$$word123"),
+                         configuration.RegionName)));
+
+        // TODO (adinas): Func for creating MySQLDB
+        // TODO: Firewall rule? query uploader?
+        private async Task CreateMySQLDbAndProvisionAsync()
+        {
+            //Create DB
+            await Execute(
+                $"Creating MySQL On Azure Server Databse: cromwell_db...",
+                () => new MySQLManagementClient(azureCredentials)
+                { SubscriptionId = configuration.SubscriptionId }.Databases.BeginCreateOrUpdateAsync(
+               configuration.ResourceGroupName, configuration.MySQLServerName, "cromwell_db",
+               new Database()));
+            // Execute queries
+
+        }
 
         private Task AssignVmAsBillingReaderToSubscriptionAsync(IIdentity managedIdentity)
         {
@@ -1718,6 +1765,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.StorageAccountName, nameof(configuration.StorageAccountName));
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
             ThrowIfProvidedForUpdate(configuration.CosmosDbAccountName, nameof(configuration.CosmosDbAccountName));
+            ThrowIfProvidedForUpdate(configuration.MySQLServerName, nameof(configuration.MySQLServerName));
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
