@@ -30,6 +30,29 @@ namespace TesApi.Tests
         private static readonly Regex downloadFilesBlobxferRegex = new(@"path='([^']*)' && url='([^']*)' && blobxfer download");
         private static readonly Regex downloadFilesWgetRegex = new(@"path='([^']*)' && url='([^']*)' && mkdir .* wget");
 
+        [TestMethod]
+        public Task BatchUtils_ReadApplicationVersions()
+        {
+            try
+            {
+                var appVersions = new Dictionary<string, (IDictionary<string, (int, bool)>, string)>();
+                appVersions.Add("test1", (new Dictionary<string, (int, bool)>(new[] { new KeyValuePair<string, (int, bool)>("ver1", (1, false)) }), "test1"));
+                BatchUtils.WriteApplicationVersions(appVersions);
+                var result = BatchUtils.ReadApplicationVersions();
+                Assert.IsNotNull(result);
+                Assert.AreEqual(1, result.Count);
+                Assert.AreEqual("test1", result["test1"].ServerAppName);
+                Assert.AreEqual(1, result["test1"].Packages.Count);
+                Assert.AreEqual((1, false), result["test1"].Packages["ver1"]);
+                return Task.CompletedTask;
+            }
+            finally
+            {
+                var versionsFile = new FileInfo(Path.Combine(AppContext.BaseDirectory, @"HostConfigs", @"Versions.json"));
+                if (versionsFile.Exists) { versionsFile.Delete(); }
+            }
+        }
+
         [TestCategory("TES 1.1")]
         [TestMethod]
         public async Task BackendParametersVmSizeShallOverrideVmSelection()

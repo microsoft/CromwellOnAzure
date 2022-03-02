@@ -139,32 +139,34 @@ namespace TesApi.Web
             return OperatingSystem.IsWindows() ? variable.ToUpperInvariant() : variable.Replace('.', '_').Replace('-', '_').Replace('#', '_');
         }
 
-        private static (int Version, bool ContainsTaskScript, string ServerAppName) FindMetadata(string host)
+        private static (int Version, bool ContainsTaskScript, string ServerAppName) FindMetadata(string name)
             => ReadApplicationVersions()
-                .TryGetValue(host, out var hashes)
-                    ? hashes.TryGetValue(GetApplicationPayloadHashes()
-                        .TryGetValue(host, out var hashVal)
+                .TryGetValue(name, out var hashes)
+                    ? hashes.Packages.TryGetValue(GetApplicationPayloadHashes()
+                        .TryGetValue(name, out var hashVal)
                             ? Convert.ToHexString(hashVal)
                             : string.Empty, out var value)
-                        ? value
-                        : (-1, false, default)
-                    : (-1, false, default);
+                        ? (value.Version, value.ContainsTaskScript, hashes.ServerAppName)
+                        : (-1, false, hashes.ServerAppName)
+                    : (-1, false, hashes.ServerAppName);
 
         /// <summary>
         /// Retrieves the current registered batch application versions
         /// </summary>
         /// <returns>Application version values. host -> hash -> metadata.</returns>
-        public static Dictionary<string, Dictionary<string, (int Version, bool ContainsTaskScript, string ServerAppName)>> ReadApplicationVersions()
+        public static IDictionary<string, (IDictionary<string, (int Version, bool ContainsTaskScript)> Packages, string ServerAppName)> ReadApplicationVersions()
         {
             var versionsFile = new FileInfo(Path.Combine(HostConfigsDirectory, @"Versions.json"));
             return versionsFile.Exists
                 ? ReadFile()
-                : new Dictionary<string, Dictionary<string, (int, bool, string)>>();
+                : new Dictionary<string, (IDictionary<string, (int, bool)>, string)>();
 
-            Dictionary<string, Dictionary<string, (int, bool, string)>> ReadFile()
+            IDictionary<string, (IDictionary<string, (int, bool)>, string)> ReadFile()
             {
                 using var reader = new JsonTextReader(versionsFile.OpenText());
-                return JsonSerializer.CreateDefault().Deserialize<Dictionary<string, Dictionary<string, (int Version, bool ContainsTaskScript, string ServerAppName)>>>(reader);
+                var serializer = JsonSerializer.CreateDefault();
+                serializer.Converters.Add(new ApplicationVersionsDictionaryConverter());
+                return serializer.Deserialize<IDictionary<string, (IDictionary<string, (int, bool)>, string)>>(reader);
             }
         }
 
@@ -172,10 +174,34 @@ namespace TesApi.Web
         /// Stores the current registered batch application versions
         /// </summary>
         /// <param name="versions">Application version values. host -> hash -> version.</param>
-        public static void WriteApplicationVersions(Dictionary<string, Dictionary<string, (int Version, bool ContainsTaskScript, string ServerAppName)>> versions)
+        public static void WriteApplicationVersions(IDictionary<string, (IDictionary<string, (int Version, bool ContainsTaskScript)> Packages, string ServerAppName)> versions)
         {
             using var writer = new JsonTextWriter(File.CreateText(Path.Combine(HostConfigsDirectory, @"Versions.json")));
             JsonSerializer.CreateDefault().Serialize(writer, versions);
+        }
+
+        private class ApplicationVersionsDictionaryConverter : JsonConverter
+        {
+            public override bool CanWrite => false;
+
+            public override bool CanConvert(Type objectType)
+                => objectType switch
+                {
+                    var x when x == typeof(IDictionary<string, (IDictionary<string, (int, bool)>, string)>) => true,
+                    var x when x == typeof(IDictionary<string, (int, bool)>) => true,
+                    _ => false,
+                };
+
+            public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+                => objectType switch
+                {
+                    var x when x == typeof(IDictionary<string, (IDictionary<string, (int, bool)>, string)>) => serializer.Deserialize<Dictionary<string, (IDictionary<string, (int, bool)>, string)>>(reader),
+                    var x when x == typeof(IDictionary<string, (int, bool)>) => serializer.Deserialize<Dictionary<string, (int, bool)>>(reader),
+                    _ => throw new ArgumentException(default, nameof(objectType)),
+                };
+
+            public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+                => throw new NotImplementedException();
         }
     }
 }

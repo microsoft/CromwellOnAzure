@@ -922,13 +922,15 @@ namespace TesApi.Web
             var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
 
             var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
-            _ = await batchManagementClient.Application.CreateAsync(batchResourceGroupName, batchAccountName, name, new BatchModels.Application(allowUpdates: false));
+            _ = await batchManagementClient.Application.CreateAsync(batchResourceGroupName, batchAccountName, name);
             var applicationPackage = await batchManagementClient.ApplicationPackage.CreateAsync(batchResourceGroupName, batchAccountName, name, version);
             var blob = new CloudBlockBlob(new Uri(applicationPackage.StorageUrl, UriKind.Absolute));
             blob.Metadata["OriginHash"] = hash;
-            await blob.SetMetadataAsync();
             await blob.UploadFromStreamAsync(package);
-            return await batchManagementClient.ApplicationPackage.ActivateAsync(batchResourceGroupName, batchAccountName, name, version, "zip");
+            await blob.SetMetadataAsync();
+            applicationPackage = await batchManagementClient.ApplicationPackage.ActivateAsync(batchResourceGroupName, batchAccountName, name, version, "zip");
+            _ = batchManagementClient.Application.UpdateAsync(batchResourceGroupName, batchAccountName, name, new BatchModels.Application(allowUpdates: false));
+            return applicationPackage;
         }
 
         /// <summary>

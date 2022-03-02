@@ -202,19 +202,19 @@ namespace TesApi.Web
                     {
                         if (storedVersions.TryGetValue(hash.Name, out var keyMetadata))
                         {
-                            if (keyMetadata.TryGetValue(hash.Hash, out var hashMetadata))
+                            if (keyMetadata.Packages.TryGetValue(hash.Hash, out var hashMetadata))
                             {
                                 knownExtant = knownExtant.Append((hash.Name, hash.Hash));
                             }
                             else
                             {
-                                keyMetadata.Add(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name), BatchUtils.BatchAppFromHostConfigName(hash.Name)));
+                                keyMetadata.Packages.Add(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name)));
                                 writeStoredVersions = true;
                             }
                         }
                         else
                         {
-                            storedVersions.Add(hash.Name, new(Enumerable.Empty<KeyValuePair<string, (int, bool, string)>>().Append(new(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name), BatchUtils.BatchAppFromHostConfigName(hash.Name))))));
+                            storedVersions.Add(hash.Name, (new Dictionary<string, (int, bool)>(Enumerable.Empty<KeyValuePair<string, (int, bool)>>().Append(new(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name))))), BatchUtils.BatchAppFromHostConfigName(hash.Name)));
                             writeStoredVersions = true;
                         }
                     }
@@ -225,16 +225,17 @@ namespace TesApi.Web
                         serverAppList = serverAppList.Append(await appVersion);
                     }
 
+                    var storedVersionsByServerName = new Dictionary<string, (IDictionary<string, (int, bool)> Packages, string)>(storedVersions.Select(p => new KeyValuePair<string, (IDictionary<string, (int, bool)>, string)>(p.Value.ServerAppName, (p.Value.Packages, p.Key))));
                     var appsToRemove = Enumerable.Empty<(BatchModels.ApplicationPackage Package, string Hash)>();
                     var storedVersionsFoundBuilder = Enumerable.Empty<(string Name, string Hash)>();
                     foreach (var app in serverAppList)
                     {
-                        if (storedVersions.TryGetValue(app.Package.Name, out var keyMetadata))
+                        if (storedVersionsByServerName.TryGetValue(app.Package.Name, out var keyMetadata))
                         {
-                            var storedHashes = new List<string>(keyMetadata.Keys);
+                            var storedHashes = new List<string>(keyMetadata.Packages.Keys);
 
                             var serverHash = app.Hash;
-                            foreach (var hash in keyMetadata)
+                            foreach (var hash in keyMetadata.Packages)
                             {
                                 if (hash.Key.Equals(serverHash, StringComparison.InvariantCulture))
                                 {
@@ -260,15 +261,15 @@ namespace TesApi.Web
                     var storedVersionsFound = storedVersionsFoundBuilder.ToList();
                     foreach (var app in storedVersions)
                     {
-                        foreach (var version in app.Value)
+                        foreach (var version in app.Value.Packages)
                         {
                             if (!storedVersionsFound.Contains((app.Key, version.Key)))
                             {
                                 var newVersion = version.Value.Version + 1;
-                                storedVersions[app.Key][version.Key] = new(newVersion, version.Value.ContainsTaskScript, version.Value.ServerAppName);
+                                storedVersions[app.Key].Packages[version.Key] = new(newVersion, version.Value.ContainsTaskScript);
                                 writeStoredVersions = true;
                                 using var payload = BatchUtils.GetApplicationPayload(app.Key);
-                                await azureProxy.CreateAndActivateBatchApplication(version.Value.ServerAppName, version.Key, newVersion.ToString("G"), payload);
+                                await azureProxy.CreateAndActivateBatchApplication(app.Value.ServerAppName, version.Key, newVersion.ToString("G"), payload);
                             }
                         }
                     }
