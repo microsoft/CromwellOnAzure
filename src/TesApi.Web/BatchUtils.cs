@@ -148,8 +148,8 @@ namespace TesApi.Web
                            .TryGetValue(name, out var hashes)
                                ? hashes.Packages.TryGetValue(version, out var value)
                                    ? (hashes.Id, version, value.ContainsTaskScript, hashes.ServerAppName)
-                                   : (null, null, false, hashes.ServerAppName)
-                               : (null, null, false, hashes.ServerAppName);
+                                   : default
+                               : default;
         }
 
         /// <summary>

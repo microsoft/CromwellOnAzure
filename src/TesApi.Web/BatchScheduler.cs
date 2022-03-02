@@ -1334,9 +1334,14 @@ namespace TesApi.Web
                 ResizeTimeout = TimeSpan.FromMinutes(30),
                 TargetLowPriorityComputeNodes = preemptible == true ? 1 : 0,
                 TargetDedicatedComputeNodes = preemptible == false ? 1 : 0,
-                ApplicationPackageReferences = applicationPackages is null ? default : applicationPackages.ToList(),
                 StartTask = startTask
             };
+
+            var appPkgs = applicationPackages?.ToList();
+            if (appPkgs is not null && appPkgs.Count != 0)
+            {
+                poolSpecification.ApplicationPackageReferences = appPkgs;
+            }
 
             if (!string.IsNullOrEmpty(this.batchNodesSubnetId))
             {
