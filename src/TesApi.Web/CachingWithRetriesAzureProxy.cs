@@ -169,11 +169,7 @@ namespace TesApi.Web
             => azureProxy.ListApplications();
 
         /// <inheritdoc/>
-        public Task<BatchModels.ApplicationPackage> CreateAndActivateBatchApplication(string name, string hash, string version, System.IO.Stream package)
-            => azureProxy.CreateAndActivateBatchApplication(name, hash, version, package);
-
-        /// <inheritdoc/>
-        public Task<string> GetStorageBlobMetadataHash(string uri)
-            => azureProxy.GetStorageBlobMetadataHash(uri);
+        public Task<string> CreateAndActivateBatchApplication(string name, string version, System.IO.Stream package)
+            => azureProxy.CreateAndActivateBatchApplication(name, version, package);
     }
 }

@@ -35,8 +35,11 @@ namespace TesApi.Tests
         {
             try
             {
-                var appVersions = new Dictionary<string, (IDictionary<string, (int, bool)>, string)>();
-                appVersions.Add("test1", (new Dictionary<string, (int, bool)>(new[] { new KeyValuePair<string, (int, bool)>("ver1", (1, false)) }), "test1"));
+                var appVersions = new Dictionary<string, (string, string, IDictionary<string, (int, bool)>)>
+                {
+                    { "test1", ("test1Id", "test1", new Dictionary<string, (int, bool)>(new[] { new KeyValuePair<string, (int, bool)>("ver1", (1, false)) })) }
+                };
+
                 BatchUtils.WriteApplicationVersions(appVersions);
                 var result = BatchUtils.ReadApplicationVersions();
                 Assert.IsNotNull(result);

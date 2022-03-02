@@ -195,18 +195,10 @@ namespace TesApi.Web
         /// Creates, activates, and loads a versioned package into a new Batch Application
         /// </summary>
         /// <param name="name"></param>
-        /// <param name="hash"></param>
         /// <param name="version"></param>
         /// <param name="package"></param>
         /// <returns></returns>
-        Task<BatchModels.ApplicationPackage> CreateAndActivateBatchApplication(string name, string hash, string version, System.IO.Stream package);
-
-        /// <summary>
-        /// Gets the metadata associated with the origninal hash of the blob.
-        /// </summary>
-        /// <param name="uri">Url to access the blob.</param>
-        /// <returns></returns>
-        Task<string> GetStorageBlobMetadataHash(string uri);
+        Task<string> CreateAndActivateBatchApplication(string name, string version, System.IO.Stream package);
 
         /// <summary>
         /// Checks if a local file exists

@@ -913,36 +913,19 @@ namespace TesApi.Web
         /// Creates, activates, and loads a versioned package into a new Batch Application
         /// </summary>
         /// <param name="name"></param>
-        /// <param name="hash"></param>
         /// <param name="version"></param>
         /// <param name="package"></param>
         /// <returns></returns>
-        public async Task<BatchModels.ApplicationPackage> CreateAndActivateBatchApplication(string name, string hash, string version, Stream package)
+        public async Task<string> CreateAndActivateBatchApplication(string name, string version, Stream package)
         {
             var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
 
             var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
             _ = await batchManagementClient.Application.CreateAsync(batchResourceGroupName, batchAccountName, name);
             var applicationPackage = await batchManagementClient.ApplicationPackage.CreateAsync(batchResourceGroupName, batchAccountName, name, version);
-            var blob = new CloudBlockBlob(new Uri(applicationPackage.StorageUrl, UriKind.Absolute));
-            blob.Metadata["OriginHash"] = hash;
-            await blob.UploadFromStreamAsync(package);
-            await blob.SetMetadataAsync();
-            applicationPackage = await batchManagementClient.ApplicationPackage.ActivateAsync(batchResourceGroupName, batchAccountName, name, version, "zip");
-            _ = batchManagementClient.Application.UpdateAsync(batchResourceGroupName, batchAccountName, name, new BatchModels.Application(allowUpdates: false));
-            return applicationPackage;
-        }
-
-        /// <summary>
-        /// Gets the metadata associated with the origninal hash of the blob.
-        /// </summary>
-        /// <param name="uri">Url to access the blob.</param>
-        /// <returns></returns>
-        public async Task<string> GetStorageBlobMetadataHash(string uri)
-        {
-            var blob = new CloudBlob(new Uri(uri, UriKind.Absolute));
-            await blob.FetchAttributesAsync();
-            return blob.Metadata["OriginHash"];
+            await new CloudBlockBlob(new Uri(applicationPackage.StorageUrl, UriKind.Absolute)).UploadFromStreamAsync(package);
+            _ = await batchManagementClient.ApplicationPackage.ActivateAsync(batchResourceGroupName, batchAccountName, name, version, "zip");
+            return (await batchManagementClient.Application.UpdateAsync(batchResourceGroupName, batchAccountName, name, new BatchModels.Application(allowUpdates: false))).Id;
         }
 
         private class VmPrice

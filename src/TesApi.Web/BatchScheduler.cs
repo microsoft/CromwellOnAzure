@@ -214,36 +214,35 @@ namespace TesApi.Web
                         }
                         else
                         {
-                            storedVersions.Add(hash.Name, (new Dictionary<string, (int, bool)>(Enumerable.Empty<KeyValuePair<string, (int, bool)>>().Append(new(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name))))), BatchUtils.BatchAppFromHostConfigName(hash.Name)));
+                            storedVersions.Add(hash.Name, (default, BatchUtils.BatchAppFromHostConfigName(hash.Name), new Dictionary<string, (int, bool)>(Enumerable.Empty<KeyValuePair<string, (int, bool)>>().Append(new(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name)))))));
                             writeStoredVersions = true;
                         }
                     }
 
-                    var serverAppList = Enumerable.Empty<(BatchModels.ApplicationPackage Package, string Hash)>();
-                    foreach (var appVersion in (await azureProxy.ListApplications()).SelectMany(a => azureProxy.ListApplicationPackages(a).Result).Select(async p => (p, Hash: await azureProxy.GetStorageBlobMetadataHash(p.StorageUrl))))
+                    var serverAppList = Enumerable.Empty<(string Name, string Version)>();
+                    foreach (var appVersion in (await azureProxy.ListApplications()).Select(a => (a.Name, azureProxy.ListApplicationPackages(a).Result)).SelectMany(t => t.Result.Select(p => (t.Name, p.Name))))
                     {
-                        serverAppList = serverAppList.Append(await appVersion);
+                        serverAppList = serverAppList.Append(appVersion);
                     }
 
                     var storedVersionsByServerName = new Dictionary<string, (IDictionary<string, (int, bool)> Packages, string)>(storedVersions.Select(p => new KeyValuePair<string, (IDictionary<string, (int, bool)>, string)>(p.Value.ServerAppName, (p.Value.Packages, p.Key))));
-                    var appsToRemove = Enumerable.Empty<(BatchModels.ApplicationPackage Package, string Hash)>();
-                    var storedVersionsFoundBuilder = Enumerable.Empty<(string Name, string Hash)>();
+                    var appsToRemove = Enumerable.Empty<(string Name, string Version)>();
+                    var storedVersionsFoundBuilder = Enumerable.Empty<(string Name, string Version)>();
                     foreach (var app in serverAppList)
                     {
-                        if (storedVersionsByServerName.TryGetValue(app.Package.Name, out var keyMetadata))
+                        if (storedVersionsByServerName.TryGetValue(app.Name, out var keyMetadata))
                         {
                             var storedHashes = new List<string>(keyMetadata.Packages.Keys);
 
-                            var serverHash = app.Hash;
                             foreach (var hash in keyMetadata.Packages)
                             {
-                                if (hash.Key.Equals(serverHash, StringComparison.InvariantCulture))
+                                if (hash.Key.Equals(app.Version, StringComparison.InvariantCulture))
                                 {
-                                    storedVersionsFoundBuilder = storedVersionsFoundBuilder.Append(new(app.Package.Name, serverHash));
+                                    storedVersionsFoundBuilder = storedVersionsFoundBuilder.Append(new(app.Name, app.Version));
                                 }
                                 else
                                 {
-                                    appsToRemove = appsToRemove.Append(new(app.Package, serverHash));
+                                    appsToRemove = appsToRemove.Append(new(app.Name, app.Version));
                                 }
                             }
                         }
@@ -259,19 +258,23 @@ namespace TesApi.Web
                     }
 
                     var storedVersionsFound = storedVersionsFoundBuilder.ToList();
+                    var updates = Enumerable.Empty<KeyValuePair<string, (string, string, IDictionary<string, (int, bool)>)>>();
                     foreach (var app in storedVersions)
                     {
                         foreach (var version in app.Value.Packages)
                         {
                             if (!storedVersionsFound.Contains((app.Key, version.Key)))
                             {
-                                var newVersion = version.Value.Version + 1;
-                                storedVersions[app.Key].Packages[version.Key] = new(newVersion, version.Value.ContainsTaskScript);
-                                writeStoredVersions = true;
                                 using var payload = BatchUtils.GetApplicationPayload(app.Key);
-                                await azureProxy.CreateAndActivateBatchApplication(app.Value.ServerAppName, version.Key, newVersion.ToString("G"), payload);
+                                updates = updates.Append(new KeyValuePair<string, (string, string, IDictionary<string, (int, bool)>)>(app.Key,
+                                    (await azureProxy.CreateAndActivateBatchApplication(app.Value.ServerAppName, version.Key, payload), app.Value.ServerAppName, app.Value.Packages)));
                             }
                         }
+                    }
+
+                    foreach (var app in updates)
+                    {
+                        storedVersions[app.Key] = app.Value;
                     }
                 }
                 finally
@@ -416,13 +419,14 @@ namespace TesApi.Web
                 var identityResourceId = IsIdentityProvided ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
 
                 var containerConfiguration = await GetContainerConfigurationIfNeeded(dockerImage);
-                var (startTask, nodeInfo, dockerParams, preCommand) = await GetDockerHostConfiguration(tesTask);
+                var (startTask, nodeInfo, dockerParams, applicationPackages, preCommand) = await GetDockerHostConfiguration(tesTask);
 
                 var poolInformation = await CreateAutoPoolModePoolInformation(
                     virtualMachineInfo.VmSize,
                     virtualMachineInfo.LowPriority,
                     nodeInfo ?? batchNodeInfo,
                     containerConfiguration,
+                    applicationPackages,
                     startTask,
                     jobId,
                     identityResourceId);
@@ -956,12 +960,13 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="tesTask">The <see cref="TesTask"/> to schedule on Azure Batch</param>
         /// <returns></returns>
-        private async Task<(StartTask startTask, BatchNodeInfo nodeInfo, string dockerParams, string[] preCommand)> GetDockerHostConfiguration(TesTask tesTask)
+        private async Task<(StartTask startTask, BatchNodeInfo nodeInfo, string dockerParams, IEnumerable<ApplicationPackageReference> applicationPackages, string[] preCommand)> GetDockerHostConfiguration(TesTask tesTask)
         {
             StartTask taskResult = default;
             BatchNodeInfo batchResult = default;
             string dockerParams = null;
             string[] preCommand = null;
+            var appPkgs = Enumerable.Empty<ApplicationPackageReference>();
 
             if (tesTask.Executors.First().Image.StartsWith("coa:65536/"))
             {
@@ -974,6 +979,8 @@ namespace TesApi.Web
                 {
                     throw new Exception();
                 }
+                var (Id, Version, _) = BatchUtils.GetApplicationDirectoryForHostConfigTask(parts[0], "task");
+                appPkgs = appPkgs.Append(new() { ApplicationId = Id, Version = Version });
             }
 
             if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) == true)
@@ -1009,7 +1016,9 @@ namespace TesApi.Web
                     var isScriptInApp = false;
                     try
                     {
-                        appDir = BatchUtils.GetApplicationDirectoryForHostConfigTask(hostConfigName, "start");
+                        var (Id, Version, Variable) = BatchUtils.GetApplicationDirectoryForHostConfigTask(hostConfigName, "start");
+                        appPkgs = appPkgs.Append(new() { ApplicationId = Id, Version = Version });
+                        appDir = Variable;
                         isScriptInApp = BatchUtils.DoesHostConfigTaskIncludeTaskScript(hostConfigName, "start");
                     }
                     catch (KeyNotFoundException) { }
@@ -1029,7 +1038,7 @@ namespace TesApi.Web
                 }
             }
 
-            return (taskResult, batchResult, dockerParams, preCommand);
+            return (taskResult, batchResult, dockerParams, appPkgs, preCommand);
 
             void ThrowHostConfigNotFound(string name, Exception e)
                 => throw new TesException("NoHostConfig", $"Could not identify the configuration for the host config {name} for task {tesTask.Id}", e);
@@ -1253,18 +1262,19 @@ namespace TesApi.Web
         /// <param name="preemptible">True if preemptible machine should be used</param>
         /// <param name="nodeInfo"></param>
         /// <param name="containerConfiguration">The configuration to download private images</param>
+        /// <param name="applicationPackages"></param>
         /// <param name="startTask">The start task for all jobs/tasks in the pool</param>
         /// <param name="jobId"></param>
         /// <param name="identityResourceId"></param>
         /// <returns>An Azure Batch Pool specifier</returns>
-        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(string vmSize, bool preemptible, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration, StartTask startTask, string jobId = null, string identityResourceId = null)
+        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(string vmSize, bool preemptible, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration, IEnumerable<ApplicationPackageReference> applicationPackages, StartTask startTask, string jobId = null, string identityResourceId = null)
         {
             if (!string.IsNullOrWhiteSpace(identityResourceId))
             {
                 _ = jobId ?? throw new ArgumentNullException(nameof(jobId));
             }
 
-            var poolSpecification = GetPoolSpecification(vmSize, preemptible, nodeInfo, containerConfiguration, startTask);
+            var poolSpecification = GetPoolSpecification(vmSize, preemptible, nodeInfo, containerConfiguration, applicationPackages, startTask);
 
             // By default, the pool will have the same name/ID as the job if the identity is provided, otherwise we return an actual autopool.
             return string.IsNullOrWhiteSpace(identityResourceId)
@@ -1301,9 +1311,10 @@ namespace TesApi.Web
         /// <param name="preemptible"></param>
         /// <param name="nodeInfo"></param>
         /// <param name="containerConfiguration"></param>
+        /// <param name="applicationPackages"></param>
         /// <param name="startTask"></param>
         /// <returns></returns>
-        private PoolSpecification GetPoolSpecification(string vmSize, bool? preemptible, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration, StartTask startTask)
+        private PoolSpecification GetPoolSpecification(string vmSize, bool? preemptible, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration, IEnumerable<ApplicationPackageReference> applicationPackages, StartTask startTask)
         {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
@@ -1323,6 +1334,7 @@ namespace TesApi.Web
                 ResizeTimeout = TimeSpan.FromMinutes(30),
                 TargetLowPriorityComputeNodes = preemptible == true ? 1 : 0,
                 TargetDedicatedComputeNodes = preemptible == false ? 1 : 0,
+                ApplicationPackageReferences = applicationPackages is null ? default : applicationPackages.ToList(),
                 StartTask = startTask
             };
 

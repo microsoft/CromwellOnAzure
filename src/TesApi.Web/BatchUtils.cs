@@ -130,43 +130,45 @@ namespace TesApi.Web
         /// <param name="host">The <seealso cref="Tes.Models.TesResources.BackendParameters"/> <see cref="Tes.Models.TesResources.SupportedBackendParameters.docker_host_configuration"/> value</param>
         /// <param name="task">The task type where the application is first consumed.</param>
         /// <returns></returns>
-        public static string GetApplicationDirectoryForHostConfigTask(string host, string task)
+        public static (string Id, string Version, string Variable) GetApplicationDirectoryForHostConfigTask(string host, string task)
         {
             var metadata = FindMetadata($"{host}_{task}");
-            var version = metadata.Version;
-            if (version == -1) { throw new KeyNotFoundException(); }
-            var variable = $"AZ_BATCH_APP_PACKAGE_{metadata.ServerAppName}#{version:G}";
-            return OperatingSystem.IsWindows() ? variable.ToUpperInvariant() : variable.Replace('.', '_').Replace('-', '_').Replace('#', '_');
+            var version = metadata.Version ?? throw new KeyNotFoundException();
+            var variable = $"AZ_BATCH_APP_PACKAGE_{metadata.ServerAppName}#{version}";
+            return (metadata.Id, version, OperatingSystem.IsWindows() ? variable.ToUpperInvariant() : variable.Replace('.', '_').Replace('-', '_').Replace('#', '_'));
         }
 
-        private static (int Version, bool ContainsTaskScript, string ServerAppName) FindMetadata(string name)
-            => ReadApplicationVersions()
-                .TryGetValue(name, out var hashes)
-                    ? hashes.Packages.TryGetValue(GetApplicationPayloadHashes()
-                        .TryGetValue(name, out var hashVal)
-                            ? Convert.ToHexString(hashVal)
-                            : string.Empty, out var value)
-                        ? (value.Version, value.ContainsTaskScript, hashes.ServerAppName)
-                        : (-1, false, hashes.ServerAppName)
-                    : (-1, false, hashes.ServerAppName);
+        private static (string Id, string Version, bool ContainsTaskScript, string ServerAppName) FindMetadata(string name)
+        {
+            var version = GetApplicationPayloadHashes()
+                                   .TryGetValue(name, out var hashVal)
+                                       ? Convert.ToHexString(hashVal)
+                                       : null;
+            return version is null ? default : ReadApplicationVersions()
+                           .TryGetValue(name, out var hashes)
+                               ? hashes.Packages.TryGetValue(version, out var value)
+                                   ? (hashes.Id, version, value.ContainsTaskScript, hashes.ServerAppName)
+                                   : (null, null, false, hashes.ServerAppName)
+                               : (null, null, false, hashes.ServerAppName);
+        }
 
         /// <summary>
         /// Retrieves the current registered batch application versions
         /// </summary>
         /// <returns>Application version values. host -> hash -> metadata.</returns>
-        public static IDictionary<string, (IDictionary<string, (int Version, bool ContainsTaskScript)> Packages, string ServerAppName)> ReadApplicationVersions()
+        public static IDictionary<string, (string Id, string ServerAppName, IDictionary<string, (int Reserved, bool ContainsTaskScript)> Packages)> ReadApplicationVersions()
         {
             var versionsFile = new FileInfo(Path.Combine(HostConfigsDirectory, @"Versions.json"));
             return versionsFile.Exists
                 ? ReadFile()
-                : new Dictionary<string, (IDictionary<string, (int, bool)>, string)>();
+                : new Dictionary<string, (string, string, IDictionary<string, (int, bool)>)>();
 
-            IDictionary<string, (IDictionary<string, (int, bool)>, string)> ReadFile()
+            IDictionary<string, (string, string, IDictionary<string, (int, bool)>)> ReadFile()
             {
                 using var reader = new JsonTextReader(versionsFile.OpenText());
                 var serializer = JsonSerializer.CreateDefault();
                 serializer.Converters.Add(new ApplicationVersionsDictionaryConverter());
-                return serializer.Deserialize<IDictionary<string, (IDictionary<string, (int, bool)>, string)>>(reader);
+                return serializer.Deserialize<IDictionary<string, (string, string, IDictionary<string, (int, bool)>)>>(reader);
             }
         }
 
@@ -174,7 +176,7 @@ namespace TesApi.Web
         /// Stores the current registered batch application versions
         /// </summary>
         /// <param name="versions">Application version values. host -> hash -> version.</param>
-        public static void WriteApplicationVersions(IDictionary<string, (IDictionary<string, (int Version, bool ContainsTaskScript)> Packages, string ServerAppName)> versions)
+        public static void WriteApplicationVersions(IDictionary<string, (string Id, string ServerAppName, IDictionary<string, (int Reserved, bool ContainsTaskScript)> Packages)> versions)
         {
             using var writer = new JsonTextWriter(File.CreateText(Path.Combine(HostConfigsDirectory, @"Versions.json")));
             JsonSerializer.CreateDefault().Serialize(writer, versions);
@@ -187,7 +189,7 @@ namespace TesApi.Web
             public override bool CanConvert(Type objectType)
                 => objectType switch
                 {
-                    var x when x == typeof(IDictionary<string, (IDictionary<string, (int, bool)>, string)>) => true,
+                    var x when x == typeof(IDictionary<string, (string, string, IDictionary<string, (int, bool)>)>) => true,
                     var x when x == typeof(IDictionary<string, (int, bool)>) => true,
                     _ => false,
                 };
@@ -195,7 +197,7 @@ namespace TesApi.Web
             public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
                 => objectType switch
                 {
-                    var x when x == typeof(IDictionary<string, (IDictionary<string, (int, bool)>, string)>) => serializer.Deserialize<Dictionary<string, (IDictionary<string, (int, bool)>, string)>>(reader),
+                    var x when x == typeof(IDictionary<string, (string, string, IDictionary<string, (int, bool)>)>) => serializer.Deserialize<Dictionary<string, (string, string, IDictionary<string, (int, bool)>)>>(reader),
                     var x when x == typeof(IDictionary<string, (int, bool)>) => serializer.Deserialize<Dictionary<string, (int, bool)>>(reader),
                     _ => throw new ArgumentException(default, nameof(objectType)),
                 };
