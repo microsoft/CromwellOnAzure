@@ -135,7 +135,7 @@ namespace TesApi.Web
             var metadata = FindMetadata($"{host}_{task}");
             var version = metadata.Version ?? throw new KeyNotFoundException();
             var variable = $"AZ_BATCH_APP_PACKAGE_{metadata.ServerAppName}#{version}";
-            return (metadata.Id, version, OperatingSystem.IsWindows() ? variable.ToUpperInvariant() : variable.Replace('.', '_').Replace('-', '_').Replace('#', '_'));
+            return (metadata.ServerAppName, version, OperatingSystem.IsWindows() ? variable.ToUpperInvariant() : variable.Replace('.', '_').Replace('-', '_').Replace('#', '_'));
         }
 
         private static (string Id, string Version, bool ContainsTaskScript, string ServerAppName) FindMetadata(string name)
