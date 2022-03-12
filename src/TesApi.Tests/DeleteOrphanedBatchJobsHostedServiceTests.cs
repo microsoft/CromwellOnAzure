@@ -4,6 +4,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -81,6 +82,8 @@ namespace TesApi.Tests
 
         private static async Task<Mock<IAzureProxy>> ArrangeTest(TesTask[] tasks)
         {
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+            configuration["BatchAutopool"] = true.ToString();
             var azureProxy = new Mock<IAzureProxy>();
             var mockRepo = new Mock<IRepository<TesTask>>();
 
@@ -97,6 +100,7 @@ namespace TesApi.Tests
             }
 
             var deleteOrphanedBatchJobsHostedService = new DeleteOrphanedBatchJobsHostedService(
+                configuration,
                 azureProxy.Object,
                 mockRepo.Object,
                 new NullLogger<DeleteOrphanedBatchJobsHostedService>());

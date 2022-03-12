@@ -168,12 +168,28 @@ namespace TesApi.Web
         Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Deletes the specified computeNodes
+        /// </summary>
+        /// <param name="poolId"></param>
+        /// <param name="computeNodes"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        Task DeleteBatchComputeNodesAsync(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// TODO
         /// </summary>
         /// <param name="poolId"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         Task<Microsoft.Azure.Batch.Common.AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="poolId"></param>
+        /// <returns></returns>
+        (int TargetLowPriority, int TargetDedicated) GetComputeNodeTargets(string poolId);
 
         /// <summary>
         /// TODO

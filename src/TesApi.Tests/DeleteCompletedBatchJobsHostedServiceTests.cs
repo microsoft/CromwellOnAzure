@@ -25,8 +25,10 @@ namespace TesApi.Tests
         {
             azureProxy = new Mock<IAzureProxy>();
             mockRepo = new Mock<IRepository<TesTask>>();
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+            configuration["BatchAutopool"] = true.ToString();
             deleteCompletedBatchJobsHostedService = new DeleteCompletedBatchJobsHostedService(
-                new ConfigurationBuilder().Build(),
+                configuration,
                 azureProxy.Object,
                 mockRepo.Object,
                 new NullLogger<DeleteCompletedBatchJobsHostedService>());

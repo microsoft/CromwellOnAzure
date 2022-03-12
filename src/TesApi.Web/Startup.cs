@@ -76,7 +76,7 @@ namespace TesApi.Web
 
             (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
 
-            BatchPools = new BatchPools(cachingAzureProxy, loggerFactory.CreateLogger<BatchPools>());
+            BatchPools = new BatchPools(cachingAzureProxy, loggerFactory.CreateLogger<BatchPools>(), Configuration);
 
             return (cache, azureProxy, cachingAzureProxy, storageAccessProvider,
                 new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId));

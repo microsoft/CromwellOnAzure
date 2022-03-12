@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Microsoft.ApplicationInsights.WindowsServer;
+//using Microsoft.ApplicationInsights.WindowsServer;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 //using Microsoft.Azure.Management.ResourceManager.Fluent;
@@ -196,11 +196,7 @@ namespace TesApi.Web
         /// <param name="tesTask">The <see cref="TesTask"/></param>
         /// <returns>True if the TES task needs to be persisted.</returns>
         public async Task<bool> ProcessTesTaskAsync(TesTask tesTask)
-        {
-            var combinedBatchTaskInfo = await GetBatchTaskStateAsync(tesTask);
-            var tesTaskChanged = await HandleTesTaskTransitionAsync(tesTask, combinedBatchTaskInfo);
-            return tesTaskChanged;
-        }
+            => await HandleTesTaskTransitionAsync(tesTask, await GetBatchTaskStateAsync(tesTask));
 
         private static string GetCromwellExecutionDirectoryPath(TesTask task)
             => GetParentPath(task.Inputs?.FirstOrDefault(IsCromwellCommandScript)?.Path);
@@ -256,12 +252,16 @@ namespace TesApi.Web
         {
             try
             {
-                var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id); // <-- TODO: should this be moved...
+                var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
-                await CheckBatchAccountQuotas(virtualMachineInfo);
-
-                // <-- ... to here?
+                var IsIdentityProvided = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true;
+                var identityResourceId = IsIdentityProvided ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
+                // TODO: -_0-9A-Za-z <-- it would appear that both inputs are already constrained to this requirment, but it would be best to fully confirm or even better assume that one of the inputs may broaden in the future.
+                var poolName = IsIdentityProvided
+                    ? $"{virtualMachineInfo.VmSize}-{Path.GetFileName(identityResourceId)}"
+                    : virtualMachineInfo.VmSize;
+                await CheckBatchAccountQuotas(virtualMachineInfo, poolName);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
@@ -269,8 +269,6 @@ namespace TesApi.Web
                 var dockerImage = tesTask.Executors.First().Image;
 
                 PoolInformation poolInformation = null;
-                var IsIdentityProvided = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true;
-                var identityResourceId = IsIdentityProvided ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
 
                 var containerConfiguration = await ContainerConfigurationIfNeeded(dockerImage);
                 var startTask = await StartTaskIfNeeded(tesTask);
@@ -288,16 +286,11 @@ namespace TesApi.Web
                 }
                 else
                 {
-                    // TODO: -_0-9A-Za-z <-- it would appear that both inputs are already constrained to this requirment, but it would be best to fully confirm or even better assume that one of the inputs may broaden in the future.
-                    var poolName = IsIdentityProvided
-                        ? $"{virtualMachineInfo.VmSize}-{Path.GetFileName(identityResourceId)}"
-                        : virtualMachineInfo.VmSize;
-
-                    poolInformation = (await batchPools.GetOrAdd(poolName, id => azureProxy.CreateBatchPoolAsync(ConvertPoolSpecificationToModelsPool(
+                    poolInformation = (await batchPools.GetOrAddAsync(poolName, id => ConvertPoolSpecificationToModelsPool(
                             name: id,
                             displayName: poolName,
                             GetBatchPoolIdentity(identityResourceId),
-                            GetPoolSpecification(virtualMachineInfo.VmSize, null, containerConfiguration, startTask)))))
+                            GetPoolSpecification(virtualMachineInfo.VmSize, null, containerConfiguration, startTask))))
                         .Pool;
 
                     getAffinity = () => batchPools.TryGet(poolInformation.PoolId, out var pool) ? pool.PrepareNodeAsync(virtualMachineInfo.LowPriority).Result : default;
@@ -696,7 +689,6 @@ namespace TesApi.Web
 
             var cloudTask = new CloudTask(taskId, $"/bin/sh /mnt{batchScriptPath}")
             {
-                AffinityInformation = GetAffinityInfo(),
                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                 ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(batchScriptSasUrl, $"/mnt{batchScriptPath}"), ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptSasUrl, $"/mnt{uploadFilesScriptPath}") },
                 OutputFiles = new List<OutputFile> {
@@ -717,6 +709,7 @@ namespace TesApi.Web
                 cloudTask.ContainerSettings = new TaskContainerSettings(dockerInDockerImageName, containerRunOptions);
             }
 
+            cloudTask.AffinityInformation = GetAffinityInfo();
             return cloudTask;
         }
 
@@ -1083,7 +1076,8 @@ namespace TesApi.Web
         /// Check quotas for available active jobs, pool and CPU cores.
         /// </summary>
         /// <param name="vmInfo">Dedicated virtual machine information.</param>
-        private async Task CheckBatchAccountQuotas(VirtualMachineInformation vmInfo)
+        /// <param name="poolName">Name of pool</param>
+        private async Task CheckBatchAccountQuotas(VirtualMachineInformation vmInfo, string poolName)
         {
             var workflowCoresRequirement = vmInfo.NumberOfCores.Value;
             var preemptible = vmInfo.LowPriority;
@@ -1124,7 +1118,7 @@ namespace TesApi.Web
                 throw new AzureBatchQuotaMaxedOutException($"No remaining active jobs quota available. There are {activeJobsCount} active jobs out of {activeJobAndJobScheduleQuota}.");
             }
 
-            if (activePoolsCount + 1 > poolQuota)
+            if ((this.enableBatchAutopool || !batchPools.IsPoolAvailable(poolName)) && activePoolsCount + 1 > poolQuota)
             {
                 throw new AzureBatchQuotaMaxedOutException($"No remaining pool quota available. There are {activePoolsCount} pools in use out of {poolQuota}.");
             }

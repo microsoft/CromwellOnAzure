@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -15,6 +16,8 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task DeleteOrphanedAutoPoolsServiceOnlyDeletesPoolsNotReferencedByJobs()
         {
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+            configuration["BatchAutopool"] = true.ToString();
             var activePoolIds = new List<string> { "1", "2", "3" };
             var poolIdsReferencedByJobs = new List<string> { "3", "4" };
 
@@ -22,7 +25,7 @@ namespace TesApi.Tests
             azureProxy.Setup(p => p.GetActivePoolIdsAsync(It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>())).ReturnsAsync(activePoolIds);
             azureProxy.Setup(p => p.GetPoolIdsReferencedByJobsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(poolIdsReferencedByJobs);
 
-            var deleteCompletedBatchJobsHostedService = new DeleteOrphanedAutoPoolsHostedService(azureProxy.Object, new NullLogger<DeleteOrphanedAutoPoolsHostedService>());
+            var deleteCompletedBatchJobsHostedService = new DeleteOrphanedAutoPoolsHostedService(configuration, azureProxy.Object, new NullLogger<DeleteOrphanedAutoPoolsHostedService>());
 
             await deleteCompletedBatchJobsHostedService.StartAsync(default);
 

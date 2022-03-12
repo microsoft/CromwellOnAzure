@@ -4,6 +4,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Tes.Extensions;
@@ -23,18 +24,32 @@ namespace TesApi.Web
         private readonly IRepository<TesTask> repository;
         private readonly IAzureProxy azureProxy;
         private readonly ILogger<DeleteOrphanedBatchJobsHostedService> logger;
+        private readonly bool isDisabled;
 
         /// <summary>
         /// Default constructor
         /// </summary>
+        /// <param name="configuration">The configuration instance settings</param>
         /// <param name="azureProxy">Azure Proxy</param>
         /// <param name="repository">The main TES task database repository</param>
         /// <param name="logger">The logger instance</param>
-        public DeleteOrphanedBatchJobsHostedService(IAzureProxy azureProxy, IRepository<TesTask> repository, ILogger<DeleteOrphanedBatchJobsHostedService> logger)
+        public DeleteOrphanedBatchJobsHostedService(IConfiguration configuration, IAzureProxy azureProxy, IRepository<TesTask> repository, ILogger<DeleteOrphanedBatchJobsHostedService> logger)
         {
             this.repository = repository;
             this.azureProxy = azureProxy;
             this.logger = logger;
+            this.isDisabled = !configuration.GetValue("BatchAutopool", false);
+        }
+
+        /// <inheritdoc />
+        public override Task StartAsync(CancellationToken cancellationToken)
+        {
+            if (isDisabled)
+            {
+                return Task.CompletedTask;
+            }
+
+            return base.StartAsync(cancellationToken);
         }
 
         /// <inheritdoc />

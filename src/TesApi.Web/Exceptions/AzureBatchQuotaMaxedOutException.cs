@@ -9,14 +9,9 @@ namespace TesApi.Web
     [Serializable]
     internal class AzureBatchQuotaMaxedOutException : Exception
     {
-        private readonly Exception exception;
-
         public AzureBatchQuotaMaxedOutException()
         {
         }
-
-        public AzureBatchQuotaMaxedOutException(Exception exception)
-            => this.exception = exception;
 
         public AzureBatchQuotaMaxedOutException(string message) : base(message)
         {

@@ -23,6 +23,11 @@ namespace TesApi.Web
         PoolInformation Pool { get; }
 
         /// <summary>
+        /// Provides the VmSize of the compute nodes this pool can manage
+        /// </summary>
+        string VmSize { get; }
+
+        /// <summary>
         /// Either reserves an idle compute node in the pool, or requests an additional compute node.
         /// </summary>
         /// <param name="isLowPriority">True if the task is low priority, False if dedicated.</param>
@@ -49,6 +54,11 @@ namespace TesApi.Web
         /// </summary>
         enum ServiceKind
         {
+            /// <summary>
+            /// Syncs the locally stored target values to the pool's target values.
+            /// </summary>
+            SyncSize,
+
             /// <summary>
             /// Updates the targeted numbers of dedicated and low priority compute nodes in the pool.
             /// </summary>

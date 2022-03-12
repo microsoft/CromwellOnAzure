@@ -333,6 +333,8 @@ namespace TesApi.Web
 
                     if (pool is not null)
                     {
+                        _ = await batchPools.Value.GetOrAddAsync(pool);
+
                         nodeAllocationFailed = pool.ResizeErrors?.Count > 0;
 
                         var node = (await pool.ListComputeNodes().ToListAsync()).FirstOrDefault();
@@ -483,6 +485,12 @@ namespace TesApi.Web
                 .Select(j => j.ExecutionInformation.PoolId);
 
         /// <summary>
+        /// Deletes the specified computeNodes
+        /// </summary>
+        public Task DeleteBatchComputeNodesAsync(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken = default)
+            => batchClient.PoolOperations.RemoveFromPoolAsync(poolId, computeNodes, deallocationOption: ComputeNodeDeallocationOption.TaskCompletion, cancellationToken: cancellationToken);
+
+        /// <summary>
         /// Deletes the specified pool
         /// </summary>
         public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default)
@@ -518,6 +526,13 @@ namespace TesApi.Web
         {
             var pool = await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "currentLowPriorityNodes,currentDedicatedNodes"), cancellationToken: cancellationToken);
             return (pool.CurrentLowPriorityComputeNodes, pool.CurrentDedicatedComputeNodes);
+        }
+
+        /// <inheritdoc/>
+        public (int TargetLowPriority, int TargetDedicated) GetComputeNodeTargets(string poolId)
+        {
+            var pool = batchClient.PoolOperations.GetPool(poolId, detailLevel: new ODATADetailLevel(selectClause: "targetLowPriorityNodes,targetDedicatedNodes"));
+            return (pool.TargetLowPriorityComputeNodes ?? 0, pool.TargetDedicatedComputeNodes ?? 0);
         }
 
         /// <summary>

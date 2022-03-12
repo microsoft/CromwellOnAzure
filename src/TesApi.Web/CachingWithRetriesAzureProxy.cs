@@ -51,6 +51,10 @@ namespace TesApi.Web
         public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchPoolAsync(poolId, cancellationToken));
 
         /// <inheritdoc/>
+        public Task DeleteBatchComputeNodesAsync(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken = default)
+            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchComputeNodesAsync(poolId, computeNodes, cancellationToken));
+
+        /// <inheritdoc/>
         public Task<string> DownloadBlobAsync(Uri blobAbsoluteUri) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DownloadBlobAsync(blobAbsoluteUri));
 
         /// <inheritdoc/>
@@ -159,6 +163,10 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default)
             => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetCurrentComputeNodesAsync(poolId, cancellationToken));
+
+        /// <inheritdoc/>
+        public (int TargetLowPriority, int TargetDedicated) GetComputeNodeTargets(string poolId)
+            => azureProxy.GetComputeNodeTargets(poolId);
 
         /// <inheritdoc/>
         public Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default)
