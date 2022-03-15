@@ -54,7 +54,7 @@ namespace TesApi.Web
             AffinityInformation result = default;
             try
             {
-                await _batchPools.azureProxy.ForEachComputeNodeAsync(Pool.PoolId, ConsiderNode, detailLevel: new ODATADetailLevel(filterClause: $"state eq idle", selectClause: "id,affinityId,isDedicated"), cancellationToken: cancellationToken);
+                await _batchPools.azureProxy.ForEachComputeNodeAsync(Pool.PoolId, ConsiderNode, detailLevel: new ODATADetailLevel(filterClause: $"state eq 'idle'", selectClause: "id,affinityId,isDedicated"), cancellationToken: cancellationToken);
 
                 void ConsiderNode(ComputeNode node)
                 {
@@ -191,7 +191,7 @@ namespace TesApi.Web
                                         break;
                                 }
                             }
-                        }, detailLevel: new ODATADetailLevel(filterClause: $"state eq idle AND stateTransitionTime lt {expiryTime.ToString("yyyy-MM-dd'T'HH:mm:ss-00:00", CultureInfo.InvariantCulture)}", selectClause: "id,affinityId,isDedicated"), cancellationToken: cancellationToken);
+                        }, detailLevel: new ODATADetailLevel(filterClause: $"state eq 'idle' and stateTransitionTime lt DateTime'{expiryTime.ToString("yyyy-MM-dd'T'HH:mm:ssZ", CultureInfo.InvariantCulture)}'", selectClause: "id,affinityId,isDedicated"), cancellationToken: cancellationToken);
 
                         // It's documented that a max of 100 nodes can be removed at a time. Group the nodes to remove in batches up to 100 in quantity.
                         var removeNodesTasks = Enumerable.Empty<Task>();
