@@ -861,7 +861,7 @@ namespace TesApi.Tests
 
         private static async Task<(string JobId, CloudTask CloudTask, PoolInformation PoolInformation, Pool batchModelsPool, IBatchPools batchPools)> ProcessTesTaskAndGetBatchJobArgumentsAsync(TesTask tesTask, IConfiguration configuration, Mock<IAzureProxy> azureProxy)
         {
-            var batchPools = new BatchPools(azureProxy.Object, new Mock<ILogger<BatchPools>>().Object, configuration, BatchPoolTests.GetHost());
+            var batchPools = new BatchPools(azureProxy.Object, new Mock<ILogger<BatchPools>>().Object, configuration, BatchPoolTests.GetBatchPoolFactory());
             var batchScheduler = new BatchScheduler(
                 new Mock<ILogger<BatchScheduler>>().Object,
                 configuration, 

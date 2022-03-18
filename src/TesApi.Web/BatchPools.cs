@@ -41,7 +41,7 @@ namespace TesApi.Web
 
         private readonly ILogger _logger;
         private readonly IAzureProxy _azureProxy;
-        private readonly Func<PoolInformation, string, IBatchPools, DateTime?, DateTime?, IBatchPool> _batchPoolCreator;
+        private readonly BatchPoolFactory _poolFactory;
         private readonly bool isDisabled;
 
         private readonly Random random = new();
@@ -52,19 +52,17 @@ namespace TesApi.Web
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
         /// <param name="configuration"></param>
-        /// <param name="host"></param>
-        public BatchPools(IAzureProxy azureProxy, ILogger<BatchPools> logger, IConfiguration configuration, IHost host)
+        /// <param name="poolFactory"></param>
+        public BatchPools(IAzureProxy azureProxy, ILogger<BatchPools> logger, IConfiguration configuration, BatchPoolFactory poolFactory)
         {
             this.isDisabled = configuration.GetValue("BatchAutopool", false);
             if (!this.isDisabled)
             {
-                var factory = ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(PoolInformation), typeof(string), typeof(IBatchPools), typeof(DateTime?), typeof(DateTime?) });
-                _batchPoolCreator = (pool, size, pools, create, change) => (IBatchPool)factory(host.Services, new object[] { pool, size, pools, create, change });
-
                 _idleNodeCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdleNodeTime", 5)); // TODO: set this to an appropriate value
                 _idlePoolCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdlePoolTime", 30)); // TODO: set this to an appropriate value
                 _forcePoolRotationAge = TimeSpan.FromDays(configuration.GetValue<double>("BatchPoolRotationForcedTime", 60)); // TODO: set this to an appropriate value
 
+                _poolFactory = poolFactory;
                 _azureProxy = azureProxy;
                 _logger = logger;
             }
@@ -122,7 +120,7 @@ namespace TesApi.Web
                             var uniquifier = new byte[8]; // This always becomes 13 chars, if you remove the three '=' at the end. We won't ever decode this, so we don't need any '='s
                             random.NextBytes(uniquifier);
                             var pool = valueFactory($"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"); // '-' is required by GetOrAddAsync(CloudPool)
-                            result = _batchPoolCreator(_azureProxy.CreateBatchPoolAsync(pool).Result, pool.VmSize, this, null, null);
+                            result = _poolFactory.Create(_azureProxy.CreateBatchPoolAsync(pool).Result, pool.VmSize, this);
                             queue.Enqueue(result);
                         }
                     }
@@ -160,7 +158,7 @@ namespace TesApi.Web
         {
             if (isDisabled)
             {
-                return _batchPoolCreator(new PoolInformation { PoolId = pool.Id }, pool.VirtualMachineSize, this, null, null);
+                return _poolFactory.Create(new PoolInformation { PoolId = pool.Id }, pool.VirtualMachineSize, this);
             }
 
             IBatchPool result;
@@ -183,7 +181,7 @@ namespace TesApi.Web
                 DateTime? allocationStateTransitionTime = default;
                 try { creationTime = pool.CreationTime; } catch (InvalidOperationException) { }
                 try { allocationStateTransitionTime = pool.AllocationStateTransitionTime; } catch (InvalidOperationException) { }
-                result = _batchPoolCreator(new PoolInformation { PoolId = pool.Id }, pool.VirtualMachineSize, this, creationTime, allocationStateTransitionTime);
+                result = _poolFactory.Create(new PoolInformation { PoolId = pool.Id }, pool.VirtualMachineSize, this, creationTime, allocationStateTransitionTime);
                 ManagedBatchPools.GetOrAdd(key, k => new()).Enqueue(result);
             }
 

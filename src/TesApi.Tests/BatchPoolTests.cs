@@ -311,16 +311,14 @@ namespace TesApi.Tests
         }
 
         private async Task<IBatchPool> CreateBatchPoolAsync()
-            => await new BatchPools(GetMockAzureProxy(AzureProxyReturnValues.Get()).Object, new Mock<ILogger<BatchPools>>().Object, GetMockConfig(), GetHost())
+            => await new BatchPools(GetMockAzureProxy(AzureProxyReturnValues.Get()).Object, new Mock<ILogger<BatchPools>>().Object, GetMockConfig(), GetBatchPoolFactory())
                 .GetOrAddAsync("key1", id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
 
-        internal static IHost GetHost()
+        internal static BatchPoolFactory GetBatchPoolFactory()
         {
-            var host = new Mock<IHost>();
             var services = new ServiceCollection();
             services.AddSingleton(_ => new Mock<ILogger<BatchPool>>().Object);
-            host.Setup(a => a.Services).Returns(services.BuildServiceProvider());
-            return host.Object;
+            return new BatchPoolFactory(services.BuildServiceProvider());
         }
 
         private class AzureProxyReturnValues

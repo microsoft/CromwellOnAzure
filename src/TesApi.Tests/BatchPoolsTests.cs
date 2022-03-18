@@ -177,7 +177,7 @@ namespace TesApi.Tests
         {
             IBatchPool info = default;
             IBatchPools result;
-            result = new BatchPools((mockAzureProxy ?? GetMockAzureProxy(azureProxyReturnValues ?? AzureProxyReturnValues.Get())).Object, new Mock<ILogger<BatchPools>>().Object, configuration ?? GetMockConfig(), BatchPoolTests.GetHost());
+            result = new BatchPools((mockAzureProxy ?? GetMockAzureProxy(azureProxyReturnValues ?? AzureProxyReturnValues.Get())).Object, new Mock<ILogger<BatchPools>>().Object, configuration ?? GetMockConfig(), BatchPoolTests.GetBatchPoolFactory());
             if (createInitialPool)
             {
                 info = await result.GetOrAddAsync("key1", id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
