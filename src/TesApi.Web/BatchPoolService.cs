@@ -102,6 +102,7 @@ namespace TesApi.Web
         {
             while (!stoppingToken.IsCancellationRequested)
             {
+                logger.LogTrace("Calling {ServiceKind}", service);
                 try
                 {
                     await Task.WhenAll(batchPools.ManagedBatchPools.Values.SelectMany(q => q).Select(p => p.ServicePoolAsync(service, stoppingToken)).ToArray());
@@ -114,6 +115,7 @@ namespace TesApi.Web
                 {
                     logger.LogError(ex, @"Failure in {Task}: {Message}", service, ex.Message);
                 }
+                logger.LogTrace("Completed {ServiceKind}", service);
 
                 try
                 {

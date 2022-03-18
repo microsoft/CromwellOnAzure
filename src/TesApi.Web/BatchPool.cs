@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace TesApi.Web
 {
@@ -67,6 +68,7 @@ namespace TesApi.Web
                                 return;
                             }
 
+                            _batchPools.Logger.LogDebug("Reserving ComputeNode {NodeId}", node.Id);
                             result = new AffinityInformation(node.AffinityId);
                             ReservedComputeNodes.Add(result);
                         }
@@ -98,9 +100,9 @@ namespace TesApi.Web
                         {
                             await ServicePoolAsync(IBatchPool.ServiceKind.Resize, cancellationToken);
                         }
-                        catch (Exception /*ex*/)
+                        catch (Exception ex)
                         {
-                            // log
+                            _batchPools.Logger.LogError(ex, "Failed to resize pool {PoolId}", Pool.PoolId);
                         }
                     }
                 }
@@ -111,7 +113,7 @@ namespace TesApi.Web
             }
             else if (rebootTask is not null)
             {
-                await rebootTask; // TODO: Wait until idle?
+                await rebootTask;
             }
 
             return result;
@@ -159,6 +161,7 @@ namespace TesApi.Web
 
                         if (values.dirty && (await _batchPools.azureProxy.GetAllocationStateAsync(Pool.PoolId, cancellationToken)) == AllocationState.Steady)
                         {
+                            _batchPools.Logger.LogDebug("Resizing {PoolId}", Pool.PoolId);
                             await _batchPools.azureProxy.SetComputeNodeTargetsAsync(Pool.PoolId, values.lowPri, values.dedicated, cancellationToken);
                             lock (lockObj)
                             {
@@ -177,6 +180,7 @@ namespace TesApi.Web
                         var expiryTime = DateTime.UtcNow - _batchPools.IdleNodeCheck;
                         await _batchPools.azureProxy.ForEachComputeNodeAsync(Pool.PoolId, n =>
                         {
+                            _batchPools.Logger.LogDebug("Found idle node {NodeId}", n.Id);
                             if (!ReservedComputeNodes.Any(r => r.AffinityId.Equals(n.AffinityId)))
                             {
                                 nodesToRemove = nodesToRemove.Append(n);
@@ -205,6 +209,7 @@ namespace TesApi.Web
                         {
                             foreach (var task in removeNodesTasks)
                             {
+                                _batchPools.Logger.LogDebug("Removing nodes from {PoolId}", Pool.PoolId);
                                 await task;
                             }
                         }, cancellationToken);

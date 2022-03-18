@@ -20,6 +20,7 @@ namespace TesApi.Web
     {
         ConcurrentDictionary<string, ConcurrentQueue<IBatchPool>> ManagedBatchPools { get; }
         object syncObject { get; }
+        ILogger Logger { get; }
         IAzureProxy azureProxy { get; }
 
         TimeSpan IdleNodeCheck { get; }
@@ -30,7 +31,7 @@ namespace TesApi.Web
     /// <summary>
     /// Managed Azure Batch Pools service
     /// </summary>
-    internal sealed class BatchPools : IBatchPools, IBatchPoolsImpl
+    public sealed class BatchPools : IBatchPools, IBatchPoolsImpl
     {
         private readonly TimeSpan _idleNodeCheck;
         private readonly TimeSpan _idlePoolCheck;
@@ -48,7 +49,7 @@ namespace TesApi.Web
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
         /// <param name="configuration"></param>
-        public BatchPools(IAzureProxy azureProxy, ILogger logger, IConfiguration configuration)
+        public BatchPools(IAzureProxy azureProxy, ILogger<BatchPools> logger, IConfiguration configuration)
         {
             this.isDisabled = configuration.GetValue("BatchAutopool", false);
             if (!this.isDisabled)
@@ -112,7 +113,7 @@ namespace TesApi.Web
                             }
                             var uniquifier = new byte[8]; // This always becomes 13 chars, if you remove the three '=' at the end. We won't ever decode this, so we don't need any '='s
                             random.NextBytes(uniquifier);
-                            var pool = valueFactory($"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"); // '-' is required by GetOrAddAsync(CloudPool
+                            var pool = valueFactory($"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"); // '-' is required by GetOrAddAsync(CloudPool)
                             result = BatchPool.Create(_azureProxy.CreateBatchPoolAsync(pool).Result, pool.VmSize, this);
                             queue.Enqueue(result);
                         }
@@ -192,6 +193,7 @@ namespace TesApi.Web
 
         ConcurrentDictionary<string, ConcurrentQueue<IBatchPool>> IBatchPoolsImpl.ManagedBatchPools => ManagedBatchPools;
         object IBatchPoolsImpl.syncObject => syncObject;
+        ILogger IBatchPoolsImpl.Logger => _logger;
         IAzureProxy IBatchPoolsImpl.azureProxy => _azureProxy;
         #endregion
     }
