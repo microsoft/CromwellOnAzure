@@ -99,10 +99,10 @@ namespace TesApi.Tests
             task.Resources.BackendParameters = backendParameters;
 
             var batchScheduler = new BatchScheduler(
-                new Mock<ILogger>().Object,
+                new Mock<ILogger<BatchScheduler>>().Object,
                 GetMockConfig(),
                 new CachingWithRetriesAzureProxy(proxy, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions())))),
-                new StorageAccessProvider(new Mock<ILogger>().Object, GetMockConfig(), proxy),
+                new StorageAccessProvider(new Mock<ILogger<StorageAccessProvider>>().Object, GetMockConfig(), proxy),
                 new Mock<IBatchPools>().Object);
 
             var size = await batchScheduler.GetVmSizeAsync(task);
@@ -861,12 +861,12 @@ namespace TesApi.Tests
 
         private static async Task<(string JobId, CloudTask CloudTask, PoolInformation PoolInformation, Pool batchModelsPool, IBatchPools batchPools)> ProcessTesTaskAndGetBatchJobArgumentsAsync(TesTask tesTask, IConfiguration configuration, Mock<IAzureProxy> azureProxy)
         {
-            var batchPools = new BatchPools(azureProxy.Object, new Mock<ILogger>().Object, configuration);
+            var batchPools = new BatchPools(azureProxy.Object, new Mock<ILogger<BatchPools>>().Object, configuration, BatchPoolTests.GetHost());
             var batchScheduler = new BatchScheduler(
-                new Mock<ILogger>().Object, 
+                new Mock<ILogger<BatchScheduler>>().Object,
                 configuration, 
                 new CachingWithRetriesAzureProxy(azureProxy.Object, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions())))),
-                new StorageAccessProvider(new Mock<ILogger>().Object, configuration, azureProxy.Object),
+                new StorageAccessProvider(new Mock<ILogger<StorageAccessProvider>>().Object, configuration, azureProxy.Object),
                 batchPools
             );
 

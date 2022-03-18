@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -28,7 +28,7 @@ namespace TesApi.Web
         /// <param name="azureProxy"><see cref="IAzureProxy"/></param>
         /// <param name="storageAccessProvider"><see cref="IStorageAccessProvider"/></param>
         /// <param name="logger"><see cref="ILogger"/></param>
-        public ConfigurationUtils(IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, ILogger logger)
+        public ConfigurationUtils(IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, ILogger<ConfigurationUtils> logger)
         {
             this.configuration = configuration;
             this.azureProxy = azureProxy;

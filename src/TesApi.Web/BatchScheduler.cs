@@ -68,7 +68,7 @@ namespace TesApi.Web
         /// <param name="azureProxy">Azure proxy <see cref="IAzureProxy"/></param>
         /// <param name="storageAccessProvider">Storage access provider <see cref="IStorageAccessProvider"/></param>
         /// <param name="batchPools">Batch pool provider <see cref="IBatchPools"/></param>
-        public BatchScheduler(ILogger logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, IBatchPools batchPools)
+        public BatchScheduler(ILogger<BatchScheduler> logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, IBatchPools batchPools)
         {
             this.logger = logger;
             this.azureProxy = azureProxy;

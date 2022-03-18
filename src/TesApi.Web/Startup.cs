@@ -30,19 +30,17 @@ namespace TesApi.Web
         private const string DefaultAzureOfferDurableId = "MS-AZR-0003p";
 
         private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
         private readonly IWebHostEnvironment hostingEnvironment;
         private readonly string azureOfferDurableId;
 
         /// <summary>
         /// Startup class for ASP.NET core
         /// </summary>
-        public Startup(IConfiguration configuration, ILoggerFactory loggerFactory, IWebHostEnvironment hostingEnvironment)
+        public Startup(IConfiguration configuration, ILogger<Startup> logger, IWebHostEnvironment hostingEnvironment)
         {
             Configuration = configuration;
             this.hostingEnvironment = hostingEnvironment;
-            logger = loggerFactory.CreateLogger<Startup>();
-            this.loggerFactory = loggerFactory;
+            this.logger = logger;
             azureOfferDurableId = Configuration.GetValue("AzureOfferDurableId", DefaultAzureOfferDurableId);
         }
 
@@ -56,38 +54,11 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="services">The Microsoft.Extensions.DependencyInjection.IServiceCollection to add the services to.</param>
         public void ConfigureServices(IServiceCollection services)
-        {
-            var (cache, azureProxy, cachingAzureProxy, storageAccessProvider, repository) = ConfigureServices();
-            ConfigureServices(services, cache, azureProxy, cachingAzureProxy, storageAccessProvider, repository);
-        }
+            => services.AddSingleton<IAppCache>(sp => new CachingService())
 
-        private IBatchPools BatchPools { get; set; }
-
-        private (IAppCache cache, AzureProxy azureProxy, IAzureProxy cachingAzureProxy, IStorageAccessProvider storageAccessProvider, IRepository<TesTask> repository) ConfigureServices()
-        {
-            var cache = new CachingService();
-
-            var azureProxy = new AzureProxy(Configuration["BatchAccountName"], azureOfferDurableId, new(() => BatchPools), loggerFactory.CreateLogger<AzureProxy>());
-            IAzureProxy cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy, cache);
-            IStorageAccessProvider storageAccessProvider = new StorageAccessProvider(loggerFactory.CreateLogger<StorageAccessProvider>(), Configuration, cachingAzureProxy);
-
-            var configurationUtils = new ConfigurationUtils(Configuration, cachingAzureProxy, storageAccessProvider, loggerFactory.CreateLogger<ConfigurationUtils>());
-            configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync().Wait();
-
-            (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
-
-            BatchPools = new BatchPools(cachingAzureProxy, loggerFactory.CreateLogger<BatchPools>(), Configuration);
-
-            return (cache, azureProxy, cachingAzureProxy, storageAccessProvider,
-                new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId));
-        }
-
-        private void ConfigureServices(IServiceCollection services, IAppCache cache, AzureProxy azureProxy, IAzureProxy cachingAzureProxy, IStorageAccessProvider storageAccessProvider, IRepository<TesTask> repository)
-            => services.AddSingleton(cache)
-
-            .AddSingleton(cachingAzureProxy)
-            .AddSingleton(azureProxy)
-            .AddSingleton(BatchPools)
+            .AddSingleton(sp => (IAzureProxy)ActivatorUtilities.CreateInstance<CachingWithRetriesAzureProxy>(sp, (IAzureProxy)sp.GetService(typeof(AzureProxy))))
+            .AddSingleton(sp => ActivatorUtilities.CreateInstance<AzureProxy>(sp, Configuration["BatchAccountName"], azureOfferDurableId, new Lazy<IBatchPools>(() => (IBatchPools)sp.GetService(typeof(IBatchPools)))))
+            .AddSingleton<IBatchPools, BatchPools>()
 
             .AddControllers()
             .AddNewtonsoftJson(opts =>
@@ -96,8 +67,13 @@ namespace TesApi.Web
                 opts.SerializerSettings.Converters.Add(new StringEnumConverter(new CamelCaseNamingStrategy()));
             }).Services
 
-            .AddSingleton<IRepository<TesTask>>(new CachingWithRetriesRepository<TesTask>(repository))
-            .AddSingleton<IBatchScheduler>(new BatchScheduler(loggerFactory.CreateLogger<BatchScheduler>(), Configuration, cachingAzureProxy, storageAccessProvider, BatchPools))
+            .AddSingleton(sp =>
+            {
+                (var cosmosDbEndpoint, var cosmosDbKey) = ((IAzureProxy)sp.GetService(typeof(IAzureProxy))).GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
+                return (IRepository<TesTask>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<TesTask>>(sp, new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId));
+            })
+            .AddSingleton<IBatchScheduler, BatchScheduler>()
+            .AddSingleton<IStorageAccessProvider, StorageAccessProvider>()
 
             .AddSwaggerGen(c =>
             {
@@ -176,7 +152,14 @@ namespace TesApi.Web
                     var r = s.UseHsts();
                     logger.LogInformation("Configuring for Production environment");
                     return r;
-                });
+                })
+
+            .IfThenElse(false, s => s, s =>
+            {
+                var configurationUtils = ActivatorUtilities.GetServiceOrCreateInstance<ConfigurationUtils>(s.ApplicationServices);
+                configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync().Wait();
+                return s;
+            });
     }
 
     internal static class BooleanMethodSelectorExtensions

@@ -18,6 +18,8 @@ using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Sql.Fluent;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -309,8 +311,17 @@ namespace TesApi.Tests
         }
 
         private async Task<IBatchPool> CreateBatchPoolAsync()
-            => await new BatchPools(GetMockAzureProxy(AzureProxyReturnValues.Get()).Object, new Mock<ILogger>().Object, GetMockConfig())
+            => await new BatchPools(GetMockAzureProxy(AzureProxyReturnValues.Get()).Object, new Mock<ILogger<BatchPools>>().Object, GetMockConfig(), GetHost())
                 .GetOrAddAsync("key1", id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
+
+        internal static IHost GetHost()
+        {
+            var host = new Mock<IHost>();
+            var services = new ServiceCollection();
+            services.AddSingleton(_ => new Mock<ILogger<BatchPool>>().Object);
+            host.Setup(a => a.Services).Returns(services.BuildServiceProvider());
+            return host.Object;
+        }
 
         private class AzureProxyReturnValues
         {

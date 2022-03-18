@@ -5,11 +5,14 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
@@ -20,7 +23,6 @@ namespace TesApi.Web
     {
         ConcurrentDictionary<string, ConcurrentQueue<IBatchPool>> ManagedBatchPools { get; }
         object syncObject { get; }
-        ILogger Logger { get; }
         IAzureProxy azureProxy { get; }
 
         TimeSpan IdleNodeCheck { get; }
@@ -39,6 +41,7 @@ namespace TesApi.Web
 
         private readonly ILogger _logger;
         private readonly IAzureProxy _azureProxy;
+        private readonly Func<PoolInformation, string, IBatchPools, DateTime?, DateTime?, IBatchPool> _batchPoolCreator;
         private readonly bool isDisabled;
 
         private readonly Random random = new();
@@ -49,14 +52,19 @@ namespace TesApi.Web
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
         /// <param name="configuration"></param>
-        public BatchPools(IAzureProxy azureProxy, ILogger<BatchPools> logger, IConfiguration configuration)
+        /// <param name="host"></param>
+        public BatchPools(IAzureProxy azureProxy, ILogger<BatchPools> logger, IConfiguration configuration, IHost host)
         {
             this.isDisabled = configuration.GetValue("BatchAutopool", false);
             if (!this.isDisabled)
             {
+                var factory = ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(PoolInformation), typeof(string), typeof(IBatchPools), typeof(DateTime?), typeof(DateTime?) });
+                _batchPoolCreator = (pool, size, pools, create, change) => (IBatchPool)factory(host.Services, new object[] { pool, size, pools, create, change });
+
                 _idleNodeCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdleNodeTime", 5)); // TODO: set this to an appropriate value
                 _idlePoolCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdlePoolTime", 30)); // TODO: set this to an appropriate value
                 _forcePoolRotationAge = TimeSpan.FromDays(configuration.GetValue<double>("BatchPoolRotationForcedTime", 60)); // TODO: set this to an appropriate value
+
                 _azureProxy = azureProxy;
                 _logger = logger;
             }
@@ -114,7 +122,7 @@ namespace TesApi.Web
                             var uniquifier = new byte[8]; // This always becomes 13 chars, if you remove the three '=' at the end. We won't ever decode this, so we don't need any '='s
                             random.NextBytes(uniquifier);
                             var pool = valueFactory($"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"); // '-' is required by GetOrAddAsync(CloudPool)
-                            result = BatchPool.Create(_azureProxy.CreateBatchPoolAsync(pool).Result, pool.VmSize, this);
+                            result = _batchPoolCreator(_azureProxy.CreateBatchPoolAsync(pool).Result, pool.VmSize, this, null, null);
                             queue.Enqueue(result);
                         }
                     }
@@ -152,7 +160,7 @@ namespace TesApi.Web
         {
             if (isDisabled)
             {
-                return BatchPool.Create(new PoolInformation { PoolId = pool.Id }, pool.VirtualMachineSize, this);
+                return _batchPoolCreator(new PoolInformation { PoolId = pool.Id }, pool.VirtualMachineSize, this, null, null);
             }
 
             IBatchPool result;
@@ -175,7 +183,7 @@ namespace TesApi.Web
                 DateTime? allocationStateTransitionTime = default;
                 try { creationTime = pool.CreationTime; } catch (InvalidOperationException) { }
                 try { allocationStateTransitionTime = pool.AllocationStateTransitionTime; } catch (InvalidOperationException) { }
-                result = BatchPool.Create(new PoolInformation { PoolId = pool.Id }, pool.VirtualMachineSize, this, creationTime, allocationStateTransitionTime);
+                result = _batchPoolCreator(new PoolInformation { PoolId = pool.Id }, pool.VirtualMachineSize, this, creationTime, allocationStateTransitionTime);
                 ManagedBatchPools.GetOrAdd(key, k => new()).Enqueue(result);
             }
 
@@ -193,7 +201,6 @@ namespace TesApi.Web
 
         ConcurrentDictionary<string, ConcurrentQueue<IBatchPool>> IBatchPoolsImpl.ManagedBatchPools => ManagedBatchPools;
         object IBatchPoolsImpl.syncObject => syncObject;
-        ILogger IBatchPoolsImpl.Logger => _logger;
         IAzureProxy IBatchPoolsImpl.azureProxy => _azureProxy;
         #endregion
     }

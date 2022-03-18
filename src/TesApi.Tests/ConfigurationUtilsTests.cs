@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -22,10 +22,9 @@ namespace TesApi.Tests
         {
             var configuration = GetInMemoryConfig();
             var mockAzureProxy = GetMockAzureProxy();
-            var mockLogger = new Mock<ILogger>().Object;
-            var storageAccessProvider = new StorageAccessProvider(mockLogger, configuration, mockAzureProxy.Object);
+            var storageAccessProvider = new StorageAccessProvider(new Mock<ILogger<StorageAccessProvider>>().Object, configuration, mockAzureProxy.Object);
 
-            var configurationUtils = new ConfigurationUtils(configuration, mockAzureProxy.Object, storageAccessProvider, mockLogger);
+            var configurationUtils = new ConfigurationUtils(configuration, mockAzureProxy.Object, storageAccessProvider, new Mock<ILogger<ConfigurationUtils>>().Object);
 
             await configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync();
 
@@ -44,10 +43,9 @@ namespace TesApi.Tests
         {
             var configuration = GetInMemoryConfig();
             var mockAzureProxy = GetMockAzureProxy();
-            var mockLogger = new Mock<ILogger>().Object;
-            var storageAccessProvider = new StorageAccessProvider(mockLogger, configuration, mockAzureProxy.Object);
+            var storageAccessProvider = new StorageAccessProvider(new Mock<ILogger<StorageAccessProvider>>().Object, configuration, mockAzureProxy.Object);
 
-            var configurationUtils = new ConfigurationUtils(configuration, mockAzureProxy.Object, storageAccessProvider, mockLogger);
+            var configurationUtils = new ConfigurationUtils(configuration, mockAzureProxy.Object, storageAccessProvider, new Mock<ILogger<ConfigurationUtils>>().Object);
 
             await configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync();
 

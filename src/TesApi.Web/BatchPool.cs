@@ -26,7 +26,7 @@ namespace TesApi.Web
     /// <summary>
     /// Represents a pool in an Azure Batch Account.
     /// </summary>
-    internal sealed class BatchPool : IBatchPool, IBatchPoolImpl
+    public sealed class BatchPool : IBatchPool, IBatchPoolImpl
     {
         /// <summary>
         /// Indicates that the pool is available for new jobs/tasks.
@@ -68,7 +68,7 @@ namespace TesApi.Web
                                 return;
                             }
 
-                            _batchPools.Logger.LogDebug("Reserving ComputeNode {NodeId}", node.Id);
+                            logger.LogDebug("Reserving ComputeNode {NodeId}", node.Id);
                             result = new AffinityInformation(node.AffinityId);
                             ReservedComputeNodes.Add(result);
                         }
@@ -102,7 +102,7 @@ namespace TesApi.Web
                         }
                         catch (Exception ex)
                         {
-                            _batchPools.Logger.LogError(ex, "Failed to resize pool {PoolId}", Pool.PoolId);
+                            logger.LogError(ex, "Failed to resize pool {PoolId}", Pool.PoolId);
                         }
                     }
                 }
@@ -161,7 +161,7 @@ namespace TesApi.Web
 
                         if (values.dirty && (await _batchPools.azureProxy.GetAllocationStateAsync(Pool.PoolId, cancellationToken)) == AllocationState.Steady)
                         {
-                            _batchPools.Logger.LogDebug("Resizing {PoolId}", Pool.PoolId);
+                            logger.LogDebug("Resizing {PoolId}", Pool.PoolId);
                             await _batchPools.azureProxy.SetComputeNodeTargetsAsync(Pool.PoolId, values.lowPri, values.dedicated, cancellationToken);
                             lock (lockObj)
                             {
@@ -180,7 +180,7 @@ namespace TesApi.Web
                         var expiryTime = DateTime.UtcNow - _batchPools.IdleNodeCheck;
                         await _batchPools.azureProxy.ForEachComputeNodeAsync(Pool.PoolId, n =>
                         {
-                            _batchPools.Logger.LogDebug("Found idle node {NodeId}", n.Id);
+                            logger.LogDebug("Found idle node {NodeId}", n.Id);
                             if (!ReservedComputeNodes.Any(r => r.AffinityId.Equals(n.AffinityId)))
                             {
                                 nodesToRemove = nodesToRemove.Append(n);
@@ -209,7 +209,7 @@ namespace TesApi.Web
                         {
                             foreach (var task in removeNodesTasks)
                             {
-                                _batchPools.Logger.LogDebug("Removing nodes from {PoolId}", Pool.PoolId);
+                                logger.LogDebug("Removing nodes from {PoolId}", Pool.PoolId);
                                 await task;
                             }
                         }, cancellationToken);
@@ -271,15 +271,19 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Creates a new BatchPool
+        /// Constructor of <see cref="BatchPool"/>
         /// </summary>
-        /// <returns>the new BatchPool</returns>
-        internal static BatchPool Create(PoolInformation poolInformation, string vmSize, IBatchPoolsImpl batchPools, DateTime? creationTime = default, DateTime? changedTime = default)
-            => new(poolInformation, vmSize, batchPools, creationTime, changedTime);
-
-        private BatchPool(PoolInformation poolInformation, string vmSize, IBatchPoolsImpl batchPools, DateTime? creationTime, DateTime? changedTime)
+        /// <param name="poolInformation"></param>
+        /// <param name="vmSize"></param>
+        /// <param name="batchPools"></param>
+        /// <param name="creationTime"></param>
+        /// <param name="changedTime"></param>
+        /// <param name="logger"></param>
+        /// <exception cref="ArgumentException"></exception>
+        public BatchPool(PoolInformation poolInformation, string vmSize, IBatchPools batchPools, DateTime? creationTime, DateTime? changedTime, ILogger<BatchPool> logger)
         {
-            _batchPools = batchPools;
+            this.logger = logger;
+            _batchPools = batchPools as IBatchPoolsImpl ?? throw new ArgumentException("batchPools must be of type IBatchPoolsImpl", nameof(batchPools));
             VmSize = vmSize;
             Pool = poolInformation;
             var now = DateTime.UtcNow;
@@ -287,6 +291,7 @@ namespace TesApi.Web
             Changed = changedTime ?? now;
         }
 
+        private readonly ILogger logger;
         private DateTime Creation { get; }
         private DateTime Changed { get; set; }
 

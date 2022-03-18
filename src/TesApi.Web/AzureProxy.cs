@@ -61,7 +61,7 @@ namespace TesApi.Web
         /// <param name="azureOfferDurableId">Azure offer id</param>
         /// <param name="batchPools">Managed Azure Batch Pools service</param>
         /// <param name="logger">The logger</param>
-        public AzureProxy(string batchAccountName, string azureOfferDurableId, Lazy<IBatchPools> batchPools, ILogger logger)
+        public AzureProxy(string batchAccountName, string azureOfferDurableId, Lazy<IBatchPools> batchPools, ILogger<AzureProxy> logger)
         {
             this.logger = logger;
             this.batchPools = batchPools;
