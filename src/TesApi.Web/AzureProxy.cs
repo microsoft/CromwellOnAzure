@@ -17,6 +17,7 @@ using Microsoft.Azure.Batch.Auth;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.Batch;
+using Microsoft.Azure.Management.Compute.Models;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
@@ -333,6 +334,7 @@ namespace TesApi.Web
 
                     if (pool is not null)
                     {
+                        // Ensure that BatchPools knows about this pool
                         _ = await batchPools.Value.GetOrAddAsync(pool);
 
                         nodeAllocationFailed = pool.ResizeErrors?.Count > 0;
@@ -421,6 +423,18 @@ namespace TesApi.Web
             {
                 logger.LogInformation($"Deleting job {job.Id}");
                 await batchClient.JobOperations.DeleteJobAsync(job.Id, cancellationToken: cancellationToken);
+
+                if (!string.IsNullOrWhiteSpace(job.PoolInformation?.PoolId))
+                {
+                    // With manual pools, the PoolId property is set
+                    if (batchPools.Value.TryGet(job.PoolInformation.PoolId, out var batchPool))
+                    {
+                        foreach (var task in await job.ListTasks(detailLevel: new ODATADetailLevel { SelectClause = "affinityId" }).ToListAsync(cancellationToken: cancellationToken))
+                        {
+                            batchPool.ReleaseNode(task.AffinityInformation);
+                        }
+                    }
+                }
             }
         }
 

@@ -76,7 +76,7 @@ namespace TesApi.Web
                     }
                 }
             }
-            catch (Exception /*ex*/) // Don't try to reserve an existing idle node if there's any errors. Just reserve a new one.
+            catch (Exception /*ex*/) // Don't try to reserve an existing idle node if there's any errors. Just request a new one.
             {
                 // log
             }
@@ -90,25 +90,6 @@ namespace TesApi.Web
                         case true: ++TargetLowPriority; break;
                         case false: ++TargetDedicated; break;
                     }
-                }
-
-                try
-                {
-                    if (Interlocked.Increment(ref _resizeGuard) == 1)
-                    {
-                        try
-                        {
-                            await ServicePoolAsync(IBatchPool.ServiceKind.Resize, cancellationToken);
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogError(ex, "Failed to resize pool {PoolId}", Pool.PoolId);
-                        }
-                    }
-                }
-                finally
-                {
-                    Interlocked.Decrement(ref _resizeGuard);
                 }
             }
             else if (rebootTask is not null)
@@ -127,7 +108,10 @@ namespace TesApi.Web
         {
             lock (lockObj)
             {
-                ReservedComputeNodes.Remove(affinity);
+                if (ReservedComputeNodes.Remove(affinity))
+                {
+                    logger.LogDebug("Removing reservation for {NodeId}", affinity.AffinityId);
+                }
             }
         }
 
@@ -159,7 +143,7 @@ namespace TesApi.Web
                             values = (ResizeDirty, TargetLowPriority, TargetDedicated);
                         }
 
-                        if (values.dirty && (await _batchPools.azureProxy.GetAllocationStateAsync(Pool.PoolId, cancellationToken)) == AllocationState.Steady)
+                        if (values.dirty && Changed < DateTime.UtcNow - BatchPoolService.ResizeInterval && (await _batchPools.azureProxy.GetAllocationStateAsync(Pool.PoolId, cancellationToken)) == AllocationState.Steady)
                         {
                             logger.LogDebug("Resizing {PoolId}", Pool.PoolId);
                             await _batchPools.azureProxy.SetComputeNodeTargetsAsync(Pool.PoolId, values.lowPri, values.dedicated, cancellationToken);
@@ -304,7 +288,6 @@ namespace TesApi.Web
 
         private readonly IBatchPoolsImpl _batchPools;
         private readonly object lockObj = new();
-        private volatile int _resizeGuard = 0;
 
         private List<AffinityInformation> ReservedComputeNodes { get; } = new();
 

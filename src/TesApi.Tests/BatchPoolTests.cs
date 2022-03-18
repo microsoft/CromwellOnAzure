@@ -184,6 +184,7 @@ namespace TesApi.Tests
             {
                 AzureProxySetComputeNodeTargets = SetTargets;
                 AzureProxyGetAllocationState = GetState;
+                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
             }
             finally
@@ -215,6 +216,7 @@ namespace TesApi.Tests
                 AzureProxySetComputeNodeTargets = SetTargets;
                 AzureProxyGetAllocationState = GetState;
                 _ = await pool.PrepareNodeAsync(false);
+                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
             }
             finally
@@ -247,6 +249,7 @@ namespace TesApi.Tests
                 AzureProxySetComputeNodeTargets = SetTargets;
                 AzureProxyGetAllocationState = GetState;
                 _ = await pool.PrepareNodeAsync(false);
+                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
             }
             finally
