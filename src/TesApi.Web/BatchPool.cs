@@ -108,7 +108,7 @@ namespace TesApi.Web
         {
             lock (lockObj)
             {
-                if (ReservedComputeNodes.Remove(affinity))
+                if (ReservedComputeNodes.Remove(ReservedComputeNodes.FirstOrDefault(n => n.AffinityId.Equals(affinity.AffinityId))))
                 {
                     logger.LogDebug("Removing reservation for {NodeId}", affinity.AffinityId);
                 }
