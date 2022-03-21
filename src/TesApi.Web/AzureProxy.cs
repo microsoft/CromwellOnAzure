@@ -296,6 +296,8 @@ namespace TesApi.Web
                 var activeJobWithMissingAutoPool = false;
                 ComputeNodeState? nodeState = null;
                 TaskState? taskState = null;
+                string poolId = null;
+                AffinityInformation affinityInformation = null;
                 TaskExecutionInformation taskExecutionInformation = null;
 
                 var jobFilter = new ODATADetailLevel
@@ -321,12 +323,13 @@ namespace TesApi.Web
 
                 var job = lastJobInfo.Job;
                 var attemptNumber = lastJobInfo.AttemptNumber;
+                poolId = job.ExecutionInformation?.PoolId;
 
-                if (job.State == JobState.Active && job.ExecutionInformation?.PoolId is not null)
+                if (job.State == JobState.Active && poolId is not null)
                 {
                     var poolFilter = new ODATADetailLevel
                     {
-                        FilterClause = $"id eq '{job.ExecutionInformation.PoolId}'",
+                        FilterClause = $"id eq '{poolId}'",
                         SelectClause = "*"
                     };
 
@@ -362,6 +365,7 @@ namespace TesApi.Web
                 {
                     var batchTask = await batchClient.JobOperations.GetTaskAsync(job.Id, tesTaskId);
                     taskState = batchTask.State;
+                    affinityInformation = batchTask.AffinityInformation;
                     taskExecutionInformation = batchTask.ExecutionInformation;
                 }
                 catch (Exception ex)
@@ -383,6 +387,8 @@ namespace TesApi.Web
                     JobEndTime = job.ExecutionInformation?.EndTime,
                     JobSchedulingError = job.ExecutionInformation?.SchedulingError,
                     TaskState = taskState,
+                    PoolId = poolId,
+                    AffinityInformation = affinityInformation,
                     TaskExecutionResult = taskExecutionInformation?.Result,
                     TaskStartTime = taskExecutionInformation?.StartTime,
                     TaskEndTime = taskExecutionInformation?.EndTime,

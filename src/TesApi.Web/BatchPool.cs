@@ -110,7 +110,7 @@ namespace TesApi.Web
             {
                 if (ReservedComputeNodes.Remove(ReservedComputeNodes.FirstOrDefault(n => n.AffinityId.Equals(affinity.AffinityId))))
                 {
-                    logger.LogDebug("Removing reservation for {NodeId}", affinity.AffinityId);
+                    logger.LogDebug("Removing reservation for {AffinityId}", affinity.AffinityId);
                 }
             }
         }
@@ -161,11 +161,17 @@ namespace TesApi.Web
                         var lowPriDecrementTarget = 0;
                         var dedicatedDecrementTarget = 0;
                         var nodesToRemove = Enumerable.Empty<ComputeNode>();
+                        var affinitiesToRemove = Enumerable.Empty<AffinityInformation>();
                         var expiryTime = DateTime.UtcNow - _batchPools.IdleNodeCheck;
                         await _batchPools.azureProxy.ForEachComputeNodeAsync(Pool.PoolId, n =>
                         {
                             logger.LogDebug("Found idle node {NodeId}", n.Id);
-                            if (!ReservedComputeNodes.Any(r => r.AffinityId.Equals(n.AffinityId)))
+                            if (ReservedComputeNodes.Any(r => r.AffinityId.Equals(n.AffinityId)))
+                            {
+                                logger.LogTrace("Removing {ComputeNode} from reserved nodes list", n.Id);
+                                affinitiesToRemove = affinitiesToRemove.Append(ReservedComputeNodes.FirstOrDefault(r => r.AffinityId.Equals(n.AffinityId)));
+                            }
+                            else
                             {
                                 nodesToRemove = nodesToRemove.Append(n);
                                 switch (n.IsDedicated)
@@ -203,6 +209,10 @@ namespace TesApi.Web
                         {
                             TargetDedicated -= dedicatedDecrementTarget;
                             TargetLowPriority -= lowPriDecrementTarget;
+                            foreach (var affinity in affinitiesToRemove)
+                            {
+                                _ = ReservedComputeNodes.Remove(affinity);
+                            }
                         }
 
                         // Return when all the groups are done

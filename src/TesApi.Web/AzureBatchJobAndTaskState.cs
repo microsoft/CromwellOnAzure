@@ -117,5 +117,13 @@ namespace TesApi.Web
         ///     equivilant to the error field returned by "docker inspect".
         /// </remarks>
         public string TaskContainerError { get; set; }
+        /// <summary>
+        /// Gets the task's pool Id.
+        /// </summary>
+        public string PoolId { get; set; }
+        /// <summary>
+        /// Gets a locality hint that can be used by the Batch service to select a node on which to start the task.
+        /// </summary>
+        public AffinityInformation AffinityInformation { get; set; }
     }
 }
