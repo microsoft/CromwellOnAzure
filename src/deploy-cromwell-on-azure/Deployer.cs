@@ -257,8 +257,6 @@ namespace CromwellOnAzureDeployer
 
                         configuration.CosmosDbAccountName = cosmosDbAccountName;
 
-                        await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
-
                         var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
 
                         if (installedVersion is null)
