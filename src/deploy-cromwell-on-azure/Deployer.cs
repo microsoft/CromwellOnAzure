@@ -1993,7 +1993,7 @@ namespace CromwellOnAzureDeployer
             var container = blobClient.GetBlobContainerClient(containerName);
 
             await container.CreateIfNotExistsAsync();
-            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), cts.Token);
+            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, cts.Token);
         }
 
         private static string GetLinuxParentPath(string path)
