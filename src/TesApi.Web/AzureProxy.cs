@@ -24,6 +24,7 @@ using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
+using Microsoft.VisualBasic;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -526,17 +527,6 @@ namespace TesApi.Web
             => (await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState"), cancellationToken: cancellationToken)).AllocationState;
 
         /// <summary>
-        /// Iterates over the compute nodes of the specified pool, invoking a synchronous delegate for each compute node.
-        /// </summary>
-        /// <param name="poolId">The id of the pool.</param>
-        /// <param name="body">The delegate to execute for each compute node in the specified pool.</param>
-        /// <param name="detailLevel">A Microsoft.Azure.Batch.DetailLevel used for filtering the list and for controlling which properties are retrieved from the service.</param>
-        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
-        /// <returns></returns>
-        public async Task ForEachComputeNodeAsync(string poolId, Action<ComputeNode> body, DetailLevel detailLevel = null, CancellationToken cancellationToken = default)
-            => await batchClient.PoolOperations.ListComputeNodes(poolId, detailLevel: detailLevel).ForEachAsync(body, cancellationToken);
-
-        /// <summary>
         /// TODO
         /// </summary>
         /// <param name="poolId"></param>
@@ -871,9 +861,9 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Creates an Azure Batch pool that's lifecycle must be manually managed
+        /// Creates an Azure Batch pool who's lifecycle must be manually managed
         /// </summary>
-        /// <param name="poolInfo">Contains information about a pool. poolInfo.Name becomes the Pool.Id</param>
+        /// <param name="poolInfo">Contains information about a pool. <see cref="BatchModels.ProxyResource.Name"/> becomes the <see cref="CloudPool.Id"/></param>
         /// <returns></returns>
         public async Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo)
         {
@@ -928,6 +918,10 @@ namespace TesApi.Web
         public async Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName)
             => (await GetAccessibleStorageAccountsAsync())
                 .FirstOrDefault(storageAccount => storageAccount.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase));
+
+        /// <inheritdoc/>
+        public IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null)
+            => batchClient.PoolOperations.ListComputeNodes(poolId, detailLevel: detailLevel).ToAsyncEnumerable();
 
         private class VmPrice
         {

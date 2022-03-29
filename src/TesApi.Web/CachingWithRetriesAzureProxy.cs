@@ -173,7 +173,7 @@ namespace TesApi.Web
             => asyncRetryPolicy.ExecuteAsync(() => azureProxy.SetComputeNodeTargetsAsync(poolId, targetLowPriorityComputeNodes, targetDedicatedComputeNodes, cancellationToken));
 
         /// <inheritdoc/>
-        public Task ForEachComputeNodeAsync(string poolId, Action<ComputeNode> body, DetailLevel detailLevel = null, CancellationToken cancellationToken = default)
-            => azureProxy.ForEachComputeNodeAsync(poolId, body, detailLevel, cancellationToken);
+        public IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null)
+            => retryPolicy.Execute(() => azureProxy.ListComputeNodesAsync(poolId, detailLevel));
     }
 }

@@ -159,69 +159,72 @@ namespace TesApi.Web
         /// <summary>
         /// Gets the list of pool ids referenced by the jobs
         /// </summary>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns>Pool ids</returns>
         Task<IEnumerable<string>> GetPoolIdsReferencedByJobsAsync(CancellationToken cancellationToken);
 
         /// <summary>
         /// Deletes the specified pool
         /// </summary>
+        /// <param name="poolId">The id of the pool.</param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Lists compute nodes in batch pool <paramref name="poolId"/>
+        /// </summary>
+        /// <param name="poolId">The id of the pool.</param>
+        /// <param name="detailLevel">A Microsoft.Azure.Batch.DetailLevel used for filtering the list and for controlling which properties are retrieved from the service.</param>
+        /// <returns></returns>
+        IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null);
 
         /// <summary>
         /// Deletes the specified computeNodes
         /// </summary>
-        /// <param name="poolId"></param>
+        /// <param name="poolId">The id of the pool.</param>
         /// <param name="computeNodes"></param>
-        /// <param name="cancellationToken"></param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         Task DeleteBatchComputeNodesAsync(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// TODO
         /// </summary>
-        /// <param name="poolId"></param>
-        /// <param name="cancellationToken"></param>
+        /// <param name="poolId">The id of the pool.</param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         Task<Microsoft.Azure.Batch.Common.AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// TODO
         /// </summary>
-        /// <param name="poolId"></param>
+        /// <param name="poolId">The id of the pool.</param>
         /// <returns></returns>
         (int TargetLowPriority, int TargetDedicated) GetComputeNodeTargets(string poolId);
 
         /// <summary>
         /// TODO
         /// </summary>
-        /// <param name="poolId"></param>
+        /// <param name="poolId">The id of the pool.</param>
         /// <param name="targetLowPriorityComputeNodes"></param>
         /// <param name="targetDedicatedComputeNodes"></param>
-        /// <param name="cancellationToken"></param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Iterates over the compute nodes of the specified pool, invoking a synchronous delegate for each compute node.
-        /// </summary>
-        /// <param name="poolId">The id of the pool.</param>
-        /// <param name="body">The delegate to execute for each compute node in the specified pool.</param>
-        /// <param name="detailLevel">A Microsoft.Azure.Batch.DetailLevel used for filtering the list and for controlling which properties are retrieved from the service.</param>
-        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
-        /// <returns></returns>
-        Task ForEachComputeNodeAsync(string poolId, Action<ComputeNode> body, DetailLevel detailLevel = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
         /// TODO
         /// </summary>
-        /// <param name="poolId"></param>
-        /// <param name="cancellationToken"></param>
+        /// <param name="poolId">The id of the pool.</param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Checks if a local file exists
         /// </summary>
+	/// <param name="path"></param>
+	/// <returns>True if file was found</returns>
         bool LocalFileExists(string path);
 
         /// <summary>

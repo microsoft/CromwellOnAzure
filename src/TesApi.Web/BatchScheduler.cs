@@ -136,28 +136,28 @@ namespace TesApi.Web
 
             async Task SetTaskCompleted(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                ReleaseComputeNodeReservation(batchInfo);
+                await ReleaseComputeNodeReservationOrRemovePool(batchInfo);
                 await azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, TesState.COMPLETEEnum, batchInfo);
             }
 
             async Task SetTaskExecutorError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                ReleaseComputeNodeReservation(batchInfo);
+                await ReleaseComputeNodeReservationOrRemovePool(batchInfo);
                 await azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             }
 
             async Task SetTaskSystemError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                ReleaseComputeNodeReservation(batchInfo);
+                await ReleaseComputeNodeReservationOrRemovePool(batchInfo);
                 await azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, TesState.SYSTEMERROREnum, batchInfo);
             }
 
             async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
             {
-                ReleaseComputeNodeReservation(batchInfo);
+                await ReleaseComputeNodeReservationOrRemovePool(batchInfo);
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, newTaskState, batchInfo); 
             }
@@ -170,13 +170,25 @@ namespace TesApi.Web
 
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                ReleaseComputeNodeReservation(batchInfo);
+                await ReleaseComputeNodeReservationOrRemovePool(batchInfo);
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 tesTask.IsCancelRequested = false; 
             }
 
-            void ReleaseComputeNodeReservation(CombinedBatchTaskInfo batchInfo)
-                => (!enableBatchAutopool && batchPools.TryGet(batchInfo.PoolId, out var pool) ? pool : default)?.ReleaseNode(batchInfo.AffinityInformation);
+            async Task ReleaseComputeNodeReservationOrRemovePool(CombinedBatchTaskInfo batchInfo)
+            {
+                if (enableBatchAutopool)
+                {
+                    if (!string.IsNullOrWhiteSpace(batchInfo.PoolId) && !batchInfo.PoolId.StartsWith("TES"))
+                    {
+                        await azureProxy.DeleteBatchPoolAsync(batchInfo.PoolId);
+                    }
+                }
+                else
+                {
+                    (batchPools.TryGet(batchInfo.PoolId, out var pool) ? pool : default)?.ReleaseNode(batchInfo.AffinityInformation);
+                }
+            }
 
             tesTaskStateTransitions = new List<TesTaskStateTransition>()
             {
@@ -258,6 +270,8 @@ namespace TesApi.Web
         /// <returns>A task to await</returns>
         private async Task AddBatchJobAsync(TesTask tesTask)
         {
+            PoolInformation poolInformation = null;
+
             try
             {
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
@@ -275,8 +289,6 @@ namespace TesApi.Web
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var dockerImage = tesTask.Executors.First().Image;
-
-                PoolInformation poolInformation = null;
 
                 var containerConfiguration = await ContainerConfigurationIfNeeded(dockerImage);
                 var startTask = await StartTaskIfNeeded(tesTask);
@@ -310,6 +322,7 @@ namespace TesApi.Web
 
                 tesTaskLog.StartTime = DateTimeOffset.UtcNow;
                 tesTask.State = TesState.INITIALIZINGEnum;
+                poolInformation = null;
             }
             catch (AzureBatchQuotaMaxedOutException exception)
             {
@@ -345,6 +358,13 @@ namespace TesApi.Web
                 tesTask.State = TesState.SYSTEMERROREnum;
                 tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
                 logger.LogError(exc, exc.Message);
+            }
+            finally
+            {
+                if (enableBatchAutopool && poolInformation is not null && poolInformation.AutoPoolSpecification is null)
+                {
+                    await azureProxy.DeleteBatchPoolAsync(poolInformation.PoolId);
+                }
             }
         }
 
@@ -1252,7 +1272,7 @@ namespace TesApi.Web
                 }
             }
 
-            throw new AzureBatchVirtualMachineAvailabilityException(noVmFoundMessage);
+            throw new AzureBatchVirtualMachineAvailabilityException(noVmFoundMessage.Trim());
         }
 
         private async Task<(BatchNodeMetrics BatchNodeMetrics, DateTimeOffset? TaskStartTime, DateTimeOffset? TaskEndTime, int? CromwellRcCode)> GetBatchNodeMetricsAndCromwellResultCodeAsync(TesTask tesTask)

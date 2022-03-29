@@ -23,7 +23,6 @@ namespace TesApi.Web
     {
         ConcurrentDictionary<string, ConcurrentQueue<IBatchPool>> ManagedBatchPools { get; }
         object syncObject { get; }
-        IAzureProxy azureProxy { get; }
 
         TimeSpan IdleNodeCheck { get; }
         TimeSpan IdlePoolCheck { get; }
@@ -199,7 +198,6 @@ namespace TesApi.Web
 
         ConcurrentDictionary<string, ConcurrentQueue<IBatchPool>> IBatchPoolsImpl.ManagedBatchPools => ManagedBatchPools;
         object IBatchPoolsImpl.syncObject => syncObject;
-        IAzureProxy IBatchPoolsImpl.azureProxy => _azureProxy;
         #endregion
     }
 }

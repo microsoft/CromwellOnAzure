@@ -57,22 +57,17 @@ namespace TesApi.Web
             this.batchPools = (IBatchPoolsImpl)batchPools;
             this.logger = logger;
             this.isDisabled = configuration.GetValue("BatchAutopool", false);
-            resizeInterval = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolResizeTime", 0.5)); // TODO: set this to an appropriate value
-            removeNodeIfIdleInterval = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolRemoveNodeIfIdleTime", 2)); // TODO: set this to an appropriate value
-            rotateInterval = TimeSpan.FromDays(configuration.GetValue<double>("BatchPoolRotateTime", 0.25)); // TODO: set this to an appropriate value
-            removePoolIfEmptyInterval = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolRemovePoolIfEmptyTime", 60)); // TODO: set this to an appropriate value
+            resizeInterval = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolResizeInterval", 0.5)); // TODO: set this to an appropriate value
+            removeNodeIfIdleInterval = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolRemoveNodeIfIdleInterval", 2)); // TODO: set this to an appropriate value
+            rotateInterval = TimeSpan.FromDays(configuration.GetValue<double>("BatchPoolRotateInterval", 0.25)); // TODO: set this to an appropriate value
+            removePoolIfEmptyInterval = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolRemovePoolIfEmptyInterval", 60)); // TODO: set this to an appropriate value
         }
 
         /// <inheritdoc />
         public override Task StartAsync(CancellationToken cancellationToken)
-        {
-            if (isDisabled)
-            {
-                return Task.CompletedTask;
-            }
-
-            return base.StartAsync(cancellationToken);
-        }
+            => isDisabled
+                ? Task.CompletedTask
+                : base.StartAsync(cancellationToken);
 
         /// <inheritdoc/>
         public override Task StopAsync(CancellationToken cancellationToken)
@@ -97,40 +92,54 @@ namespace TesApi.Web
 
         private async Task ResizeAsync(CancellationToken stoppingToken)
         {
-            logger.LogInformation("Resize BatchPool task started.");
+            logger.LogInformation("BatchPool Resize task started.");
             await ProcessPoolsAsync(IBatchPool.ServiceKind.Resize, ResizeInterval, stoppingToken).ConfigureAwait(false);
-            logger.LogInformation("Resize BatchPool task gracefully stopped.");
+            logger.LogInformation("BatchPool Resize task gracefully stopped.");
         }
 
         private async Task RemoveNodeIfIdleAsync(CancellationToken stoppingToken)
         {
-            logger.LogInformation("RemoveNodeIfIdle BatchPool task started.");
+            logger.LogInformation("BatchPool RemoveNodeIfIdle task started.");
             await ProcessPoolsAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle, RemoveNodeIfIdleInterval, stoppingToken).ConfigureAwait(false);
-            logger.LogInformation("RemoveNodeIfIdle BatchPool task gracefully stopped.");
+            logger.LogInformation("BatchPool RemoveNodeIfIdle task gracefully stopped.");
         }
 
         private async Task RotateAsync(CancellationToken stoppingToken)
         {
-            logger.LogInformation("Rotate BatchPool task started.");
+            logger.LogInformation("BatchPool Rotate task started.");
             await ProcessPoolsAsync(IBatchPool.ServiceKind.Rotate, RotateInterval, stoppingToken).ConfigureAwait(false);
-            logger.LogInformation("Rotate BatchPool task gracefully stopped.");
+            logger.LogInformation("BatchPool Rotate task gracefully stopped.");
         }
 
         private async Task RemovePoolIfEmptyAsync(CancellationToken stoppingToken)
         {
-            logger.LogInformation("RemovePoolIfEmpty BatchPool task started.");
+            logger.LogInformation("BatchPool RemovePoolIfEmpty task started.");
             await ProcessPoolsAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty, RemovePoolIfEmptyInterval, stoppingToken).ConfigureAwait(false);
-            logger.LogInformation("RemovePoolIfEmpty BatchPool task gracefully stopped.");
+            logger.LogInformation("BatchPool RemovePoolIfEmpty task gracefully stopped.");
         }
 
         private async Task ProcessPoolsAsync(IBatchPool.ServiceKind service, TimeSpan processInterval, CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                logger.LogTrace("Calling {ServiceKind}", service);
+                logger.LogTrace("BatchPool Calling {ServiceKind}", service);
                 try
                 {
                     await Task.WhenAll(batchPools.ManagedBatchPools.Values.SelectMany(q => q).Select(p => p.ServicePoolAsync(service, stoppingToken)).ToArray());
+                }
+                catch (AggregateException ex)
+                {
+                    foreach (var e in ex.InnerExceptions)
+                    {
+                        if (e switch
+                            {
+                                var x when x is OperationCanceledException && stoppingToken.IsCancellationRequested => false,
+                                _ => true,
+                            })
+                        {
+                            LogError(e);
+                        }
+                    }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -138,9 +147,9 @@ namespace TesApi.Web
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, @"Failure in {Task}: {Message}", service, ex.Message);
+                    LogError(ex);
                 }
-                logger.LogTrace("Completed {ServiceKind}", service);
+                logger.LogTrace("BatchPool Finished {ServiceKind}", service);
 
                 try
                 {
@@ -151,6 +160,9 @@ namespace TesApi.Web
                     break;
                 }
             }
+
+            void LogError(Exception e)
+                => logger.LogError(e, @"Failure in BatchPool {Task}: {Message}", service, e.Message);
         }
     }
 }
