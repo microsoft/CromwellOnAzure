@@ -35,12 +35,14 @@ using Microsoft.Azure.Management.Storage.Fluent;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Rest;
 using Microsoft.Rest.Azure.OData;
+using MySql.Data.MySqlClient;
 using Newtonsoft.Json;
 using Polly;
 using Polly.Retry;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 using Common;
+using System.Net;
 
 namespace CromwellOnAzureDeployer
 {
@@ -88,6 +90,7 @@ namespace CromwellOnAzureDeployer
         private IEnumerable<string> subscriptionIds { get; set; }
         private bool SkipBillingReaderRoleAssignment { get; set; }
         private bool isResourceGroupCreated { get; set; }
+        private string totalNumberOfRunningDockerContainers { get; set; }
 
         public Deployer(Configuration configuration)
         {
@@ -112,6 +115,7 @@ namespace CromwellOnAzureDeployer
                 azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                 subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
+                totalNumberOfRunningDockerContainers = "3"; // TODO: replace with command line flag.
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
@@ -120,7 +124,7 @@ namespace CromwellOnAzureDeployer
                 IGenericResource logAnalyticsWorkspace = null;
                 IGenericResource appInsights = null;
                 ICosmosDBAccount cosmosDb = null;
-                Server mySQLServer = null;
+                IMySQLManagementClient mySQLServer = null;
                 IStorageAccount storageAccount = null;
                 IVirtualMachine linuxVm = null;
                 INetworkSecurityGroup networkSecurityGroup = null;
@@ -259,8 +263,11 @@ namespace CromwellOnAzureDeployer
                         {
                             throw new ValidationException($"Could not retrieve the MySQL Server name from virtual machine {configuration.VmName}.");
                         }
-                        mySQLServer = await new MySQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId }.Servers.GetAsync(configuration.ResourceGroupName, mySQLServerName)
+                        mySQLServer = new MySQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+                        var loadServer = await mySQLServer.Servers.GetAsync(configuration.ResourceGroupName, mySQLServerName)
                             ?? throw new ValidationException($"MySQL server {mySQLServerName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+                        await AddMySQLFirewallRuleForNicAsync(linuxVm, mySQLServer);
+
 
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
 
@@ -411,14 +418,13 @@ namespace CromwellOnAzureDeployer
                             configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
                         }
 
+                        // Provision Azure MySQL DB before provisioning VM.
+                        await Task.Run(async () => mySQLServer = await CreateAndProvisionMySQLServerAsync());
+
                         await Task.WhenAll(new Task[]
                         {
                         	Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
                         	Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
-                        	Task.Run(async () => mySQLServer = await CreateMySQLServerAsync()),
-                        	Task.Run(async () => await CreateMySQLDbAndProvisionAsync()),
-
-                            // TODO (adinas): This is likely where I need to make an Azure MySQL instance
 
                             Task.Run(async () =>
                             {
@@ -444,6 +450,7 @@ namespace CromwellOnAzureDeployer
                                         {
                                             networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
                                             await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
+                                            await AddMySQLFirewallRuleForNicAsync(linuxVm, mySQLServer);
                                         }
 
                                         sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
@@ -602,7 +609,7 @@ namespace CromwellOnAzureDeployer
                     {
                         var (numberOfRunningContainers, _, _) = await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo docker ps -a | grep -c 'Up ' || :");
 
-                        if (numberOfRunningContainers == "4")
+                        if (numberOfRunningContainers == totalNumberOfRunningDockerContainers)
                         {
                             break;
                         }
@@ -793,9 +800,7 @@ namespace CromwellOnAzureDeployer
                         (Utility.GetFileContent("scripts", "env-03-external-images.txt"), $"{CromwellAzureRootDir}/env-03-external-images.txt", false),
                         (Utility.GetFileContent("scripts", "docker-compose.yml"), $"{CromwellAzureRootDir}/docker-compose.yml", false),
                         (Utility.GetFileContent("scripts", "cromwellazure.service"), "/lib/systemd/system/cromwellazure.service", false),
-                        (Utility.GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true),
-                        (Utility.GetFileContent("scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
-                        (Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
+                        (Utility.GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true)
                     }));
 
         private Task WriteCoaVersionToVmAsync(ConnectionInfo sshConnectionInfo)
@@ -1048,12 +1053,15 @@ namespace CromwellOnAzureDeployer
                     .WithWriteReplication(Region.Create(configuration.RegionName))
                     .CreateAsync(cts.Token));
 
-        // TODO (adinas): Func for creating MySQLServer
-        private Task<Server> CreateMySQLServerAsync()
-            => Execute(
+        private async Task<IMySQLManagementClient> CreateAndProvisionMySQLServerAsync()
+        {
+            var mySQLManagementClient = new MySQLManagementClient(azureCredentials)
+            { SubscriptionId = configuration.SubscriptionId };
+
+            // Create Server.
+            await Execute(
                 $"Creating MySQL On Azure Server Instance: {configuration.MySQLServerName}...",
-                () => new MySQLManagementClient(azureCredentials) 
-                { SubscriptionId = configuration.SubscriptionId }.Servers.BeginCreateAsync(
+                () => mySQLManagementClient.Servers.CreateAsync(
                      configuration.ResourceGroupName, configuration.MySQLServerName,
                      new ServerForCreate(
                          new ServerPropertiesForDefaultCreate(
@@ -1061,19 +1069,46 @@ namespace CromwellOnAzureDeployer
                              administratorLoginPassword: "Pa$$word123"),
                          configuration.RegionName)));
 
-        // TODO (adinas): Func for creating MySQLDB
-        // TODO: Firewall rule? query uploader?
-        private async Task CreateMySQLDbAndProvisionAsync()
-        {
-            //Create DB
+            // Create a firewall rule for current machine's external IP.
+            var externalIpString = new WebClient().DownloadString("http://icanhazip.com").Replace("\\r\\n", "").Replace("\\n", "").Trim();
+            var externalIp = IPAddress.Parse(externalIpString);
+            await Execute(
+                $"Creating Firewall Rule...",
+                () => mySQLManagementClient.FirewallRules.CreateOrUpdateAsync(
+                    configuration.ResourceGroupName, configuration.MySQLServerName, "AllowLocalIP",
+            new FirewallRule(externalIp.ToString(), externalIp.ToString())));
+            
+            // Create Database.
             await Execute(
                 $"Creating MySQL On Azure Server Databse: cromwell_db...",
-                () => new MySQLManagementClient(azureCredentials)
-                { SubscriptionId = configuration.SubscriptionId }.Databases.BeginCreateOrUpdateAsync(
+                () => mySQLManagementClient.Databases.CreateOrUpdateAsync(
                configuration.ResourceGroupName, configuration.MySQLServerName, "cromwell_db",
                new Database()));
-            // Execute queries
 
+            // Execute queries
+            ConsoleEx.WriteLine("Executing scripts on cromwell_db.");
+            var connectionString = $"Database=cromwell_db;Data Source={configuration.MySQLServerName}.mysql.database.azure.com;User Id=cromwell@{configuration.MySQLServerName};Password=Pa$$word123";
+            using (var connection = new MySqlConnection(connectionString))
+            {
+                var initScript = new MySqlScript(connection, Utility.GetFileContent("scripts", "mysql", "init-user.sql"));
+                var unlockChangeScript = new MySqlScript(connection, Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"))
+                {
+                    Delimiter = "$$"
+                };
+                await connection.OpenAsync();
+                await initScript.ExecuteAsync();
+                await unlockChangeScript.ExecuteAsync();
+            }
+
+            // Update the cromwell-application.conf file with server name.
+            // TODO: FIX??? Find and replace somehow not writing but working in code????
+            ConsoleEx.WriteLine("Updating cromwell-application.conf with new server information.");
+            Utility.PersonalizeContent(new[]
+            {
+                new Utility.ConfigReplaceTextItem("{ReplaceWithServerName}", configuration.MySQLServerName),
+            }, "scripts", "cromwell-application.conf");
+
+            return mySQLManagementClient;
         }
 
         private Task AssignVmAsBillingReaderToSubscriptionAsync(IIdentity managedIdentity)
@@ -1213,6 +1248,12 @@ namespace CromwellOnAzureDeployer
                 () => networkInterface.Update().WithExistingNetworkSecurityGroup(networkSecurityGroup).ApplyAsync()
             );
 
+        private Task<FirewallRule> AddMySQLFirewallRuleForNicAsync(IVirtualMachine vm, IMySQLManagementClient sqlManagementClient)
+        => Execute(
+            $"Adding MySQL Firewall Rule for VM NIC. IP: {vm.GetPrimaryPublicIPAddress().IPAddress}",
+            () => sqlManagementClient.FirewallRules.CreateOrUpdateAsync(configuration.ResourceGroupName, configuration.MySQLServerName,
+                    "AllowVMNic", new FirewallRule(vm.GetPrimaryPublicIPAddress().IPAddress, vm.GetPrimaryPublicIPAddress().IPAddress))                
+            );
 
         private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
             => Execute(
