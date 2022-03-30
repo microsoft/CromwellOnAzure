@@ -50,6 +50,15 @@ namespace TesApi.Web
         Task ServicePoolAsync(ServiceKind serviceKind, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Schedules reimaging of the compute node.
+        /// </summary>
+        /// <param name="nodeInformation">Descriptor of the compute node to reimage.</param>
+        /// <param name="taskState"></param>
+        /// <returns></returns>
+        /// <remarks>This needs to be called as soon as possible after the compute node enters the 'Running' state. It's safe to call at any time as well as repeatedly.</remarks>
+        Task ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState);
+
+        /// <summary>
         /// Types of maintenance calls offered by the <see cref="IBatchPool.ServicePoolAsync(ServiceKind, CancellationToken)"/> service method.
         /// </summary>
         enum ServiceKind

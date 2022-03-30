@@ -187,14 +187,14 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task BatchJobContainsExpectedBatchPoolInformation()
         {
-            (_, _, var poolInformation, var pool, var batchPools) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(false);
+            (_, var task, var poolInformation, var pool, var batchPools) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(false);
 
             Assert.IsNull(poolInformation.AutoPoolSpecification);
             Assert.IsNotNull(poolInformation.PoolId);
             Assert.AreEqual("VmSizeDedicated1-", poolInformation.PoolId[0..^13]);
             Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
             Assert.IsTrue(batchPools.TryGet(poolInformation.PoolId, out var pool1));
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool1).TestTargetDedicated);
+            Assert.IsTrue(((IBatchPoolImpl)pool1).TestIsNodeReserved(task.AffinityInformation.AffinityId));
             Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
         }
 
@@ -930,6 +930,10 @@ namespace TesApi.Tests
             azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>())).Returns(Task.FromResult(azureProxyReturnValues.DownloadedBlobContent));
             azureProxy.Setup(a => a.LocalFileExists(It.IsAny<string>())).Returns(azureProxyReturnValues.LocalFileExists);
             azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>())).Returns((Pool p) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
+            azureProxy.Setup(a => a.ListComputeNodesAsync(It.IsAny<string>(), It.IsAny<DetailLevel>()))
+                .Returns(new Func<string, DetailLevel, IAsyncEnumerable<ComputeNode>>((string poolId, DetailLevel detailLevel)
+                    => AsyncEnumerable.Empty<ComputeNode>()
+                        .Append(BatchPoolTests.GenerateNode(poolId, "ComputeNodeDedicated1", true, true))));
 
             return azureProxy;
         }

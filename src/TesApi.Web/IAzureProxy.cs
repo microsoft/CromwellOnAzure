@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
+using Microsoft.Azure.Batch.Common;
 using Tes.Models;
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
 
@@ -199,6 +200,16 @@ namespace TesApi.Web
         /// TODO
         /// </summary>
         /// <param name="poolId">The id of the pool.</param>
+        /// <param name="computeNodeId"></param>
+        /// <param name="reimageOption"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="poolId">The id of the pool.</param>
         /// <returns></returns>
         (int TargetLowPriority, int TargetDedicated) GetComputeNodeTargets(string poolId);
 
@@ -223,8 +234,8 @@ namespace TesApi.Web
         /// <summary>
         /// Checks if a local file exists
         /// </summary>
-	/// <param name="path"></param>
-	/// <returns>True if file was found</returns>
+        /// <param name="path"></param>
+        /// <returns>True if file was found</returns>
         bool LocalFileExists(string path);
 
         /// <summary>

@@ -46,6 +46,8 @@ namespace TesApi.Tests
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
                 info = await pool.PrepareNodeAsync(true);
             }
+            catch (AzureBatchQuotaMaxedOutException)
+            { }
             finally
             {
                 AzureProxyListComputeNodesAsync = default;
@@ -75,6 +77,8 @@ namespace TesApi.Tests
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
                 info = await pool.PrepareNodeAsync(false);
             }
+            catch (AzureBatchQuotaMaxedOutException)
+            { }
             finally
             {
                 AzureProxyListComputeNodesAsync = default;
@@ -96,7 +100,6 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeIncrementsLowPriorityTargetWhenNoLowPriorityNodeIsIdle()
         {
-            var reboots = 0;
             var pool = await CreateBatchPoolAsync();
             var nodes = new ComputeNode[]
             {
@@ -113,25 +116,19 @@ namespace TesApi.Tests
             AffinityInformation info = default;
             try
             {
-                IsRebootCandidate = (isDedicated, isIdle) => isIdle && !isDedicated;
-                RebootCalled = rebootCalled;
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
                 info = await pool.PrepareNodeAsync(true);
             }
+            catch (AzureBatchQuotaMaxedOutException)
+            { }
             finally
             {
                 AzureProxyListComputeNodesAsync = default;
-                IsRebootCandidate = default;
-                RebootCalled = default;
             }
 
             Assert.IsNull(info);
-            Assert.AreEqual(0, reboots);
             Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
-
-            void rebootCalled()
-                => ++reboots;
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
@@ -147,7 +144,6 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeIncrementsLowPriorityTargetWhenNoDedicatedNodeIsIdle()
         {
-            var reboots = 0;
             var pool = await CreateBatchPoolAsync();
             var nodes = new ComputeNode[]
             {
@@ -164,25 +160,19 @@ namespace TesApi.Tests
             AffinityInformation info = default;
             try
             {
-                IsRebootCandidate = (isDedicated, isIdle) => isIdle && isDedicated;
-                RebootCalled = rebootCalled;
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
                 info = await pool.PrepareNodeAsync(false);
             }
+            catch (AzureBatchQuotaMaxedOutException)
+            { }
             finally
             {
                 AzureProxyListComputeNodesAsync = default;
-                IsRebootCandidate = default;
-                RebootCalled = default;
             }
 
             Assert.IsNull(info);
-            Assert.AreEqual(0, reboots);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetDedicated);
-
-            void rebootCalled()
-                => ++reboots;
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
@@ -198,7 +188,6 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeReturnsLowPriorityTargetWhenAtLeastOneNodeIsIdle()
         {
-            var reboots = 0;
             var pool = await CreateBatchPoolAsync();
             var nodes = new ComputeNode[]
             {
@@ -215,25 +204,17 @@ namespace TesApi.Tests
             AffinityInformation info = default;
             try
             {
-                IsRebootCandidate = (isDedicated, isIdle) => isIdle && !isDedicated;
-                RebootCalled = rebootCalled;
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
                 info = await pool.PrepareNodeAsync(true);
             }
             finally
             {
                 AzureProxyListComputeNodesAsync = default;
-                IsRebootCandidate = default;
-                RebootCalled = default;
             }
 
             Assert.AreEqual(AffinityPrefix + "NodeOneLoPriIdle", info.AffinityId);
-            Assert.AreEqual(1, reboots);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
-
-            void rebootCalled()
-                => ++reboots;
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
@@ -249,7 +230,6 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeReturnsDedictatedTargetWhenAtLeastOneNodeIsIdle()
         {
-            var reboots = 0;
             var pool = await CreateBatchPoolAsync();
             var nodes = new ComputeNode[]
             {
@@ -266,25 +246,17 @@ namespace TesApi.Tests
             AffinityInformation info = default;
             try
             {
-                IsRebootCandidate = (isDedicated, isIdle) => isIdle && isDedicated;
-                RebootCalled = rebootCalled;
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
                 info = await pool.PrepareNodeAsync(false);
             }
             finally
             {
                 AzureProxyListComputeNodesAsync = default;
-                IsRebootCandidate = default;
-                RebootCalled = default;
             }
 
             Assert.AreEqual(AffinityPrefix + "NodeOneDedicatedIdle", info.AffinityId);
-            Assert.AreEqual(1, reboots);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
-
-            void rebootCalled()
-                => ++reboots;
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
@@ -300,7 +272,6 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeDoesNotDuplicateNodes()
         {
-            var reboots = 0;
             var pool = await CreateBatchPoolAsync();
             var nodes = new ComputeNode[]
             {
@@ -316,8 +287,6 @@ namespace TesApi.Tests
 
             try
             {
-                IsRebootCandidate = (isDedicated, isIdle) => isIdle;
-                RebootCalled = rebootCalled;
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
                 _ = await pool.PrepareNodeAsync(true);
                 _ = await pool.PrepareNodeAsync(true);
@@ -325,16 +294,11 @@ namespace TesApi.Tests
             finally
             {
                 AzureProxyListComputeNodesAsync = default;
-                IsRebootCandidate = default;
-                RebootCalled = default;
             }
 
             Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeTwoLoPriIdle"));
             Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneLoPriIdle"));
             Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-
-            void rebootCalled()
-                => ++reboots;
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
@@ -350,7 +314,6 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ReleaseNodeRemovesNodeWhenReserved()
         {
-            var reboots = 0;
             var pool = await CreateBatchPoolAsync();
             var nodes = new ComputeNode[]
             {
@@ -366,8 +329,6 @@ namespace TesApi.Tests
 
             try
             {
-                IsRebootCandidate = (isDedicated, isIdle) => isIdle;
-                RebootCalled = rebootCalled;
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
                 _ = await pool.PrepareNodeAsync(true);
                 _ = await pool.PrepareNodeAsync(false);
@@ -379,16 +340,11 @@ namespace TesApi.Tests
             finally
             {
                 AzureProxyListComputeNodesAsync = default;
-                IsRebootCandidate = default;
-                RebootCalled = default;
             }
 
             Assert.IsFalse(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneDedicatedIdle"));
             Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneLoPriIdle"));
             Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-
-            void rebootCalled()
-                => ++reboots;
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
@@ -404,7 +360,6 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ReleaseNodeDoesNotFailWhenNodeNotFound()
         {
-            var reboots = 0;
             var pool = await CreateBatchPoolAsync();
             var nodes = new ComputeNode[]
             {
@@ -420,8 +375,6 @@ namespace TesApi.Tests
 
             try
             {
-                IsRebootCandidate = (isDedicated, isIdle) => isIdle;
-                RebootCalled = rebootCalled;
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
                 _ = await pool.PrepareNodeAsync(true);
                 _ = await pool.PrepareNodeAsync(false);
@@ -433,14 +386,9 @@ namespace TesApi.Tests
             finally
             {
                 AzureProxyListComputeNodesAsync = default;
-                IsRebootCandidate = default;
-                RebootCalled = default;
             }
 
             Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-
-            void rebootCalled()
-                => ++reboots;
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
@@ -519,7 +467,7 @@ namespace TesApi.Tests
             {
                 AzureProxySetComputeNodeTargets = SetTargets;
                 AzureProxyGetAllocationState = GetState;
-                _ = await pool.PrepareNodeAsync(false);
+                try { _ = await pool.PrepareNodeAsync(false); } catch (AzureBatchQuotaMaxedOutException) { }
                 await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
             }
@@ -552,7 +500,7 @@ namespace TesApi.Tests
             {
                 AzureProxySetComputeNodeTargets = SetTargets;
                 AzureProxyGetAllocationState = GetState;
-                _ = await pool.PrepareNodeAsync(false);
+                try { _ = await pool.PrepareNodeAsync(false); } catch (AzureBatchQuotaMaxedOutException) { }
                 await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
             }
@@ -585,7 +533,6 @@ namespace TesApi.Tests
         public async Task RemoveNodeIfIdleRemovesNodesWhenNodesAreIdle()
         {
             DateTime expiryTime = default;
-            var reboots = 0;
             var pool = await CreateBatchPoolAsync();
             var nodes = new ComputeNode[]
             {
@@ -604,8 +551,6 @@ namespace TesApi.Tests
                 AzureProxyGetAllocationState = GetState;
                 AzureProxyReturnComputeNodeTargets = () => (4, 4);
                 AzureProxyGetComputeNodeTargets = ValidateComputeNodeTargets;
-                IsRebootCandidate = (isDedicated, isIdle) => isIdle;
-                RebootCalled = rebootCalled;
                 AzureProxyListComputeNodesAsync = ListComputeNodesSyncSize;
                 _ = await pool.PrepareNodeAsync(true);
                 _ = await pool.PrepareNodeAsync(true);
@@ -637,8 +582,6 @@ namespace TesApi.Tests
             {
                 AzureProxyDeleteBatchComputeNodes = default;
                 AzureProxyListComputeNodesAsync = default;
-                IsRebootCandidate = default;
-                RebootCalled = default;
                 AzureProxyReturnComputeNodeTargets = default;
                 AzureProxyGetComputeNodeTargets = default;
                 AzureProxyGetAllocationState = default;
@@ -658,9 +601,6 @@ namespace TesApi.Tests
             void ValidateComputeNodeTargets(string id)
                 => Assert.AreEqual(pool.Pool.PoolId, id);
 
-            void rebootCalled()
-                => ++reboots;
-
             IAsyncEnumerable<ComputeNode> ListComputeNodesSyncSize(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCNSyncSize, c => c.State == ComputeNodeState.Idle);
 
@@ -668,8 +608,8 @@ namespace TesApi.Tests
             {
                 Assert.AreEqual(pool.Pool.PoolId, id);
                 Assert.IsNotNull(detail);
-                Assert.AreEqual("id,affinityId,isDedicated", detail.SelectClause);
-                Assert.AreEqual("state eq 'idle'", detail.FilterClause);
+                Assert.AreEqual("id,state,affinityId,isDedicated", detail.SelectClause);
+                Assert.AreEqual("state ne 'unusable' and state ne 'starttaskfailed' and state ne 'unknown' and state ne 'leavingpool' and state ne 'offline' and state ne 'preempted'", detail.FilterClause);
             }
 
             IAsyncEnumerable<ComputeNode> ListComputeNodesRemoveNode(string id, ODATADetailLevel detail)
@@ -726,7 +666,7 @@ namespace TesApi.Tests
         public async Task RotateMarksPoolUnavailableWhenRotateIntervalHasPassed()
         {
             var pool = await CreateBatchPoolAsync();
-            _ = await pool.PrepareNodeAsync(false);
+            try { _ = await pool.PrepareNodeAsync(false); } catch (AzureBatchQuotaMaxedOutException) { }
 
             await Task.Delay(((IBatchPoolImpl)pool).TestRotatePoolTime);
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Rotate);
@@ -846,8 +786,6 @@ namespace TesApi.Tests
         private Action<string, int?, int?> AzureProxySetComputeNodeTargets;
         private Func<(int?, int?)> AzureProxyGetCurrentComputeNodes;
         private Action<string, CancellationToken> AzureProxyDeleteBatchPool;
-        private Func<bool, bool, bool> IsRebootCandidate;
-        private Action RebootCalled;
 
         private static IConfiguration GetMockConfig()
         {
@@ -859,22 +797,9 @@ namespace TesApi.Tests
             return config;
         }
 
-        private ComputeNode GenerateNode(string poolId, string id, bool isDedicated, bool isIdle)
+        internal static ComputeNode GenerateNode(string poolId, string id, bool isDedicated, bool isIdle)
         {
             var computeNodeOperations = new Mock<Microsoft.Azure.Batch.Protocol.IComputeNodeOperations>();
-            computeNodeOperations.Setup(x => x.RebootWithHttpMessagesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Microsoft.Azure.Batch.Protocol.Models.ComputeNodeRebootOption?>(), It.IsAny<Microsoft.Azure.Batch.Protocol.Models.ComputeNodeRebootOptions>(), It.IsAny<Dictionary<string, List<string>>>(), It.IsAny<CancellationToken>()))
-                .Callback<string, string, Microsoft.Azure.Batch.Protocol.Models.ComputeNodeRebootOption?, Microsoft.Azure.Batch.Protocol.Models.ComputeNodeRebootOptions, Dictionary<string, List<string>>, CancellationToken>((poolId, nodeId, nodeRebootOption, computeNodeRebootOptions, customHeaders, cancelationToken) =>
-                {
-                    if (IsRebootCandidate?.Invoke(isDedicated, isIdle) ?? false)
-                    {
-                        RebootCalled();
-                    }
-                    else
-                    {
-                        Assert.Fail("Should not be rebooted.");
-                    }
-                })
-                .Returns(Task.FromResult(new Microsoft.Rest.Azure.AzureOperationHeaderResponse<Microsoft.Azure.Batch.Protocol.Models.ComputeNodeRebootHeaders>()));
             var batchServiceClient = new MockServiceClient(computeNodeOperations.Object);
             var protocolLayer = typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient).Assembly.GetType("Microsoft.Azure.Batch.ProtocolLayer").GetConstructor(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient) }, null)
                 .Invoke(new object[] { batchServiceClient });

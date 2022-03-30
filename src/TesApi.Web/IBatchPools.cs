@@ -42,11 +42,20 @@ namespace TesApi.Web
         Task<IBatchPool> GetOrAddAsync(CloudPool pool);
 
         /// <summary>
-        /// 
+        /// Retrieves the requested batch pool.
         /// </summary>
         /// <param name="poolId">The <see cref="PoolInformation.PoolId"/> of the requested <paramref name="batchPool"/>.</param>
         /// <param name="batchPool">Returns the requested <see cref="IBatchPool"/>.</param>
         /// <returns>True if the requested <paramref name="batchPool"/> was found, False otherwise.</returns>
         bool TryGet(string poolId, out IBatchPool batchPool);
+
+        /// <summary>
+        /// Schedules reimaging of the compute node.
+        /// </summary>
+        /// <param name="nodeInformation">Descriptor of the compute node to reimage.</param>
+        /// <param name="taskState"></param>
+        /// <returns></returns>
+        /// <remarks>This needs to be called as soon as possible after the compute node enters the 'Running' state. It's safe to call at any time as well as repeatedly.</remarks>
+        Task ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState);
     }
 }

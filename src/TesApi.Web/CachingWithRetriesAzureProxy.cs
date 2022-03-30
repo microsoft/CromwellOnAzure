@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using LazyCache;
 using Microsoft.Azure.Batch;
+using Microsoft.Azure.Batch.Common;
 using Polly;
 using Polly.Retry;
 using Tes.Models;
@@ -175,5 +176,9 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null)
             => retryPolicy.Execute(() => azureProxy.ListComputeNodesAsync(poolId, detailLevel));
+
+        /// <inheritdoc/>
+        public Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default)
+            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ReimageComputeNodeAsync(poolId, computeNodeId, reimageOption, cancellationToken));
     }
 }

@@ -125,5 +125,9 @@ namespace TesApi.Web
         /// Gets a locality hint that can be used by the Batch service to select a node on which to start the task.
         /// </summary>
         public AffinityInformation AffinityInformation { get; set; }
+        /// <summary>
+        /// Gets the compute node information.
+        /// </summary>
+        public ComputeNodeInformation ComputeNodeInformation { get; set; }
     }
 }

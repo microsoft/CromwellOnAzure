@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -54,27 +55,51 @@ namespace TesApi.Web
         /// <returns>An <see cref="AffinityInformation"/> describing the reserved compute node, or null if a new node is requested.</returns>
         public async Task<AffinityInformation> PrepareNodeAsync(bool isLowPriority, CancellationToken cancellationToken = default)
         {
-            Task rebootTask = default;
             AffinityInformation result = default;
             try
             {
+                var cache = new ConcurrentDictionary<ComputeNodeState, List<ComputeNode>>();
                 await foreach (var node in azureProxy
                     .ListComputeNodesAsync(
                         Pool.PoolId,
-                        new ODATADetailLevel(filterClause: $"state eq 'idle'", selectClause: "id,affinityId,isDedicated"))
+                        new ODATADetailLevel(filterClause: "state ne 'unusable' and state ne 'starttaskfailed' and state ne 'unknown' and state ne 'leavingpool' and state ne 'offline' and state ne 'preempted'", selectClause: "id,state,affinityId,isDedicated"))
                     .WithCancellation(cancellationToken))
                 {
                     if (result is null && isLowPriority == !node.IsDedicated)
                     {
-                        lock (lockObj)
+                        switch (node.State)
                         {
-                            var affinityId = new AffinityInformation(node.AffinityId);
-                            if (ReservedComputeNodes.Contains(affinityId)) { continue; }
-                            logger.LogDebug("Reserving ComputeNode {NodeId}", node.Id);
-                            ReservedComputeNodes.Add(result = affinityId);
+                            case ComputeNodeState.Idle:
+                                result = TryAssignNode(node);
+                                if (result is not null) { return result; }
+                                break;
+
+                            case ComputeNodeState.Rebooting:
+                            case ComputeNodeState.Reimaging:
+                            case ComputeNodeState.Running:
+                            case ComputeNodeState.Creating:
+                            case ComputeNodeState.Starting:
+                            case ComputeNodeState.WaitingForStartTask:
+                                cache.GetOrAdd(node.State.Value, s => new List<ComputeNode>()).Add(node);
+                                break;
+
+                            default:
+                                throw new InvalidOperationException("Unexpected compute node state.");
                         }
-                        rebootTask = node.RebootAsync(rebootOption: ComputeNodeRebootOption.TaskCompletion, cancellationToken: CancellationToken.None);
-                        break;
+                    }
+                }
+
+                if (result is null)
+                {
+                    var states = new[] { ComputeNodeState.WaitingForStartTask, ComputeNodeState.Starting, ComputeNodeState.Rebooting, ComputeNodeState.Creating, ComputeNodeState.Reimaging/*, ComputeNodeState.Running*/ };
+                    foreach (var state in states)
+                    {
+                        foreach (var node in cache.GetOrAdd(state, s => new List<ComputeNode>()))
+                        {
+                            // TODO: Consider adding some intelligence around stateTransitionTime
+                            result = TryAssignNode(node);
+                            if (result is not null) { return result; }
+                        }
                     }
                 }
             }
@@ -83,23 +108,28 @@ namespace TesApi.Web
                 // log? TODO: determine
             }
 
-            if (result is null)
+            lock (lockObj)
+            {
+                switch (isLowPriority)
+                {
+                    case true: ++TargetLowPriority; break;
+                    case false: ++TargetDedicated; break;
+                }
+            }
+
+            throw new AzureBatchQuotaMaxedOutException("Pool is being resized for this job.");
+
+            AffinityInformation TryAssignNode(ComputeNode node)
             {
                 lock (lockObj)
                 {
-                    switch (isLowPriority)
-                    {
-                        case true: ++TargetLowPriority; break;
-                        case false: ++TargetDedicated; break;
-                    }
+                    var affinityId = new AffinityInformation(node.AffinityId);
+                    if (ReservedComputeNodes.Contains(affinityId)) { return default; }
+                    logger.LogDebug("Reserving ComputeNode {NodeId}", node.Id);
+                    ReservedComputeNodes.Add(affinityId);
+                    return affinityId;
                 }
             }
-            else if (rebootTask is not null)
-            {
-                await rebootTask;
-            }
-
-            return result;
         }
 
         /// <summary>
@@ -113,6 +143,51 @@ namespace TesApi.Web
                 if (ReservedComputeNodes.Remove(ReservedComputeNodes.FirstOrDefault(n => n.Equals(affinity))))
                 {
                     logger.LogDebug("Removing reservation for {AffinityId}", affinity.AffinityId);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState)
+        {
+            if (nodeInformation is not null)
+            {
+                var affinity = new AffinityInformation(nodeInformation.AffinityId);
+                if (ReservedComputeNodes.Contains(affinity))
+                {
+                    switch (taskState)
+                    {
+                        case BatchTaskState.Initializing:
+                            break;
+
+                        case BatchTaskState.Running:
+                        case BatchTaskState.CompletedSuccessfully:
+                        case BatchTaskState.CompletedWithErrors:
+                        case BatchTaskState.NodeFailedDuringStartupOrExecution:
+                            if (ReservedComputeNodes.Contains(affinity))
+                            {
+                                if (await azureProxy.ReimageComputeNodeAsync(nodeInformation.PoolId, nodeInformation.ComputeNodeId, taskState switch
+                                {
+                                    BatchTaskState.Running => ComputeNodeReimageOption.TaskCompletion,
+                                    _ => ComputeNodeReimageOption.Requeue,
+                                }))
+                                {
+                                    ReleaseNode(affinity);
+                                }
+                            }
+                            break;
+
+                        case BatchTaskState.ActiveJobWithMissingAutoPool:
+                        case BatchTaskState.JobNotFound:
+                        case BatchTaskState.ErrorRetrievingJobs:
+                        case BatchTaskState.MoreThanOneActiveJobFound:
+                        case BatchTaskState.NodeAllocationFailed:
+                        case BatchTaskState.NodePreempted:
+                        case BatchTaskState.NodeUnusable:
+                        case BatchTaskState.MissingBatchTask:
+                            ReleaseNode(affinity);
+                            break;
+                    }
                 }
             }
         }

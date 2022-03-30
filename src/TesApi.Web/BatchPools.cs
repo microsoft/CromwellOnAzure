@@ -155,9 +155,9 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public async Task<IBatchPool> GetOrAddAsync(CloudPool pool)
         {
-            if (isDisabled)
+            if (pool is null || isDisabled)
             {
-                return _poolFactory.Create(new PoolInformation { PoolId = pool.Id }, pool.VirtualMachineSize, this);
+                return default;
             }
 
             IBatchPool result;
@@ -172,7 +172,7 @@ namespace TesApi.Web
                 var separator = pool.Id?.LastIndexOf('-') ?? -1;
                 if (separator == -1 || pool.Id?.Length - separator != 14 || pool.AutoScaleEnabled != false) // this can't be our pool
                 {
-                    return default;
+                    return default; // TODO: Consider throwing? This should never happen, unless our caller is simply enumerating pools in the batch account.
                 }
 
                 var key = pool.Id[0..separator];
@@ -186,6 +186,20 @@ namespace TesApi.Web
 
             await result.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize);
             return result;
+        }
+
+        /// <inheritdoc/>
+        public Task ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState)
+        {
+            if (!isDisabled && nodeInformation is not null)
+            {
+                if (TryGet(nodeInformation.PoolId, out var pool))
+                {
+                    return pool.ScheduleReimage(nodeInformation, taskState);
+                }
+            }
+
+            return Task.CompletedTask;
         }
 
         private readonly object syncObject = new();

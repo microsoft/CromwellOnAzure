@@ -324,6 +324,10 @@ namespace TesApi.Web
                 tesTask.State = TesState.INITIALIZINGEnum;
                 poolInformation = null;
             }
+            catch (AggregateException ex) when (ex.InnerException is AzureBatchQuotaMaxedOutException)
+            {
+                logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {ex.InnerException.Message}. Task will remain in queue.");
+            }
             catch (AzureBatchQuotaMaxedOutException exception)
             {
                 logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {exception.Message}. Task will remain in queue.");
@@ -399,45 +403,105 @@ namespace TesApi.Web
             {
                 var batchJobInfo = JsonConvert.SerializeObject(azureBatchJobAndTaskState);
                 logger.LogWarning($"Found active job without auto pool for TES task {tesTask.Id}. Deleting the job and requeuing the task. BatchJobInfo: {batchJobInfo}");
-                return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.ActiveJobWithMissingAutoPool, FailureReason = BatchTaskState.ActiveJobWithMissingAutoPool.ToString(), PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                return new CombinedBatchTaskInfo
+                {
+                    BatchTaskState = BatchTaskState.ActiveJobWithMissingAutoPool,
+                    FailureReason = BatchTaskState.ActiveJobWithMissingAutoPool.ToString(),
+                    PoolId = azureBatchJobAndTaskState.PoolId,
+                    AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                    ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                };
             }
 
             if (azureBatchJobAndTaskState.MoreThanOneActiveJobFound)
             {
-                return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.MoreThanOneActiveJobFound, FailureReason = BatchTaskState.MoreThanOneActiveJobFound.ToString(), PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                return new CombinedBatchTaskInfo
+                {
+                    BatchTaskState = BatchTaskState.MoreThanOneActiveJobFound,
+                    FailureReason = BatchTaskState.MoreThanOneActiveJobFound.ToString(),
+                    PoolId = azureBatchJobAndTaskState.PoolId,
+                    AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                    ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                };
             }
 
             switch (azureBatchJobAndTaskState.JobState)
             {
                 case null:
                 case JobState.Deleting:
-                    return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.JobNotFound, FailureReason = BatchTaskState.JobNotFound.ToString(), PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                    return new CombinedBatchTaskInfo
+                    {
+                        BatchTaskState = BatchTaskState.JobNotFound,
+                        FailureReason = BatchTaskState.JobNotFound.ToString(),
+                        PoolId = azureBatchJobAndTaskState.PoolId,
+                        AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                        ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                    };
                 case JobState.Active:
                     {
                         if (azureBatchJobAndTaskState.NodeAllocationFailed)
                         {
-                            return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeAllocationFailed, FailureReason = BatchTaskState.NodeAllocationFailed.ToString(), SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState), PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                            return new CombinedBatchTaskInfo
+                            {
+                                BatchTaskState = BatchTaskState.NodeAllocationFailed,
+                                FailureReason = BatchTaskState.NodeAllocationFailed.ToString(),
+                                SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
+                                PoolId = azureBatchJobAndTaskState.PoolId,
+                                AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                                ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                            };
                         }
 
                         if (azureBatchJobAndTaskState.NodeState == ComputeNodeState.Unusable)
                         {
-                            return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeUnusable, FailureReason = BatchTaskState.NodeUnusable.ToString(), SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState), PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                            return new CombinedBatchTaskInfo
+                            {
+                                BatchTaskState = BatchTaskState.NodeUnusable,
+                                FailureReason = BatchTaskState.NodeUnusable.ToString(),
+                                SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
+                                PoolId = azureBatchJobAndTaskState.PoolId,
+                                AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                                ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                            };
                         }
 
                         if (azureBatchJobAndTaskState.NodeState == ComputeNodeState.Preempted)
                         {
-                            return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodePreempted, FailureReason = BatchTaskState.NodePreempted.ToString(), SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState), PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                            return new CombinedBatchTaskInfo
+                            {
+                                BatchTaskState = BatchTaskState.NodePreempted,
+                                FailureReason = BatchTaskState.NodePreempted.ToString(),
+                                SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
+                                PoolId = azureBatchJobAndTaskState.PoolId,
+                                AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                                ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                            };
                         }
 
                         if (azureBatchJobAndTaskState.NodeErrorCode is not null)
                         {
                             if (azureBatchJobAndTaskState.NodeErrorCode == "DiskFull")
                             {
-                                return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeFailedDuringStartupOrExecution, FailureReason = azureBatchJobAndTaskState.NodeErrorCode, PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                                return new CombinedBatchTaskInfo
+                                {
+                                    BatchTaskState = BatchTaskState.NodeFailedDuringStartupOrExecution,
+                                    FailureReason = azureBatchJobAndTaskState.NodeErrorCode,
+                                    PoolId = azureBatchJobAndTaskState.PoolId,
+                                    AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                                    ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                                };
                             }
                             else
                             {
-                                return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.NodeFailedDuringStartupOrExecution, FailureReason = BatchTaskState.NodeFailedDuringStartupOrExecution.ToString(), SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState), PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                                return new CombinedBatchTaskInfo
+                                {
+                                    BatchTaskState = BatchTaskState.NodeFailedDuringStartupOrExecution,
+                                    FailureReason = BatchTaskState.NodeFailedDuringStartupOrExecution.ToString(),
+                                    SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
+                                    PoolId = azureBatchJobAndTaskState.PoolId,
+                                    AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                                    ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                                };
                             }
                         }
 
@@ -453,12 +517,31 @@ namespace TesApi.Web
             switch (azureBatchJobAndTaskState.TaskState)
             {
                 case null:
-                    return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.MissingBatchTask, FailureReason = BatchTaskState.MissingBatchTask.ToString(), PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                    return new CombinedBatchTaskInfo
+                    {
+                        BatchTaskState = BatchTaskState.MissingBatchTask,
+                        FailureReason = BatchTaskState.MissingBatchTask.ToString(),
+                        PoolId = azureBatchJobAndTaskState.PoolId,
+                        AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                        ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                    };
                 case TaskState.Active:
                 case TaskState.Preparing:
-                    return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.Initializing, PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                    return new CombinedBatchTaskInfo
+                    {
+                        BatchTaskState = BatchTaskState.Initializing,
+                        PoolId = azureBatchJobAndTaskState.PoolId,
+                        AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                        ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                    };
                 case TaskState.Running:
-                    return new CombinedBatchTaskInfo { BatchTaskState = BatchTaskState.Running, PoolId = azureBatchJobAndTaskState.PoolId, AffinityInformation = azureBatchJobAndTaskState.AffinityInformation };
+                    return new CombinedBatchTaskInfo
+                    {
+                        BatchTaskState = BatchTaskState.Running,
+                        PoolId = azureBatchJobAndTaskState.PoolId,
+                        AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                        ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
+                    };
                 case TaskState.Completed:
                     var batchJobInfo = JsonConvert.SerializeObject(azureBatchJobAndTaskState);
 
@@ -475,7 +558,8 @@ namespace TesApi.Web
                             BatchNodeMetrics = metrics.BatchNodeMetrics,
                             CromwellRcCode = metrics.CromwellRcCode,
                             PoolId = azureBatchJobAndTaskState.PoolId,
-                            AffinityInformation = azureBatchJobAndTaskState.AffinityInformation
+                            AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                            ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                         };
                     }
                     else
@@ -491,7 +575,8 @@ namespace TesApi.Web
                             BatchTaskEndTime = azureBatchJobAndTaskState.TaskEndTime,
                             SystemLogItems = new[] { azureBatchJobAndTaskState.TaskFailureInformation?.Details?.FirstOrDefault()?.Value },
                             PoolId = azureBatchJobAndTaskState.PoolId,
-                            AffinityInformation = azureBatchJobAndTaskState.AffinityInformation
+                            AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
+                            ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                         };
                     }
                 default:
@@ -507,6 +592,8 @@ namespace TesApi.Web
         /// <returns>True if the TES task was changed.</returns>
         private async Task<bool> HandleTesTaskTransitionAsync(TesTask tesTask, CombinedBatchTaskInfo combinedBatchTaskInfo)
         {
+            await batchPools.ScheduleReimage(combinedBatchTaskInfo.ComputeNodeInformation, combinedBatchTaskInfo.BatchTaskState);
+
             // TODO: Here we need just need to apply actions
             // When task is executed the following may be touched:
             // tesTask.Log[].SystemLog
@@ -1411,6 +1498,7 @@ namespace TesApi.Web
             public IEnumerable<string> SystemLogItems { get; set; }
             public string PoolId { get; set; }
             public AffinityInformation AffinityInformation { get; set; }
+            public ComputeNodeInformation ComputeNodeInformation { get; set; }
         }
     }
 }

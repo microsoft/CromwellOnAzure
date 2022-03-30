@@ -300,6 +300,7 @@ namespace TesApi.Web
                 string poolId = null;
                 AffinityInformation affinityInformation = null;
                 TaskExecutionInformation taskExecutionInformation = null;
+                ComputeNodeInformation computeNodeInformation = null;
 
                 var jobFilter = new ODATADetailLevel
                 {
@@ -326,7 +327,7 @@ namespace TesApi.Web
                 var attemptNumber = lastJobInfo.AttemptNumber;
                 poolId = job.ExecutionInformation?.PoolId;
 
-                if (job.State == JobState.Active && poolId is not null)
+                if (poolId is not null)
                 {
                     var poolFilter = new ODATADetailLevel
                     {
@@ -334,30 +335,31 @@ namespace TesApi.Web
                         SelectClause = "*"
                     };
 
-                    var pool = (await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync()).FirstOrDefault();
+                    var pool = await batchClient.PoolOperations.ListPools(poolFilter).ToAsyncEnumerable().FirstOrDefaultAsync();
+                    _ = await batchPools.Value.GetOrAddAsync(pool); // Ensure that BatchPools knows about this pool.
 
-                    if (pool is not null)
+                    if (job.State == JobState.Active)
                     {
-                        // Ensure that BatchPools knows about this pool
-                        _ = await batchPools.Value.GetOrAddAsync(pool);
-
-                        nodeAllocationFailed = pool.ResizeErrors?.Count > 0;
-
-                        var node = (await pool.ListComputeNodes().ToListAsync()).FirstOrDefault();
-
-                        if (node is not null)
+                        if (pool is not null)
                         {
-                            nodeState = node.State;
-                            var nodeError = node.Errors?.FirstOrDefault();
-                            nodeErrorCode = nodeError?.Code;
-                            nodeErrorDetails = nodeError?.ErrorDetails?.Select(e => e.Value);
+                            nodeAllocationFailed = pool.ResizeErrors?.Count > 0;
+
+                            var node = await pool.ListComputeNodes().ToAsyncEnumerable().FirstOrDefaultAsync(n => (n.RecentTasks?.Select(t => t.JobId) ?? Enumerable.Empty<string>()).Contains(job.Id));
+
+                            if (node is not null)
+                            {
+                                nodeState = node.State;
+                                var nodeError = node.Errors?.FirstOrDefault();
+                                nodeErrorCode = nodeError?.Code;
+                                nodeErrorDetails = nodeError?.ErrorDetails?.Select(e => e.Value);
+                            }
                         }
-                    }
-                    else
-                    {
-                        if (job.CreationTime.HasValue && DateTime.UtcNow.Subtract(job.CreationTime.Value) > TimeSpan.FromMinutes(30))
+                        else
                         {
-                            activeJobWithMissingAutoPool = true;
+                            if (job.CreationTime.HasValue && DateTime.UtcNow.Subtract(job.CreationTime.Value) > TimeSpan.FromMinutes(30))
+                            {
+                                activeJobWithMissingAutoPool = true;
+                            }
                         }
                     }
                 }
@@ -368,6 +370,7 @@ namespace TesApi.Web
                     taskState = batchTask.State;
                     affinityInformation = batchTask.AffinityInformation;
                     taskExecutionInformation = batchTask.ExecutionInformation;
+                    computeNodeInformation = batchTask.ComputeNodeInformation;
                 }
                 catch (Exception ex)
                 {
@@ -396,7 +399,8 @@ namespace TesApi.Web
                     TaskExitCode = taskExecutionInformation?.ExitCode,
                     TaskFailureInformation = taskExecutionInformation?.FailureInformation,
                     TaskContainerState = taskExecutionInformation?.ContainerInformation?.State,
-                    TaskContainerError = taskExecutionInformation?.ContainerInformation?.Error
+                    TaskContainerError = taskExecutionInformation?.ContainerInformation?.Error,
+                    ComputeNodeInformation = computeNodeInformation
                 };
             }
             catch (Exception ex)
@@ -525,6 +529,21 @@ namespace TesApi.Web
         /// <returns></returns>
         public async Task<AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
             => (await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState"), cancellationToken: cancellationToken)).AllocationState;
+
+        /// <inheritdoc/>
+        public async Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default)
+        {
+            var computeNode = await batchClient.PoolOperations.GetComputeNodeAsync(poolId, computeNodeId, detailLevel: new ODATADetailLevel(selectClause: "id,state"), cancellationToken: cancellationToken);
+            switch (computeNode.State)
+            {
+                case ComputeNodeState.Idle:
+                case ComputeNodeState.Running:
+                    await computeNode.ReimageAsync(reimageOption: reimageOption, cancellationToken: cancellationToken);
+                    return true;
+                default:
+                    return false;
+            }
+        }
 
         /// <summary>
         /// TODO
