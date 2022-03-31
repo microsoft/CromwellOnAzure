@@ -362,7 +362,7 @@ namespace TesApi.Web
             if (!IsAvailable)
             {
                 var (lowPriorityNodes, dedicatedNodes) = await azureProxy.GetCurrentComputeNodesAsync(Pool.PoolId, cancellationToken);
-                if ((lowPriorityNodes is null || lowPriorityNodes == 0) && (dedicatedNodes is null || dedicatedNodes == 0) && PendingReservations.IsEmpty && ReservedComputeNodes.IsEmpty)
+                if ((lowPriorityNodes is null || lowPriorityNodes == 0) && (dedicatedNodes is null || dedicatedNodes == 0) && PendingReservations.IsEmpty && ReservedComputeNodes.Count == 0)
                 {
                     foreach (var queue in _batchPools.ManagedBatchPools.Values)
                     {
