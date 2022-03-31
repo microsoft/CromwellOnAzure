@@ -166,18 +166,23 @@ namespace CromwellOnAzureDeployer
 
                         networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(g => g.NetworkInterfaceIds.Contains(linuxVm.GetPrimaryNetworkInterface().Id));
 
-                        if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup is null)
+                        if (!configuration.PrivateNetworking.GetValueOrDefault())
                         {
-                            if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
+                            if (networkSecurityGroup is null)
                             {
-                                configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                                if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
+                                {
+                                    configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                                }
+
+                                networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
+                                await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
                             }
 
-                            networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
-                            await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
+                            await EnableSsh(networkSecurityGroup);
                         }
 
-                        await EnableSsh(networkSecurityGroup);
+
 
                         sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
 
@@ -2000,7 +2005,7 @@ namespace CromwellOnAzureDeployer
             var container = blobClient.GetBlobContainerClient(containerName);
 
             await container.CreateIfNotExistsAsync();
-            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), cts.Token);
+            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, cts.Token);
         }
 
         private static string GetLinuxParentPath(string path)
