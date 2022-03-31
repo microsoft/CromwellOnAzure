@@ -346,6 +346,11 @@ namespace CromwellOnAzureDeployer
                             configuration.MySQLServerName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
                         }
 
+                        if (string.IsNullOrWhiteSpace(configuration.MySQLServerPassword))
+                        {
+                            configuration.MySQLServerPassword = Utility.GeneratePassword();
+                        }
+
                         if (string.IsNullOrWhiteSpace(configuration.ApplicationInsightsAccountName))
                         {
                             configuration.ApplicationInsightsAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
@@ -418,13 +423,12 @@ namespace CromwellOnAzureDeployer
                             configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
                         }
 
-                        // Provision Azure MySQL DB before provisioning VM.
-                        await Task.Run(async () => mySQLServer = await CreateAndProvisionMySQLServerAsync());
 
                         await Task.WhenAll(new Task[]
                         {
                         	Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
                         	Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
+                            Task.Run(async () => mySQLServer = await CreateAndProvisionMySQLServerAsync()),
 
                             Task.Run(async () =>
                             {
@@ -450,7 +454,6 @@ namespace CromwellOnAzureDeployer
                                         {
                                             networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
                                             await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
-                                            await AddMySQLFirewallRuleForNicAsync(linuxVm, mySQLServer);
                                         }
 
                                         sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
@@ -474,6 +477,7 @@ namespace CromwellOnAzureDeployer
                     }
 
                     await WriteCoaVersionToVmAsync(sshConnectionInfo);
+                    await AddMySQLFirewallRuleForNicAsync(linuxVm, mySQLServer);
                     await RebootVmAsync(sshConnectionInfo);
                     await WaitForSshConnectivityAsync(sshConnectionInfo);
 
@@ -1015,7 +1019,11 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
                         new Utility.ConfigReplaceTextItem("{ManagedIdentityName}", managedIdentityName)
                     }, "scripts", ContainersToMountFileName));
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.GetFileContent("scripts", CromwellConfigurationFileName));
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
+                    {
+                        new Utility.ConfigReplaceTextItem("{ReplaceWithServerName}", configuration.MySQLServerName),
+                        new Utility.ConfigReplaceTextItem("{ReplaceWithServerPassword}", configuration.MySQLServerPassword),
+                    }, "scripts", CromwellConfigurationFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
 
@@ -1060,13 +1068,13 @@ namespace CromwellOnAzureDeployer
 
             // Create Server.
             await Execute(
-                $"Creating MySQL On Azure Server Instance: {configuration.MySQLServerName}...",
+                $"Creating MySQL On Azure Server Instance: {configuration.MySQLServerName} With Password: {configuration.MySQLServerPassword}...",
                 () => mySQLManagementClient.Servers.CreateAsync(
                      configuration.ResourceGroupName, configuration.MySQLServerName,
                      new ServerForCreate(
                          new ServerPropertiesForDefaultCreate(
                              administratorLogin: "cromwell",
-                             administratorLoginPassword: "Pa$$word123"),
+                             administratorLoginPassword: configuration.MySQLServerPassword),
                          configuration.RegionName)));
 
             // Create a firewall rule for current machine's external IP.
@@ -1087,7 +1095,7 @@ namespace CromwellOnAzureDeployer
 
             // Execute queries
             ConsoleEx.WriteLine("Executing scripts on cromwell_db.");
-            var connectionString = $"Database=cromwell_db;Data Source={configuration.MySQLServerName}.mysql.database.azure.com;User Id=cromwell@{configuration.MySQLServerName};Password=Pa$$word123";
+            var connectionString = $"Database=cromwell_db;Data Source={configuration.MySQLServerName}.mysql.database.azure.com;User Id=cromwell@{configuration.MySQLServerName};Password={configuration.MySQLServerPassword}";
             using (var connection = new MySqlConnection(connectionString))
             {
                 var initScript = new MySqlScript(connection, Utility.GetFileContent("scripts", "mysql", "init-user.sql"));
@@ -1099,14 +1107,6 @@ namespace CromwellOnAzureDeployer
                 await initScript.ExecuteAsync();
                 await unlockChangeScript.ExecuteAsync();
             }
-
-            // Update the cromwell-application.conf file with server name.
-            // TODO: FIX??? Find and replace somehow not writing but working in code????
-            ConsoleEx.WriteLine("Updating cromwell-application.conf with new server information.");
-            Utility.PersonalizeContent(new[]
-            {
-                new Utility.ConfigReplaceTextItem("{ReplaceWithServerName}", configuration.MySQLServerName),
-            }, "scripts", "cromwell-application.conf");
 
             return mySQLManagementClient;
         }
