@@ -17,36 +17,36 @@ namespace TesApi.Web
     /// </summary>
     public static partial class PagedInterfaceExtensions
     {
-        /// <summary>
-        /// Calls each element in the <see cref="IAsyncEnumerable{T}"/>, stopping when <paramref name="body"/> returns false.
-        /// </summary>
-        /// <typeparam name="T">The type of objects to enumerate.</typeparam>
-        /// <param name="source">The <see cref="IAsyncEnumerable{T}"/> to enumerate.</param>
-        /// <param name="body">The <see cref="Predicate{T}"/> that visits each element. Enumeration continues as long as <paramref name="body"/> returns true.</param>
-        /// <param name="cancellationToken">A <see cref="CancellationToken"/> for controlling the lifetime of the asynchronous operation.</param>
-        /// <returns><see cref="Task"/></returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="OperationCanceledException"></exception>
-        public static async Task ForEachAsync<T>(this IAsyncEnumerable<T> source, Predicate<T> body, CancellationToken cancellationToken = default)
-        {
-            await foreach (var item in (source ?? throw new ArgumentNullException(nameof(source))).WithCancellation(cancellationToken).ConfigureAwait(false))
-            {
-                if (!body(item)) return;
-            }
-        }
+        ///// <summary>
+        ///// Calls each element in the <see cref="IAsyncEnumerable{T}"/>, stopping when <paramref name="body"/> returns false.
+        ///// </summary>
+        ///// <typeparam name="T">The type of objects to enumerate.</typeparam>
+        ///// <param name="source">The <see cref="IAsyncEnumerable{T}"/> to enumerate.</param>
+        ///// <param name="body">The <see cref="Predicate{T}"/> that visits each element. Enumeration continues as long as <paramref name="body"/> returns true.</param>
+        ///// <param name="cancellationToken">A <see cref="CancellationToken"/> for controlling the lifetime of the asynchronous operation.</param>
+        ///// <returns><see cref="Task"/></returns>
+        ///// <exception cref="ArgumentNullException"></exception>
+        ///// <exception cref="OperationCanceledException"></exception>
+        //public static async Task ForEachAsync<T>(this IAsyncEnumerable<T> source, Predicate<T> body, CancellationToken cancellationToken = default)
+        //{
+        //    await foreach (var item in (source ?? throw new ArgumentNullException(nameof(source))).WithCancellation(cancellationToken).ConfigureAwait(false))
+        //    {
+        //        if (!body(item)) return;
+        //    }
+        //}
 
-        /// <summary>
-        /// Calls each element in the <see cref="IAsyncEnumerable{T}"/> with <paramref name="body"/>.
-        /// </summary>
-        /// <typeparam name="T">The type of objects to enumerate.</typeparam>
-        /// <param name="source">The <see cref="IAsyncEnumerable{T}"/> to enumerate.</param>
-        /// <param name="body">The <see cref="Action{Task}"/> that visits each element.</param>
-        /// <param name="cancellationToken">A <see cref="CancellationToken"/> for controlling the lifetime of the asynchronous operation.</param>
-        /// <returns><see cref="Task"/></returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="OperationCanceledException"></exception>
-        public static Task ForEachAsync<T>(this IAsyncEnumerable<T> source, Action<T> body, CancellationToken cancellationToken = default)
-            => source.ForEachAsync(t => { body(t); return true; }, cancellationToken);
+        ///// <summary>
+        ///// Calls each element in the <see cref="IAsyncEnumerable{T}"/> with <paramref name="body"/>.
+        ///// </summary>
+        ///// <typeparam name="T">The type of objects to enumerate.</typeparam>
+        ///// <param name="source">The <see cref="IAsyncEnumerable{T}"/> to enumerate.</param>
+        ///// <param name="body">The <see cref="Action{Task}"/> that visits each element.</param>
+        ///// <param name="cancellationToken">A <see cref="CancellationToken"/> for controlling the lifetime of the asynchronous operation.</param>
+        ///// <returns><see cref="Task"/></returns>
+        ///// <exception cref="ArgumentNullException"></exception>
+        ///// <exception cref="OperationCanceledException"></exception>
+        //public static Task ForEachAsync<T>(this IAsyncEnumerable<T> source, Action<T> body, CancellationToken cancellationToken = default)
+        //    => source.ForEachAsync(t => { body(t); return true; }, cancellationToken);
 
 
         /// <summary>
@@ -71,7 +71,7 @@ namespace TesApi.Web
 
 
         #region Implementation classes
-        private sealed class AsyncEnumerable<T> : IAsyncEnumerable<T>
+        private struct AsyncEnumerable<T> : IAsyncEnumerable<T>
         {
             private readonly Func<CancellationToken, IAsyncEnumerator<T>> getEnumerator;
 
@@ -117,21 +117,23 @@ namespace TesApi.Web
                 cancellationToken.ThrowIfCancellationRequested();
                 return enumerator.MoveNext()
                     ? ValueTask.FromResult(true)
-                    : new(new Func<Task<bool>>(async () =>
+                    : new(MoveToNextSource());
+
+                async Task<bool> MoveToNextSource()
+                {
+                    do
                     {
-                        do
+                        enumerator?.Dispose();
+                        enumerator = null;
+                        source = await source.GetNextPageAsync(cancellationToken).ConfigureAwait(false);
+                        if (source is null)
                         {
-                            enumerator?.Dispose();
-                            enumerator = null;
-                            source = await source.GetNextPageAsync(cancellationToken).ConfigureAwait(false);
-                            if (source is null)
-                            {
-                                return false;
-                            }
-                            enumerator = source.GetEnumerator();
-                        } while (!(enumerator?.MoveNext() ?? false));
-                        return true;
-                    })());
+                            return false;
+                        }
+                        enumerator = source.GetEnumerator();
+                    } while (!(enumerator?.MoveNext() ?? false));
+                    return true;
+                }
             }
         }
 

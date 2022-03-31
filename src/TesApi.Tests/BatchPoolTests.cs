@@ -3,29 +3,29 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
+//using System.IO;
 using System.Linq;
-using System.Numerics;
-using System.Text;
-using System.Text.RegularExpressions;
+//using System.Numerics;
+//using System.Text;
+//using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using LazyCache;
-using LazyCache.Providers;
+//using LazyCache;
+//using LazyCache.Providers;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.Batch.Models;
-using Microsoft.Azure.Management.Sql.Fluent;
-using Microsoft.Extensions.Caching.Memory;
+//using Microsoft.Azure.Management.Sql.Fluent;
+//using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+//using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using Newtonsoft.Json;
-using Tes.Extensions;
-using Tes.Models;
+//using Newtonsoft.Json;
+//using Tes.Extensions;
+//using Tes.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests
@@ -36,7 +36,7 @@ namespace TesApi.Tests
         private const string AffinityPrefix = "AP-";
 
         [TestMethod]
-        public async Task PrepareNodeIncrementsLowPriorityTargetWhenNoNodeIsIdle()
+        public async Task PrepareNodeMakesReservationWhenPoolIsEmpty()
         {
             var pool = await CreateBatchPoolAsync();
 
@@ -44,7 +44,7 @@ namespace TesApi.Tests
             try
             {
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
-                info = await pool.PrepareNodeAsync(true);
+                info = await pool.PrepareNodeAsync("JobId1", true);
             }
             catch (AzureBatchQuotaMaxedOutException)
             { }
@@ -54,7 +54,8 @@ namespace TesApi.Tests
             }
 
             Assert.IsNull(info);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetLowPriority);
+            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
+            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
@@ -63,6 +64,176 @@ namespace TesApi.Tests
                 Assert.IsNotNull(detail);
                 Assert.IsNotNull(detail.SelectClause);
                 return AsyncEnumerable.Empty<ComputeNode>();
+            }
+        }
+
+        [TestMethod]
+        public async Task PrepareNodeMakesOnlyOneReservationPerJobWhenPoolIsNotResized()
+        {
+            var pool = await CreateBatchPoolAsync();
+
+            AffinityInformation info = default;
+            try
+            {
+                AzureProxyListComputeNodesAsync = ListComputeNodes;
+                _ = await pool.PrepareNodeAsync("JobId1", true);
+            }
+            catch (AzureBatchQuotaMaxedOutException)
+            {
+                try { info = await pool.PrepareNodeAsync("JobId1", true); }
+                catch (AzureBatchQuotaMaxedOutException) { }
+            }
+            finally
+            {
+                AzureProxyListComputeNodesAsync = default;
+            }
+
+            Assert.IsNull(info);
+            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
+            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
+            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
+
+            IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
+            {
+                Assert.AreEqual(pool.Pool.PoolId, id);
+                Assert.IsNotNull(detail);
+                Assert.IsNotNull(detail.SelectClause);
+                return AsyncEnumerable.Empty<ComputeNode>();
+            }
+        }
+
+        [TestMethod]
+        public async Task PrepareNodeMakesMultipleReservationsWhenPoolIsNotResized()
+        {
+            var pool = await CreateBatchPoolAsync();
+
+            AffinityInformation info = default;
+            try
+            {
+                AzureProxyListComputeNodesAsync = ListComputeNodes;
+                _ = await pool.PrepareNodeAsync("JobId1", true);
+            }
+            catch (AzureBatchQuotaMaxedOutException)
+            {
+                try { info = await pool.PrepareNodeAsync("JobId2", true); }
+                catch (AzureBatchQuotaMaxedOutException) { }
+            }
+            finally
+            {
+                AzureProxyListComputeNodesAsync = default;
+            }
+
+            Assert.IsNull(info);
+            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
+            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
+            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
+
+            IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
+            {
+                Assert.AreEqual(pool.Pool.PoolId, id);
+                Assert.IsNotNull(detail);
+                Assert.IsNotNull(detail.SelectClause);
+                return AsyncEnumerable.Empty<ComputeNode>();
+            }
+        }
+
+        [TestMethod]
+        public async Task PrepareNodeIncrementsLowPriorityTargetWhenNoNodeIsIdle()
+        {
+            var pool = await CreateBatchPoolAsync();
+            var setTargetsCalled = false;
+
+            AffinityInformation info = default;
+            try
+            {
+                AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
+                AzureProxySetComputeNodeTargets = (id, loPri, dedic) => setTargetsCalled = true;
+                AzureProxyListComputeNodesAsync = ListComputeNodes;
+                _ = await pool.PrepareNodeAsync("JobId1", true);
+            }
+            catch (AzureBatchQuotaMaxedOutException)
+            {
+                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
+                await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
+                info = await pool.PrepareNodeAsync("JobId1", true);
+            }
+            finally
+            {
+                AzureProxyListComputeNodesAsync = default;
+                AzureProxySetComputeNodeTargets = default;
+                AzureProxyGetAllocationState = default;
+            }
+
+            Assert.IsNotNull(info);
+            Assert.IsTrue(setTargetsCalled);
+            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetLowPriority);
+            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
+
+            IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
+            {
+                Assert.AreEqual(pool.Pool.PoolId, id);
+                Assert.IsNotNull(detail);
+                Assert.IsNotNull(detail.SelectClause);
+                var result = AsyncEnumerable.Empty<ComputeNode>();
+                if (setTargetsCalled)
+                {
+                    result = result.Append(GenerateNode(pool.Pool.PoolId, "ComputeNode1", false, true));
+                }
+                return result;
+            }
+        }
+
+        [TestMethod]
+        public async Task PrepareNodeAssignsRunningNodeWhenNoUnassignedNodeIsIsIdle()
+        {
+            var pool = await CreateBatchPoolAsync();
+            var setTargetsCalled = false;
+
+            AffinityInformation info = default;
+            try
+            {
+                AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
+                AzureProxySetComputeNodeTargets = (id, loPri, dedic) => setTargetsCalled = true;
+                AzureProxyListComputeNodesAsync = ListComputeNodes;
+                _ = await pool.PrepareNodeAsync("JobId1", true);
+            }
+            catch (AzureBatchQuotaMaxedOutException)
+            {
+                try { info = await pool.PrepareNodeAsync("JobId2", true); }
+                catch (AzureBatchQuotaMaxedOutException) { }
+                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
+                await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
+                _ = await pool.PrepareNodeAsync("JobId2", true);
+                info = await pool.PrepareNodeAsync("JobId1", true);
+            }
+            finally
+            {
+                AzureProxyListComputeNodesAsync = default;
+                AzureProxySetComputeNodeTargets = default;
+                AzureProxyGetAllocationState = default;
+            }
+
+            Assert.IsNotNull(info);
+            Assert.IsTrue(setTargetsCalled);
+            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
+            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestTargetLowPriority);
+            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(AffinityPrefix + "ComputeNode1", info.AffinityId);
+
+            IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
+            {
+                Assert.AreEqual(pool.Pool.PoolId, id);
+                Assert.IsNotNull(detail);
+                Assert.IsNotNull(detail.SelectClause);
+                var result = AsyncEnumerable.Empty<ComputeNode>();
+                if (setTargetsCalled)
+                {
+                    result = result.Append(GenerateNode(pool.Pool.PoolId, "ComputeNode1", false, false));
+                    result = result.Append(GenerateNode(pool.Pool.PoolId, "ComputeNode2", false, true));
+                }
+                return result;
             }
         }
 
@@ -70,21 +241,32 @@ namespace TesApi.Tests
         public async Task PrepareNodeIncrementsDedicatedTargetWhenNoNodeIsIdle()
         {
             var pool = await CreateBatchPoolAsync();
+            var setTargetsCalled = false;
 
             AffinityInformation info = default;
             try
             {
+                AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
+                AzureProxySetComputeNodeTargets = (id, loPri, dedic) => setTargetsCalled = true;
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
-                info = await pool.PrepareNodeAsync(false);
+                _ = await pool.PrepareNodeAsync("JobId1", false);
             }
             catch (AzureBatchQuotaMaxedOutException)
-            { }
+            {
+                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
+                await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
+                info = await pool.PrepareNodeAsync("JobId1", false);
+            }
             finally
             {
                 AzureProxyListComputeNodesAsync = default;
+                AzureProxySetComputeNodeTargets = default;
+                AzureProxyGetAllocationState = default;
             }
 
-            Assert.IsNull(info);
+            Assert.IsNotNull(info);
+            Assert.IsTrue(setTargetsCalled);
+            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestNodeReservationCount);
             Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetDedicated);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
 
@@ -93,179 +275,12 @@ namespace TesApi.Tests
                 Assert.AreEqual(pool.Pool.PoolId, id);
                 Assert.IsNotNull(detail);
                 Assert.IsNotNull(detail.SelectClause);
-                return AsyncEnumerable.Empty<ComputeNode>();
-            }
-        }
-
-        [TestMethod]
-        public async Task PrepareNodeIncrementsLowPriorityTargetWhenNoLowPriorityNodeIsIdle()
-        {
-            var pool = await CreateBatchPoolAsync();
-            var nodes = new ComputeNode[]
-            {
-                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedRunning", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriRunning", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedRunning", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriIdle", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedIdle", true, true),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriIdle", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, true),
-            };
-
-            AffinityInformation info = default;
-            try
-            {
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
-                info = await pool.PrepareNodeAsync(true);
-            }
-            catch (AzureBatchQuotaMaxedOutException)
-            { }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-            }
-
-            Assert.IsNull(info);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
-
-            IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
-                => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
-
-            void ValidateLCN(string id, ODATADetailLevel detail)
-            {
-                Assert.AreEqual(pool.Pool.PoolId, id);
-                Assert.IsNotNull(detail);
-                Assert.IsNotNull(detail.SelectClause);
-            }
-        }
-
-        [TestMethod]
-        public async Task PrepareNodeIncrementsLowPriorityTargetWhenNoDedicatedNodeIsIdle()
-        {
-            var pool = await CreateBatchPoolAsync();
-            var nodes = new ComputeNode[]
-            {
-                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedRunning", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriRunning", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedRunning", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriIdle", false, true),
-                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedIdle", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriIdle", false, true),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, false),
-            };
-
-            AffinityInformation info = default;
-            try
-            {
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
-                info = await pool.PrepareNodeAsync(false);
-            }
-            catch (AzureBatchQuotaMaxedOutException)
-            { }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-            }
-
-            Assert.IsNull(info);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetDedicated);
-
-            IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
-                => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
-
-            void ValidateLCN(string id, ODATADetailLevel detail)
-            {
-                Assert.AreEqual(pool.Pool.PoolId, id);
-                Assert.IsNotNull(detail);
-                Assert.IsNotNull(detail.SelectClause);
-            }
-        }
-
-        [TestMethod]
-        public async Task PrepareNodeReturnsLowPriorityTargetWhenAtLeastOneNodeIsIdle()
-        {
-            var pool = await CreateBatchPoolAsync();
-            var nodes = new ComputeNode[]
-            {
-                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedRunning", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriRunning", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedRunning", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriIdle", false, true),
-                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedIdle", true, true),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriIdle", false, true),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, true),
-            };
-
-            AffinityInformation info = default;
-            try
-            {
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
-                info = await pool.PrepareNodeAsync(true);
-            }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-            }
-
-            Assert.AreEqual(AffinityPrefix + "NodeOneLoPriIdle", info.AffinityId);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
-
-            IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
-                => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
-
-            void ValidateLCN(string id, ODATADetailLevel detail)
-            {
-                Assert.AreEqual(pool.Pool.PoolId, id);
-                Assert.IsNotNull(detail);
-                Assert.IsNotNull(detail.SelectClause);
-            }
-        }
-
-        [TestMethod]
-        public async Task PrepareNodeReturnsDedictatedTargetWhenAtLeastOneNodeIsIdle()
-        {
-            var pool = await CreateBatchPoolAsync();
-            var nodes = new ComputeNode[]
-            {
-                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedRunning", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriRunning", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedRunning", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriIdle", false, true),
-                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedIdle", true, true),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriIdle", false, true),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, true),
-            };
-
-            AffinityInformation info = default;
-            try
-            {
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
-                info = await pool.PrepareNodeAsync(false);
-            }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-            }
-
-            Assert.AreEqual(AffinityPrefix + "NodeOneDedicatedIdle", info.AffinityId);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
-
-            IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
-                => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
-
-            void ValidateLCN(string id, ODATADetailLevel detail)
-            {
-                Assert.AreEqual(pool.Pool.PoolId, id);
-                Assert.IsNotNull(detail);
-                Assert.IsNotNull(detail.SelectClause);
+                var result = AsyncEnumerable.Empty<ComputeNode>();
+                if (setTargetsCalled)
+                {
+                    result = result.Append(GenerateNode(pool.Pool.PoolId, "ComputeNode1", true, true));
+                }
+                return result;
             }
         }
 
@@ -288,8 +303,8 @@ namespace TesApi.Tests
             try
             {
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
-                _ = await pool.PrepareNodeAsync(true);
-                _ = await pool.PrepareNodeAsync(true);
+                _ = await pool.PrepareNodeAsync("JobId1", true);
+                _ = await pool.PrepareNodeAsync("JobId2", true);
             }
             finally
             {
@@ -330,8 +345,8 @@ namespace TesApi.Tests
             try
             {
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
-                _ = await pool.PrepareNodeAsync(true);
-                _ = await pool.PrepareNodeAsync(false);
+                _ = await pool.PrepareNodeAsync("JobId1", true);
+                _ = await pool.PrepareNodeAsync("JobId2", false);
 
                 Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneDedicatedIdle"));
 
@@ -376,8 +391,8 @@ namespace TesApi.Tests
             try
             {
                 AzureProxyListComputeNodesAsync = ListComputeNodes;
-                _ = await pool.PrepareNodeAsync(true);
-                _ = await pool.PrepareNodeAsync(false);
+                _ = await pool.PrepareNodeAsync("JobId1", true);
+                _ = await pool.PrepareNodeAsync("JobId2", false);
 
                 Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
 
@@ -402,7 +417,7 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
-        public async Task SyncSizeSetsIBatchPoolState()
+        public async Task SyncSizeSetsBatchPoolState()
         {
             var pool = await CreateBatchPoolAsync();
 
@@ -428,7 +443,7 @@ namespace TesApi.Tests
         // Test the actions performed by BatchPoolService
 
         [TestMethod]
-        public async Task ResizeDoesNothingWhenTargetsNotChanged()
+        public async Task ResizeDoesNothingWhenNoReservationsAreAddedNorTargetsChanged()
         {
             var pool = await CreateBatchPoolAsync();
 
@@ -445,6 +460,7 @@ namespace TesApi.Tests
                 AzureProxyGetAllocationState = default;
             }
 
+            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestNodeReservationCount);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
 
@@ -467,7 +483,7 @@ namespace TesApi.Tests
             {
                 AzureProxySetComputeNodeTargets = SetTargets;
                 AzureProxyGetAllocationState = GetState;
-                try { _ = await pool.PrepareNodeAsync(false); } catch (AzureBatchQuotaMaxedOutException) { }
+                try { _ = await pool.PrepareNodeAsync("JobId1", false); } catch (AzureBatchQuotaMaxedOutException) { }
                 await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
             }
@@ -477,6 +493,7 @@ namespace TesApi.Tests
                 AzureProxyGetAllocationState = default;
             }
 
+            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestNodeReservationCount);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetDedicated);
 
@@ -498,9 +515,10 @@ namespace TesApi.Tests
 
             try
             {
+                AzureProxyListComputeNodesAsync = (i, d) => AsyncEnumerable.Empty<ComputeNode>();
                 AzureProxySetComputeNodeTargets = SetTargets;
                 AzureProxyGetAllocationState = GetState;
-                try { _ = await pool.PrepareNodeAsync(false); } catch (AzureBatchQuotaMaxedOutException) { }
+                try { _ = await pool.PrepareNodeAsync("JobId1", false); } catch (AzureBatchQuotaMaxedOutException) { }
                 await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
             }
@@ -508,9 +526,11 @@ namespace TesApi.Tests
             {
                 AzureProxySetComputeNodeTargets = default;
                 AzureProxyGetAllocationState = default;
+                AzureProxyListComputeNodesAsync = default;
             }
 
             Assert.AreEqual(1, setTargetsCalled);
+            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetDedicated);
 
@@ -552,10 +572,10 @@ namespace TesApi.Tests
                 AzureProxyReturnComputeNodeTargets = () => (4, 4);
                 AzureProxyGetComputeNodeTargets = ValidateComputeNodeTargets;
                 AzureProxyListComputeNodesAsync = ListComputeNodesSyncSize;
-                _ = await pool.PrepareNodeAsync(true);
-                _ = await pool.PrepareNodeAsync(true);
-                _ = await pool.PrepareNodeAsync(false);
-                _ = await pool.PrepareNodeAsync(false);
+                _ = await pool.PrepareNodeAsync("JobId1", true);
+                _ = await pool.PrepareNodeAsync("JobId2", true);
+                _ = await pool.PrepareNodeAsync("JobId3", false);
+                _ = await pool.PrepareNodeAsync("JobId4", false);
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize);
                 AzureProxyListComputeNodesAsync = ListComputeNodesRemoveNode;
                 AzureProxyDeleteBatchComputeNodes = DeleteComputeNodes;
@@ -666,7 +686,24 @@ namespace TesApi.Tests
         public async Task RotateMarksPoolUnavailableWhenRotateIntervalHasPassed()
         {
             var pool = await CreateBatchPoolAsync();
-            try { _ = await pool.PrepareNodeAsync(false); } catch (AzureBatchQuotaMaxedOutException) { }
+            try
+            {
+                AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
+                AzureProxySetComputeNodeTargets = (id, loPri, dedic) => { };
+                AzureProxyListComputeNodesAsync = (i,d) => AsyncEnumerable.Empty<ComputeNode>();
+                _ = await pool.PrepareNodeAsync("JobId1", false);
+            }
+            catch (AzureBatchQuotaMaxedOutException)
+            {
+                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
+                await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
+            }
+            finally
+            {
+                AzureProxyListComputeNodesAsync = default;
+                AzureProxySetComputeNodeTargets = default;
+                AzureProxyGetAllocationState = default;
+            }
 
             await Task.Delay(((IBatchPoolImpl)pool).TestRotatePoolTime);
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Rotate);

@@ -122,6 +122,10 @@ namespace TesApi.Web
         /// </summary>
         public string PoolId { get; set; }
         /// <summary>
+        /// Gets the task's job Id.
+        /// </summary>
+        public string JobId { get; set; }
+        /// <summary>
         /// Gets a locality hint that can be used by the Batch service to select a node on which to start the task.
         /// </summary>
         public AffinityInformation AffinityInformation { get; set; }

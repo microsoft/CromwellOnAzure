@@ -30,16 +30,23 @@ namespace TesApi.Web
         /// <summary>
         /// Either reserves an idle compute node in the pool, or requests an additional compute node.
         /// </summary>
+        /// <param name="jobId">The <see cref="CloudJob.Id"/> to be assigned a node</param>
         /// <param name="isLowPriority">True if the task is low priority, False if dedicated.</param>
         /// <param name="cancellationToken"></param>
         /// <returns>An <see cref="AffinityInformation"/> describing the reserved compute node, or null if a new node is requested.</returns>
-        Task<AffinityInformation> PrepareNodeAsync(bool isLowPriority, CancellationToken cancellationToken = default);
+        Task<AffinityInformation> PrepareNodeAsync(string jobId, bool isLowPriority, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Releases a reserved compute node.
+        /// Releases a compute node reservation.
         /// </summary>
-        /// <param name="affinity">The <see cref="AffinityInformation"/> of the compute node to release.</param>
-        void ReleaseNode(AffinityInformation affinity);
+        /// <param name="affinityInformation">The <see cref="AffinityInformation"/> of the compute node to release.</param>
+        void ReleaseNode(AffinityInformation affinityInformation);
+
+        /// <summary>
+        /// Releases a compute node reservation.
+        /// </summary>
+        /// <param name="jobId">The <see cref="CloudJob.Id"/> to be removed from the pending reservation list.</param>
+        void ReleaseNode(string jobId);
 
         /// <summary>
         /// Method used by the {BatchPoolService} to maintain this <see cref="IBatchPool"/> in the <see cref="IBatchPools"/> service.

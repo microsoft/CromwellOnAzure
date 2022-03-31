@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -17,14 +16,12 @@ using Microsoft.Azure.Batch.Auth;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.Batch;
-using Microsoft.Azure.Management.Compute.Models;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
-using Microsoft.VisualBasic;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -273,6 +270,7 @@ namespace TesApi.Web
                     // With manual pools, the PoolId property is set
                     if (batchPools.Value.TryGet(poolInformation.PoolId, out var batchPool))
                     {
+                        batchPool.ReleaseNode(jobId);
                         batchPool.ReleaseNode(cloudTask.AffinityInformation);
                     }
                 }
@@ -392,6 +390,7 @@ namespace TesApi.Web
                     JobSchedulingError = job.ExecutionInformation?.SchedulingError,
                     TaskState = taskState,
                     PoolId = poolId,
+                    JobId = job.Id,
                     AffinityInformation = affinityInformation,
                     TaskExecutionResult = taskExecutionInformation?.Result,
                     TaskStartTime = taskExecutionInformation?.StartTime,
@@ -440,6 +439,7 @@ namespace TesApi.Web
                     // With manual pools, the PoolId property is set
                     if (batchPools.Value.TryGet(job.PoolInformation.PoolId, out var batchPool))
                     {
+                        batchPool.ReleaseNode(job.Id);
                         foreach (var task in await job.ListTasks(detailLevel: new ODATADetailLevel { SelectClause = "affinityId" }).ToListAsync(cancellationToken: cancellationToken))
                         {
                             batchPool.ReleaseNode(task.AffinityInformation);
@@ -531,19 +531,21 @@ namespace TesApi.Web
             => (await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState"), cancellationToken: cancellationToken)).AllocationState;
 
         /// <inheritdoc/>
-        public async Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default)
-        {
-            var computeNode = await batchClient.PoolOperations.GetComputeNodeAsync(poolId, computeNodeId, detailLevel: new ODATADetailLevel(selectClause: "id,state"), cancellationToken: cancellationToken);
-            switch (computeNode.State)
-            {
-                case ComputeNodeState.Idle:
-                case ComputeNodeState.Running:
-                    await computeNode.ReimageAsync(reimageOption: reimageOption, cancellationToken: cancellationToken);
-                    return true;
-                default:
-                    return false;
-            }
-        }
+        public /*async */Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default)
+            // Currently, `Reimage` "can be invoked only on Pools created with the cloud service configuration property." [third line of content](https://docs.microsoft.com/en-us/rest/api/batchservice/compute-node/reimage).
+            => Task.FromResult(true);
+        //{
+        //    var computeNode = await batchClient.PoolOperations.GetComputeNodeAsync(poolId, computeNodeId, detailLevel: new ODATADetailLevel(selectClause: "id,state"), cancellationToken: cancellationToken);
+        //    switch (computeNode.State)
+        //    {
+        //        case ComputeNodeState.Idle:
+        //        case ComputeNodeState.Running:
+        //            await computeNode.ReimageAsync(reimageOption: reimageOption, cancellationToken: cancellationToken);
+        //            return true;
+        //        default:
+        //            return false;
+        //    }
+        //}
 
         /// <summary>
         /// TODO
