@@ -43,26 +43,6 @@ services:
         source: /mnt/cromwell-tmp
         target: /cromwell-tmp
     restart: unless-stopped
-  mysqldb:
-    image: "$MySqlImageName"
-    environment:
-      - MYSQL_ROOT_PASSWORD=cromwell
-      - MYSQL_DATABASE=cromwell_db
-    volumes:
-      - type: bind
-        source: /data/mysql
-        target: /var/lib/mysql
-      - type: bind
-        source: /data/cromwellazure/mysql-init
-        target: /mysql-init
-    entrypoint:
-      - /bin/sh
-      - -c
-    command: ["ln -sf /mysql-init/init-user.sql /docker-entrypoint-initdb.d/init_user.sql \
-      && docker-entrypoint.sh mysqld --init-file /mysql-init/unlock-change-log.sql --disable-log-bin"]
-    expose:
-      - "3306"
-    restart: unless-stopped
   cromwell:
     image: "$CromwellImageName"
     volumes:
@@ -75,11 +55,10 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-    command: ["/wait-for-it/wait-for-it.sh mysqldb:3306 -t 255 -- java -Djava.io.tmpdir=/cromwell-tmp/ -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server"]
+    command: ["java -Djava.io.tmpdir=/cromwell-tmp/ -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server"]
     ports:
       - "8000:8000"
     depends_on:
-      - "mysqldb"
       - "tes"
     restart: unless-stopped
   triggerservice:

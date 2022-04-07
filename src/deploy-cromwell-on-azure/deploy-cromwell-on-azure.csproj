@@ -59,6 +59,7 @@
     <EmbeddedResource Include="scripts\cromwell-application.conf" />
     <EmbeddedResource Include="scripts\cromwellazure.service" />
     <EmbeddedResource Include="scripts\docker-compose.yml" />
+    <EmbeddedResource Include="scripts\docker-compose.azure.yml" />
     <EmbeddedResource Include="scripts\env-00-coa-version.txt" />
     <EmbeddedResource Include="scripts\env-01-account-names.txt" />
     <EmbeddedResource Include="scripts\env-02-internal-images.txt" />
