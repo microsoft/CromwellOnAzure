@@ -264,8 +264,8 @@ namespace CromwellOnAzureDeployer
                         if (configuration.ProvisionMySQLOnAzure)
                         {
                             mySQLServer = new MySQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
-                            var loadServer = await mySQLServer.Servers.GetAsync(configuration.ResourceGroupName, mySQLServerName)
-                                ?? throw new ValidationException($"MySQL server {mySQLServerName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+                            var loadServer = await mySQLServer.Servers.GetAsync(configuration.ResourceGroupName, configuration.MySQLServerName)
+                                ?? throw new ValidationException($"MySQL server {configuration.MySQLServerName}, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
                             await AddMySQLFirewallRuleForNicAsync(linuxVm, mySQLServer);
                         }
 
