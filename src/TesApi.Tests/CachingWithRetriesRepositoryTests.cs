@@ -21,8 +21,8 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task CreateItemAsync_ClearsAllItemsPredicateCacheKeys()
         {
-            var repository = GetMockRepository();
-            var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<CachingWithRetriesRepository<TesTask>>(tesTaskRepository: PrepareRepository);
+            var cachingRepository = serviceProvider.GetT();
             var tesTask = new TesTask { Id = "createItem", State = TesState.QUEUEDEnum };
 
             Expression<Func<TesTask, bool>> predicate = t => t.State == TesState.QUEUEDEnum
@@ -34,16 +34,16 @@ namespace TesApi.Tests
             await cachingRepository.CreateItemAsync(tesTask);
             var items2 = await cachingRepository.GetItemsAsync(predicate);
 
-            repository.Verify(mock => mock.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()), Times.Exactly(2));
-            repository.Verify(mock => mock.CreateItemAsync(It.IsAny<TesTask>()), Times.Once());
+            serviceProvider.TesTaskRepository.Verify(mock => mock.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()), Times.Exactly(2));
+            serviceProvider.TesTaskRepository.Verify(mock => mock.CreateItemAsync(It.IsAny<TesTask>()), Times.Once());
             Assert.AreEqual(items, items2);
         }
 
         [TestMethod]
         public async Task DeleteItemAsync_ClearsAllItemsPredicateCacheKeys()
         {
-            var repository = GetMockRepository();
-            var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<CachingWithRetriesRepository<TesTask>>(tesTaskRepository: PrepareRepository);
+            var cachingRepository = serviceProvider.GetT();
 
             Expression<Func<TesTask, bool>> predicate = t => t.State == TesState.QUEUEDEnum
                        || t.State == TesState.INITIALIZINGEnum
@@ -54,24 +54,24 @@ namespace TesApi.Tests
             await cachingRepository.DeleteItemAsync("deleteItem");
             var items2 = await cachingRepository.GetItemsAsync(predicate);
 
-            repository.Verify(mock => mock.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()), Times.Exactly(2));
-            repository.Verify(mock => mock.DeleteItemAsync(It.IsAny<string>()), Times.Once());
+            serviceProvider.TesTaskRepository.Verify(mock => mock.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()), Times.Exactly(2));
+            serviceProvider.TesTaskRepository.Verify(mock => mock.DeleteItemAsync(It.IsAny<string>()), Times.Once());
             Assert.AreEqual(items, items2);
         }
 
         [TestMethod]
         public async Task DeleteItemAsync_RemovesItemFromCache()
         {
-            var repository = GetMockRepository();
-            var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<CachingWithRetriesRepository<TesTask>>(tesTaskRepository: PrepareRepository);
+            var cachingRepository = serviceProvider.GetT();
 
             TesTask tesTask = null;
             var success = await cachingRepository.TryGetItemAsync("tesTaskId1", item => tesTask = item);
             await cachingRepository.DeleteItemAsync("tesTaskId1");
             var success2 = await cachingRepository.TryGetItemAsync("tesTaskId1", item => tesTask = item);
 
-            repository.Verify(mock => mock.TryGetItemAsync("tesTaskId1", It.IsAny<Action<TesTask>>()), Times.Exactly(2));
-            repository.Verify(mock => mock.DeleteItemAsync("tesTaskId1"), Times.Once());
+            serviceProvider.TesTaskRepository.Verify(mock => mock.TryGetItemAsync("tesTaskId1", It.IsAny<Action<TesTask>>()), Times.Exactly(2));
+            serviceProvider.TesTaskRepository.Verify(mock => mock.DeleteItemAsync("tesTaskId1"), Times.Once());
             Assert.IsTrue(success);
             Assert.IsTrue(success2);
         }
@@ -79,8 +79,8 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task UpdateItemAsync_ClearsAllItemsPredicateCacheKeys()
         {
-            var repository = GetMockRepository();
-            var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<CachingWithRetriesRepository<TesTask>>(tesTaskRepository: PrepareRepository);
+            var cachingRepository = serviceProvider.GetT();
             var tesTask = new TesTask { Id = "updateItem" };
 
             Expression <Func<TesTask, bool>> predicate = t => t.State == TesState.QUEUEDEnum
@@ -92,24 +92,24 @@ namespace TesApi.Tests
             await cachingRepository.UpdateItemAsync(tesTask);
             var items2 = await cachingRepository.GetItemsAsync(predicate);
 
-            repository.Verify(mock => mock.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()), Times.Exactly(2));
-            repository.Verify(mock => mock.UpdateItemAsync(It.IsAny<TesTask>()), Times.Once());
+            serviceProvider.TesTaskRepository.Verify(mock => mock.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()), Times.Exactly(2));
+            serviceProvider.TesTaskRepository.Verify(mock => mock.UpdateItemAsync(It.IsAny<TesTask>()), Times.Once());
             Assert.AreEqual(items, items2);
         }
 
         [TestMethod]
         public async Task UpdateItemAsync_RemovesItemFromCache()
         {
-            var repository = GetMockRepository();
-            var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<CachingWithRetriesRepository<TesTask>>(tesTaskRepository: PrepareRepository);
+            var cachingRepository = serviceProvider.GetT();
 
             TesTask tesTask = null;
             var success = await cachingRepository.TryGetItemAsync("tesTaskId1", item => tesTask = item);
             await cachingRepository.UpdateItemAsync(tesTask);
             var success2 = await cachingRepository.TryGetItemAsync("tesTaskId1", item => tesTask = item);
 
-            repository.Verify(mock => mock.TryGetItemAsync("tesTaskId1", It.IsAny<Action<TesTask>>()), Times.Exactly(2));
-            repository.Verify(mock => mock.UpdateItemAsync(It.IsAny<TesTask>()), Times.Once());
+            serviceProvider.TesTaskRepository.Verify(mock => mock.TryGetItemAsync("tesTaskId1", It.IsAny<Action<TesTask>>()), Times.Exactly(2));
+            serviceProvider.TesTaskRepository.Verify(mock => mock.UpdateItemAsync(It.IsAny<TesTask>()), Times.Once());
             Assert.IsTrue(success);
             Assert.IsTrue(success2);
         }
@@ -117,8 +117,8 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task GetItemsAsync_UsesCache()
         {
-            var repository = GetMockRepository();
-            var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<CachingWithRetriesRepository<TesTask>>(tesTaskRepository: PrepareRepository);
+            var cachingRepository = serviceProvider.GetT();
 
             Expression<Func<TesTask, bool>> predicate = t => t.State == TesState.QUEUEDEnum
                        || t.State == TesState.INITIALIZINGEnum
@@ -128,7 +128,7 @@ namespace TesApi.Tests
             var items = await cachingRepository.GetItemsAsync(predicate);
             var items2 = await cachingRepository.GetItemsAsync(predicate);
 
-            repository.Verify(mock => mock.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()), Times.Once());
+            serviceProvider.TesTaskRepository.Verify(mock => mock.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()), Times.Once());
             Assert.AreEqual(items, items2);
             Assert.AreEqual(3, items.Count());
         }
@@ -138,25 +138,25 @@ namespace TesApi.Tests
         {
             SystemClock.SleepAsync = (_, __) => Task.FromResult(true);
             SystemClock.Sleep = (_, __) => { };
-            var repository = GetMockRepository();
-            var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<CachingWithRetriesRepository<TesTask>>(tesTaskRepository: PrepareRepository);
+            var cachingRepository = serviceProvider.GetT();
             Expression<Func<TesTask, bool>> predicate = t => t.WorkflowId.Equals("doesNotExist");
 
             await Assert.ThrowsExceptionAsync<Exception>(async () => await cachingRepository.GetItemsAsync(predicate));
-            repository.Verify(mock => mock.GetItemsAsync(predicate), Times.Exactly(4));
+            serviceProvider.TesTaskRepository.Verify(mock => mock.GetItemsAsync(predicate), Times.Exactly(4));
         }
 
         [TestMethod]
         public async Task TryGetItemAsync_UsesCache()
         {
-            var repository = GetMockRepository();
-            var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<CachingWithRetriesRepository<TesTask>>(tesTaskRepository: PrepareRepository);
+            var cachingRepository = serviceProvider.GetT();
 
             TesTask tesTask = null;
             var success = await cachingRepository.TryGetItemAsync("tesTaskId1", item => tesTask = item);
             var success2 = await cachingRepository.TryGetItemAsync("tesTaskId1", item => tesTask = item);
 
-            repository.Verify(mock => mock.TryGetItemAsync("tesTaskId1", It.IsAny<Action<TesTask>>()), Times.Once());
+            serviceProvider.TesTaskRepository.Verify(mock => mock.TryGetItemAsync("tesTaskId1", It.IsAny<Action<TesTask>>()), Times.Once());
             Assert.IsTrue(success);
             Assert.IsTrue(success2);
         }
@@ -164,14 +164,14 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task TryGetItemAsync_IfItemNotFound_DoesNotSetCache()
         {
-            var repository = GetMockRepository();
-            var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<CachingWithRetriesRepository<TesTask>>(tesTaskRepository: PrepareRepository);
+            var cachingRepository = serviceProvider.GetT();
 
             TesTask tesTask = null;
             var success = await cachingRepository.TryGetItemAsync("notFound", item => tesTask = item);
             var success2 = await cachingRepository.TryGetItemAsync("notFound", item => tesTask = item);
 
-            repository.Verify(mock => mock.TryGetItemAsync("notFound", It.IsAny<Action<TesTask>>()), Times.Exactly(2));
+            serviceProvider.TesTaskRepository.Verify(mock => mock.TryGetItemAsync("notFound", It.IsAny<Action<TesTask>>()), Times.Exactly(2));
             Assert.IsFalse(success);
             Assert.IsFalse(success2);
         }
@@ -181,18 +181,16 @@ namespace TesApi.Tests
         {
             SystemClock.SleepAsync = (_, __) => Task.FromResult(true);
             SystemClock.Sleep = (_, __) => { };
-            var repository = GetMockRepository();
-            var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<CachingWithRetriesRepository<TesTask>>(tesTaskRepository: PrepareRepository);
+            var cachingRepository = serviceProvider.GetT();
 
             TesTask tesTask = null;
             await Assert.ThrowsExceptionAsync<Exception>(async () => await cachingRepository.TryGetItemAsync("throws", item => tesTask = item));
-            repository.Verify(mock => mock.TryGetItemAsync("throws", It.IsAny<Action<TesTask>>()), Times.Exactly(4));
+            serviceProvider.TesTaskRepository.Verify(mock => mock.TryGetItemAsync("throws", It.IsAny<Action<TesTask>>()), Times.Exactly(4));
         }
 
-        private static Mock<IRepository<TesTask>> GetMockRepository()
+        private static void PrepareRepository(Mock<IRepository<TesTask>> repository)
         {
-            var repository = new Mock<IRepository<TesTask>>();
-
             IEnumerable<TesTask> tasks = new List<TesTask>()
             {
                 new TesTask { Id = "tesTaskId1", State = TesState.QUEUEDEnum, ETag = Guid.NewGuid().ToString() },
@@ -221,8 +219,6 @@ namespace TesApi.Tests
 
             repository.Setup(a => a.TryGetItemAsync("throws", It.IsAny<Action<TesTask>>()))
                 .Throws(new Exception());
-
-            return repository;
         }
 
     }

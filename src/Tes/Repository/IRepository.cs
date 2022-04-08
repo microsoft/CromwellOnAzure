@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Tes.Repository
@@ -12,7 +13,7 @@ namespace Tes.Repository
     /// A general repository interface for persistence of T instances
     /// </summary>
     /// <typeparam name="T">The type of the instance</typeparam>
-    public interface IRepository<T> where T : RepositoryItem<T>
+    public interface IRepository<T> : IDisposable where T : RepositoryItem<T>
     {
         /// <summary>
         /// Create a new item
@@ -36,11 +37,27 @@ namespace Tes.Repository
         Task<bool> TryGetItemAsync(string id, Action<T> onSuccess = null);
 
         /// <summary>
+        /// Get an item by ID
+        /// </summary>
+        /// <param name="id">The ID of the item to retrieve</param>
+        /// <returns>The item instance, or null if the item doesn't exist</returns>
+        Task<T> GetItemOrDefaultAsync(string id);
+
+        /// <summary>
         /// Reads a collection of items from the repository
         /// </summary>
         /// <param name="predicate">The 'where' clause</param>
         /// <returns>The collection of retrieved items</returns>
         Task<IEnumerable<T>> GetItemsAsync(Expression<Func<T, bool>> predicate);
+
+        /// <summary>
+        /// Reads a collection of items from the repository
+        /// </summary>
+        /// <param name="predicate"></param>
+        /// <param name="pageSize">Suggested default: 256</param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        IAsyncEnumerable<T> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, CancellationToken cancellationToken);
 
         /// <summary>
         /// Reads a collection of items from the repository

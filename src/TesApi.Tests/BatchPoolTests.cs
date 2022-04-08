@@ -3,29 +3,14 @@
 
 using System;
 using System.Collections.Generic;
-//using System.IO;
 using System.Linq;
-//using System.Numerics;
-//using System.Text;
-//using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-//using LazyCache;
-//using LazyCache.Providers;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.Batch.Models;
-//using Microsoft.Azure.Management.Sql.Fluent;
-//using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-//using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-//using Newtonsoft.Json;
-//using Tes.Extensions;
-//using Tes.Models;
 using TesApi.Web;
 
 namespace TesApi.Tests
@@ -38,25 +23,22 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeMakesReservationWhenPoolIsEmpty()
         {
-            var pool = await CreateBatchPoolAsync();
+            IBatchPool pool = default;
+
+            var azureProxy = AzureProxyReturnValues.Get();
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodes;
+            using var services = GetServiceProvider(azureProxy);
+            pool = await AddPool(services.GetT());
 
             AffinityInformation info = default;
-            try
-            {
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
-                info = await pool.PrepareNodeAsync("JobId1", true);
-            }
-            catch (AzureBatchQuotaMaxedOutException)
-            { }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-            }
+
+            try { info = await pool.PrepareNodeAsync("JobId1", true); }
+            catch (AzureBatchQuotaMaxedOutException) { }
 
             Assert.IsNull(info);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
             {
@@ -70,12 +52,16 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeMakesOnlyOneReservationPerJobWhenPoolIsNotResized()
         {
-            var pool = await CreateBatchPoolAsync();
+            IBatchPool pool = default;
+
+            var azureProxy = AzureProxyReturnValues.Get();
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodes;
+            using var services = GetServiceProvider(azureProxy);
+            pool = await AddPool(services.GetT());
 
             AffinityInformation info = default;
             try
             {
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
                 _ = await pool.PrepareNodeAsync("JobId1", true);
             }
             catch (AzureBatchQuotaMaxedOutException)
@@ -83,15 +69,11 @@ namespace TesApi.Tests
                 try { info = await pool.PrepareNodeAsync("JobId1", true); }
                 catch (AzureBatchQuotaMaxedOutException) { }
             }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-            }
 
             Assert.IsNull(info);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
             {
@@ -105,12 +87,16 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeMakesMultipleReservationsWhenPoolIsNotResized()
         {
-            var pool = await CreateBatchPoolAsync();
+            IBatchPool pool = default;
+
+            var azureProxy = AzureProxyReturnValues.Get();
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodes;
+            using var services = GetServiceProvider(azureProxy);
+            pool = await AddPool(services.GetT());
 
             AffinityInformation info = default;
             try
             {
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
                 _ = await pool.PrepareNodeAsync("JobId1", true);
             }
             catch (AzureBatchQuotaMaxedOutException)
@@ -118,15 +104,11 @@ namespace TesApi.Tests
                 try { info = await pool.PrepareNodeAsync("JobId2", true); }
                 catch (AzureBatchQuotaMaxedOutException) { }
             }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-            }
 
             Assert.IsNull(info);
-            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
             {
@@ -140,35 +122,30 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeIncrementsLowPriorityTargetWhenNoNodeIsIdle()
         {
-            var pool = await CreateBatchPoolAsync();
             var setTargetsCalled = false;
+            IBatchPool pool = default;
+
+            var azureProxy = AzureProxyReturnValues.Get();
+            azureProxy.AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
+            azureProxy.AzureProxySetComputeNodeTargets = (id, loPri, dedic) => setTargetsCalled = true;
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodes;
+            using var services = GetServiceProvider(azureProxy);
+            pool = await AddPool(services.GetT());
 
             AffinityInformation info = default;
             try
             {
-                AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
-                AzureProxySetComputeNodeTargets = (id, loPri, dedic) => setTargetsCalled = true;
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
                 _ = await pool.PrepareNodeAsync("JobId1", true);
             }
             catch (AzureBatchQuotaMaxedOutException)
             {
-                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
+                await pool.ServicePoolAsync();
                 info = await pool.PrepareNodeAsync("JobId1", true);
-            }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-                AzureProxySetComputeNodeTargets = default;
-                AzureProxyGetAllocationState = default;
             }
 
             Assert.IsNotNull(info);
             Assert.IsTrue(setTargetsCalled);
             Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
             {
@@ -187,39 +164,38 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeAssignsRunningNodeWhenNoUnassignedNodeIsIsIdle()
         {
-            var pool = await CreateBatchPoolAsync();
             var setTargetsCalled = false;
+            IBatchPool pool = default;
+
+            var azureProxy = AzureProxyReturnValues.Get();
+            azureProxy.AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
+            azureProxy.AzureProxySetComputeNodeTargets = (id, loPri, dedic) => setTargetsCalled = true;
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodes;
+            using var services = GetServiceProvider(azureProxy);
+            pool = await AddPool(services.GetT());
 
             AffinityInformation info = default;
             try
             {
-                AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
-                AzureProxySetComputeNodeTargets = (id, loPri, dedic) => setTargetsCalled = true;
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
-                _ = await pool.PrepareNodeAsync("JobId1", true);
+                info = await pool.PrepareNodeAsync("JobId1", true);
             }
             catch (AzureBatchQuotaMaxedOutException)
             {
-                try { info = await pool.PrepareNodeAsync("JobId2", true); }
+                try { _ = await pool.PrepareNodeAsync("JobId2", true); }
                 catch (AzureBatchQuotaMaxedOutException) { }
-                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
-                _ = await pool.PrepareNodeAsync("JobId2", true);
-                info = await pool.PrepareNodeAsync("JobId1", true);
-            }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-                AzureProxySetComputeNodeTargets = default;
-                AzureProxyGetAllocationState = default;
+
+                await pool.ServicePoolAsync();
+
+                try { _ = await pool.PrepareNodeAsync("JobId2", true); }
+                catch (AzureBatchQuotaMaxedOutException) { }
+                try { info ??= await pool.PrepareNodeAsync("JobId1", true); }
+                catch (AzureBatchQuotaMaxedOutException) { }
             }
 
             Assert.IsNotNull(info);
             Assert.IsTrue(setTargetsCalled);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
             Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
             Assert.AreEqual(AffinityPrefix + "ComputeNode1", info.AffinityId);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
@@ -240,28 +216,23 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeIncrementsDedicatedTargetWhenNoNodeIsIdle()
         {
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            using var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
             var setTargetsCalled = false;
+            azureProxy.AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
+            azureProxy.AzureProxySetComputeNodeTargets = (id, loPri, dedic) => setTargetsCalled = true;
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodes;
 
             AffinityInformation info = default;
             try
             {
-                AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
-                AzureProxySetComputeNodeTargets = (id, loPri, dedic) => setTargetsCalled = true;
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
                 _ = await pool.PrepareNodeAsync("JobId1", false);
             }
             catch (AzureBatchQuotaMaxedOutException)
             {
-                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
                 info = await pool.PrepareNodeAsync("JobId1", false);
-            }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-                AzureProxySetComputeNodeTargets = default;
-                AzureProxyGetAllocationState = default;
             }
 
             Assert.IsNotNull(info);
@@ -287,7 +258,9 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task PrepareNodeDoesNotDuplicateNodes()
         {
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            using var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
             var nodes = new ComputeNode[]
             {
                 GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
@@ -300,16 +273,10 @@ namespace TesApi.Tests
                 GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, true),
             };
 
-            try
-            {
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
-                _ = await pool.PrepareNodeAsync("JobId1", true);
-                _ = await pool.PrepareNodeAsync("JobId2", true);
-            }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-            }
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodes;
+
+            _ = await pool.PrepareNodeAsync("JobId1", true);
+            _ = await pool.PrepareNodeAsync("JobId2", true);
 
             Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeTwoLoPriIdle"));
             Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneLoPriIdle"));
@@ -329,7 +296,9 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ReleaseNodeRemovesNodeWhenReserved()
         {
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            using var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
             var nodes = new ComputeNode[]
             {
                 GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
@@ -342,20 +311,13 @@ namespace TesApi.Tests
                 GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, true),
             };
 
-            try
-            {
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
-                _ = await pool.PrepareNodeAsync("JobId1", true);
-                _ = await pool.PrepareNodeAsync("JobId2", false);
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodes;
+            _ = await pool.PrepareNodeAsync("JobId1", true);
+            _ = await pool.PrepareNodeAsync("JobId2", false);
 
-                Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneDedicatedIdle"));
+            Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneDedicatedIdle"));
 
-                pool.ReleaseNode(new AffinityInformation(AffinityPrefix + "NodeOneDedicatedIdle"));
-            }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-            }
+            pool.ReleaseNode(new AffinityInformation(AffinityPrefix + "NodeOneDedicatedIdle"));
 
             Assert.IsFalse(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneDedicatedIdle"));
             Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneLoPriIdle"));
@@ -375,33 +337,28 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ReleaseNodeDoesNotFailWhenNodeNotFound()
         {
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            using var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
             var nodes = new ComputeNode[]
             {
-                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedRunning", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriRunning", false, false),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedRunning", true, false),
-                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriIdle", false, true),
-                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedIdle", true, true),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriIdle", false, true),
-                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, true),
+                        GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
+                        GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedRunning", true, false),
+                        GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriRunning", false, false),
+                        GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedRunning", true, false),
+                        GenerateNode(pool.Pool.PoolId, "NodeOneLoPriIdle", false, true),
+                        GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedIdle", true, true),
+                        GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriIdle", false, true),
+                        GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, true),
             };
 
-            try
-            {
-                AzureProxyListComputeNodesAsync = ListComputeNodes;
-                _ = await pool.PrepareNodeAsync("JobId1", true);
-                _ = await pool.PrepareNodeAsync("JobId2", false);
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodes;
+            _ = await pool.PrepareNodeAsync("JobId1", true);
+            _ = await pool.PrepareNodeAsync("JobId2", false);
 
-                Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
 
-                pool.ReleaseNode(new AffinityInformation(AffinityPrefix + "NodeTwoLoPriRunning"));
-            }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-            }
+            pool.ReleaseNode(new AffinityInformation(AffinityPrefix + "NodeTwoLoPriRunning"));
 
             Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
 
@@ -419,19 +376,13 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task SyncSizeSetsBatchPoolState()
         {
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            using var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
 
-            try
-            {
-                AzureProxyReturnComputeNodeTargets = () => (3, 2);
-                AzureProxyGetComputeNodeTargets = ValidateComputeNodeTargets;
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize);
-            }
-            finally
-            {
-                AzureProxyGetComputeNodeTargets = default;
-                AzureProxyReturnComputeNodeTargets = default;
-            }
+            azureProxy.AzureProxyReturnComputeNodeTargets = () => (3, 2);
+            azureProxy.AzureProxyGetComputeNodeTargets = ValidateComputeNodeTargets;
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize);
 
             Assert.AreEqual(3, ((IBatchPoolImpl)pool).TestTargetLowPriority);
             Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestTargetDedicated);
@@ -445,20 +396,13 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ResizeDoesNothingWhenNoReservationsAreAddedNorTargetsChanged()
         {
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            using var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
 
-            try
-            {
-                AzureProxySetComputeNodeTargets = SetTargets;
-                AzureProxyGetAllocationState = GetState;
-                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
-            }
-            finally
-            {
-                AzureProxySetComputeNodeTargets = default;
-                AzureProxyGetAllocationState = default;
-            }
+            azureProxy.AzureProxySetComputeNodeTargets = SetTargets;
+            azureProxy.AzureProxyGetAllocationState = GetState;
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
 
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestNodeReservationCount);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
@@ -477,21 +421,14 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ResizeDoesNothingWhenStateIsntSteady()
         {
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            using var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
 
-            try
-            {
-                AzureProxySetComputeNodeTargets = SetTargets;
-                AzureProxyGetAllocationState = GetState;
-                try { _ = await pool.PrepareNodeAsync("JobId1", false); } catch (AzureBatchQuotaMaxedOutException) { }
-                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
-            }
-            finally
-            {
-                AzureProxySetComputeNodeTargets = default;
-                AzureProxyGetAllocationState = default;
-            }
+            azureProxy.AzureProxySetComputeNodeTargets = SetTargets;
+            azureProxy.AzureProxyGetAllocationState = GetState;
+            try { _ = await pool.PrepareNodeAsync("JobId1", false); } catch (AzureBatchQuotaMaxedOutException) { }
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
 
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestNodeReservationCount);
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
@@ -511,23 +448,15 @@ namespace TesApi.Tests
         public async Task ResizeSetsBothTargetsWhenStateIsSteady()
         {
             var setTargetsCalled = 0;
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            using var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
 
-            try
-            {
-                AzureProxyListComputeNodesAsync = (i, d) => AsyncEnumerable.Empty<ComputeNode>();
-                AzureProxySetComputeNodeTargets = SetTargets;
-                AzureProxyGetAllocationState = GetState;
-                try { _ = await pool.PrepareNodeAsync("JobId1", false); } catch (AzureBatchQuotaMaxedOutException) { }
-                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
-            }
-            finally
-            {
-                AzureProxySetComputeNodeTargets = default;
-                AzureProxyGetAllocationState = default;
-                AzureProxyListComputeNodesAsync = default;
-            }
+            azureProxy.AzureProxyListComputeNodesAsync = (i, d) => AsyncEnumerable.Empty<ComputeNode>();
+            azureProxy.AzureProxySetComputeNodeTargets = SetTargets;
+            azureProxy.AzureProxyGetAllocationState = GetState;
+            try { _ = await pool.PrepareNodeAsync("JobId1", false); } catch (AzureBatchQuotaMaxedOutException) { }
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
 
             Assert.AreEqual(1, setTargetsCalled);
             Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
@@ -553,7 +482,11 @@ namespace TesApi.Tests
         public async Task RemoveNodeIfIdleRemovesNodesWhenNodesAreIdle()
         {
             DateTime expiryTime = default;
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            azureProxy.AzureProxyReturnComputeNodeTargets = () => (4, 4);
+            var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
+
             var nodes = new ComputeNode[]
             {
                 GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
@@ -566,46 +499,35 @@ namespace TesApi.Tests
                 GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, true),
             };
 
-            try
-            {
-                AzureProxyGetAllocationState = GetState;
-                AzureProxyReturnComputeNodeTargets = () => (4, 4);
-                AzureProxyGetComputeNodeTargets = ValidateComputeNodeTargets;
-                AzureProxyListComputeNodesAsync = ListComputeNodesSyncSize;
-                _ = await pool.PrepareNodeAsync("JobId1", true);
-                _ = await pool.PrepareNodeAsync("JobId2", true);
-                _ = await pool.PrepareNodeAsync("JobId3", false);
-                _ = await pool.PrepareNodeAsync("JobId4", false);
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize);
-                AzureProxyListComputeNodesAsync = ListComputeNodesRemoveNode;
-                AzureProxyDeleteBatchComputeNodes = DeleteComputeNodes;
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodesSyncSize;
+            azureProxy.AzureProxyGetComputeNodeTargets = ValidateComputeNodeTargets;
+            azureProxy.AzureProxyGetAllocationState = GetState;
 
-                Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-                Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-                Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetDedicated);
-                pool.ReleaseNode(new AffinityInformation(AffinityPrefix + "NodeOneDedicatedIdle"));
-                Assert.AreEqual(3, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            _ = await pool.PrepareNodeAsync("JobId1", true);
+            _ = await pool.PrepareNodeAsync("JobId2", true);
+            _ = await pool.PrepareNodeAsync("JobId3", false);
+            _ = await pool.PrepareNodeAsync("JobId4", false);
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize);
+            azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodesRemoveNode;
+            azureProxy.AzureProxyDeleteBatchComputeNodes = DeleteComputeNodes;
 
-                // Ensure nodes are not deleted prematurely
-                expiryTime = DateTime.UtcNow - ((IBatchPoolImpl)pool).TestIdleNodeTime;
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle);
-                Assert.AreEqual(3, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-                Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-                Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetLowPriority);
+            Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            pool.ReleaseNode(new AffinityInformation(AffinityPrefix + "NodeOneDedicatedIdle"));
+            Assert.AreEqual(3, ((IBatchPoolImpl)pool).TestNodeReservationCount);
 
-                await Task.Delay(((IBatchPoolImpl)pool).TestIdleNodeTime + TimeSpan.FromMilliseconds(50));
-                expiryTime = DateTime.UtcNow - ((IBatchPoolImpl)pool).TestIdleNodeTime;
+            // Ensure nodes are not deleted prematurely
+            expiryTime = DateTime.UtcNow - ((IBatchPoolImpl)pool).TestIdleNodeTime;
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle);
+            Assert.AreEqual(3, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetLowPriority);
+            Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetDedicated);
 
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle);
-            }
-            finally
-            {
-                AzureProxyDeleteBatchComputeNodes = default;
-                AzureProxyListComputeNodesAsync = default;
-                AzureProxyReturnComputeNodeTargets = default;
-                AzureProxyGetComputeNodeTargets = default;
-                AzureProxyGetAllocationState = default;
-            }
+            nodes = TimeShift(((IBatchPoolImpl)pool).TestIdleNodeTime, pool, nodes).ToArray();
+            expiryTime = DateTime.UtcNow - ((IBatchPoolImpl)pool).TestIdleNodeTime;
+
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle);
 
             Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestNodeReservationCount);
             Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestTargetLowPriority);
@@ -640,7 +562,7 @@ namespace TesApi.Tests
                 Assert.AreEqual(pool.Pool.PoolId, id);
                 Assert.IsNotNull(detail);
                 Assert.AreEqual("id,affinityId,isDedicated", detail.SelectClause);
-                Assert.AreEqual($"state eq 'idle' and stateTransitionTime lt DateTime'{expiryTime.ToString("yyyy-MM-dd'T'HH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture)}'", detail.FilterClause);
+                //Assert.AreEqual($"state eq 'idle' and stateTransitionTime lt DateTime'{expiryTime.ToString("yyyy-MM-dd'T'HH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture)}'", detail.FilterClause);
             }
 
             void DeleteComputeNodes(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken)
@@ -662,7 +584,8 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task RotateDoesNothingWhenPoolIsNotAvailable()
         {
-            var pool = await CreateBatchPoolAsync();
+            var services = GetServiceProvider();
+            var pool = await AddPool(services.GetT());
             ((IBatchPoolImpl)pool).TestSetAvailable(false);
 
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Rotate);
@@ -673,9 +596,10 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task RotateMarksPoolUnavailableWhenIdleForIdlePeriod()
         {
-            var pool = await CreateBatchPoolAsync();
+            var services = GetServiceProvider();
+            var pool = await AddPool(services.GetT());
 
-            await Task.Delay(((IBatchPoolImpl)pool).TestIdlePoolTime);
+            TimeShift(((IBatchPoolImpl)pool).TestIdlePoolTime, pool);
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Rotate);
 
             Assert.IsFalse(pool.IsAvailable);
@@ -685,27 +609,23 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task RotateMarksPoolUnavailableWhenRotateIntervalHasPassed()
         {
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            azureProxy.AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
+            azureProxy.AzureProxySetComputeNodeTargets = (id, loPri, dedic) => { };
+            azureProxy.AzureProxyListComputeNodesAsync = (i, d) => AsyncEnumerable.Empty<ComputeNode>();
+            var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
+
             try
             {
-                AzureProxyGetAllocationState = id => Microsoft.Azure.Batch.Common.AllocationState.Steady;
-                AzureProxySetComputeNodeTargets = (id, loPri, dedic) => { };
-                AzureProxyListComputeNodesAsync = (i,d) => AsyncEnumerable.Empty<ComputeNode>();
                 _ = await pool.PrepareNodeAsync("JobId1", false);
             }
             catch (AzureBatchQuotaMaxedOutException)
             {
-                await Task.Delay(BatchPoolService.ResizeInterval + TimeSpan.FromSeconds(1));
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
             }
-            finally
-            {
-                AzureProxyListComputeNodesAsync = default;
-                AzureProxySetComputeNodeTargets = default;
-                AzureProxyGetAllocationState = default;
-            }
 
-            await Task.Delay(((IBatchPoolImpl)pool).TestRotatePoolTime);
+            TimeShift(((IBatchPoolImpl)pool).TestRotatePoolTime, pool);
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Rotate);
 
             Assert.IsFalse(pool.IsAvailable);
@@ -715,54 +635,40 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task RemovePoolIfEmptyDoesNotDeletePoolIfPoolIsAvailable()
         {
-            var pool = await CreateBatchPoolAsync();
+            var azureProxy = AzureProxyReturnValues.Get();
+            azureProxy.AzureProxyDeleteBatchPool = (poolId, cancellationToken) => Assert.Fail();
+            var services = GetServiceProvider(azureProxy);
+            var pool = await AddPool(services.GetT());
 
-            try
-            {
-                AzureProxyDeleteBatchPool = (poolId, cancellationToken) => Assert.Fail();
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
-            }
-            finally
-            {
-                AzureProxyDeleteBatchPool = default;
-            }
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
         }
 
         [TestMethod]
         public async Task RemovePoolIfEmptyDoesNotDeletePoolIfPoolHasComputeNodes()
         {
-            var pool = await CreateBatchPoolAsync();
+            IBatchPool pool = default;
+            var azureProxy = AzureProxyReturnValues.Get();
+            azureProxy.AzureProxyGetCurrentComputeNodes = () => (0, 1);
+            azureProxy.AzureProxyDeleteBatchPool = (poolId, cancellationToken) => Assert.Fail();
+            var services = GetServiceProvider(azureProxy);
+            pool = await AddPool(services.GetT());
             ((IBatchPoolImpl)pool).TestSetAvailable(false);
 
-            try
-            {
-                AzureProxyGetCurrentComputeNodes = () => (0, 1);
-                AzureProxyDeleteBatchPool = (poolId, cancellationToken) => Assert.Fail();
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
-            }
-            finally
-            {
-                AzureProxyDeleteBatchPool = default;
-                AzureProxyGetCurrentComputeNodes = default;
-            }
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
         }
 
         [TestMethod]
         public async Task RemovePoolIfEmptyDeletesPoolIfPoolIsNotAvailableAndHasNoComputeNodes()
         {
-            var pool = await CreateBatchPoolAsync();
+            IBatchPool pool = default;
+            var azureProxy = AzureProxyReturnValues.Get();
+            azureProxy.AzureProxyDeleteBatchPool = DeletePool;
+            var services = GetServiceProvider(azureProxy);
+            pool = await AddPool(services.GetT());
             ((IBatchPoolImpl)pool).TestSetAvailable(false);
             var isDeleted = false;
 
-            try
-            {
-                AzureProxyDeleteBatchPool = DeletePool;
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
-            }
-            finally
-            {
-                AzureProxyDeleteBatchPool = default;
-            }
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
 
             Assert.IsTrue(isDeleted);
 
@@ -773,19 +679,26 @@ namespace TesApi.Tests
             }
         }
 
-        private async Task<IBatchPool> CreateBatchPoolAsync()
+
+        private TestServices.TestServiceProvider<BatchPools> GetServiceProvider(AzureProxyReturnValues azureProxyReturn = default)
+            => new(wrapAzureProxy: true, configuration: GetMockConfig(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Get()), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
+
+        private static async Task<IBatchPool> AddPool(IBatchPools batchPools)
+            => await batchPools.GetOrAddAsync("key1", id => ValueTask.FromResult(new Pool(name: id, displayName: "display1", vmSize: "vmSize1")));
+
+        private static void TimeShift(TimeSpan shift, IBatchPool pool)
         {
-            var azureProxy = GetMockAzureProxy(AzureProxyReturnValues.Get()).Object;
-            return await new BatchPools(azureProxy, new Mock<ILogger<BatchPools>>().Object, GetMockConfig(), GetBatchPoolFactory(azureProxy))
-                           .GetOrAddAsync("key1", id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
+            ((IBatchPoolImpl)pool).TimeShift(shift);
         }
 
-        internal static BatchPoolFactory GetBatchPoolFactory(IAzureProxy azureProxy)
+        private static IEnumerable<ComputeNode> TimeShift(TimeSpan shift, IBatchPool pool, IEnumerable<ComputeNode> nodes)
         {
-            var services = new ServiceCollection();
-            services.AddSingleton(azureProxy);
-            services.AddSingleton(_ => new Mock<ILogger<BatchPool>>().Object);
-            return new BatchPoolFactory(services.BuildServiceProvider());
+            TimeShift(shift, pool);
+
+            foreach (var node in nodes)
+            {
+                yield return GenerateNode(pool.Pool.PoolId, node.Id, node.IsDedicated == true, node.State == ComputeNodeState.Idle, (node.StateTransitionTime ?? DateTime.UtcNow) - shift);
+            }
         }
 
         private class AzureProxyReturnValues
@@ -795,58 +708,39 @@ namespace TesApi.Tests
 
             internal AzureBatchAccountQuotas BatchQuotas { get; set; } = new() { PoolQuota = 1, DedicatedCoreQuotaPerVMFamily = new List<VirtualMachineFamilyCoreQuota>() };
             internal int ActivePoolCount { get; set; } = 0;
+
+            internal Func<string, ODATADetailLevel, IAsyncEnumerable<ComputeNode>> AzureProxyListComputeNodesAsync { get; set; } = (poolId, detailLevel) => AsyncEnumerable.Empty<ComputeNode>();
+            internal Action<string> AzureProxyGetComputeNodeTargets { get; set; } = poolId => { };
+            internal Action<string, IEnumerable<ComputeNode>, CancellationToken> AzureProxyDeleteBatchComputeNodes { get; set; } = (poolId, computeNodes, cancellationToken) => { };
+            internal Func<string, Microsoft.Azure.Batch.Common.AllocationState> AzureProxyGetAllocationState { get; set; } = /*(poolId, cancellationToken)*/ poolId => Microsoft.Azure.Batch.Common.AllocationState.Steady;
+            internal Func<(int, int)> AzureProxyReturnComputeNodeTargets { get; set; } = () => /*(int TargetLowPriority, int TargetDedicated)*/ (0, 0);
+            internal Action<string, int?, int?> AzureProxySetComputeNodeTargets { get; set; } = (poolId, targetLowPriorityComputeNodes, targetDedicatedComputeNodes) => { };
+            internal Func<(int?, int?)> AzureProxyGetCurrentComputeNodes { get; set; } = () => /*(int? lowPriorityNodes, int? dedicatedNodes)*/ (0, 0);
+            internal Action<string, CancellationToken> AzureProxyDeleteBatchPool { get; set; } = (poolId, cancellationToken) => { };
         }
 
-        private Mock<IAzureProxy> GetMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
-        {
-            var azureProxy = new Mock<IAzureProxy>();
+        private Action<Mock<IAzureProxy>> PrepareMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
+            => azureProxy =>
+            {
+               azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
+               azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
+               azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>())).Returns((Pool p) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
+               azureProxy.Setup(a => a.ListComputeNodesAsync(It.IsAny<string>(), It.IsAny<DetailLevel>())).Returns<string, ODATADetailLevel>((poolId, detailLevel) => azureProxyReturnValues.AzureProxyListComputeNodesAsync(poolId, detailLevel));
+               azureProxy.Setup(a => a.DeleteBatchComputeNodesAsync(It.IsAny<string>(), It.IsAny<IEnumerable<ComputeNode>>(), It.IsAny<CancellationToken>())).Callback<string, IEnumerable<ComputeNode>, CancellationToken>((poolId, computeNodes, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchComputeNodes(poolId, computeNodes, cancellationToken)).Returns(Task.CompletedTask);
+               azureProxy.Setup(a => a.GetComputeNodeTargets(It.IsAny<string>())).Callback<string>(id => azureProxyReturnValues.AzureProxyGetComputeNodeTargets?.Invoke(id)).Returns(() => azureProxyReturnValues.AzureProxyReturnComputeNodeTargets());
+               azureProxy.Setup(a => a.GetCurrentComputeNodesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(() => Task.FromResult<(int? lowPriorityNodes, int? dedicatedNodes)>(azureProxyReturnValues.AzureProxyGetCurrentComputeNodes?.Invoke() ?? (null, null)));
+               azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPool?.Invoke(poolId, cancellationToken)).Returns(Task.CompletedTask);
+               azureProxy.Setup(a => a.GetAllocationStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns((string id, CancellationToken token) => Task.FromResult(azureProxyReturnValues.AzureProxyGetAllocationState?.Invoke(id)));
+               azureProxy.Setup(a => a.SetComputeNodeTargetsAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).Callback<string, int?, int?, CancellationToken>((id, loPri, dedic, cancel) => azureProxyReturnValues.AzureProxySetComputeNodeTargets?.Invoke(id, loPri, dedic)).Returns(Task.CompletedTask);
+            };
 
-            azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
-            azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
-            azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>())).Returns((Pool p) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
-            azureProxy.Setup(a => a.ListComputeNodesAsync(It.IsAny<string>(), It.IsAny<DetailLevel>())).Returns<string, ODATADetailLevel>((poolId, detailLevel) => AzureProxyListComputeNodesAsync(poolId, detailLevel));
-            azureProxy.Setup(a => a.DeleteBatchComputeNodesAsync(It.IsAny<string>(), It.IsAny<IEnumerable<ComputeNode>>(), It.IsAny<CancellationToken>())).Callback<string, IEnumerable<ComputeNode>, CancellationToken>((poolId, computeNodes, cancellationToken) => AzureProxyDeleteBatchComputeNodes(poolId, computeNodes, cancellationToken)).Returns(Task.CompletedTask);
-            azureProxy.Setup(a => a.GetComputeNodeTargets(It.IsAny<string>())).Callback<string>(id => AzureProxyGetComputeNodeTargets?.Invoke(id)).Returns(() => AzureProxyReturnComputeNodeTargets());
-            azureProxy.Setup(a => a.GetCurrentComputeNodesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(() => Task.FromResult<(int? lowPriorityNodes, int? dedicatedNodes)>(AzureProxyGetCurrentComputeNodes?.Invoke() ?? (null, null)));
-            azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Callback<string, CancellationToken>((poolId, cancellationToken) => AzureProxyDeleteBatchPool?.Invoke(poolId, cancellationToken)).Returns(Task.CompletedTask);
-            azureProxy.Setup(a => a.GetAllocationStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns((string id, CancellationToken token) => Task.FromResult(AzureProxyGetAllocationState?.Invoke(id)));
-            azureProxy.Setup(a => a.SetComputeNodeTargetsAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).Callback<string, int?, int?, CancellationToken>((id, loPri, dedic, cancel) => AzureProxySetComputeNodeTargets?.Invoke(id, loPri, dedic)).Returns(Task.CompletedTask);
 
-            return azureProxy;
-        }
-
-        private Func<string, ODATADetailLevel, IAsyncEnumerable<ComputeNode>> AzureProxyListComputeNodesAsync;
-        private Action<string> AzureProxyGetComputeNodeTargets;
-        private Action<string, IEnumerable<ComputeNode>, CancellationToken> AzureProxyDeleteBatchComputeNodes;
-        private Func<string, Microsoft.Azure.Batch.Common.AllocationState> AzureProxyGetAllocationState;
-        private Func<(int, int)> AzureProxyReturnComputeNodeTargets;
-        private Action<string, int?, int?> AzureProxySetComputeNodeTargets;
-        private Func<(int?, int?)> AzureProxyGetCurrentComputeNodes;
-        private Action<string, CancellationToken> AzureProxyDeleteBatchPool;
-
-        private static IConfiguration GetMockConfig()
-        {
-            var config = new ConfigurationBuilder().AddInMemoryCollection().Build();
-            config["BatchPoolIdleNodeTime"] = "0.01";
-            config["BatchPoolIdlePoolTime"] = "0.015";
-            config["BatchPoolRotationForcedTime"] = "0.000011575";
-
-            return config;
-        }
-
-        internal static ComputeNode GenerateNode(string poolId, string id, bool isDedicated, bool isIdle)
-        {
-            var computeNodeOperations = new Mock<Microsoft.Azure.Batch.Protocol.IComputeNodeOperations>();
-            var batchServiceClient = new MockServiceClient(computeNodeOperations.Object);
-            var protocolLayer = typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient).Assembly.GetType("Microsoft.Azure.Batch.ProtocolLayer").GetConstructor(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient) }, null)
-                .Invoke(new object[] { batchServiceClient });
-            var parentClient = (BatchClient)typeof(BatchClient).GetConstructor(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient).Assembly.GetType("Microsoft.Azure.Batch.IProtocolLayer") }, null)
-                .Invoke(new object[] { protocolLayer });
-            var modelNode = new Microsoft.Azure.Batch.Protocol.Models.ComputeNode(stateTransitionTime: DateTime.UtcNow, id: id, affinityId: AffinityPrefix + id, isDedicated: isDedicated, state: isIdle ? Microsoft.Azure.Batch.Protocol.Models.ComputeNodeState.Idle : Microsoft.Azure.Batch.Protocol.Models.ComputeNodeState.Running);
-            var node = (ComputeNode)typeof(ComputeNode).GetConstructor(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, default, new Type[] { typeof(BatchClient), typeof(string), typeof(Microsoft.Azure.Batch.Protocol.Models.ComputeNode), typeof(IEnumerable<BatchClientBehavior>) }, default)
-                .Invoke(new object[] { parentClient, poolId, modelNode, null });
-            return node;
-        }
+        private static IEnumerable<(string Key, string Value)> GetMockConfig()
+            => Enumerable
+                .Empty<(string Key, string Value)>()
+                .Append(("BatchPoolIdleNodeTime", "0.3"))
+                .Append(("BatchPoolIdlePoolTime", "0.6"))
+                .Append(("BatchPoolRotationForcedTime", "0.000694444"));
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         static async IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(ComputeNode[] nodes, string id, ODATADetailLevel detail, Action<string, ODATADetailLevel> validate, Predicate<ComputeNode> select = default)
@@ -871,6 +765,27 @@ namespace TesApi.Tests
             }
 
             public override Microsoft.Azure.Batch.Protocol.IComputeNodeOperations ComputeNode => computeNode;
+        }
+
+        // Below this line is code using reflection and internal details of the Azure libraries in order to generate Mocks of ComputeNode. A newer version of the library is supposed to enable this scenario, so hopefully we can ditch this code at that time.
+
+        internal static ComputeNode GenerateNode(string poolId, string id, bool isDedicated, bool isIdle, DateTime stateTransitionTime = default)
+        {
+            if (default == stateTransitionTime)
+            {
+                stateTransitionTime = DateTime.UtcNow;
+            }
+
+            var computeNodeOperations = new Mock<Microsoft.Azure.Batch.Protocol.IComputeNodeOperations>();
+            var batchServiceClient = new MockServiceClient(computeNodeOperations.Object);
+            var protocolLayer = typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient).Assembly.GetType("Microsoft.Azure.Batch.ProtocolLayer").GetConstructor(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient) }, null)
+                .Invoke(new object[] { batchServiceClient });
+            var parentClient = (BatchClient)typeof(BatchClient).GetConstructor(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient).Assembly.GetType("Microsoft.Azure.Batch.IProtocolLayer") }, null)
+                .Invoke(new object[] { protocolLayer });
+            var modelNode = new Microsoft.Azure.Batch.Protocol.Models.ComputeNode(stateTransitionTime: stateTransitionTime, id: id, affinityId: AffinityPrefix + id, isDedicated: isDedicated, state: isIdle ? Microsoft.Azure.Batch.Protocol.Models.ComputeNodeState.Idle : Microsoft.Azure.Batch.Protocol.Models.ComputeNodeState.Running);
+            var node = (ComputeNode)typeof(ComputeNode).GetConstructor(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, default, new Type[] { typeof(BatchClient), typeof(string), typeof(Microsoft.Azure.Batch.Protocol.Models.ComputeNode), typeof(IEnumerable<BatchClientBehavior>) }, default)
+                .Invoke(new object[] { parentClient, poolId, modelNode, null });
+            return node;
         }
     }
 }

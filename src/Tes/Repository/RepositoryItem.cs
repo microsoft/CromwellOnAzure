@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -14,7 +14,7 @@ namespace Tes.Repository
     /// </summary>
     /// <typeparam name="T">Type of the item</typeparam>
     [DataContract]
-    public class RepositoryItem<T> where T : class
+    public abstract class RepositoryItem<T> where T : class
     {
         /// <summary>
         /// Name of the JSON field containing the partition key

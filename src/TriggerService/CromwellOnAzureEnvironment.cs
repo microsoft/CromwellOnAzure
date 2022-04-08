@@ -463,7 +463,7 @@ namespace TriggerService
         {
             var blobName = blobTriggerName[(currentState.ToString().Length + 1)..];
             var withoutExtension = Path.GetFileNameWithoutExtension(blobName);
-            return withoutExtension.Substring(0, withoutExtension.LastIndexOf('.'));
+            return withoutExtension[..withoutExtension.LastIndexOf('.')];
         }
 
         private static string GetBlobName(string url)

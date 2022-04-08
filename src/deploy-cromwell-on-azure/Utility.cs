@@ -115,7 +115,7 @@ namespace CromwellOnAzureDeployer
                 var password = Convert.ToBase64String(buffer)
                     .Replace("+", "-")
                     .Replace("/", "_")
-                    .Substring(0, length);
+                    [..length];
 
                 if (regex.IsMatch(password))
                 {

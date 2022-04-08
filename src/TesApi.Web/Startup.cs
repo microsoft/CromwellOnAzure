@@ -60,6 +60,7 @@ namespace TesApi.Web
             .AddSingleton(sp => ActivatorUtilities.CreateInstance<AzureProxy>(sp, Configuration["BatchAccountName"], azureOfferDurableId, new Lazy<IBatchPools>(() => (IBatchPools)sp.GetService(typeof(IBatchPools)))))
             .AddSingleton<IBatchPools, BatchPools>()
             .AddSingleton<BatchPoolFactory>()
+            .AddSingleton<PoolRepositoryFactory>()
 
             .AddControllers()
             .AddNewtonsoftJson(opts =>
@@ -73,6 +74,13 @@ namespace TesApi.Web
                 (var cosmosDbEndpoint, var cosmosDbKey) = ((IAzureProxy)sp.GetService(typeof(IAzureProxy))).GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
                 return (IRepository<TesTask>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<TesTask>>(sp, new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId));
             })
+
+            .AddSingleton(sp =>
+            {
+                (var cosmosDbEndpoint, var cosmosDbKey) = ((IAzureProxy)sp.GetService(typeof(IAzureProxy))).GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
+                return (IRepository<BatchPools.PoolList>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<BatchPools.PoolList>>(sp, new CosmosDbRepository<BatchPools.PoolList>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, BatchPools.CosmosDbContainerId, Constants.CosmosDbPartitionId));
+            })
+
             .AddSingleton<IBatchScheduler, BatchScheduler>()
             .AddSingleton<IStorageAccessProvider, StorageAccessProvider>()
 
@@ -99,7 +107,6 @@ namespace TesApi.Web
             .AddHostedService<DeleteOrphanedBatchJobsHostedService>()
             .AddHostedService<DeleteOrphanedAutoPoolsHostedService>()
             .AddHostedService<RefreshVMSizesAndPricesHostedService>()
-            .AddHostedService<BatchPoolService>()
 
             // Configure AppInsights Azure Service when in PRODUCTION environment
             .IfThenElse(hostingEnvironment.IsProduction(),

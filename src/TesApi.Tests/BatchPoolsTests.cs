@@ -3,11 +3,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -21,103 +24,66 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task GetOrAddDoesNotAddExistingAvailablePool()
         {
-            var mockAzureProxy = GetMockAzureProxy(AzureProxyReturnValues.Get());
-            var (pools, info) = await ConfigureBatchPools(true, mockAzureProxy: mockAzureProxy);
-            var keyCount = ((IBatchPoolsImpl)pools).ManagedBatchPools.Count;
-            var key = ((IBatchPoolsImpl)pools).ManagedBatchPools.Keys.First();
-            var count = ((IBatchPoolsImpl)pools).ManagedBatchPools.Values.SelectMany(q => q).Count();
-            Assert.AreEqual(1, mockAzureProxy.Invocations.Count(i => i.Method.Name.Equals(nameof(IAzureProxy.CreateBatchPoolAsync))));
+            using var serviceProvider = GetServiceProvider();
+            var pools = serviceProvider.GetT();
+            var info = await AddPool(pools);
+            var keyCount = await ((IBatchPoolsImpl)pools).GetPoolGroups().CountAsync();
+            var key = await ((IBatchPoolsImpl)pools).GetPoolGroups().SelectAwait(g => ValueTask.FromResult(g.Key)).FirstAsync();
+            var count = await pools.GetPoolsAsync().CountAsync();
+            serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>()), Times.Once);
 
-            var pool = await pools.GetOrAddAsync(key, id => new Pool(name: id));
+            var pool = await pools.GetOrAddAsync(key, id => ValueTask.FromResult(new Pool(name: id)));
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
 
-            Assert.AreEqual(((IBatchPoolsImpl)pools).ManagedBatchPools.Values.SelectMany(q => q).Count(), count);
-            Assert.AreEqual(((IBatchPoolsImpl)pools).ManagedBatchPools.Count, keyCount);
-            Assert.AreSame(info, pool);
-            Assert.AreEqual(1, mockAzureProxy.Invocations.Count(i => i.Method.Name.Equals(nameof(IAzureProxy.CreateBatchPoolAsync))));
+            Assert.AreEqual(await pools.GetPoolsAsync().CountAsync(), count);
+            Assert.AreEqual(await ((IBatchPoolsImpl)pools).GetPoolGroups().CountAsync(), keyCount);
+            //Assert.AreSame(info, pool);
+            Assert.AreEqual(info.Pool.PoolId, pool.Pool.PoolId);
+            serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>()), Times.Once);
         }
 
         [TestMethod]
         public async Task GetOrAddDoesAddWithExistingUnavailablePool()
         {
-            var (pools, info) = await ConfigureBatchPools(true);
+            using var serviceProvider = GetServiceProvider();
+            var pools = serviceProvider.GetT();
+            var info = await AddPool(pools);
             ((IBatchPoolImpl)info).TestSetAvailable(false);
-            var keyCount = ((IBatchPoolsImpl)pools).ManagedBatchPools.Count;
-            var key = ((IBatchPoolsImpl)pools).ManagedBatchPools.Keys.First();
-            var count = ((IBatchPoolsImpl)pools).ManagedBatchPools.Values.SelectMany(q => q).Count();
+            await info.ServicePoolAsync(IBatchPool.ServiceKind.Update);
+            var keyCount = await ((IBatchPoolsImpl)pools).GetPoolGroups().CountAsync();
+            var key = await ((IBatchPoolsImpl)pools).GetPoolGroups().SelectAwait(g => ValueTask.FromResult(g.Key)).FirstAsync();
+            var count = await pools.GetPoolsAsync().CountAsync();
 
-            var pool = await pools.GetOrAddAsync(key, id => new Pool(name: id));
+            var pool = await pools.GetOrAddAsync(key, id => ValueTask.FromResult(new Pool(name: id)));
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
 
-            Assert.AreNotEqual(((IBatchPoolsImpl)pools).ManagedBatchPools.Values.SelectMany(q => q).Count(), count);
-            Assert.AreEqual(((IBatchPoolsImpl)pools).ManagedBatchPools.Count, keyCount);
-            Assert.AreNotSame(info, pool);
+            Assert.AreNotEqual(await pools.GetPoolsAsync().CountAsync(), count);
+            Assert.AreEqual(await ((IBatchPoolsImpl)pools).GetPoolGroups().CountAsync(), keyCount);
+            //Assert.AreNotSame(info, pool);
+            Assert.AreNotEqual(info.Pool.PoolId, pool.Pool.PoolId);
         }
 
-        [TestMethod]
-        public async Task GetOrAddCloudPoolDoesNotAddExistingPool()
-        {
-            var (pools, info) = await ConfigureBatchPools(true);
-
-            var cloudPool = new Mock<CloudPool>().Object;
-            cloudPool.VirtualMachineSize = "vmSize1";
-            cloudPool.AutoScaleEnabled = false;
-            cloudPool.Id = info.Pool.PoolId;
-
-            var count = ((IBatchPoolsImpl)pools).ManagedBatchPools.Values.SelectMany(q => q).Count();
-            var pool = await pools.GetOrAddAsync(cloudPool);
-
-            Assert.AreEqual(((IBatchPoolsImpl)pools).ManagedBatchPools.Values.SelectMany(q => q).Count(), count);
-            Assert.AreSame(info, pool);
-        }
-
-        [TestMethod]
-        public async Task GetOrAddCloudPoolDoesAddNonexistingPool()
-        {
-            var (pools, _) = await ConfigureBatchPools(false);
-
-            var cloudPool = new Mock<CloudPool>().Object;
-            cloudPool.VirtualMachineSize = "vmSize1";
-            cloudPool.AutoScaleEnabled = false;
-            cloudPool.Id = @"key1-_____________";
-
-            var count = ((IBatchPoolsImpl)pools).ManagedBatchPools.Values.SelectMany(q => q).Count();
-            var pool = await pools.GetOrAddAsync(cloudPool);
-
-            Assert.AreNotEqual(((IBatchPoolsImpl)pools).ManagedBatchPools.Values.SelectMany(q => q).Count(), count);
-            Assert.AreEqual(pool.Pool.PoolId, cloudPool.Id);
-        }
-
-        [TestMethod]
-        public async Task GetOrAddCloudPoolDoesNotAddAutoscalingPool()
-        {
-            var (pools, _) = await ConfigureBatchPools(false);
-
-            var cloudPool = new Mock<CloudPool>().Object;
-            cloudPool.VirtualMachineSize = "vmSize1";
-            cloudPool.AutoScaleEnabled = true;
-            cloudPool.Id = "key1-_____________";
-
-            var count = ((IBatchPoolsImpl)pools).ManagedBatchPools.Values.SelectMany(q => q).Count();
-            var pool = await pools.GetOrAddAsync(cloudPool);
-
-            Assert.AreEqual(((IBatchPoolsImpl)pools).ManagedBatchPools.Values.SelectMany(q => q).Count(), count);
-            Assert.IsNull(pool);
-        }
 
         [TestMethod]
         public async Task TryGetReturnsTrueAndCorrectPool()
         {
-            var (pools, info) = await ConfigureBatchPools(true);
+            using var serviceProvider = GetServiceProvider();
+            var pools = serviceProvider.GetT();
+            var info = await AddPool(pools);
 
             var result = pools.TryGet(info.Pool.PoolId, out var pool);
 
             Assert.IsTrue(result);
-            Assert.AreSame(info, pool);
+            //Assert.AreSame(infoPoolId, pool);
+            Assert.AreEqual(info.Pool.PoolId, pool.Pool.PoolId);
         }
 
         [TestMethod]
         public async Task TryGetReturnsFalseWhenPoolIdNotPresent()
         {
-            var (pools, _) = await ConfigureBatchPools(true);
+            using var serviceProvider = GetServiceProvider();
+            var pools = serviceProvider.GetT();
+            _ = await AddPool(pools);
 
             var result = pools.TryGet("key2", out _);
 
@@ -127,7 +93,9 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task TryGetReturnsFalseWhenNoPoolIsAvailable()
         {
-            var (pools, pool) = await ConfigureBatchPools(true);
+            using var serviceProvider = GetServiceProvider();
+            var pools = serviceProvider.GetT();
+            var pool = await AddPool(pools);
             ((IBatchPoolImpl)pool).TestSetAvailable(false);
 
             var result = pools.TryGet("key1", out _);
@@ -136,55 +104,45 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
-        public async Task TryGetReturnsFalseWhenPoolIdIsNull()
+        public Task TryGetReturnsFalseWhenPoolIdIsNull()
         {
-            var (pools, _) = await ConfigureBatchPools(false);
+            using var serviceProvider = GetServiceProvider();
+            var pools = serviceProvider.GetT();
 
             var result = pools.TryGet(null, out _);
 
             Assert.IsFalse(result);
+            return Task.CompletedTask;
         }
 
         [TestMethod]
         public async Task UnavailablePoolsAreRemoved()
         {
-            var (pools, pool) = await ConfigureBatchPools(true);
+            var poolId = string.Empty;
+            var azureProxyMock = AzureProxyReturnValues.Get();
+            azureProxyMock.AzureProxyDeleteBatchPool = id => poolId = id;
+
+            using var serviceProvider = GetServiceProvider(azureProxyMock);
+            var pools = serviceProvider.GetT();
+            var pool = await AddPool(pools);
             Assert.IsTrue(pools.IsPoolAvailable("key1"));
             ((IBatchPoolImpl)pool).TestSetAvailable(false);
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
             Assert.IsFalse(pools.IsPoolAvailable("key1"));
-            Assert.IsFalse(pools.IsEmpty);
+            Assert.IsTrue(await pools.GetPoolsAsync().AnyAsync());
 
-            var poolId = string.Empty;
-            try
-            {
-                AzureProxyDeleteBatchPool = SavePoolId;
-                await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
-            }
-            finally
-            {
-                AzureProxyDeleteBatchPool = default;
-            }
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
 
             Assert.AreEqual(pool.Pool.PoolId, poolId);
             Assert.IsFalse(pools.IsPoolAvailable("key1"));
-            Assert.IsTrue(pools.IsEmpty);
-
-            void SavePoolId(string id)
-                => poolId = id;
+            Assert.IsFalse(await pools.GetPoolsAsync().AnyAsync());
         }
 
-        private async Task<(IBatchPools pools, IBatchPool pool)> ConfigureBatchPools(bool createInitialPool, AzureProxyReturnValues azureProxyReturnValues = default, IConfiguration configuration = default, Mock<IAzureProxy> mockAzureProxy = default)
-        {
-            IBatchPool info = default;
-            IBatchPools result;
-            var azureProxy = (mockAzureProxy ?? GetMockAzureProxy(azureProxyReturnValues ?? AzureProxyReturnValues.Get())).Object;
-            result = new BatchPools(azureProxy, new Mock<ILogger<BatchPools>>().Object, configuration ?? GetMockConfig(), BatchPoolTests.GetBatchPoolFactory(azureProxy));
-            if (createInitialPool)
-            {
-                info = await result.GetOrAddAsync("key1", id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
-            }
-            return (result, info);
-        }
+        private TestServices.TestServiceProvider<BatchPools> GetServiceProvider(AzureProxyReturnValues azureProxyReturn = default)
+            => new(wrapAzureProxy: true, configuration: GetMockConfig(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Get()), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
+
+        private static async Task<IBatchPool> AddPool(IBatchPools batchPools)
+            => await batchPools.GetOrAddAsync("key1", id => ValueTask.FromResult(new Pool(name: id, displayName: "display1", vmSize: "vmSize1")));
 
         private class AzureProxyReturnValues
         {
@@ -193,33 +151,30 @@ namespace TesApi.Tests
 
             internal AzureBatchAccountQuotas BatchQuotas { get; set; } = new() { PoolQuota = 1, DedicatedCoreQuotaPerVMFamily = new List<VirtualMachineFamilyCoreQuota>() };
             internal int ActivePoolCount { get; set; } = 0;
+
+            internal Action<string> AzureProxyDeleteBatchPool { get; set; } = poolId => { };
         }
 
-        private Mock<IAzureProxy> GetMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
+        private Action<Mock<IAzureProxy>> PrepareMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
         {
-            var azureProxy = new Mock<IAzureProxy>();
+            return azureProxy =>
+            {
+                azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
+                azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
+                azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>())).Returns((Pool p) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
+                azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Callback<string, CancellationToken>(DeleteBatchPoolCallback);
+            };
 
-            azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
-            azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
-            azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>())).Returns((Pool p) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
-            azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<System.Threading.CancellationToken>())).Callback<string, System.Threading.CancellationToken>(DeleteBatchPoolCallback);
-
-            return azureProxy;
-
-            void DeleteBatchPoolCallback(string poolId, System.Threading.CancellationToken cancellationToken)
-                => AzureProxyDeleteBatchPool?.Invoke(poolId);
+            void DeleteBatchPoolCallback(string poolId, CancellationToken cancellationToken)
+                => azureProxyReturnValues.AzureProxyDeleteBatchPool?.Invoke(poolId);
         }
 
-        private Action<string> AzureProxyDeleteBatchPool;
-
-        private static IConfiguration GetMockConfig()
-        {
-            var config = new ConfigurationBuilder().AddInMemoryCollection().Build();
-            //config["BatchPoolIdleNodeTime"] = "0.3";
-            //config["BatchPoolIdlePoolTime"] = "0.6";
-            //config["BatchPoolRotationForcedTime"] = "0.000694444";
-
-            return config;
-        }
+        private static IEnumerable<(string Key, string Value)> GetMockConfig()
+            => Enumerable
+                .Empty<(string Key, string Value)>()
+                //.Append(("BatchPoolIdleNodeTime", "0.3"))
+                //.Append(("BatchPoolIdlePoolTime", "0.6"))
+                //.Append(("BatchPoolRotationForcedTime", "0.000694444"))
+            ;
     }
 }

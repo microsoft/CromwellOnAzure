@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using LazyCache;
 using Microsoft.Azure.Batch;
-using Microsoft.Azure.Batch.Common;
 using Polly;
 using Polly.Retry;
 using Tes.Models;
@@ -23,13 +22,16 @@ namespace TesApi.Web
         private readonly IAzureProxy azureProxy;
         private readonly IAppCache cache;
 
+        private static TimeSpan SleepDurationProvider(int attempt)
+            => TimeSpan.FromSeconds(Math.Pow(2, attempt));
+
         private readonly AsyncRetryPolicy asyncRetryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)));
+            .WaitAndRetryAsync(3, SleepDurationProvider);
 
         private readonly RetryPolicy retryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetry(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)));
+            .WaitAndRetry(3, SleepDurationProvider);
 
         /// <summary>
         /// Contructor to create a cache of <see cref="IAzureProxy"/>
@@ -175,10 +177,10 @@ namespace TesApi.Web
 
         /// <inheritdoc/>
         public IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null)
-            => retryPolicy.Execute(() => azureProxy.ListComputeNodesAsync(poolId, detailLevel));
+            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListComputeNodesAsync(poolId, detailLevel), retryPolicy);
 
         /// <inheritdoc/>
-        public Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default)
+        public Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, Microsoft.Azure.Batch.Common.ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default)
             => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ReimageComputeNodeAsync(poolId, computeNodeId, reimageOption, cancellationToken));
     }
 }

@@ -3,11 +3,13 @@
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+//using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
+//using Polly;
+using Polly.Retry;
 
 // TODO: move this to Common.csproj?
 namespace TesApi.Web
@@ -17,38 +19,6 @@ namespace TesApi.Web
     /// </summary>
     public static partial class PagedInterfaceExtensions
     {
-        ///// <summary>
-        ///// Calls each element in the <see cref="IAsyncEnumerable{T}"/>, stopping when <paramref name="body"/> returns false.
-        ///// </summary>
-        ///// <typeparam name="T">The type of objects to enumerate.</typeparam>
-        ///// <param name="source">The <see cref="IAsyncEnumerable{T}"/> to enumerate.</param>
-        ///// <param name="body">The <see cref="Predicate{T}"/> that visits each element. Enumeration continues as long as <paramref name="body"/> returns true.</param>
-        ///// <param name="cancellationToken">A <see cref="CancellationToken"/> for controlling the lifetime of the asynchronous operation.</param>
-        ///// <returns><see cref="Task"/></returns>
-        ///// <exception cref="ArgumentNullException"></exception>
-        ///// <exception cref="OperationCanceledException"></exception>
-        //public static async Task ForEachAsync<T>(this IAsyncEnumerable<T> source, Predicate<T> body, CancellationToken cancellationToken = default)
-        //{
-        //    await foreach (var item in (source ?? throw new ArgumentNullException(nameof(source))).WithCancellation(cancellationToken).ConfigureAwait(false))
-        //    {
-        //        if (!body(item)) return;
-        //    }
-        //}
-
-        ///// <summary>
-        ///// Calls each element in the <see cref="IAsyncEnumerable{T}"/> with <paramref name="body"/>.
-        ///// </summary>
-        ///// <typeparam name="T">The type of objects to enumerate.</typeparam>
-        ///// <param name="source">The <see cref="IAsyncEnumerable{T}"/> to enumerate.</param>
-        ///// <param name="body">The <see cref="Action{Task}"/> that visits each element.</param>
-        ///// <param name="cancellationToken">A <see cref="CancellationToken"/> for controlling the lifetime of the asynchronous operation.</param>
-        ///// <returns><see cref="Task"/></returns>
-        ///// <exception cref="ArgumentNullException"></exception>
-        ///// <exception cref="OperationCanceledException"></exception>
-        //public static Task ForEachAsync<T>(this IAsyncEnumerable<T> source, Action<T> body, CancellationToken cancellationToken = default)
-        //    => source.ForEachAsync(t => { body(t); return true; }, cancellationToken);
-
-
         /// <summary>
         /// Creates an <see cref="IAsyncEnumerable{T}"/> from an <see cref="IPagedEnumerable{T}"/>.
         /// </summary>
@@ -69,8 +39,57 @@ namespace TesApi.Web
         public static IAsyncEnumerable<T> ToAsyncEnumerable<T>(this IPagedCollection<T> source)
             => new AsyncEnumerable<T>(source ?? throw new ArgumentNullException(nameof(source)));
 
+        /// <summary>
+        /// Adapts calls returning <see cref="IAsyncEnumerable{T}"/> to <see cref="AsyncRetryPolicy"/>.
+        /// </summary>
+        /// <typeparam name="T">Type of results returned in <see cref="IAsyncEnumerable{T}"/> by <paramref name="func"/>.</typeparam>
+        /// <param name="asyncRetryPolicy">Policy retrying calls made while enumerating results returned by <paramref name="func"/>.</param>
+        /// <param name="func">Method returning <see cref="IAsyncEnumerable{T}"/>.</param>
+        /// <param name="retryPolicy">Policy retrying call to <paramref name="func"/>.</param>
+        /// <returns></returns>
+        public static IAsyncEnumerable<T> ExecuteAsync<T>(this AsyncRetryPolicy asyncRetryPolicy, Func<IAsyncEnumerable<T>> func, RetryPolicy retryPolicy)
+        {
+            _ = func ?? throw new ArgumentNullException(nameof(func));
+            return new PollyAsyncEnumerable<T>((retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy))).Execute(() => func()), asyncRetryPolicy ?? throw new ArgumentNullException(nameof(asyncRetryPolicy)));
+        }
 
         #region Implementation classes
+        private sealed class PollyAsyncEnumerable<T> : IAsyncEnumerable<T>
+        {
+            private readonly IAsyncEnumerable<T> _source;
+            private readonly AsyncRetryPolicy _retryPolicy;
+
+            public PollyAsyncEnumerable(IAsyncEnumerable<T> source, AsyncRetryPolicy retryPolicy)
+            {
+                _source = source ?? throw new ArgumentNullException(nameof(source));
+                _retryPolicy = retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
+            }
+
+            IAsyncEnumerator<T> IAsyncEnumerable<T>.GetAsyncEnumerator(CancellationToken cancellationToken)
+                => new PollyAsyncEnumerator<T>(_source.GetAsyncEnumerator(cancellationToken), _retryPolicy);
+        }
+
+        private sealed class PollyAsyncEnumerator<T> : IAsyncEnumerator<T>
+        {
+            private readonly IAsyncEnumerator<T> _source;
+            private readonly AsyncRetryPolicy _retryPolicy;
+
+            public PollyAsyncEnumerator(IAsyncEnumerator<T> source, AsyncRetryPolicy retryPolicy)
+            {
+                _source = source ?? throw new ArgumentNullException(nameof(source));
+                _retryPolicy = retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
+            }
+
+            T IAsyncEnumerator<T>.Current
+                => _source.Current;
+
+            ValueTask IAsyncDisposable.DisposeAsync()
+                => _source.DisposeAsync();
+
+            ValueTask<bool> IAsyncEnumerator<T>.MoveNextAsync()
+                => new(_retryPolicy.ExecuteAsync(() => _source.MoveNextAsync().AsTask()));
+        }
+
         private struct AsyncEnumerable<T> : IAsyncEnumerable<T>
         {
             private readonly Func<CancellationToken, IAsyncEnumerator<T>> getEnumerator;
@@ -158,9 +177,8 @@ namespace TesApi.Web
 
             public async ValueTask<bool> MoveNextAsync()
             {
-                var result = await source.MoveNextAsync(cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
-                return result;
+                return await source.MoveNextAsync(cancellationToken).ConfigureAwait(false);
             }
         }
         #endregion

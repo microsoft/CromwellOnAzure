@@ -3,30 +3,28 @@
 
 using System;
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using System.Text;
+using System.Runtime.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
+using Tes.Repository;
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
 
 namespace TesApi.Web
 {
     internal interface IBatchPoolsImpl
     {
-        ConcurrentDictionary<string, ConcurrentQueue<IBatchPool>> ManagedBatchPools { get; }
-        object syncObject { get; }
+        Task RemovePoolFromList(string poolId);
 
-        TimeSpan IdleNodeCheck { get; }
-        TimeSpan IdlePoolCheck { get; }
-        TimeSpan ForcePoolRotationAge { get; }
+        IAsyncEnumerable<BatchPools.PoolList> GetPoolGroups();
+        IAsyncEnumerable<IBatchPool> GetPools(string key);
     }
 
     /// <summary>
@@ -34,13 +32,15 @@ namespace TesApi.Web
     /// </summary>
     public sealed class BatchPools : IBatchPools, IBatchPoolsImpl
     {
-        private readonly TimeSpan _idleNodeCheck;
-        private readonly TimeSpan _idlePoolCheck;
-        private readonly TimeSpan _forcePoolRotationAge;
+        /// <summary>
+        /// CosmosDB container id for storing pool metadata that needs to survive reboots/etc.
+        /// </summary>
+        public const string CosmosDbContainerId = "Pools";
 
         private readonly ILogger _logger;
         private readonly IAzureProxy _azureProxy;
         private readonly BatchPoolFactory _poolFactory;
+        private readonly IRepository<PoolList> _poolListRepository;
         private readonly bool isDisabled;
 
         private readonly Random random = new();
@@ -51,16 +51,14 @@ namespace TesApi.Web
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
         /// <param name="configuration"></param>
+        /// <param name="poolListRepository"></param>
         /// <param name="poolFactory"></param>
-        public BatchPools(IAzureProxy azureProxy, ILogger<BatchPools> logger, IConfiguration configuration, BatchPoolFactory poolFactory)
+        public BatchPools(IAzureProxy azureProxy, ILogger<BatchPools> logger, IConfiguration configuration, IRepository<PoolList> poolListRepository, BatchPoolFactory poolFactory)
         {
             this.isDisabled = configuration.GetValue("BatchAutopool", false);
             if (!this.isDisabled)
             {
-                _idleNodeCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdleNodeTime", 5)); // TODO: set this to an appropriate value
-                _idlePoolCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdlePoolTime", 30)); // TODO: set this to an appropriate value
-                _forcePoolRotationAge = TimeSpan.FromDays(configuration.GetValue<double>("BatchPoolRotationForcedTime", 60)); // TODO: set this to an appropriate value
-
+                _poolListRepository = poolListRepository;
                 _poolFactory = poolFactory;
                 _azureProxy = azureProxy;
                 _logger = logger;
@@ -68,22 +66,18 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public bool IsEmpty
-            => ManagedBatchPools.Values.All(q => q.IsEmpty);
-
-        /// <inheritdoc/>
         public bool TryGet(string poolId, out IBatchPool batchPool)
         {
-            batchPool = ManagedBatchPools.Values.SelectMany(q => q).FirstOrDefault(p => p.Pool.PoolId.Equals(poolId, StringComparison.OrdinalIgnoreCase));
+            batchPool = GetAllBatchPoolsAsync().Result.FirstOrDefault(p => p.Pool.PoolId.Equals(poolId, StringComparison.OrdinalIgnoreCase));
             return batchPool is not null;
         }
 
         /// <inheritdoc/>
         public bool IsPoolAvailable(string key)
-            => ManagedBatchPools.TryGetValue(key, out var queue) && queue.Any(p => p.IsAvailable);
+            => GetBatchPoolsByKeyAsync(key).Result?.Any(p => p.IsAvailable) ?? false;
 
         /// <inheritdoc/>
-        public async Task<IBatchPool> GetOrAddAsync(string key, Func<string, BatchModels.Pool> valueFactory)
+        public async Task<IBatchPool> GetOrAddAsync(string key, Func<string, ValueTask<BatchModels.Pool>> valueFactory)
         {
             if (isDisabled)
             {
@@ -99,31 +93,22 @@ namespace TesApi.Web
 
             // TODO: Make sure key doesn't contain any nonsupported chars
 
-            var queue = ManagedBatchPools.GetOrAdd(key, k => new());
-            var result = queue.LastOrDefault(Available);
+            var queue = await GetBatchPoolsByKeyAsync(key);
+            var result = queue?.LastOrDefault(Available);
             if (result is null)
             {
-                await Task.Run(() =>
+                var poolQuota = _azureProxy.GetBatchAccountQuotasAsync().Result.PoolQuota;
+                var activePoolsCount = _azureProxy.GetBatchActivePoolCount();
+                if (activePoolsCount + 1 > poolQuota)
                 {
-                    lock (syncObject)
-                    {
-                        result = queue.LastOrDefault(Available);
-                        if (result is null)
-                        {
-                            var poolQuota = _azureProxy.GetBatchAccountQuotasAsync().Result.PoolQuota;
-                            var activePoolsCount = _azureProxy.GetBatchActivePoolCount();
-                            if (activePoolsCount + 1 > poolQuota)
-                            {
-                                throw new AzureBatchQuotaMaxedOutException($"No remaining pool quota available. There are {activePoolsCount} pools in use out of {poolQuota}.");
-                            }
-                            var uniquifier = new byte[8]; // This always becomes 13 chars, if you remove the three '=' at the end. We won't ever decode this, so we don't need any '='s
-                            random.NextBytes(uniquifier);
-                            var pool = valueFactory($"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"); // '-' is required by GetOrAddAsync(CloudPool)
-                            result = _poolFactory.Create(_azureProxy.CreateBatchPoolAsync(pool).Result, pool.VmSize, this);
-                            queue.Enqueue(result);
-                        }
-                    }
-                });
+                    throw new AzureBatchQuotaMaxedOutException($"No remaining pool quota available. There are {activePoolsCount} pools in use out of {poolQuota}.");
+                }
+                var uniquifier = new byte[8]; // This always becomes 13 chars, if you remove the three '=' at the end. We won't ever decode this, so we don't need any '='s
+                random.NextBytes(uniquifier);
+                var pool = await valueFactory($"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"); // '-' is required by GetOrAddAsync(CloudPool)
+                result = _poolFactory.CreateNew(_azureProxy.CreateBatchPoolAsync(pool).Result, this);
+                await result.ServicePoolAsync(IBatchPool.ServiceKind.Create);
+                await AddPool(key, result);
             }
             return result;
 
@@ -153,42 +138,6 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task<IBatchPool> GetOrAddAsync(CloudPool pool)
-        {
-            if (pool is null || isDisabled)
-            {
-                return default;
-            }
-
-            IBatchPool result;
-            lock (syncObject)
-            {
-                result = ManagedBatchPools.Values.SelectMany(q => q).FirstOrDefault(p => p.Pool.PoolId.Equals(pool.Id));
-                if (result is not null)
-                {
-                    return result;
-                }
-
-                var separator = pool.Id?.LastIndexOf('-') ?? -1;
-                if (separator == -1 || pool.Id?.Length - separator != 14 || pool.AutoScaleEnabled != false) // this can't be our pool
-                {
-                    return default; // TODO: Consider throwing? This should never happen, unless our caller is simply enumerating pools in the batch account.
-                }
-
-                var key = pool.Id[0..separator];
-                DateTime? creationTime = default;
-                DateTime? allocationStateTransitionTime = default;
-                try { creationTime = pool.CreationTime; } catch (InvalidOperationException) { }
-                try { allocationStateTransitionTime = pool.AllocationStateTransitionTime; } catch (InvalidOperationException) { }
-                result = _poolFactory.Create(new PoolInformation { PoolId = pool.Id }, pool.VirtualMachineSize, this, creationTime, allocationStateTransitionTime);
-                ManagedBatchPools.GetOrAdd(key, k => new()).Enqueue(result);
-            }
-
-            await result.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize);
-            return result;
-        }
-
-        /// <inheritdoc/>
         public Task ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState)
         {
             if (!isDisabled && nodeInformation is not null)
@@ -202,16 +151,70 @@ namespace TesApi.Web
             return Task.CompletedTask;
         }
 
-        private readonly object syncObject = new();
-        private ConcurrentDictionary<string, ConcurrentQueue<IBatchPool>> ManagedBatchPools { get; } = new();
+        /// <inheritdoc/>
+        public IAsyncEnumerable<IBatchPool> GetPoolsAsync(System.Threading.CancellationToken cancellationToken = default)
+            => _poolListRepository.GetItemsAsync(p => true, 256, cancellationToken).SelectManyAwait(GetPoolsAsyncAdapter);
+
+        private async ValueTask AddPool(string key, IBatchPool pool)
+        {
+            if (!await _poolListRepository.TryGetItemAsync(key, async l => { l.Pools.Add(pool.Pool.PoolId); await _poolListRepository.UpdateItemAsync(l); }))
+            {
+                await _poolListRepository.CreateItemAsync(new PoolList { Key = key, Pools = new(Enumerable.Empty<string>().Append(pool.Pool.PoolId)) });
+            }
+        }
+
+        private ValueTask<IAsyncEnumerable<IBatchPool>> GetPoolsAsyncAdapter(PoolList poolList)
+            => ValueTask.FromResult(GetPoolsAsync(poolList.Pools));
+
+        private IAsyncEnumerable<IBatchPool> GetPoolsAsync(IEnumerable<string> pools)
+            => pools.Select(i => _poolFactory.Retrieve(i, this)).ToAsyncEnumerable();
+
+        private async Task<IEnumerable<IBatchPool>> GetAllBatchPoolsAsync()
+            => (await _poolListRepository.GetItemsAsync(i => true)).SelectMany(l => l.Pools).Select(i => _poolFactory.Retrieve(i, this));
+
+        private async Task<IEnumerable<IBatchPool>> GetBatchPoolsByKeyAsync(string key)
+            => (await _poolListRepository.GetItemOrDefaultAsync(key))?.Pools.Select(i => _poolFactory.Retrieve(i, this));
 
         #region IBatchPoolsImpl
-        TimeSpan IBatchPoolsImpl.IdleNodeCheck => _idleNodeCheck;
-        TimeSpan IBatchPoolsImpl.IdlePoolCheck => _idlePoolCheck;
-        TimeSpan IBatchPoolsImpl.ForcePoolRotationAge => _forcePoolRotationAge;
+        async Task IBatchPoolsImpl.RemovePoolFromList(string poolId)
+        {
+            var pool = (await _poolListRepository.GetItemsAsync(l => l.Pools.Contains(poolId))).FirstOrDefault();
+            pool.Pools.Remove(poolId);
+            if (pool.Pools.Count == 0)
+            {
+                await _poolListRepository.DeleteItemAsync(pool.Key);
+            }
+            else
+            {
+                await _poolListRepository.UpdateItemAsync(pool);
+            }
+        }
 
-        ConcurrentDictionary<string, ConcurrentQueue<IBatchPool>> IBatchPoolsImpl.ManagedBatchPools => ManagedBatchPools;
-        object IBatchPoolsImpl.syncObject => syncObject;
+        IAsyncEnumerable<PoolList> IBatchPoolsImpl.GetPoolGroups()
+            => _poolListRepository.GetItemsAsync(i => true).Result.ToAsyncEnumerable();
+
+        IAsyncEnumerable<IBatchPool> IBatchPoolsImpl.GetPools(string key)
+            => GetBatchPoolsByKeyAsync(key).Result?.ToAsyncEnumerable();
+        #endregion
+
+        #region Embedded classes
+        /// <summary>
+        /// List of Azure Batch account pools stored in CosmosDB
+        /// </summary>
+        public class PoolList : RepositoryItem<PoolList>
+        {
+            /// <summary>
+            /// <see cref="IBatchPools"/> "key" value.
+            /// </summary>
+            [DataMember(Name = "id")]
+            public string Key { get; set; }
+
+            /// <summary>
+            /// List of PoolId (<seealso cref="BatchPool.PoolData"/>)
+            /// </summary>
+            [DataMember(Name = "pools")]
+            public List<string> Pools { get; set; }
+        }
         #endregion
     }
 }

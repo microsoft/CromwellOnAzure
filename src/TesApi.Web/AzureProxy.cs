@@ -334,7 +334,6 @@ namespace TesApi.Web
                     };
 
                     var pool = await batchClient.PoolOperations.ListPools(poolFilter).ToAsyncEnumerable().FirstOrDefaultAsync();
-                    _ = await batchPools.Value.GetOrAddAsync(pool); // Ensure that BatchPools knows about this pool.
 
                     if (job.State == JobState.Active)
                     {

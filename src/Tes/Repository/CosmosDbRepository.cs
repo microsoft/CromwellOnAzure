@@ -7,6 +7,8 @@ namespace Tes.Repository
     using System.Collections.Generic;
     using System.Linq;
     using System.Linq.Expressions;
+    using System.Runtime.CompilerServices;
+    using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Azure.Cosmos;
     using Microsoft.Azure.Cosmos.Linq;
@@ -22,6 +24,7 @@ namespace Tes.Repository
         private readonly Container container;
         private readonly PartitionKey partitionKey;
         private readonly string partitionKeyValue;
+        private bool disposedValue;
 
         /// <summary>
         /// Default constructor
@@ -47,30 +50,36 @@ namespace Tes.Repository
         /// <param name="id">The document ID</param>
         /// <param name="onSuccess"></param>
         /// <returns>An etag and object of type T as a RepositoryItem</returns>
-        public async Task<bool> TryGetItemAsync(string id, Action<T> onSuccess)
+        public async Task<bool> TryGetItemAsync(string id, Action<T> onSuccess = null)
+        {
+            var item = await this.GetItemOrDefaultAsync(id);
+            if (item is not null)
+            {
+                onSuccess?.Invoke(item);
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task<T> GetItemOrDefaultAsync(string id)
         {
             try
             {
-                var response = await this.container.ReadItemAsync<T>(id, partitionKey);
-                var item = response.Resource;
-
-                if (item is not null)
-                {
-                    onSuccess?.Invoke(item);
-                    return true;
-                }
+                return await this.container.ReadItemAsync<T>(id, partitionKey);
             }
             catch (CosmosException e)
             {
                 if (e.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    return false;
+                    return default;
                 }
 
                 throw;
             }
-
-            return false;
         }
 
         /// <inheritdoc/>
@@ -91,11 +100,32 @@ namespace Tes.Repository
         }
 
         /// <inheritdoc/>
-        public async Task<(string, IEnumerable<T>)> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, string continuationToken)
+        async IAsyncEnumerable<T> IRepository<T>.GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            string continuationToken = null;
+            do
+            {
+                IEnumerable<T> repositoryItems;
+                (continuationToken, repositoryItems) = await GetItemsAsync(predicate, pageSize, continuationToken, cancellationToken);
+                foreach (var item in repositoryItems)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    yield return item;
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+            }
+            while (continuationToken is not null);
+        }
+
+        /// <inheritdoc/>
+        public Task<(string, IEnumerable<T>)> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, string continuationToken)
+            => GetItemsAsync(predicate, pageSize, continuationToken, default);
+
+        private async Task<(string, IEnumerable<T>)> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, string continuationToken, CancellationToken cancellationToken)
         {
             var requestOptions = new QueryRequestOptions { MaxItemCount = pageSize, PartitionKey = partitionKey };
             var feedIterator = container.GetItemLinqQueryable<T>(false, continuationToken, requestOptions).Where(predicate).ToFeedIterator();
-            var response = await feedIterator.ReadNextAsync();
+            var response = await feedIterator.ReadNextAsync(cancellationToken);
 
             return (response.ContinuationToken, response.Resource);
         }
@@ -152,6 +182,26 @@ namespace Tes.Repository
             {
                 throw new Exception($"Existing CosmosDb container {container.Id} partition key path ({existingPartitionKeyPath}) differs from the requested one (/{RepositoryItem<T>.PartitionKeyFieldName}). Recreate the container.");
             }
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    cosmosClient?.Dispose();
+                }
+
+                disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Extensions.Configuration;
@@ -20,11 +21,8 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task ValidateSupportedVmSizesFileContent()
         {
-            var configuration = GetInMemoryConfig();
-            var mockAzureProxy = GetMockAzureProxy();
-            var storageAccessProvider = new StorageAccessProvider(new Mock<ILogger<StorageAccessProvider>>().Object, configuration, mockAzureProxy.Object);
-
-            var configurationUtils = new ConfigurationUtils(configuration, mockAzureProxy.Object, storageAccessProvider, new Mock<ILogger<ConfigurationUtils>>().Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<ConfigurationUtils>(configuration: GetInMemoryConfig(), azureProxy: PrepareAzureProxy);
+            var configurationUtils = serviceProvider.GetT();
 
             await configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync();
 
@@ -35,21 +33,18 @@ namespace TesApi.Tests
                 "VmSize2 VmFamily2    33.000   44.000       6     4     40                 0\n" +
                 "VmSize3 VmFamily3    55.000      N/A      12     8     80               300";
 
-            mockAzureProxy.Verify(m => m.UploadBlobAsync(It.Is<Uri>(x => x.AbsoluteUri.Contains("supported-vm-sizes")), It.Is<string>(s => s.Equals(expectedSupportedVmSizesFileContent))), Times.Exactly(1));
+            serviceProvider.AzureProxy.Verify(m => m.UploadBlobAsync(It.Is<Uri>(x => x.AbsoluteUri.Contains("supported-vm-sizes")), It.Is<string>(s => s.Equals(expectedSupportedVmSizesFileContent))), Times.Exactly(1));
         }
 
         [TestMethod]
         public async Task UnsupportedVmSizeInAllowedVmSizesFileIsIgnoredAndTaggedWithWarning()
         {
-            var configuration = GetInMemoryConfig();
-            var mockAzureProxy = GetMockAzureProxy();
-            var storageAccessProvider = new StorageAccessProvider(new Mock<ILogger<StorageAccessProvider>>().Object, configuration, mockAzureProxy.Object);
-
-            var configurationUtils = new ConfigurationUtils(configuration, mockAzureProxy.Object, storageAccessProvider, new Mock<ILogger<ConfigurationUtils>>().Object);
+            using var serviceProvider = new TestServices.TestServiceProvider<ConfigurationUtils>(configuration: GetInMemoryConfig(), azureProxy: PrepareAzureProxy);
+            var configurationUtils = serviceProvider.GetT();
 
             await configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync();
 
-            Assert.AreEqual("VmSize1,VmSize2", configuration["AllowedVmSizes"]);
+            Assert.AreEqual("VmSize1,VmSize2", serviceProvider.Configuration["AllowedVmSizes"]);
 
             var expectedAllowedVmSizesFileContent =
                 "VmSize1\n" +
@@ -57,18 +52,13 @@ namespace TesApi.Tests
                 "VmSize2\n" +
                 "VmSizeNonExistent <-- WARNING: This VM size is either misspelled or not supported in your region. It will be ignored.";
 
-            mockAzureProxy.Verify(m => m.UploadBlobAsync(It.Is<Uri>(x => x.AbsoluteUri.Contains("allowed-vm-sizes")), It.Is<string>(s => s.Equals(expectedAllowedVmSizesFileContent))), Times.Exactly(1));
+            serviceProvider.AzureProxy.Verify(m => m.UploadBlobAsync(It.Is<Uri>(x => x.AbsoluteUri.Contains("allowed-vm-sizes")), It.Is<string>(s => s.Equals(expectedAllowedVmSizesFileContent))), Times.Exactly(1));
         }
 
-        private static IConfiguration GetInMemoryConfig()
-        {
-            var config = new ConfigurationBuilder().AddInMemoryCollection().Build();
-            config["DefaultStorageAccountName"] = "defaultstorageaccount";
+        private static IEnumerable<(string Key, string Value)> GetInMemoryConfig()
+            => Enumerable.Repeat(("DefaultStorageAccountName", "defaultstorageaccount"), 1);
 
-            return config;
-        }
-
-        private static Mock<IAzureProxy> GetMockAzureProxy()
+        private static void PrepareAzureProxy(Mock<IAzureProxy> azureProxy)
         {
             var vmInfos = new List<VirtualMachineInformation> {
                     new VirtualMachineInformation { VmSize = "VmSize1", VmFamily = "VmFamily1", LowPriority = false, NumberOfCores = 2, MemoryInGB = 3, ResourceDiskSizeInGB = 20, PricePerHour = 11 },
@@ -97,15 +87,11 @@ namespace TesApi.Tests
                 } 
              };
 
-            var azureProxy = new Mock<IAzureProxy>();
-
             azureProxy.Setup(a => a.GetVmSizesAndPricesAsync()).Returns(Task.FromResult(vmInfos));
             azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(batchQuotas));
             azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>())).Returns(Task.FromResult(allowedVmSizesFileContent));
             azureProxy.Setup(a => a.GetStorageAccountInfoAsync("defaultstorageaccount")).Returns(Task.FromResult(storageAccountInfos["defaultstorageaccount"]));
             azureProxy.Setup(a => a.GetStorageAccountKeyAsync(It.IsAny<StorageAccountInfo>())).Returns(Task.FromResult("Key1"));
-
-            return azureProxy;
         }
     }
 }

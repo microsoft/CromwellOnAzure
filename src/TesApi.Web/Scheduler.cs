@@ -23,8 +23,10 @@ namespace TesApi.Web
     {
         private readonly IRepository<TesTask> repository;
         private readonly IBatchScheduler batchScheduler;
+        private readonly IBatchPools batchPools;
         private readonly ILogger<Scheduler> logger;
         private readonly bool isDisabled;
+        private readonly bool usingBatchPools;
         private readonly TimeSpan runInterval = TimeSpan.FromSeconds(5);
 
         /// <summary>
@@ -33,13 +35,16 @@ namespace TesApi.Web
         /// <param name="configuration">The configuration instance settings</param>
         /// <param name="repository">The main TES task database repository implementation</param>
         /// <param name="batchScheduler">The batch scheduler implementation</param>
+        /// <param name="batchPools"></param>
         /// <param name="logger">The logger instance</param>
-        public Scheduler(IConfiguration configuration, IRepository<TesTask> repository, IBatchScheduler batchScheduler, ILogger<Scheduler> logger)
+        public Scheduler(IConfiguration configuration, IRepository<TesTask> repository, IBatchScheduler batchScheduler, IBatchPools batchPools, ILogger<Scheduler> logger)
         {
             this.repository = repository;
             this.batchScheduler = batchScheduler;
+            this.batchPools = batchPools;
             this.logger = logger;
             isDisabled = configuration.GetValue("DisableBatchScheduling", false);
+            usingBatchPools = !configuration.GetValue("BatchAutopool", false);
         }
 
         /// <summary>
@@ -85,6 +90,22 @@ namespace TesApi.Web
                 catch (Exception exc)
                 {
                     logger.LogError(exc, exc.Message);
+                }
+
+                if (usingBatchPools)
+                {
+                    try
+                    {
+                        await ServiceBatchPools(stoppingToken);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.LogError(exc, exc.Message);
+                    }
                 }
 
                 try
@@ -160,6 +181,37 @@ namespace TesApi.Web
             }
 
             logger.LogDebug($"OrchestrateTesTasksOnBatch for {tesTasks.Count} tasks completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
+        }
+
+        /// <summary>
+        /// Retrieves all batch pools from the database and affords an oppertunity to react to changes.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task ServiceBatchPools(CancellationToken cancellationToken)
+        {
+            var pools = await batchPools.GetPoolsAsync(cancellationToken).ToListAsync(cancellationToken);
+
+            if (!pools.Any())
+            {
+                return;
+            }
+
+            var startTime = DateTime.UtcNow;
+
+            foreach (var pool in pools)
+            {
+                try
+                {
+                    await pool.ServicePoolAsync(cancellationToken);
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError(exc, "Batch pool {PoolId} throw an exception.", pool.Pool?.PoolId);
+                }
+            }
+
+            logger.LogDebug($"ServiceBatchPools for {pools.Count} pools completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
         }
     }
 }

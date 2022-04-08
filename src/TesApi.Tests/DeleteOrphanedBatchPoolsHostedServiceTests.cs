@@ -1,9 +1,11 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using TesApi.Web;
@@ -16,24 +18,26 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task DeleteOrphanedAutoPoolsServiceOnlyDeletesPoolsNotReferencedByJobs()
         {
-            var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
-            configuration["BatchAutopool"] = true.ToString();
             var activePoolIds = new List<string> { "1", "2", "3" };
             var poolIdsReferencedByJobs = new List<string> { "3", "4" };
 
-            var azureProxy = new Mock<IAzureProxy>();
-            azureProxy.Setup(p => p.GetActivePoolIdsAsync(It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>())).ReturnsAsync(activePoolIds);
-            azureProxy.Setup(p => p.GetPoolIdsReferencedByJobsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(poolIdsReferencedByJobs);
+            using var services = new TestServices.TestServiceProvider<DeleteOrphanedAutoPoolsHostedService>(
+                configuration: Enumerable.Repeat(("BatchAutopool", true.ToString()), 1),
+                azureProxy: a =>
+                {
+                    a.Setup(p => p.GetActivePoolIdsAsync(It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>())).ReturnsAsync(activePoolIds);
+                    a.Setup(p => p.GetPoolIdsReferencedByJobsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(poolIdsReferencedByJobs);
+                });
 
-            var deleteCompletedBatchJobsHostedService = new DeleteOrphanedAutoPoolsHostedService(configuration, azureProxy.Object, new NullLogger<DeleteOrphanedAutoPoolsHostedService>());
+            var deleteCompletedBatchJobsHostedService = services.GetT();
 
             await deleteCompletedBatchJobsHostedService.StartAsync(default);
 
-            azureProxy.Verify(i => i.GetActivePoolIdsAsync("TES_", TimeSpan.FromMinutes(30), It.IsAny<CancellationToken>()));
-            azureProxy.Verify(i => i.GetPoolIdsReferencedByJobsAsync(It.IsAny<CancellationToken>()));
-            azureProxy.Verify(i => i.DeleteBatchPoolAsync("1", It.IsAny<CancellationToken>()), Times.Once);
-            azureProxy.Verify(i => i.DeleteBatchPoolAsync("2", It.IsAny<CancellationToken>()), Times.Once);
-            azureProxy.VerifyNoOtherCalls();
+            services.AzureProxy.Verify(i => i.GetActivePoolIdsAsync("TES_", TimeSpan.FromMinutes(30), It.IsAny<CancellationToken>()));
+            services.AzureProxy.Verify(i => i.GetPoolIdsReferencedByJobsAsync(It.IsAny<CancellationToken>()));
+            services.AzureProxy.Verify(i => i.DeleteBatchPoolAsync("1", It.IsAny<CancellationToken>()), Times.Once);
+            services.AzureProxy.Verify(i => i.DeleteBatchPoolAsync("2", It.IsAny<CancellationToken>()), Times.Once);
+            services.AzureProxy.VerifyNoOtherCalls();
         }
     }
 }

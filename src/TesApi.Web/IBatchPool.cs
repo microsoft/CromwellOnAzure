@@ -23,11 +23,6 @@ namespace TesApi.Web
         PoolInformation Pool { get; }
 
         /// <summary>
-        /// Provides the VmSize of the compute nodes this pool can manage
-        /// </summary>
-        string VmSize { get; }
-
-        /// <summary>
         /// Either reserves an idle compute node in the pool, or requests an additional compute node.
         /// </summary>
         /// <param name="jobId">The <see cref="CloudJob.Id"/> to be assigned a node</param>
@@ -49,12 +44,19 @@ namespace TesApi.Web
         void ReleaseNode(string jobId);
 
         /// <summary>
-        /// Method used by the {BatchPoolService} to maintain this <see cref="IBatchPool"/> in the <see cref="IBatchPools"/> service.
+        /// Updates this instance based on changes to its environment.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        ValueTask ServicePoolAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Service methods dispatcher.
         /// </summary>
         /// <param name="serviceKind">The type of <see cref="ServiceKind"/> service call.</param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        Task ServicePoolAsync(ServiceKind serviceKind, CancellationToken cancellationToken = default);
+        ValueTask ServicePoolAsync(ServiceKind serviceKind, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Schedules reimaging of the compute node.
@@ -70,6 +72,16 @@ namespace TesApi.Web
         /// </summary>
         enum ServiceKind
         {
+            /// <summary>
+            /// Save the pool as new
+            /// </summary>
+            Create,
+
+            /// <summary>
+            /// Save the pool as update
+            /// </summary>
+            Update,
+
             /// <summary>
             /// Syncs the locally stored target values to the pool's target values.
             /// </summary>

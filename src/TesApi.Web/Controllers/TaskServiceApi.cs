@@ -133,7 +133,7 @@ namespace TesApi.Controllers
                 ?.FirstOrDefault();
 
             // Prefix the TES task id with first eight characters of root Cromwell job id to facilitate easier debugging
-            var tesTaskIdPrefix = tesTask.WorkflowId is not null && Guid.TryParse(tesTask.WorkflowId, out _) ? $"{tesTask.WorkflowId.Substring(0, 8)}_" : string.Empty;
+            var tesTaskIdPrefix = tesTask.WorkflowId is not null && Guid.TryParse(tesTask.WorkflowId, out _) ? $"{tesTask.WorkflowId[..8]}_" : string.Empty;
             tesTask.Id = $"{tesTaskIdPrefix}{Guid.NewGuid():N}";
 
             // For CWL workflows, if disk size is not specified in TES object (always), try to retrieve it from the corresponding workflow stored by Cromwell in /cromwell-tmp directory

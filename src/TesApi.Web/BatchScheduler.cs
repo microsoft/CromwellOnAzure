@@ -294,8 +294,8 @@ namespace TesApi.Web
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var dockerImage = tesTask.Executors.First().Image;
 
-                var containerConfiguration = await ContainerConfigurationIfNeeded(dockerImage);
-                var startTask = await StartTaskIfNeeded(tesTask);
+                var containerConfiguration = new Lazy<ValueTask<ContainerConfiguration>>(async () => await ContainerConfigurationIfNeeded(dockerImage));
+                var startTask = new Lazy<ValueTask<StartTask>>(async () => await StartTaskIfNeeded(tesTask));
 
                 Func<AffinityInformation> getAffinity = () => default;
                 if (this.enableBatchAutopool)
@@ -303,24 +303,24 @@ namespace TesApi.Web
                     poolInformation = await CreateAutoPoolModePoolInformation(
                         virtualMachineInfo.VmSize,
                         virtualMachineInfo.LowPriority,
-                        containerConfiguration,
-                        startTask,
+                        await containerConfiguration.Value,
+                        await startTask.Value,
                         jobId,
                         identityResourceId);
                 }
                 else
                 {
-                    poolInformation = (await batchPools.GetOrAddAsync(poolName, id => ConvertPoolSpecificationToModelsPool(
+                    poolInformation = (await batchPools.GetOrAddAsync(poolName, async id => ConvertPoolSpecificationToModelsPool(
                             name: id,
                             displayName: poolName,
                             GetBatchPoolIdentity(identityResourceId),
-                            GetPoolSpecification(virtualMachineInfo.VmSize, null, containerConfiguration, startTask))))
+                            GetPoolSpecification(virtualMachineInfo.VmSize, null, await containerConfiguration.Value, await startTask.Value))))
                         .Pool;
 
                     getAffinity = () => batchPools.TryGet(poolInformation.PoolId, out var pool) ? pool.PrepareNodeAsync(jobId, virtualMachineInfo.LowPriority).Result : default;
                 }
 
-                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, getAffinity, containerConfiguration is not null);
+                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, getAffinity, (await containerConfiguration.Value) is not null);
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
                 await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 

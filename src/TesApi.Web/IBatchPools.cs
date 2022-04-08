@@ -2,6 +2,8 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
@@ -14,9 +16,11 @@ namespace TesApi.Web
     public interface IBatchPools
     {
         /// <summary>
-        /// True if the service has no active pools
+        /// Enumerates all the managed batch pools.
         /// </summary>
-        bool IsEmpty { get; }
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        IAsyncEnumerable<IBatchPool> GetPoolsAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Indicates that a pool for the key value is available to service tasks.
@@ -32,14 +36,7 @@ namespace TesApi.Web
         /// <param name="valueFactory">A delegate to create the pool. Only called (once, even if called by multiple threads) if a pool isn't available.</param>
         /// <remarks>The argument to <paramref name="valueFactory"/> needs to be the Name argument of its construtor. It's recommended to set the <see cref="BatchModels.Pool.DisplayName"/> to the <paramref name="key"/> value.</remarks>
         /// <returns></returns>
-        Task<IBatchPool> GetOrAddAsync(string key, Func<string, BatchModels.Pool> valueFactory);
-
-        /// <summary>
-        /// Retrieves a pool that manages compute nodes of the related vmSize, creating an entry in internal state for the pool if needed.
-        /// </summary>
-        /// <param name="pool">A <see cref="CloudPool"/> associated with a known job. Must contain at minimum "id" and "vmSize". Should contain "creationTime" and "allocationStateTransitionTime".</param>
-        /// <returns></returns>
-        Task<IBatchPool> GetOrAddAsync(CloudPool pool);
+        Task<IBatchPool> GetOrAddAsync(string key, Func<string, ValueTask<BatchModels.Pool>> valueFactory);
 
         /// <summary>
         /// Retrieves the requested batch pool.
