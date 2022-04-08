@@ -116,8 +116,8 @@ namespace CromwellOnAzureDeployer
                 azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                 subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
-                totalNumberOfRunningDockerContainers = configuration.ProvisionMySQLOnAzure ? "3" : "4";
-                DockerComposeYmlFile = configuration.ProvisionMySQLOnAzure ? "docker-compose.azure.yml" : "docker-compose.yml";
+                totalNumberOfRunningDockerContainers = configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "3" : "4";
+                DockerComposeYmlFile = configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "docker-compose.azure.yml" : "docker-compose.yml";
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
@@ -261,7 +261,7 @@ namespace CromwellOnAzureDeployer
 
                         configuration.CosmosDbAccountName = cosmosDbAccountName;
 
-                        if (configuration.ProvisionMySQLOnAzure)
+                        if (configuration.ProvisionMySQLOnAzure.GetValueOrDefault())
                         {
                             mySQLServer = new MySQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
                             var loadServer = await mySQLServer.Servers.GetAsync(configuration.ResourceGroupName, configuration.MySQLServerName)
@@ -419,7 +419,7 @@ namespace CromwellOnAzureDeployer
                             Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
                             Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
                             Task.Run(async () => { 
-                                if(configuration.ProvisionMySQLOnAzure) { mySQLServer = await CreateAndProvisionMySQLServerAsync(); }
+                                if(configuration.ProvisionMySQLOnAzure.GetValueOrDefault()) { mySQLServer = await CreateAndProvisionMySQLServerAsync(); }
                             }),
 
                             Task.Run(async () =>
@@ -469,7 +469,7 @@ namespace CromwellOnAzureDeployer
                     }
 
                     await WriteCoaVersionToVmAsync(sshConnectionInfo);
-                    if (configuration.ProvisionMySQLOnAzure)
+                    if (configuration.ProvisionMySQLOnAzure.GetValueOrDefault())
                     {
                         await AddMySQLFirewallRuleForNicAsync(linuxVm, mySQLServer);
                     }
@@ -799,7 +799,7 @@ namespace CromwellOnAzureDeployer
                         (Utility.GetFileContent("scripts", DockerComposeYmlFile), $"{CromwellAzureRootDir}/docker-compose.yml", false),
                         (Utility.GetFileContent("scripts", "cromwellazure.service"), "/lib/systemd/system/cromwellazure.service", false),
                         (Utility.GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true)
-                    }.Concat(!configuration.ProvisionMySQLOnAzure
+                    }.Concat(!configuration.ProvisionMySQLOnAzure.GetValueOrDefault()
                         ? new[] {
                         (Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false),
                         }
@@ -840,12 +840,12 @@ namespace CromwellOnAzureDeployer
 
                     (Utility.PersonalizeContent(new[] 
                     {
-                        new Utility.ConfigReplaceTextItem("{ReplaceMySqlSha}", configuration.ProvisionMySQLOnAzure ? String.Empty : "kv[\"MySqlImageSha\"]=\"\""),
-                        new Utility.ConfigReplaceTextItem("{ReplaceMySqlShaSet}", configuration.ProvisionMySQLOnAzure ? String.Empty : "kv[\"MySqlImageSha\"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv[\"MySqlImageName\"]})")
+                        new Utility.ConfigReplaceTextItem("{ReplaceMySqlSha}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? String.Empty : "kv[\"MySqlImageSha\"]=\"\""),
+                        new Utility.ConfigReplaceTextItem("{ReplaceMySqlShaSet}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? String.Empty : "kv[\"MySqlImageSha\"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv[\"MySqlImageName\"]})")
 
 
                     }, "scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true)
-                }.Concat(!configuration.ProvisionMySQLOnAzure
+                }.Concat(!configuration.ProvisionMySQLOnAzure.GetValueOrDefault()
                     ? new[] {
                         (Utility.PersonalizeContent(new[]
                         {
@@ -1039,10 +1039,10 @@ namespace CromwellOnAzureDeployer
                     }, "scripts", ContainersToMountFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
-                        new Utility.ConfigReplaceTextItem("{ReplaceWithServerName}", configuration.ProvisionMySQLOnAzure ? $"{configuration.MySQLServerName}.mysql.database.azure.com" : "mysqldb"),
-                        new Utility.ConfigReplaceTextItem("{ReplaceWithUserName}", configuration.ProvisionMySQLOnAzure ? $"cromwell@{configuration.MySQLServerName}.mysql.database.azure.com" : "cromwell"),
-                        new Utility.ConfigReplaceTextItem("{ReplaceWithServerPassword}", configuration.ProvisionMySQLOnAzure ? configuration.MySQLServerPassword : "cromwell"),
-                        new Utility.ConfigReplaceTextItem("{ReplaceBool}", configuration.ProvisionMySQLOnAzure ? "true" : "false"),
+                        new Utility.ConfigReplaceTextItem("{ReplaceWithServerName}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? $"{configuration.MySQLServerName}.mysql.database.azure.com" : "mysqldb"),
+                        new Utility.ConfigReplaceTextItem("{ReplaceWithUserName}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? $"cromwell@{configuration.MySQLServerName}.mysql.database.azure.com" : "cromwell"),
+                        new Utility.ConfigReplaceTextItem("{ReplaceWithServerPassword}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? configuration.MySQLServerPassword : "cromwell"),
+                        new Utility.ConfigReplaceTextItem("{ReplaceBool}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "true" : "false"),
                     }, "scripts", CromwellConfigurationFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
