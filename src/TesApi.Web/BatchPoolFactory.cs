@@ -65,8 +65,8 @@ namespace TesApi.Web
         /// <param name="configuration"></param>
         /// <param name="azureProxy"></param>
         /// <param name="cache"></param>
-        /// <param name="poolDataType"></param>
-        /// <param name="pendingReservationItemType"></param>
+        /// <param name="poolDataType">Override for testing.</param>
+        /// <param name="pendingReservationItemType">Override for testing.</param>
         public PoolRepositoryFactoryFactory(IServiceProvider serviceProvider, IConfiguration configuration, IAzureProxy azureProxy, IAppCache cache, Type poolDataType = default, Type pendingReservationItemType = default)
         {
             poolDataType ??= typeof(Tes.Repository.CosmosDbRepository<BatchPool.PoolData>);

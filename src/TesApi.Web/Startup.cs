@@ -60,7 +60,7 @@ namespace TesApi.Web
             .AddSingleton(sp => ActivatorUtilities.CreateInstance<AzureProxy>(sp, Configuration["BatchAccountName"], azureOfferDurableId, new Lazy<IBatchPools>(() => (IBatchPools)sp.GetService(typeof(IBatchPools)))))
             .AddSingleton<IBatchPools, BatchPools>()
             .AddSingleton<BatchPoolFactory>()
-            .AddSingleton<PoolRepositoryFactory>()
+            .AddSingleton<PoolRepositoryFactoryFactory>()
 
             .AddControllers()
             .AddNewtonsoftJson(opts =>
