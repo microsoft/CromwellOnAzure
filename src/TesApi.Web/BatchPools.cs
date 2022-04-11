@@ -106,7 +106,7 @@ namespace TesApi.Web
                 var uniquifier = new byte[8]; // This always becomes 13 chars, if you remove the three '=' at the end. We won't ever decode this, so we don't need any '='s
                 random.NextBytes(uniquifier);
                 var pool = await valueFactory($"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"); // '-' is required by GetOrAddAsync(CloudPool)
-                result = _poolFactory.CreateNew(_azureProxy.CreateBatchPoolAsync(pool).Result, this);
+                result = _poolFactory.CreateNew(await _azureProxy.CreateBatchPoolAsync(pool), key, this);
                 await result.ServicePoolAsync(IBatchPool.ServiceKind.Create);
                 await AddPool(key, result);
             }
@@ -152,7 +152,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public IAsyncEnumerable<IBatchPool> GetPoolsAsync(System.Threading.CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<IBatchPool> GetPoolsAsync(CancellationToken cancellationToken = default)
             => _poolListRepository.GetItemsAsync(p => true, 256, cancellationToken).SelectManyAwait(GetPoolsAsyncAdapter);
 
         private async ValueTask AddPool(string key, IBatchPool pool)
@@ -167,13 +167,16 @@ namespace TesApi.Web
             => ValueTask.FromResult(GetPoolsAsync(poolList.Pools));
 
         private IAsyncEnumerable<IBatchPool> GetPoolsAsync(IEnumerable<string> pools)
-            => pools.Select(i => _poolFactory.Retrieve(i, this)).ToAsyncEnumerable();
+            => pools.Select(i => _poolFactory.Retrieve(i, GetKeyFromPoolId(i), this)).ToAsyncEnumerable();
+
+        private static string GetKeyFromPoolId(string poolId)
+            => poolId[..poolId.LastIndexOf('-')];
 
         private async Task<IEnumerable<IBatchPool>> GetAllBatchPoolsAsync()
-            => (await _poolListRepository.GetItemsAsync(i => true)).SelectMany(l => l.Pools).Select(i => _poolFactory.Retrieve(i, this));
+            => (await _poolListRepository.GetItemsAsync(i => true)).SelectMany(l => l.Pools.Select(p => (l.Key, PoolId: p))).Select(i => _poolFactory.Retrieve(i.PoolId, i.Key, this));
 
         private async Task<IEnumerable<IBatchPool>> GetBatchPoolsByKeyAsync(string key)
-            => (await _poolListRepository.GetItemOrDefaultAsync(key))?.Pools.Select(i => _poolFactory.Retrieve(i, this));
+            => (await _poolListRepository.GetItemOrDefaultAsync(key))?.Pools.Select(i => _poolFactory.Retrieve(i, key, this));
 
         #region IBatchPoolsImpl
         async Task IBatchPoolsImpl.RemovePoolFromList(string poolId)

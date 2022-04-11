@@ -680,7 +680,7 @@ namespace TesApi.Tests
         }
 
 
-        private TestServices.TestServiceProvider<BatchPools> GetServiceProvider(AzureProxyReturnValues azureProxyReturn = default)
+        private static TestServices.TestServiceProvider<BatchPools> GetServiceProvider(AzureProxyReturnValues azureProxyReturn = default)
             => new(wrapAzureProxy: true, configuration: GetMockConfig(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Get()), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
         private static async Task<IBatchPool> AddPool(IBatchPools batchPools)
@@ -719,7 +719,7 @@ namespace TesApi.Tests
             internal Action<string, CancellationToken> AzureProxyDeleteBatchPool { get; set; } = (poolId, cancellationToken) => { };
         }
 
-        private Action<Mock<IAzureProxy>> PrepareMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
+        private static Action<Mock<IAzureProxy>> PrepareMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
             => azureProxy =>
             {
                azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));

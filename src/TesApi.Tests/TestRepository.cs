@@ -25,8 +25,7 @@ namespace TesApi.Tests
             System.Collections.Concurrent.ConcurrentDictionary<string,              // databaseId
                 System.Collections.Concurrent.ConcurrentDictionary<string,          // containerId
                     System.Collections.Concurrent.ConcurrentDictionary<string,      // partitionKeyValue
-                        System.Collections.Concurrent.ConcurrentDictionary<Type,    // document type
-                            System.Collections.IDictionary>>>>> storage = new();
+                            System.Collections.IDictionary>>>> storage = new();
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         internal IDictionary<string, T> Items<T>(string endpoint, string databaseId, string containerId, string partitionKeyValue, Func<IDictionary<string, T>> CreateDictionary) where T : RepositoryItem<T>
@@ -40,11 +39,10 @@ namespace TesApi.Tests
             AssertResult(storage.TryAdd(endpoint, new(StringComparer.Ordinal)));
             AssertResult(storage.GetValueOrDefault(endpoint)?.TryAdd(databaseId, new(StringComparer.Ordinal)));
             AssertResult(storage.GetValueOrDefault(endpoint)?.GetValueOrDefault(databaseId)?.TryAdd(containerId, new(StringComparer.Ordinal)));
-            AssertResult(storage.GetValueOrDefault(endpoint)?.GetValueOrDefault(databaseId)?.GetValueOrDefault(containerId)?.TryAdd(partitionKeyValue, new()));
+            AssertResult(storage.GetValueOrDefault(endpoint)?.GetValueOrDefault(databaseId)?.GetValueOrDefault(containerId)?.TryAdd(partitionKeyValue, CreateDictionary() as System.Collections.IDictionary));
 
             // Create as needed and return document storage
-            AssertResult(storage.GetValueOrDefault(endpoint)?.GetValueOrDefault(databaseId)?.GetValueOrDefault(containerId)?.GetValueOrDefault(partitionKeyValue)?.TryAdd(typeof(T), CreateDictionary() as System.Collections.IDictionary));
-            return storage.GetValueOrDefault(endpoint)?.GetValueOrDefault(databaseId)?.GetValueOrDefault(containerId)?.GetValueOrDefault(partitionKeyValue)?.GetValueOrDefault(typeof(T)) as IDictionary<string, T> ?? throw new InvalidOperationException();
+            return storage.GetValueOrDefault(endpoint)?.GetValueOrDefault(databaseId)?.GetValueOrDefault(containerId)?.GetValueOrDefault(partitionKeyValue) as IDictionary<string, T> ?? throw new InvalidOperationException();
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]

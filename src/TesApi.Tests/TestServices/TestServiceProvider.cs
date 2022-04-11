@@ -110,7 +110,7 @@ namespace TesApi.Tests.TestServices
                 .AddSingleton<TestRepositoryStorage>()
                 .AddSingleton<BatchPoolFactory>()
                 .AddSingleton<IBatchPools, BatchPools>()
-                .AddSingleton(s => ActivatorUtilities.CreateInstance<PoolRepositoryFactoryFactory>(s, typeof(Repository<BatchPool.PoolData>), typeof(Repository<BatchPool.PendingReservationItem>)))
+                .AddSingleton(s => ActivatorUtilities.CreateInstance<PoolRepositoryFactory>(s, typeof(Repository<BatchPool.PoolData>), typeof(Repository<BatchPool.PendingReservationItem>)))
             .BuildServiceProvider();
 
         private IConfiguration GetConfiguration(IEnumerable<(string Key, string Value)> configuration)

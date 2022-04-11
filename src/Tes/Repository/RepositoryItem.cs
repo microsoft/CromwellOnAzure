@@ -47,7 +47,7 @@ namespace Tes.Repository
         {
             var idProperty = typeof(T).GetProperties()
                 .FirstOrDefault(info =>
-                    (info.GetCustomAttribute<DataMemberAttribute>(false)?.Name.Equals(IdFieldName) ?? false)
+                    (info.GetCustomAttribute<DataMemberAttribute>(false)?.Name?.Equals(IdFieldName) ?? false)
                     || (info.GetCustomAttribute<JsonPropertyAttribute>(false)?.PropertyName.Equals(IdFieldName) ?? false)
                     || info.Name.Equals(IdFieldName));
 
@@ -58,7 +58,7 @@ namespace Tes.Repository
 
             var idField = typeof(T).GetFields()
                 .FirstOrDefault(info =>
-                    (info.GetCustomAttribute<DataMemberAttribute>(false)?.Name.Equals(IdFieldName) ?? false)
+                    (info.GetCustomAttribute<DataMemberAttribute>(false)?.Name?.Equals(IdFieldName) ?? false)
                     || (info.GetCustomAttribute<JsonPropertyAttribute>(false)?.PropertyName.Equals(IdFieldName) ?? false)
                     || info.Name.Equals(IdFieldName));
 
