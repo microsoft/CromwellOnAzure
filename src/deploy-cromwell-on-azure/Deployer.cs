@@ -791,6 +791,14 @@ namespace CromwellOnAzureDeployer
                 () => UploadFilesToVirtualMachineAsync(
                     sshConnectionInfo,
                     new[] {
+                        // startup.sh must be written during update and doesn't have specific configuration file needs.
+                        (Utility.PersonalizeContent(new[]
+                        {
+                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlSha}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? String.Empty : "kv[\"MySqlImageSha\"]=\"\""),
+                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlShaSet}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? String.Empty : "kv[\"MySqlImageSha\"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv[\"MySqlImageName\"]})")
+
+
+                        }, "scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true),
                         (Utility.GetFileContent("scripts", "wait-for-it.sh"), $"{CromwellAzureRootDir}/wait-for-it/wait-for-it.sh", true),
                         (Utility.GetFileContent("scripts", "install-cromwellazure.sh"), $"{CromwellAzureRootDir}/install-cromwellazure.sh", true),
                         (Utility.GetFileContent("scripts", "mount_containers.sh"), $"{CromwellAzureRootDir}/mount_containers.sh", true),
@@ -801,6 +809,11 @@ namespace CromwellOnAzureDeployer
                         (Utility.GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true)
                     }.Concat(!configuration.ProvisionMySQLOnAzure.GetValueOrDefault()
                         ? new[] {
+                        (Utility.PersonalizeContent(new[]
+                        {
+                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlLocalOrAzure}", "CREATE USER 'cromwell'@'%' IDENTIFIED BY 'cromwell';"),
+
+                        }, "scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
                         (Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false),
                         }
                         : Array.Empty<(string, string, bool)>())
@@ -836,26 +849,8 @@ namespace CromwellOnAzureDeployer
                     $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
                     (Utility.GetFileContent("scripts", "env-04-settings.txt"),
-                    $"{CromwellAzureRootDir}/env-04-settings.txt", false),
-
-                    (Utility.PersonalizeContent(new[] 
-                    {
-                        new Utility.ConfigReplaceTextItem("{ReplaceMySqlSha}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? String.Empty : "kv[\"MySqlImageSha\"]=\"\""),
-                        new Utility.ConfigReplaceTextItem("{ReplaceMySqlShaSet}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? String.Empty : "kv[\"MySqlImageSha\"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv[\"MySqlImageName\"]})")
-
-
-                    }, "scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true)
-                }.Concat(!configuration.ProvisionMySQLOnAzure.GetValueOrDefault()
-                    ? new[] {
-                        (Utility.PersonalizeContent(new[]
-                        {
-                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlLocalOrAzure}", "CREATE USER 'cromwell'@'%' IDENTIFIED BY 'cromwell';"),
-
-                        }, "scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false)                    
-                    }
-                    : Array.Empty<(string, string, bool)>())
-                    .ToArray()
-                );
+                    $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                });
 
         private async Task HandleCustomImagesAsync(ConnectionInfo sshConnectionInfo)
         {
@@ -2095,7 +2090,7 @@ namespace CromwellOnAzureDeployer
             var blobClient = await GetBlobClientAsync(storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
-            return (await container.GetBlobClient(blobName).DownloadContentAsync(cts.Token)).ToString();
+            return (await container.GetBlobClient(blobName).DownloadContentAsync(cts.Token)).Value.Content.ToString();
         }
 
         private async Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
@@ -2104,7 +2099,7 @@ namespace CromwellOnAzureDeployer
             var container = blobClient.GetBlobContainerClient(containerName);
 
             await container.CreateIfNotExistsAsync();
-            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), cts.Token);
+            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, cts.Token);
         }
 
         private static string GetLinuxParentPath(string path)
