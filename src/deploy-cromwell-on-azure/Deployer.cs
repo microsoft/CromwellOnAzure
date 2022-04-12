@@ -122,7 +122,6 @@ namespace CromwellOnAzureDeployer
                 DockerComposeYmlFile = configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "docker-compose.azure.yml" : "docker-compose.yml";
                 MySQLServerName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
                 MySQLServerPassword = Utility.GeneratePassword();
-                
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
@@ -803,10 +802,8 @@ namespace CromwellOnAzureDeployer
                         // startup.sh must be written during update and doesn't have specific configuration file needs.
                         (Utility.PersonalizeContent(new[]
                         {
-                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlSha}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? String.Empty : "kv[\"MySqlImageSha\"]=\"\""),
-                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlShaSet}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? String.Empty : "kv[\"MySqlImageSha\"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv[\"MySqlImageName\"]})")
-
-
+                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlSha}", !configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "kv[\"MySqlImageSha\"]=\"\"" : String.Empty),
+                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlShaSet}", !configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "kv[\"MySqlImageSha\"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv[\"MySqlImageName\"]})" : String.Empty)
                         }, "scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true),
                         (Utility.GetFileContent("scripts", "wait-for-it.sh"), $"{CromwellAzureRootDir}/wait-for-it/wait-for-it.sh", true),
                         (Utility.GetFileContent("scripts", "install-cromwellazure.sh"), $"{CromwellAzureRootDir}/install-cromwellazure.sh", true),
@@ -818,11 +815,7 @@ namespace CromwellOnAzureDeployer
                         (Utility.GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true)
                     }.Concat(!configuration.ProvisionMySQLOnAzure.GetValueOrDefault()
                         ? new[] {
-                        (Utility.PersonalizeContent(new[]
-                        {
-                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlLocalOrAzure}", "CREATE USER 'cromwell'@'%' IDENTIFIED BY 'cromwell';"),
-
-                        }, "scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
+                        (Utility.GetFileContent("scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
                         (Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false),
                         }
                         : Array.Empty<(string, string, bool)>())
@@ -1124,7 +1117,7 @@ namespace CromwellOnAzureDeployer
             {
                 var initScript = new MySqlScript(connection, Utility.PersonalizeContent(new[]
                         {
-                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlLocalOrAzure}", String.Empty),
+                            new Utility.ConfigReplaceRegExItemText("^CREATE USER 'cromwell'@'%'.*$", String.Empty, RegexOptions.Multiline),
                         }, "scripts", "mysql", "init-user.sql"));
                 var unlockChangeScript = new MySqlScript(connection, Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"))
                 {
