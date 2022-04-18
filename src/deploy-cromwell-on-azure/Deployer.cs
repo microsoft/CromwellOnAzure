@@ -300,6 +300,11 @@ namespace CromwellOnAzureDeployer
                             ConsoleEx.WriteLine($"To do that, navigate to the storage account in the Azure Portal,", ConsoleColor.Yellow);
                             ConsoleEx.WriteLine($"Configuration tab, and click 'Upgrade.'", ConsoleColor.Yellow);
                         }
+
+                        if (installedVersion is null || installedVersion < new Version(3, 1))
+                        {
+                            await UpdateBatchImageOfferSettingV310Async(sshConnectionInfo);
+                        }
                     }
 
                     if (!configuration.Update)
@@ -1397,25 +1402,26 @@ namespace CromwellOnAzureDeployer
         private Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Adding new settings to 'env-04-settings.txt' file on the VM...",
-                async () =>
-                {
-                    var existingFileContent = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
-                    var existingSettings = Utility.DelimitedTextToDictionary(existingFileContent.Output.Trim());
-                    var newSettings = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-04-settings.txt"));
+                () => UpdateEnv04SettingsFile(
+                    sshConnectionInfo,
+                    (existingSettings, newSettings) => {
+                        foreach (var key in newSettings.Keys.Except(existingSettings.Keys))
+                        {
+                            existingSettings.Add(key, newSettings[key]);
+                        }
+                    }));
 
-                    foreach (var key in newSettings.Keys.Except(existingSettings.Keys))
-                    {
-                        existingSettings.Add(key, newSettings[key]);
-                    }
-
-                    var newFileContent = Utility.DictionaryToDelimitedText(existingSettings);
-
-                    await UploadFilesToVirtualMachineAsync(
-                        sshConnectionInfo,
-                        new[] {
-                            (newFileContent, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
-                        });
-                });
+        private Task UpdateBatchImageOfferSettingV310Async(ConnectionInfo sshConnectionInfo)
+            => Execute(
+                $"Updating 'BatchImageOffer' in 'env-04-settings.txt' file on the VM...",
+                () => UpdateEnv04SettingsFile(
+                    sshConnectionInfo,
+                    (existingSettings, newSettings) => {
+                        if (existingSettings["BatchImageOffer"] == "ubuntu-server-container")
+                        {
+                            existingSettings["BatchImageOffer"] = newSettings["BatchImageOffer"];
+                        }
+                    }));
 
         private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
             => await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)",
@@ -1428,6 +1434,23 @@ namespace CromwellOnAzureDeployer
         private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
             => await Execute("Disabling auto-start of Docker service...",
                 () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
+
+        private async Task UpdateEnv04SettingsFile(ConnectionInfo sshConnectionInfo, Action<Dictionary<string, string>, Dictionary<string, string>> action)
+        {
+            var existingFileContent = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
+            var existingSettings = Utility.DelimitedTextToDictionary(existingFileContent.Output.Trim());
+            var newSettings = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-04-settings.txt"));
+
+            action(existingSettings, newSettings);
+
+            var newFileContent = Utility.DictionaryToDelimitedText(existingSettings);
+
+            await UploadFilesToVirtualMachineAsync(
+                sshConnectionInfo,
+                new[] {
+                    (newFileContent, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                });
+        }
 
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
