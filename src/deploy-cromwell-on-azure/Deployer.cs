@@ -467,15 +467,14 @@ namespace CromwellOnAzureDeployer
                         {
                             await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
                         }
+
+                        if (configuration.ProvisionMySQLOnAzure.GetValueOrDefault())
+                        {
+                            await AddMySQLFirewallRuleForNicAsync(linuxVm, mySQLServer);
+                        }
                     }
 
                     await WriteCoaVersionToVmAsync(sshConnectionInfo);
-
-                    if (configuration.ProvisionMySQLOnAzure.GetValueOrDefault())
-                    {
-                        await AddMySQLFirewallRuleForNicAsync(linuxVm, mySQLServer);
-                    }
-
                     await RebootVmAsync(sshConnectionInfo);
                     await WaitForSshConnectivityAsync(sshConnectionInfo);
 
