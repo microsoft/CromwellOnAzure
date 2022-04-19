@@ -95,7 +95,6 @@ namespace CromwellOnAzureDeployer
         private string MySqlServerName { get; set; }
         private string MySqlServerPassword { get; set; }
         private bool isResourceGroupCreated { get; set; }
-        private string totalNumberOfRunningDockerContainers { get; set; }
 
         public Deployer(Configuration configuration)
         {
@@ -120,7 +119,6 @@ namespace CromwellOnAzureDeployer
                 azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                 subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
-                totalNumberOfRunningDockerContainers = configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "3" : "4";
                 DockerComposeYmlFile = configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "docker-compose.azure.yml" : "docker-compose.yml";
                 MySqlServerName = configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15) : String.Empty;
                 MySqlServerPassword = Utility.GeneratePassword();
@@ -606,6 +604,7 @@ namespace CromwellOnAzureDeployer
                 {
                     while (!cts.IsCancellationRequested)
                     {
+                        var totalNumberOfRunningDockerContainers = configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "3" : "4";
                         var (numberOfRunningContainers, _, _) = await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo docker ps -a | grep -c 'Up ' || :");
 
                         if (numberOfRunningContainers == totalNumberOfRunningDockerContainers)
