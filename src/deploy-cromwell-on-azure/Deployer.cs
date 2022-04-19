@@ -267,6 +267,11 @@ namespace CromwellOnAzureDeployer
 
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
 
+                        // Note: Current behavior is to block switching from Docker MySQL to Azure MySQL on Update.
+                        // However we do ancitipate including this change, this code is here to facilitate this future behavior.
+                        MySqlServerName = accountNames.GetValueOrDefault("MySqlServerName");
+                        //configuration.ProvisionMySQLOnAzure = !string.IsNullOrEmpty(MySqlServerName);
+
                         var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
 
                         if (installedVersion is null)
