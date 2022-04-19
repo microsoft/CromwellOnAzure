@@ -122,7 +122,7 @@ namespace CromwellOnAzureDeployer
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
                 totalNumberOfRunningDockerContainers = configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "3" : "4";
                 DockerComposeYmlFile = configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "docker-compose.azure.yml" : "docker-compose.yml";
-                MySqlServerName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                MySqlServerName = configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15) : String.Empty;
                 MySqlServerPassword = Utility.GeneratePassword();
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
@@ -839,6 +839,7 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{BatchAccountName}", configuration.BatchAccountName),
                         new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
                         new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
+                        new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? MySqlServerName : String.Empty),
                     }, "scripts", "env-01-account-names.txt"),
                     $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
