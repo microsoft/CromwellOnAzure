@@ -795,12 +795,7 @@ namespace CromwellOnAzureDeployer
                 () => UploadFilesToVirtualMachineAsync(
                     sshConnectionInfo,
                     new[] {
-                        // startup.sh must be written during update and doesn't have specific configuration file needs.
-                        (Utility.PersonalizeContent(new[]
-                        {
-                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlSha}", !configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "kv[\"MySqlImageSha\"]=\"\"" : String.Empty),
-                            new Utility.ConfigReplaceTextItem("{ReplaceMySqlShaSet}", !configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "kv[\"MySqlImageSha\"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv[\"MySqlImageName\"]})" : String.Empty)
-                        }, "scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true),
+                        (Utility.GetFileContent("scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true),
                         (Utility.GetFileContent("scripts", "wait-for-it.sh"), $"{CromwellAzureRootDir}/wait-for-it/wait-for-it.sh", true),
                         (Utility.GetFileContent("scripts", "install-cromwellazure.sh"), $"{CromwellAzureRootDir}/install-cromwellazure.sh", true),
                         (Utility.GetFileContent("scripts", "mount_containers.sh"), $"{CromwellAzureRootDir}/mount_containers.sh", true),
