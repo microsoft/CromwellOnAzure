@@ -24,8 +24,8 @@ using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
-using Microsoft.Azure.Management.MySQL;
-using Microsoft.Azure.Management.MySQL.Models;
+using Microsoft.Azure.Management.MySQL.FlexibleServers;
+using Microsoft.Azure.Management.MySQL.FlexibleServers.Models;
 using Microsoft.Azure.Management.Network.Fluent;
 using Microsoft.Azure.Management.Network.Fluent.Models;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
@@ -43,6 +43,8 @@ using Renci.SshNet;
 using Renci.SshNet.Common;
 using Common;
 using System.Net;
+
+using Sku = Microsoft.Azure.Management.MySQL.FlexibleServers.Models.Sku;
 
 namespace CromwellOnAzureDeployer
 {
@@ -1027,7 +1029,6 @@ namespace CromwellOnAzureDeployer
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
                         new Utility.ConfigReplaceTextItem("{ReplaceWithServerName}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? $"{MySqlServerName}.mysql.database.azure.com" : "mysqldb"),
-                        new Utility.ConfigReplaceTextItem("{ReplaceWithUserName}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? $"cromwell@{MySqlServerName}.mysql.database.azure.com" : "cromwell"),
                         new Utility.ConfigReplaceTextItem("{ReplaceWithServerPassword}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? MySqlServerPassword : "cromwell"),
                         new Utility.ConfigReplaceTextItem("{ReplaceUseSSL}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "true" : "false"),
                     }, "scripts", CromwellConfigurationFileName));
@@ -1078,11 +1079,13 @@ namespace CromwellOnAzureDeployer
                 $"Creating MySQL On Azure Server Instance: {MySqlServerName} With Password: {MySqlServerPassword}...",
                 () => mySQLManagementClient.Servers.CreateAsync(
                      configuration.ResourceGroupName, MySqlServerName,
-                     new ServerForCreate(
-                         new ServerPropertiesForDefaultCreate(
-                             administratorLogin: "cromwell",
-                             administratorLoginPassword: MySqlServerPassword),
-                         configuration.RegionName)));
+                     new Server(
+                        location: "westus2",
+                        version: "8.0.21",
+                        sku: new Sku("Standard_D2ds_v4", "GeneralPurpose"),
+                        administratorLogin: "cromwell",
+                        administratorLoginPassword: MySqlServerPassword
+                   )));
 
             // Create a firewall rule for current machine's external IP.
             var externalIpString = new WebClient().DownloadString("http://icanhazip.com").Replace("\\r\\n", "").Replace("\\n", "").Trim();
@@ -1103,7 +1106,7 @@ namespace CromwellOnAzureDeployer
 
             // Execute queries
             ConsoleEx.WriteLine("Executing scripts on cromwell_db.");
-            var connectionString = $"Database=cromwell_db;Data Source={MySqlServerName}.mysql.database.azure.com;User Id=cromwell@{MySqlServerName};Password={MySqlServerPassword}";
+            var connectionString = $"Database=cromwell_db;Data Source={MySqlServerName}.mysql.database.azure.com;User Id=cromwell;Password={MySqlServerPassword}";
             
             using (var connection = new MySqlConnection(connectionString))
             {
