@@ -1580,7 +1580,7 @@ namespace TesApi.Web
         public async ValueTask<bool> UpdateBatchPools(CancellationToken cancellationToken)
         {
             var changes = false;
-            await foreach (var pool in _poolListRepository.GetItemsAsync(p => true, 256, cancellationToken).SelectManyAwait(GetPoolsAsyncAdapter).WithCancellation(cancellationToken))
+            await foreach (var pool in _poolListRepository.GetItemsAsync(p => true, 256, cancellationToken).SelectManyAwait(GetPoolsAsyncAdapter).WhereAwait(p  => ValueTask.FromResult(p is not null)).WithCancellation(cancellationToken))
             {
                 var storedPool = batchPools.GetPoolOrDefault(pool.Pool.PoolId);
                 //TODO: verify that pool exists and is not being deleted. If so, skip or remove, as appropriate
@@ -1633,7 +1633,21 @@ namespace TesApi.Web
             => ValueTask.FromResult(GetPoolsAsync(poolList.Key, poolList.Pools));
 
         private IAsyncEnumerable<IBatchPool> GetPoolsAsync(string key, IEnumerable<string> pools)
-            => pools.Select(i => _poolFactory.Retrieve(i, key, this)).ToAsyncEnumerable();
+        {
+            return pools.Select(Retrieve).ToAsyncEnumerable();
+
+            IBatchPool Retrieve(string id)
+            {
+                try
+                {
+                    return _poolFactory.Retrieve(id, key, this);
+                }
+                catch (ArgumentNullException)
+                {
+                    return default;
+                }
+            }
+        }
 
         private static string GetKeyFromPoolId(string poolId)
             => poolId[..poolId.LastIndexOf('-')];
