@@ -1027,9 +1027,9 @@ namespace CromwellOnAzureDeployer
                     }, "scripts", ContainersToMountFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
-                        new Utility.ConfigReplaceTextItem("{ReplaceWithServerName}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? $"{MySqlServerName}.mysql.database.azure.com" : "mysqldb"),
-                        new Utility.ConfigReplaceTextItem("{ReplaceWithServerPassword}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? MySqlServerPassword : "cromwell"),
-                        new Utility.ConfigReplaceTextItem("{ReplaceUseSSL}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "true" : "false"),
+                        new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? $"{MySqlServerName}.mysql.database.azure.com" : "mysqldb"),
+                        new Utility.ConfigReplaceTextItem("{MySqlServerPassword}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? MySqlServerPassword : "cromwell"),
+                        new Utility.ConfigReplaceTextItem("{MySqlUseSSL}", configuration.ProvisionMySQLOnAzure.GetValueOrDefault() ? "true" : "false"),
                     }, "scripts", CromwellConfigurationFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
