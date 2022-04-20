@@ -59,12 +59,13 @@
     <EmbeddedResource Include="scripts\cromwell-application.conf" />
     <EmbeddedResource Include="scripts\cromwellazure.service" />
     <EmbeddedResource Include="scripts\docker-compose.yml" />
-    <EmbeddedResource Include="scripts\docker-compose.azure.yml" />
+    <EmbeddedResource Include="scripts\docker-compose.mysql.yml" />
     <EmbeddedResource Include="scripts\env-00-coa-version.txt" />
     <EmbeddedResource Include="scripts\env-01-account-names.txt" />
     <EmbeddedResource Include="scripts\env-02-internal-images.txt" />
     <EmbeddedResource Include="scripts\env-03-external-images.txt" />
     <EmbeddedResource Include="scripts\env-04-settings.txt" />
+    <EmbeddedResource Include="scripts\env-12-local-my-sql-db.txt" />
     <EmbeddedResource Include="scripts\install-cromwellazure.sh" />
     <EmbeddedResource Include="scripts\mount-data-disk.sh" />
     <EmbeddedResource Include="scripts\mount.blobfuse" />

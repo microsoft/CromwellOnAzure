@@ -32,7 +32,6 @@ while IFS='=' read key value; do kv[$key]=$value; done < <(awk 'NF > 0' env-*)
 kv["CromwellImageSha"]=""
 kv["TesImageSha"]=""
 kv["TriggerServiceImageSha"]=""
-rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 write_log
 
 storage_account_name=${kv["DefaultStorageAccountName"]}
@@ -89,6 +88,20 @@ done
 write_log "Account access OK"
 write_log
 
+write_log "Mounting containers (default storage account = $storage_account_name)"
+./mount_containers.sh -a $storage_account_name
+write_log
+
+write_log "Mounted containers:"
+findmnt -t fuse
+write_log
+
+k=docker-compose.*.yml
+readarray -t files < <(compgen -G "$k")
+k="${files[@]}"
+kv["COMPOSE_FILE"]="docker-compose.yml:${k//${IFS:0:1}/:}"
+rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
+
 write_log "Running docker-compose pull"
 docker-compose pull --ignore-pull-failures || true
 write_log
@@ -99,17 +112,9 @@ kv["TesImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}
 kv["TriggerServiceImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TriggerServiceImageName"]})
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 
-write_log "Mounting containers (default storage account = $storage_account_name)"
-./mount_containers.sh -a $storage_account_name
-write_log
-
-write_log "Mounted containers:"
-findmnt -t fuse
-write_log
-
 write_log "Running docker-compose up"
 mkdir -p /mnt/cromwell-tmp
-docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
+docker-compose up -d
 write_log
 
 write_log "Startup complete"
