@@ -42,7 +42,6 @@ namespace TesApi.Web
         private static readonly HttpClient httpClient = new();
 
         private readonly ILogger logger;
-        private readonly Lazy<IBatchPools> batchPools;
         private readonly Func<Task<BatchModels.BatchAccount>> getBatchAccountFunc;
         private readonly BatchClient batchClient;
         private readonly string subscriptionId;
@@ -58,12 +57,10 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="batchAccountName">Batch account name</param>
         /// <param name="azureOfferDurableId">Azure offer id</param>
-        /// <param name="batchPools">Managed Azure Batch Pools service</param>
         /// <param name="logger">The logger</param>
-        public AzureProxy(string batchAccountName, string azureOfferDurableId, Lazy<IBatchPools> batchPools, ILogger<AzureProxy> logger)
+        public AzureProxy(string batchAccountName, string azureOfferDurableId, ILogger<AzureProxy> logger)
         {
             this.logger = logger;
-            this.batchPools = batchPools;
             this.batchAccountName = batchAccountName;
             var (SubscriptionId, ResourceGroupName, Location, BatchAccountEndpoint) = FindBatchAccountAsync(batchAccountName).Result;
             batchResourceGroupName = ResourceGroupName;
@@ -244,8 +241,9 @@ namespace TesApi.Web
         /// <param name="jobId"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
+        /// <param name="getBatchPool"></param>
         /// <returns></returns>
-        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
+        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, IBatchScheduler.TryGetBatchPool getBatchPool)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
             await job.CommitAsync();
@@ -268,7 +266,7 @@ namespace TesApi.Web
                 if (!string.IsNullOrWhiteSpace(poolInformation?.PoolId))
                 {
                     // With manual pools, the PoolId property is set
-                    if (batchPools.Value.TryGet(poolInformation.PoolId, out var batchPool))
+                    if (getBatchPool(poolInformation.PoolId, out var batchPool))
                     {
                         batchPool.ReleaseNode(jobId);
                         batchPool.ReleaseNode(cloudTask.AffinityInformation);
@@ -412,8 +410,9 @@ namespace TesApi.Web
         /// Deletes an Azure Batch job
         /// </summary>
         /// <param name="tesTaskId">The unique TES task ID</param>
+        /// <param name="getBatchPool"></param>
         /// <param name="cancellationToken"></param>
-        public async Task DeleteBatchJobAsync(string tesTaskId, CancellationToken cancellationToken = default)
+        public async Task DeleteBatchJobAsync(string tesTaskId, IBatchScheduler.TryGetBatchPool getBatchPool, CancellationToken cancellationToken = default)
         {
             var jobFilter = new ODATADetailLevel
             {
@@ -436,7 +435,7 @@ namespace TesApi.Web
                 if (!string.IsNullOrWhiteSpace(job.PoolInformation?.PoolId))
                 {
                     // With manual pools, the PoolId property is set
-                    if (batchPools.Value.TryGet(job.PoolInformation.PoolId, out var batchPool))
+                    if (getBatchPool(job.PoolInformation.PoolId, out var batchPool))
                     {
                         batchPool.ReleaseNode(job.Id);
                         foreach (var task in await job.ListTasks(detailLevel: new ODATADetailLevel { SelectClause = "affinityId" }).ToListAsync(cancellationToken: cancellationToken))

@@ -680,16 +680,14 @@ namespace TesApi.Tests
         }
 
 
-        private static TestServices.TestServiceProvider<BatchPools> GetServiceProvider(AzureProxyReturnValues azureProxyReturn = default)
+        private static TestServices.TestServiceProvider<BatchScheduler> GetServiceProvider(AzureProxyReturnValues azureProxyReturn = default)
             => new(wrapAzureProxy: true, configuration: GetMockConfig(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Get()), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
-        private static async Task<IBatchPool> AddPool(IBatchPools batchPools)
+        private static async Task<IBatchPool> AddPool(IBatchPoolsImpl batchPools)
             => await batchPools.GetOrAddAsync("key1", id => ValueTask.FromResult(new Pool(name: id, displayName: "display1", vmSize: "vmSize1")));
 
         private static void TimeShift(TimeSpan shift, IBatchPool pool)
-        {
-            ((IBatchPoolImpl)pool).TimeShift(shift);
-        }
+            => ((IBatchPoolImpl)pool).TimeShift(shift);
 
         private static IEnumerable<ComputeNode> TimeShift(TimeSpan shift, IBatchPool pool, IEnumerable<ComputeNode> nodes)
         {
@@ -767,7 +765,7 @@ namespace TesApi.Tests
             public override Microsoft.Azure.Batch.Protocol.IComputeNodeOperations ComputeNode => computeNode;
         }
 
-        // Below this line is code using reflection and internal details of the Azure libraries in order to generate Mocks of ComputeNode. A newer version of the library is supposed to enable this scenario, so hopefully we can ditch this code at that time.
+        // Below this line the code using reflection and internal details of the Azure libraries in order to generate Mocks of ComputeNode. A newer version of the library is supposed to enable this scenario, so hopefully we can ditch this code.
 
         internal static ComputeNode GenerateNode(string poolId, string id, bool isDedicated, bool isIdle, DateTime stateTransitionTime = default)
         {

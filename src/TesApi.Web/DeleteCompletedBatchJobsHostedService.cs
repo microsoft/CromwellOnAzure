@@ -116,7 +116,7 @@ namespace TesApi.Web
                         tesTask.State == TesState.CANCELEDEnum ||
                         tesTask.State == TesState.UNKNOWNEnum)
                     {
-                        await azureProxy.DeleteBatchJobAsync(tesTaskId, cancellationToken);
+                        await azureProxy.DeleteBatchJobAsync(tesTaskId, default, cancellationToken);
                     }
                 }
             }

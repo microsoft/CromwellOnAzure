@@ -15,8 +15,8 @@ namespace TesApi.Web
     /// </summary>
     public sealed class BatchPoolFactory
     {
-        private readonly Func<PoolInformation, string, IBatchPools, IBatchPool> _batchPoolCreator;
-        private readonly Func<string, string, IBatchPools, IBatchPool> _batchPoolRequester;
+        private readonly Func<PoolInformation, string, IBatchScheduler, IBatchPool> _batchPoolCreator;
+        private readonly Func<string, string, IBatchScheduler, IBatchPool> _batchPoolRequester;
 
         /// <summary>
         /// Constructor for <see cref="BatchPoolFactory"/>.
@@ -24,8 +24,8 @@ namespace TesApi.Web
         /// <param name="serviceProvider"></param>
         public BatchPoolFactory(IServiceProvider serviceProvider)
         {
-            _batchPoolCreator = (pool, key, pools) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(PoolInformation), typeof(string), typeof(IBatchPools) })(serviceProvider, new object[] { pool, key, pools });
-            _batchPoolRequester = (pool, key, pools) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(string), typeof(string), typeof(IBatchPools) })(serviceProvider, new object[] { pool, key, pools });
+            _batchPoolCreator = (pool, key, pools) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(PoolInformation), typeof(string), typeof(IBatchScheduler) })(serviceProvider, new object[] { pool, key, pools });
+            _batchPoolRequester = (pool, key, pools) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(string), typeof(string), typeof(IBatchScheduler) })(serviceProvider, new object[] { pool, key, pools });
         }
 
         /// <summary>
@@ -35,7 +35,7 @@ namespace TesApi.Web
         /// <param name="key"></param>
         /// <param name="batchPools"></param>
         /// <returns></returns>
-        public IBatchPool CreateNew(PoolInformation poolInformation, string key, IBatchPools batchPools)
+        public IBatchPool CreateNew(PoolInformation poolInformation, string key, IBatchScheduler batchPools)
             => _batchPoolCreator(poolInformation, key, batchPools);
 
         /// <summary>
@@ -45,7 +45,7 @@ namespace TesApi.Web
         /// <param name="key"></param>
         /// <param name="batchPools"></param>
         /// <returns></returns>
-        public IBatchPool Retrieve(string poolId, string key, IBatchPools batchPools)
+        public IBatchPool Retrieve(string poolId, string key, IBatchScheduler batchPools)
             => _batchPoolRequester(poolId, key, batchPools);
     }
 
@@ -67,20 +67,18 @@ namespace TesApi.Web
         /// Constructor for <see cref="PoolRepositoryFactory"/>.
         /// </summary>
         /// <param name="serviceProvider"></param>
-        /// <param name="configuration"></param>
-        /// <param name="azureProxy"></param>
+        /// <param name="cosmosCredentials"></param>
         /// <param name="cache"></param>
         /// <param name="poolDataType">Override for testing.</param>
         /// <param name="pendingReservationItemType">Override for testing.</param>
-        public PoolRepositoryFactory(IServiceProvider serviceProvider, IConfiguration configuration, IAzureProxy azureProxy, IAppCache cache, Type poolDataType = default, Type pendingReservationItemType = default)
+        public PoolRepositoryFactory(IServiceProvider serviceProvider, CosmosCredentials cosmosCredentials, IAppCache cache, Type poolDataType = default, Type pendingReservationItemType = default)
         {
             poolDataType ??= typeof(Tes.Repository.CosmosDbRepository<BatchPool.PoolData>);
             pendingReservationItemType ??= typeof(Tes.Repository.CosmosDbRepository<BatchPool.PendingReservationItem>);
             _cache = cache;
 
-            (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(configuration["CosmosDbAccountName"]).Result;
-            _poolDataRepoFactory = id => (PoolDataRepositoryFactory)ActivatorUtilities.CreateFactory(typeof(PoolDataRepositoryFactory), new Type[] { typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(Type) })(serviceProvider, new object[] { cosmosDbEndpoint, cosmosDbKey, Common.Constants.CosmosDbDatabaseId, BatchPools.CosmosDbContainerId, id, poolDataType});
-            _poolPendingReservationFactory = id => (PoolPendingReservationRepositoryFactory)ActivatorUtilities.CreateFactory(typeof(PoolPendingReservationRepositoryFactory), new Type[] { typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(Type) })(serviceProvider, new object[] { cosmosDbEndpoint, cosmosDbKey, Common.Constants.CosmosDbDatabaseId, BatchPools.CosmosDbContainerId, id, pendingReservationItemType });
+            _poolDataRepoFactory = id => (PoolDataRepositoryFactory)ActivatorUtilities.CreateFactory(typeof(PoolDataRepositoryFactory), new Type[] { typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(Type) })(serviceProvider, new object[] { cosmosCredentials.CosmosDbEndpoint, cosmosCredentials.CosmosDbKey, Common.Constants.CosmosDbDatabaseId, BatchScheduler.CosmosDbContainerId, id, poolDataType});
+            _poolPendingReservationFactory = id => (PoolPendingReservationRepositoryFactory)ActivatorUtilities.CreateFactory(typeof(PoolPendingReservationRepositoryFactory), new Type[] { typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(Type) })(serviceProvider, new object[] { cosmosCredentials.CosmosDbEndpoint, cosmosCredentials.CosmosDbKey, Common.Constants.CosmosDbDatabaseId, BatchScheduler.CosmosDbContainerId, id, pendingReservationItemType });
         }
 
         /// <summary>

@@ -37,7 +37,8 @@ namespace TesApi.Web
         /// <param name="jobId"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
-        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation);
+        /// <param name="getBatchPool"></param>
+        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, IBatchScheduler.TryGetBatchPool getBatchPool);
 
         /// <summary>
         /// Gets the <see cref="ContainerRegistryInfo"/> for the given image name
@@ -69,8 +70,9 @@ namespace TesApi.Web
         /// Deletes an Azure Batch job
         /// </summary>
         /// <param name="taskId">The unique TES task ID</param>
+        /// <param name="getBatchPool"></param>
         /// <param name="cancellationToken"></param>
-        Task DeleteBatchJobAsync(string taskId, CancellationToken cancellationToken = default);
+        Task DeleteBatchJobAsync(string taskId, IBatchScheduler.TryGetBatchPool getBatchPool, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Get Batch account quota

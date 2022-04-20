@@ -78,7 +78,7 @@ namespace TesApi.Tests.TestServices
         internal Mock<IAzureProxy> AzureProxy { get; private set; }
         //internal Mock<IBatchPools> BatchPools { get; private set; }
         internal Mock<IRepository<TesTask>> TesTaskRepository { get; private set; }
-        internal Mock<IRepository<BatchPools.PoolList>> PoolListRepository { get; private set; }
+        internal Mock<IRepository<BatchScheduler.PoolList>> PoolListRepository { get; private set; }
         internal Mock<IRepository<BatchPool.PoolData>> PoolDataRepository { get; private set; }
         internal Mock<IRepository<BatchPool.PendingReservationItem>> PendingReservationRepository { get; private set; }
         internal Mock<IStorageAccessProvider> StorageAccessProvider { get; private set; }
@@ -89,29 +89,34 @@ namespace TesApi.Tests.TestServices
             bool wrapAzureProxy = false,
             IEnumerable<(string Key, string Value)> configuration = default,
             Action<Mock<IAzureProxy>> azureProxy = default,
-            //Action<Mock<IBatchPools>> batchPools = default,
             Action<Mock<IRepository<TesTask>>> tesTaskRepository = default,
             (string endpoint, string key, string databaseId, string containerId, string partitionKeyValue) batchPoolRepositoryArgs = default,
             Action<Mock<IStorageAccessProvider>> storageAccessProvider = default)
             => provider = new ServiceCollection()
                 .AddSingleton(_ => GetConfiguration(configuration))
                 .AddSingleton(s => wrapAzureProxy ? ActivatorUtilities.CreateInstance<CachingWithRetriesAzureProxy>(s, GetAzureProxy(azureProxy).Object) : GetAzureProxy(azureProxy).Object)
-                //.AddSingleton(_ => new Lazy<IBatchPools>(() => GetBatchPools(batchPools).Object))
                 .AddSingleton(_ => GetTesTaskRepository(tesTaskRepository).Object)
-                .AddSingleton<IRepository<BatchPools.PoolList>>(s => ActivatorUtilities.CreateInstance<Repository<BatchPools.PoolList>>(s, ParseRepositoryArgs(batchPoolRepositoryArgs)))
-                .AddSingleton<IRepository<BatchPool.PoolData>>(s => ActivatorUtilities.CreateInstance<Repository<BatchPool.PoolData>>(s, ParseRepositoryArgs(batchPoolRepositoryArgs)))
-                .AddSingleton<IRepository<BatchPool.PendingReservationItem>>(s => ActivatorUtilities.CreateInstance<Repository<BatchPool.PendingReservationItem>>(s, ParseRepositoryArgs(batchPoolRepositoryArgs)))
+                .AddSingleton(_ => new CosmosCredentials(batchPoolRepositoryArgs.endpoint ?? "endpoint", batchPoolRepositoryArgs.key ?? "key"))
+                .AddSingleton(s => GetRepository<BatchScheduler.PoolList>(s, s.GetService<CosmosCredentials>(), ParseRepositoryArgs(batchPoolRepositoryArgs)))
+                .AddSingleton(s => GetRepository<BatchPool.PoolData>(s, s.GetService<CosmosCredentials>(), ParseRepositoryArgs(batchPoolRepositoryArgs)))
+                .AddSingleton(s => GetRepository<BatchPool.PendingReservationItem>(s, s.GetService<CosmosCredentials>(), ParseRepositoryArgs(batchPoolRepositoryArgs)))
                 .AddSingleton(s => mockStorageAccessProvider ? GetStorageAccessProvider(storageAccessProvider).Object : ActivatorUtilities.CreateInstance<StorageAccessProvider>(s))
                 .AddSingleton<IAppCache>(_ => new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()))))
                 .AddTransient<ILogger<T>>(_ => NullLogger<T>.Instance)
                 .IfThenElse(mockStorageAccessProvider, s => s, s => s.AddTransient<ILogger<StorageAccessProvider>>(_ => NullLogger<StorageAccessProvider>.Instance))
-                .AddTransient<ILogger<BatchPools>>(_ => NullLogger<BatchPools>.Instance)
+                .AddTransient<ILogger<BatchScheduler>>(_ => NullLogger<BatchScheduler>.Instance)
                 .AddTransient<ILogger<BatchPool>>(_ => NullLogger<BatchPool>.Instance)
                 .AddSingleton<TestRepositoryStorage>()
                 .AddSingleton<BatchPoolFactory>()
-                .AddSingleton<IBatchPools, BatchPools>()
-                .AddSingleton(s => ActivatorUtilities.CreateInstance<PoolRepositoryFactory>(s, typeof(Repository<BatchPool.PoolData>), typeof(Repository<BatchPool.PendingReservationItem>)))
+                .AddSingleton<IBatchScheduler, BatchScheduler>()
+                .AddSingleton(s => ActivatorUtilities.CreateInstance<PoolRepositoryFactory>(s, typeof(TestRepository<BatchPool.PoolData>), typeof(TestRepository<BatchPool.PendingReservationItem>)))
             .BuildServiceProvider();
+
+        private static IRepository<I> GetRepository<I>(IServiceProvider serviceProvider, CosmosCredentials credentials, object[] args) where I : RepositoryItem<I>
+        {
+            var factory = ActivatorUtilities.CreateFactory(typeof(TestRepository<I>), Enumerable.Empty<Type>().Append(typeof(string)).Append(typeof(string)).Append(typeof(string)).Append(typeof(string)).Append(typeof(string)).ToArray());
+            return (IRepository<I>)factory(serviceProvider, args.Prepend(credentials.CosmosDbKey).Prepend(credentials.CosmosDbEndpoint).ToArray());
+        }
 
         private IConfiguration GetConfiguration(IEnumerable<(string Key, string Value)> configuration)
             => Configuration = new ConfigurationBuilder().AddInMemoryCollection(configuration?.Select(t => new KeyValuePair<string, string>(t.Key, t.Value)) ?? Enumerable.Empty<KeyValuePair<string, string>>()).Build();
@@ -123,13 +128,6 @@ namespace TesApi.Tests.TestServices
             return AzureProxy = proxy;
         }
 
-        //private Mock<IBatchPools> GetBatchPools(Action<Mock<IBatchPools>> action)
-        //{
-        //    var proxy = new Mock<IBatchPools>();
-        //    action?.Invoke(proxy);
-        //    return BatchPools = proxy;
-        //}
-
         private Mock<IRepository<TesTask>> GetTesTaskRepository(Action<Mock<IRepository<TesTask>>> action)
         {
             var proxy = new Mock<IRepository<TesTask>>();
@@ -138,9 +136,7 @@ namespace TesApi.Tests.TestServices
         }
 
         private static object[] ParseRepositoryArgs((string endpoint, string key, string databaseId, string containerId, string partitionKeyValue) batchPoolRepositoryArgs)
-            => Enumerable
-                .Repeat(batchPoolRepositoryArgs.endpoint, 1)
-                .Append(batchPoolRepositoryArgs.key)
+            => Enumerable.Empty<object>()
                 .Append(batchPoolRepositoryArgs.databaseId)
                 .Append(batchPoolRepositoryArgs.containerId)
                 .Append(batchPoolRepositoryArgs.partitionKeyValue)
@@ -164,11 +160,11 @@ namespace TesApi.Tests.TestServices
                 Dispose();
             return ValueTask.CompletedTask;
         }
+    }
 
-        private sealed class Repository<M> : BaseRepository<M> where M : RepositoryItem<M>
-        {
-            public Repository(string endpoint, string key, string databaseId, string containerId, string partitionKeyValue, TestRepositoryStorage storage)
-                : base(endpoint, key, databaseId, containerId, partitionKeyValue, storage, default, default) { }
-        }
+    internal sealed class TestRepository<T> : BaseRepository<T> where T : RepositoryItem<T>
+    {
+        public TestRepository(string endpoint, string key, string databaseId, string containerId, string partitionKeyValue, TestRepositoryStorage storage)
+            : base(endpoint, key, databaseId, containerId, partitionKeyValue, storage) { }
     }
 }

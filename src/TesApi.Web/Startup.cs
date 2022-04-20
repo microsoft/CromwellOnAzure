@@ -57,8 +57,13 @@ namespace TesApi.Web
             => services.AddSingleton<IAppCache>(sp => new CachingService())
 
             .AddSingleton(sp => (IAzureProxy)ActivatorUtilities.CreateInstance<CachingWithRetriesAzureProxy>(sp, (IAzureProxy)sp.GetService(typeof(AzureProxy))))
-            .AddSingleton(sp => ActivatorUtilities.CreateInstance<AzureProxy>(sp, Configuration["BatchAccountName"], azureOfferDurableId, new Lazy<IBatchPools>(() => (IBatchPools)sp.GetService(typeof(IBatchPools)))))
-            .AddSingleton<IBatchPools, BatchPools>()
+            .AddSingleton(sp => ActivatorUtilities.CreateInstance<AzureProxy>(sp, Configuration["BatchAccountName"], azureOfferDurableId))
+
+            .AddSingleton<CosmosCredentials>(sp =>
+            {
+                (var cosmosDbEndpoint, var cosmosDbKey) = ((IAzureProxy)sp.GetService(typeof(IAzureProxy))).GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
+                return new(cosmosDbEndpoint, cosmosDbKey);
+            })
             .AddSingleton<BatchPoolFactory>()
             .AddSingleton<PoolRepositoryFactory>()
 
@@ -71,14 +76,14 @@ namespace TesApi.Web
 
             .AddSingleton(sp =>
             {
-                (var cosmosDbEndpoint, var cosmosDbKey) = ((IAzureProxy)sp.GetService(typeof(IAzureProxy))).GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
-                return (IRepository<TesTask>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<TesTask>>(sp, new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId));
+                var cosmos = sp.GetService<CosmosCredentials>();
+                return (IRepository<TesTask>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<TesTask>>(sp, new CosmosDbRepository<TesTask>(cosmos.CosmosDbEndpoint, cosmos.CosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId));
             })
 
             .AddSingleton(sp =>
             {
-                (var cosmosDbEndpoint, var cosmosDbKey) = ((IAzureProxy)sp.GetService(typeof(IAzureProxy))).GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
-                return (IRepository<BatchPools.PoolList>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<BatchPools.PoolList>>(sp, new CosmosDbRepository<BatchPools.PoolList>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, BatchPools.CosmosDbContainerId, Constants.CosmosDbPartitionId));
+                var cosmos = sp.GetService<CosmosCredentials>();
+                return (IRepository<BatchScheduler.PoolList>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<BatchScheduler.PoolList>>(sp, new CosmosDbRepository<BatchScheduler.PoolList>(cosmos.CosmosDbEndpoint, cosmos.CosmosDbKey, Constants.CosmosDbDatabaseId, BatchScheduler.CosmosDbContainerId, Constants.CosmosDbPartitionId));
             })
 
             .AddSingleton<IBatchScheduler, BatchScheduler>()
@@ -168,6 +173,34 @@ namespace TesApi.Web
                 configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync().Wait();
                 return s;
             });
+    }
+
+    /// <summary>
+    /// TODO
+    /// </summary>
+    public sealed class CosmosCredentials
+    {
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="cosmosDbEndpoint"></param>
+        /// <param name="cosmosDbKey"></param>
+        /// <exception cref="ArgumentNullException"></exception>
+        public CosmosCredentials(string cosmosDbEndpoint, string cosmosDbKey)
+        {
+            CosmosDbEndpoint = cosmosDbEndpoint ?? throw new ArgumentNullException(nameof(cosmosDbEndpoint));
+            CosmosDbKey = cosmosDbKey ?? throw new ArgumentNullException(nameof(cosmosDbKey));
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        public string CosmosDbEndpoint { get; }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        public string CosmosDbKey { get; }
     }
 
     internal static class BooleanMethodSelectorExtensions

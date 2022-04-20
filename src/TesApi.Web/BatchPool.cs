@@ -45,7 +45,7 @@ namespace TesApi.Web
         public PoolInformation Pool { get; }
 
         /// <inheritdoc/>
-        public async Task<AffinityInformation> PrepareNodeAsync(string jobId, bool isLowPriority, CancellationToken cancellationToken = default)
+        public async ValueTask<AffinityInformation> PrepareNodeAsync(string jobId, bool isLowPriority, CancellationToken cancellationToken = default)
         {
             _ = jobId ?? throw new ArgumentNullException(nameof(jobId));
             AffinityInformation result = default;
@@ -173,7 +173,52 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState)
+        public async ValueTask<bool> UpdateIfNeeded(IBatchPool other, CancellationToken cancellationToken)
+        {
+            var changed = false;
+            if (!Data.Equals(((BatchPool)other).Data))
+            {
+                using var dataRepo = CreatePoolDataRepository();
+                await dataRepo.UpdateItemAsync(Data);
+                changed = true;
+            }
+
+            if (!PendingReservations.SequenceEqual(((BatchPool)other).PendingReservations))
+            {
+                using var pendRepo = CreatePendingReservationRepository();
+                foreach (var reservation in PendingReservations)
+                {
+                    PendingReservationItem reservationItem = default;
+                    if (await pendRepo.TryGetItemAsync(reservation.Key, item => reservationItem = item))
+                    {
+                        if (!reservationItem.Equals(reservation.Value.Source))
+                        {
+                            _ = await pendRepo.UpdateItemAsync(reservation.Value.Source);
+                            changed = true;
+                        }
+                    }
+                    else
+                    {
+                        _ = await pendRepo.CreateItemAsync(reservation.Value.Source);
+                        changed = true;
+                    }
+                }
+
+                await foreach (var reservation in pendRepo.GetItemsAsync(i => true, 256, cancellationToken).WithCancellation(cancellationToken))
+                {
+                    if (!PendingReservations.ContainsKey(reservation.JobId))
+                    {
+                        await pendRepo.DeleteItemAsync(reservation.JobId);
+                        changed = true;
+                    }
+                }
+            }
+
+            return changed;
+        }
+
+        /// <inheritdoc/>
+        public async ValueTask ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState)
         {
             if (nodeInformation is not null)
             {
@@ -382,7 +427,7 @@ namespace TesApi.Web
                 var (lowPriorityNodes, dedicatedNodes) = await azureProxy.GetCurrentComputeNodesAsync(Pool.PoolId, cancellationToken);
                 if ((lowPriorityNodes is null || lowPriorityNodes == 0) && (dedicatedNodes is null || dedicatedNodes == 0) && PendingReservations.Count == 0 && ReservedComputeNodes.Count == 0)
                 {
-                    await _batchPools.RemovePoolFromList(Pool.PoolId);
+                    _ = _batchPools.RemovePoolFromList(this);
                     await azureProxy.DeleteBatchPoolAsync(Pool.PoolId, cancellationToken);
                     _isRemoved = true;
                 }
@@ -455,7 +500,7 @@ namespace TesApi.Web
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
         /// <exception cref="ArgumentException"></exception>
-        public BatchPool(PoolInformation poolInformation, string key, IBatchPools batchPools, PoolRepositoryFactory repositoryFactory, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+        public BatchPool(PoolInformation poolInformation, string key, IBatchScheduler batchPools, PoolRepositoryFactory repositoryFactory, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
             : this(new()
                 {
                     PoolId = poolInformation.PoolId,
@@ -483,7 +528,7 @@ namespace TesApi.Web
         /// <param name="configuration"></param>
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
-        public BatchPool(string poolId, string key, IBatchPools batchPools, PoolRepositoryFactory repositoryFactory, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+        public BatchPool(string poolId, string key, IBatchScheduler batchPools, PoolRepositoryFactory repositoryFactory, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
             : this(new Func<PoolData>(() =>
                 {
                     using var dataRepo = repositoryFactory.GetPoolDataRepositoryFactory(key).CreateRepository();
@@ -498,7 +543,7 @@ namespace TesApi.Web
                 logger)
         { }
 
-        private BatchPool(PoolData data, string key, PoolInformation poolId, IBatchPools batchPools, PoolRepositoryFactory repositoryFactory, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+        private BatchPool(PoolData data, string key, PoolInformation poolId, IBatchScheduler batchPools, PoolRepositoryFactory repositoryFactory, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
             Pool = poolId ?? throw new ArgumentNullException(nameof(poolId));
@@ -655,7 +700,7 @@ namespace TesApi.Web
         }
         #endregion
 
-        #region Embedded public classes
+        #region Repository classes
         /// <summary>
         /// Simple <see cref="CloudPool"/> metadata.
         /// </summary>

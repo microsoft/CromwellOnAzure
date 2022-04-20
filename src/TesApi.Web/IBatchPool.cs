@@ -13,6 +13,14 @@ namespace TesApi.Web
     public interface IBatchPool
     {
         /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="other"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        ValueTask<bool> UpdateIfNeeded(IBatchPool other, CancellationToken cancellationToken);
+
+        /// <summary>
         /// Indicates that the pool is available for new jobs/tasks.
         /// </summary>
         bool IsAvailable { get; }
@@ -29,7 +37,7 @@ namespace TesApi.Web
         /// <param name="isLowPriority">True if the task is low priority, False if dedicated.</param>
         /// <param name="cancellationToken"></param>
         /// <returns>An <see cref="AffinityInformation"/> describing the reserved compute node, or null if a new node is requested.</returns>
-        Task<AffinityInformation> PrepareNodeAsync(string jobId, bool isLowPriority, CancellationToken cancellationToken = default);
+        ValueTask<AffinityInformation> PrepareNodeAsync(string jobId, bool isLowPriority, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Releases a compute node reservation.
@@ -65,7 +73,7 @@ namespace TesApi.Web
         /// <param name="taskState"></param>
         /// <returns></returns>
         /// <remarks>This needs to be called as soon as possible after the compute node enters the 'Running' state. It's safe to call at any time as well as repeatedly.</remarks>
-        Task ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState);
+        ValueTask ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState);
 
         /// <summary>
         /// Types of maintenance calls offered by the <see cref="IBatchPool.ServicePoolAsync(ServiceKind, CancellationToken)"/> service method.
