@@ -89,21 +89,18 @@ namespace TriggerService.Tests
                 => TestLogger;
 
             public void Dispose()
-            {
-                
-            }
+            { }
         }
 
         public sealed class TestLogger : ILogger, IDisposable
         {
+            private readonly object _lock = new();
             public List<string> LogLines { get; set; } = new List<string>();
             public IDisposable BeginScope<TState>(TState state)
                 => null;
 
             public void Dispose()
-            {
-
-            }
+            { }
 
             public bool IsEnabled(LogLevel logLevel)
                 => true;
@@ -111,7 +108,10 @@ namespace TriggerService.Tests
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
             {
                 var now = DateTime.UtcNow;
-                LogLines.Add($"{now.Second}:{now.Millisecond} {logLevel} {eventId} {state?.ToString()} {exception?.ToString()}");
+                lock (_lock)
+                {
+                    LogLines.Add($"{now.Second}:{now.Millisecond} {logLevel} {eventId} {state?.ToString()} {exception?.ToString()}");
+                }
             }
         }
     }

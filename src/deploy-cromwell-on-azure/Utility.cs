@@ -17,18 +17,84 @@ namespace CromwellOnAzureDeployer
                 .Select(r => r.Trim().Split(fieldDelimiter))
                 .ToDictionary(f => f[0].Trim(), f => f[1].Trim());
 
+        public static string PersonalizeContent(IEnumerable<ConfigReplaceTextItemBase> replacements, params string[] pathComponentsRelativeToAppBase)
+            => PersonalizeContent(replacements, GetFileContent(pathComponentsRelativeToAppBase));
+
+        public static string PersonalizeContent(IEnumerable<ConfigReplaceTextItemBase> replacements, string source)
+        {
+            foreach (var replacement in replacements)
+            {
+                source = replacement.Replace(source);
+            }
+
+            return source;
+        }
+
+        public abstract class ConfigReplaceTextItemBase
+        {
+            public abstract string Replace(string input);
+
+            public bool Skip { get; set; }
+        }
+
+        public sealed class ConfigReplaceTextItem : ConfigReplaceTextItemBase
+        {
+            private readonly string _match;
+            private readonly string _replacement;
+
+            public ConfigReplaceTextItem(string match, string replacement)
+            {
+                _match = match ?? throw new ArgumentNullException(nameof(match));
+                _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
+            }
+
+            public override string Replace(string input) => Skip ? input : input.Replace(_match, _replacement);
+        }
+
+        public sealed class ConfigReplaceRegExItemText : ConfigReplaceTextItemBase
+        {
+            private readonly string _match;
+            private readonly string _replacement;
+            private readonly RegexOptions _options;
+
+            public ConfigReplaceRegExItemText(string match, string replacement, RegexOptions options)
+            {
+                _match = match ?? throw new ArgumentNullException(nameof(match));
+                _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
+                _options = options;
+            }
+
+            public override string Replace(string input) => Skip ? input : Regex.Replace(input, _match, _replacement, _options);
+        }
+
+        public sealed class ConfigReplaceRegExItemEvaluator : ConfigReplaceTextItemBase
+        {
+            private readonly string _match;
+            private readonly MatchEvaluator _replacement;
+            private readonly RegexOptions _options;
+
+            public ConfigReplaceRegExItemEvaluator(string match, MatchEvaluator replacement, RegexOptions options)
+            {
+                _match = match ?? throw new ArgumentNullException(nameof(match));
+                _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
+                _options = options;
+            }
+
+            public override string Replace(string input) => Skip ? input : Regex.Replace(input, _match, _replacement, _options);
+        }
 
         public static string DictionaryToDelimitedText(Dictionary<string, string> dictionary, string fieldDelimiter = "=", string rowDelimiter = "\n")
             => string.Join(rowDelimiter, dictionary.Select(kv => $"{kv.Key}{fieldDelimiter}{kv.Value}"));
 
         public static string GetFileContent(params string[] pathComponentsRelativeToAppBase)
         {
-            var embeddedResourceName = $"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}";
-            var embeddedResourceStream = typeof(Deployer).Assembly.GetManifestResourceStream(embeddedResourceName);
-
+            using var embeddedResourceStream = GetBinaryFileContent(pathComponentsRelativeToAppBase);
             using var reader = new StreamReader(embeddedResourceStream);
             return reader.ReadToEnd().Replace("\r\n", "\n");
         }
+
+        private static Stream GetBinaryFileContent(params string[] pathComponentsRelativeToAppBase)
+            => typeof(Deployer).Assembly.GetManifestResourceStream($"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}");
 
         /// <summary>
         /// Generates a secure password with one lowercase letter, one uppercase letter, and one number

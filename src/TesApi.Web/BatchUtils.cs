@@ -14,7 +14,7 @@ namespace TesApi.Web
         /// <summary>
         /// Readonly variable for the command line string so we're only reading from the file once.
         /// </summary>
-        public static readonly string StartTaskScript = GetStartTaskScript(); 
+        public static readonly string StartTaskScript = GetStartTaskScript();
 
         /// <summary>
         /// Converts the install-docker.sh shell script to a string.

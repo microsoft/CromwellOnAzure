@@ -31,7 +31,7 @@ namespace CromwellOnAzureDeployer
             var containerResourceId = JsonConvert.DeserializeObject<JObject>(containerResponse)["_rid"];
 
             var query = $"{{\"query\":\"select * from root r where r.offerResourceId='{containerResourceId}'\"}}";
-            var offerQueryResponse = await QueryAsync(this.endpoint, "offers", this.key, "offers", "", query);
+            var offerQueryResponse = await QueryAsync(this.endpoint, "offers", this.key, "offers", string.Empty, query);
 
             return JsonConvert.DeserializeObject<OfferQueryResponse>(offerQueryResponse).Offers.FirstOrDefault();
         }

@@ -116,10 +116,10 @@ namespace TesApi.Web
         /// <summary>
         /// Combines the VM feature and price info with Batch quotas and produces the fixed-width list ready for uploading to .
         /// </summary>
-        /// <param name="vmInfos">List of <see cref="VirtualMachineInfo"/></param>
+        /// <param name="vmInfos">List of <see cref="VirtualMachineInformation"/></param>
         /// <param name="batchAccountQuotas">Batch quotas <see cref="AzureBatchAccountQuotas"/></param>
         /// <returns></returns>
-        private static string VirtualMachineInfoToFixedWidthColumns(IEnumerable<VirtualMachineInfo> vmInfos, AzureBatchAccountQuotas batchAccountQuotas)
+        private static string VirtualMachineInfoToFixedWidthColumns(IEnumerable<VirtualMachineInformation> vmInfos, AzureBatchAccountQuotas batchAccountQuotas)
         {
             var vmSizes = vmInfos.Where(v => !v.LowPriority).Select(v => v.VmSize);
 
@@ -139,7 +139,7 @@ namespace TesApi.Web
                         : batchAccountQuotas.DedicatedCoreQuota.ToString()
                 });
 
-            vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = "", VmFamily = "", PricePerHourDedicated = "dedicated", PricePerHourLowPri = "low pri", MemoryInGiB = "(GiB)", NumberOfCores = "", ResourceDiskSizeInGiB = "(GiB)", DedicatedQuota = $"quota {(batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? "(per fam.)" : "(total)")}" });
+            vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = string.Empty, VmFamily = string.Empty, PricePerHourDedicated = "dedicated", PricePerHourLowPri = "low pri", MemoryInGiB = "(GiB)", NumberOfCores = string.Empty, ResourceDiskSizeInGiB = "(GiB)", DedicatedQuota = $"quota {(batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? "(per fam.)" : "(total)")}" });
             vmInfosAsStrings = vmInfosAsStrings.Prepend(new { VmSize = "VM Size", VmFamily = "Family", PricePerHourDedicated = "$/hour", PricePerHourLowPri = "$/hour", MemoryInGiB = "Memory", NumberOfCores = "CPUs", ResourceDiskSizeInGiB = "Disk", DedicatedQuota = "Dedicated CPU" });
 
             var sizeColWidth = vmInfosAsStrings.Max(v => v.VmSize.Length);
