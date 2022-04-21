@@ -1580,35 +1580,84 @@ namespace TesApi.Web
         public async ValueTask<bool> UpdateBatchPools(CancellationToken cancellationToken)
         {
             var changes = false;
-            await foreach (var pool in _poolListRepository.GetItemsAsync(p => true, 256, cancellationToken).SelectManyAwait(GetPoolsAsyncAdapter).WhereAwait(p  => ValueTask.FromResult(p is not null)).WithCancellation(cancellationToken))
+            var poolLists = new Dictionary<string, (bool New, PoolList PoolList)>();
+
+            await foreach (var poolGroup in _poolListRepository.GetItemsAsync(p => true, 256, cancellationToken).WithCancellation(cancellationToken))
             {
-                var storedPool = batchPools.GetPoolOrDefault(pool.Pool.PoolId);
-                //TODO: verify that pool exists and is not being deleted. If so, skip or remove, as appropriate
-                if (storedPool is null)
+                foreach (var (PoolId, Pool) in poolGroup.Pools.Zip((await GetPoolsAsyncAdapter(poolGroup)).ToEnumerable()))
                 {
-                    batchPools.Add(pool);
-                    changes = true;
-                }
-                else
-                {
-                    changes |= await pool.UpdateIfNeeded(storedPool, cancellationToken);
+                    if (Pool is null)
+                    {
+                        if (poolLists.TryGetValue(poolGroup.Key, out var poolList))
+                        {
+                            poolList.PoolList.Pools.Remove(PoolId);
+                        }
+                        else
+                        {
+                            poolGroup.Pools.Remove(PoolId);
+                            poolLists.Add(poolGroup.Key, (false, poolGroup));
+                        }
+                    }
+                    else
+                    {
+                        var storedPool = batchPools.GetPoolOrDefault(PoolId);
+                        //TODO: verify that pool exists and is not being deleted. If so, skip or remove, as appropriate
+                        if (storedPool is null)
+                        {
+                            batchPools.Add(Pool);
+                            changes = true;
+                        }
+                        else
+                        {
+                            changes |= await storedPool.UpdateIfNeeded(Pool, cancellationToken);
+                        }
+                    }
                 }
             }
 
-            foreach (var pool in batchPools.SelectMany(l => l.Value))
+            foreach (var poolGroup in batchPools)
             {
-                var poolId = pool.Pool.PoolId;
-                if (!await _poolListRepository.TryGetItemAsync(poolId))
+                foreach (var pool in poolGroup.Value)
                 {
+                    var poolId = pool.Pool.PoolId;
                     // TODO: verify that pool exists and is not being deleted. If so, remove from the repository
 
-                    var key = GetKeyFromPoolId(poolId);
-                    if (!await _poolListRepository.TryGetItemAsync(key, async l => { l.Pools.Add(poolId); await _poolListRepository.UpdateItemAsync(l); }))
+                    PoolList poolList = default;
+                    if (await _poolListRepository.TryGetItemAsync(poolGroup.Key, l => poolList = l))
                     {
-                        await _poolListRepository.CreateItemAsync(new PoolList { Key = key, Pools = new(Enumerable.Empty<string>().Append(poolId)) });
+                        if (!poolList.Pools.Contains(poolId))
+                        {
+                            if (poolLists.TryGetValue(poolGroup.Key, out var list))
+                            {
+                                list.PoolList.Pools.Add(poolId);
+                            }
+                            else
+                            {
+                                poolLists.Add(poolGroup.Key, (false, new PoolList { Key = poolGroup.Key, Pools = new(poolList.Pools.Append(poolId)) }));
+                            }
+                        }
                     }
-                    changes = true;
+                    else
+                    {
+                        poolLists.Add(poolGroup.Key, (true, new PoolList { Key = poolGroup.Key, Pools = new(Enumerable.Empty<string>().Append(poolId)) }));
+                    }
                 }
+            }
+
+            if (poolLists.Count > 0)
+            {
+                foreach (var item in poolLists)
+                {
+                    if (item.Value.New)
+                    {
+                        await _poolListRepository.CreateItemAsync(item.Value.PoolList);
+                    }
+                    else
+                    {
+                        await _poolListRepository.UpdateItemAsync(item.Value.PoolList);
+                    }
+                }
+                changes = true;
             }
 
             return changes;
@@ -1654,12 +1703,12 @@ namespace TesApi.Web
 
         private async Task<IEnumerable<IBatchPool>> GetBatchPoolsByKeyAsync(string key)
         {
-            if (((IDictionary<string, List<IBatchPool>>)batchPools).TryGetValue(key, out var pools) && pools.Any(p => p.IsAvailable))
+            if (((IDictionary<string, ISet<IBatchPool>>)batchPools).TryGetValue(key, out var pools) && pools.Any(p => p.IsAvailable))
             {
                 return pools;
             }
 
-            pools ??= Enumerable.Empty<IBatchPool>().ToList();
+            pools ??= Enumerable.Empty<IBatchPool>().ToHashSet();
 
             return pools.Concat((await _poolListRepository.GetItemOrDefaultAsync(key))?.Pools.Select(i => _poolFactory.Retrieve(i, key, this)) ?? Enumerable.Empty<IBatchPool>()).Distinct(new BatchPoolEqualityComparer());
         }
@@ -1692,7 +1741,7 @@ namespace TesApi.Web
 
         /// <inheritdoc/>
         IEnumerable<string> IBatchPoolsImpl.GetPoolGroupKeys()
-            => ((IDictionary<string, List<IBatchPool>>)batchPools).Keys;
+            => ((IDictionary<string, ISet<IBatchPool>>)batchPools).Keys;
         #endregion
 
         #region Repository classes
@@ -1715,17 +1764,17 @@ namespace TesApi.Web
         }
         #endregion
 
-        private class PoolDictionary : IDictionary<string, List<IBatchPool>>
+        private class PoolDictionary : IDictionary<string, ISet<IBatchPool>>
         {
             #region KeyedPoolCollection
-            private class KeyedPoolCollection : KeyedCollection<string, List<IBatchPool>>
+            private class KeyedPoolCollection : KeyedCollection<string, ISet<IBatchPool>>
             {
                 public KeyedPoolCollection() : base(StringComparer.Ordinal) { }
-                protected override string GetKeyForItem(List<IBatchPool> item)
+                protected override string GetKeyForItem(ISet<IBatchPool> item)
                     => item?.Any() ?? false ? GetKeyFromPoolId(item.First().Pool.PoolId) : null;
 
-                internal new IDictionary<string, List<IBatchPool>> Dictionary => base.Dictionary;
-                internal string KeyForItem(List<IBatchPool> item) => GetKeyForItem(item);
+                internal new IDictionary<string, ISet<IBatchPool>> Dictionary => base.Dictionary;
+                internal string KeyForItem(ISet<IBatchPool> item) => GetKeyForItem(item);
             }
 
             private readonly KeyedPoolCollection pools = new();
@@ -1742,7 +1791,7 @@ namespace TesApi.Web
                 }
                 else
                 {
-                    pools.Add(Enumerable.Empty<IBatchPool>().Append(pool).ToList());
+                    pools.Add(new HashSet<IBatchPool>(Enumerable.Empty<IBatchPool>().Append(pool), new BatchPoolEqualityComparer()));
                 }
             }
 
@@ -1767,55 +1816,55 @@ namespace TesApi.Web
             }
 
             #region IDictionary
-            List<IBatchPool> IDictionary<string, List<IBatchPool>>.this[string key] { get => pools.Dictionary[key]; set => throw new NotImplementedException(); }
+            ISet<IBatchPool> IDictionary<string, ISet<IBatchPool>>.this[string key] { get => pools.Dictionary[key]; set => throw new NotImplementedException(); }
 
-            ICollection<string> IDictionary<string, List<IBatchPool>>.Keys
+            ICollection<string> IDictionary<string, ISet<IBatchPool>>.Keys
                 => pools.Dictionary?.Keys ?? Enumerable.Empty<string>().ToList();
 
-            ICollection<List<IBatchPool>> IDictionary<string, List<IBatchPool>>.Values
-                => pools.Dictionary.Values ?? Enumerable.Empty<List<IBatchPool>>().ToList();
+            ICollection<ISet<IBatchPool>> IDictionary<string, ISet<IBatchPool>>.Values
+                => pools.Dictionary.Values ?? Enumerable.Empty<ISet<IBatchPool>>().ToList();
 
-            bool ICollection<KeyValuePair<string, List<IBatchPool>>>.IsReadOnly
+            bool ICollection<KeyValuePair<string, ISet<IBatchPool>>>.IsReadOnly
                 => false;
 
-            int ICollection<KeyValuePair<string, List<IBatchPool>>>.Count
+            int ICollection<KeyValuePair<string, ISet<IBatchPool>>>.Count
                 => pools.Count;
 
-            void IDictionary<string, List<IBatchPool>>.Add(string key, List<IBatchPool> value)
-                => ((ICollection<KeyValuePair<string, List<IBatchPool>>>)this).Add(new KeyValuePair<string, List<IBatchPool>>(key, value));
+            void IDictionary<string, ISet<IBatchPool>>.Add(string key, ISet<IBatchPool> value)
+                => ((ICollection<KeyValuePair<string, ISet<IBatchPool>>>)this).Add(new KeyValuePair<string, ISet<IBatchPool>>(key, value));
 
-            void ICollection<KeyValuePair<string, List<IBatchPool>>>.Add(KeyValuePair<string, List<IBatchPool>> item)
+            void ICollection<KeyValuePair<string, ISet<IBatchPool>>>.Add(KeyValuePair<string, ISet<IBatchPool>> item)
             {
                 if (!item.Key.Equals(pools.KeyForItem(item.Value)))
                 {
                     throw new InvalidOperationException("Mismatched key");
                 }
 
-                pools.Add(item.Value);
+                pools.Add(new HashSet<IBatchPool>(item.Value, new BatchPoolEqualityComparer()));
             }
 
-            bool ICollection<KeyValuePair<string, List<IBatchPool>>>.Contains(KeyValuePair<string, List<IBatchPool>> item)
+            bool ICollection<KeyValuePair<string, ISet<IBatchPool>>>.Contains(KeyValuePair<string, ISet<IBatchPool>> item)
                 => pools.Dictionary?.Contains(item) ?? false;
 
-            bool IDictionary<string, List<IBatchPool>>.ContainsKey(string key)
+            bool IDictionary<string, ISet<IBatchPool>>.ContainsKey(string key)
                 => pools.Dictionary?.ContainsKey(key) ?? false;
 
-            void ICollection<KeyValuePair<string, List<IBatchPool>>>.CopyTo(KeyValuePair<string, List<IBatchPool>>[] array, int arrayIndex)
+            void ICollection<KeyValuePair<string, ISet<IBatchPool>>>.CopyTo(KeyValuePair<string, ISet<IBatchPool>>[] array, int arrayIndex)
                 => pools.Dictionary?.CopyTo(array, arrayIndex);
 
-            IEnumerator<KeyValuePair<string, List<IBatchPool>>> IEnumerable<KeyValuePair<string, List<IBatchPool>>>.GetEnumerator()
-                => pools.Dictionary?.GetEnumerator() ?? Enumerable.Empty<KeyValuePair<string, List<IBatchPool>>>().GetEnumerator();
+            IEnumerator<KeyValuePair<string, ISet<IBatchPool>>> IEnumerable<KeyValuePair<string, ISet<IBatchPool>>>.GetEnumerator()
+                => pools.Dictionary?.GetEnumerator() ?? Enumerable.Empty<KeyValuePair<string, ISet<IBatchPool>>>().GetEnumerator();
 
-            bool ICollection<KeyValuePair<string, List<IBatchPool>>>.Remove(KeyValuePair<string, List<IBatchPool>> item)
+            bool ICollection<KeyValuePair<string, ISet<IBatchPool>>>.Remove(KeyValuePair<string, ISet<IBatchPool>> item)
                 => pools.Dictionary?.Remove(item) ?? false;
 
-            bool IDictionary<string, List<IBatchPool>>.Remove(string key)
+            bool IDictionary<string, ISet<IBatchPool>>.Remove(string key)
                 => pools.TryGetValue(key, out var item) && pools.Remove(item);
 
-            bool IDictionary<string, List<IBatchPool>>.TryGetValue(string key, out List<IBatchPool> value)
+            bool IDictionary<string, ISet<IBatchPool>>.TryGetValue(string key, out ISet<IBatchPool> value)
                 => pools.TryGetValue(key, out value);
 
-            void ICollection<KeyValuePair<string, List<IBatchPool>>>.Clear()
+            void ICollection<KeyValuePair<string, ISet<IBatchPool>>>.Clear()
                 => pools.Clear();
 
             IEnumerator IEnumerable.GetEnumerator()
