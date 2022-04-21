@@ -73,7 +73,7 @@ namespace TesApi.Web
             configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync().Wait();
 
             (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
-            var cosmosDbRepository = new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId);
+            var cosmosDbRepository = new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, Configuration.GetValue("CosmosDbDatabaseId", Constants.CosmosDbDatabaseId), Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId);
 
             return (cache, azureProxy, cachingAzureProxy, storageAccessProvider, cosmosDbRepository);
         }

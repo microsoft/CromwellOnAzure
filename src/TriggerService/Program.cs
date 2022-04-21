@@ -61,8 +61,8 @@ namespace TriggerService
                 new CromwellApiClient.CromwellApiClient(cromwellUrl),
                 new CosmosDbRepository<TesTask>(
                     cosmosDbEndpoint, 
-                    cosmosDbKey, 
-                    Constants.CosmosDbDatabaseId, 
+                    cosmosDbKey,
+                    Environment.GetEnvironmentVariable("CosmosDbDatabaseId") ?? Constants.CosmosDbDatabaseId, 
                     Constants.CosmosDbContainerId, 
                     Constants.CosmosDbPartitionId),
                 storageAccounts);
