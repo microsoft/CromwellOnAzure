@@ -1581,17 +1581,17 @@ namespace TesApi.Web
         {
             var changes = false;
             var poolLists = new Dictionary<string, (bool New, PoolList PoolList)>();
-
-            var activePools = (await azureProxy.GetActivePoolIdsAsync(string.Empty, TimeSpan.Zero, cancellationToken)).ToList();
             var poolsToDelete = Enumerable.Empty<IBatchPool>();
+            var poolsToUpdate = Enumerable.Empty<(IBatchPool Local, IBatchPool Remote)>();
 
             await foreach (var poolGroup in _poolListRepository.GetItemsAsync(p => true, 256, cancellationToken).WithCancellation(cancellationToken))
             {
-                foreach (var (PoolId, Pool) in poolGroup.Pools.Zip((await GetPoolsAsyncAdapter(poolGroup)).ToEnumerable()))
+                var activePools = (await azureProxy.GetActivePoolIdsAsync($"{poolGroup.Key}-", TimeSpan.Zero, cancellationToken)).ToList();
+                foreach (var (PoolId, Pool) in poolGroup.Pools.Zip((await GetPoolsAsyncAdapter(poolGroup))))
                 {
                     if (Pool is null)
                     {
-                        RemovePoolFromRepository(poolGroup, PoolId);
+                        RemovePoolFromRepository();
                     }
                     else
                     {
@@ -1599,9 +1599,9 @@ namespace TesApi.Web
                         var storedPool = batchPools.GetPoolOrDefault(PoolId);
                         if (!poolExists)
                         {
-                            await Pool.ServicePoolAsync(IBatchPool.ServiceKind.ForceRemove, cancellationToken);
-                            RemovePoolFromRepository(poolGroup, PoolId);
+                            RemovePoolFromRepository();
                             poolsToDelete = poolsToDelete.Append(storedPool);
+                            await Pool.ServicePoolAsync(IBatchPool.ServiceKind.ForceRemove, cancellationToken);
                         }
                         else if (storedPool is null)
                         {
@@ -1610,7 +1610,24 @@ namespace TesApi.Web
                         }
                         else
                         {
-                            changes |= await storedPool.UpdateIfNeeded(Pool, cancellationToken);
+                            poolsToUpdate = poolsToUpdate.Append((storedPool, Pool));
+                        }
+                    }
+
+                    void RemovePoolFromRepository()
+                    {
+                        if (poolLists.TryGetValue(poolGroup.Key, out var poolList))
+                        {
+                            poolList.PoolList.Pools.Remove(PoolId);
+                        }
+                        else
+                        {
+                            poolLists.Add(poolGroup.Key,
+                                (false, new()
+                                {
+                                    Key = poolGroup.Key,
+                                    Pools = new(poolGroup.Pools.Where(id => !PoolId.Equals(id, StringComparison.Ordinal)))
+                                }));
                         }
                     }
                 }
@@ -1618,6 +1635,7 @@ namespace TesApi.Web
 
             foreach (var poolGroup in batchPools)
             {
+                var activePools = (await azureProxy.GetActivePoolIdsAsync($"{poolGroup.Key}-", TimeSpan.Zero, cancellationToken)).ToList();
                 foreach (var pool in poolGroup.Value)
                 {
                     var poolId = pool.Pool.PoolId;
@@ -1683,24 +1701,12 @@ namespace TesApi.Web
                 changes = true;
             }
 
-            return changes;
-
-            void RemovePoolFromRepository(PoolList list, string poolId)
+            foreach (var pair in poolsToUpdate)
             {
-                if (poolLists.TryGetValue(list.Key, out var poolList))
-                {
-                    poolList.PoolList.Pools.Remove(poolId);
-                }
-                else
-                {
-                    poolLists.Add(list.Key,
-                        (false, new()
-                        {
-                            Key = list.Key,
-                            Pools = new(list.Pools.Where(id => !poolId.Equals(id, StringComparison.Ordinal)))
-                        }));
-                }
+                changes |= await pair.Local.UpdateIfNeeded(pair.Remote, cancellationToken);
             }
+
+            return changes;
         }
 
         /// <inheritdoc/>
@@ -1718,12 +1724,12 @@ namespace TesApi.Web
             }
         }
 
-        private ValueTask<IAsyncEnumerable<IBatchPool>> GetPoolsAsyncAdapter(PoolList poolList)
+        private ValueTask<IEnumerable<IBatchPool>> GetPoolsAsyncAdapter(PoolList poolList)
             => ValueTask.FromResult(GetPoolsAsync(poolList.Key, poolList.Pools));
 
-        private IAsyncEnumerable<IBatchPool> GetPoolsAsync(string key, IEnumerable<string> pools)
+        private IEnumerable<IBatchPool> GetPoolsAsync(string key, IEnumerable<string> pools)
         {
-            return pools.Select(Retrieve).ToAsyncEnumerable();
+            return pools.Select(Retrieve);
 
             IBatchPool Retrieve(string id)
             {
