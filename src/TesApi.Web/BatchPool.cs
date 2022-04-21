@@ -274,6 +274,7 @@ namespace TesApi.Web
                 IBatchPool.ServiceKind.RemoveNodeIfIdle => ServicePoolRemoveNodeIfIdleAsync(cancellationToken),
                 IBatchPool.ServiceKind.Rotate => ServicePoolRotateAsync(cancellationToken),
                 IBatchPool.ServiceKind.RemovePoolIfEmpty => ServicePoolRemovePoolIfEmptyAsync(cancellationToken),
+                IBatchPool.ServiceKind.ForceRemove => ServicePoolForceRemoveAsync(cancellationToken),
                 _ => throw new InvalidOperationException(),
             };
 
@@ -427,9 +428,9 @@ namespace TesApi.Web
                 var (lowPriorityNodes, dedicatedNodes) = await azureProxy.GetCurrentComputeNodesAsync(Pool.PoolId, cancellationToken);
                 if ((lowPriorityNodes is null || lowPriorityNodes == 0) && (dedicatedNodes is null || dedicatedNodes == 0) && PendingReservations.Count == 0 && ReservedComputeNodes.Count == 0)
                 {
-                    _ = _batchPools.RemovePoolFromList(this);
-                    await azureProxy.DeleteBatchPoolAsync(Pool.PoolId, cancellationToken);
                     _isRemoved = true;
+                    await azureProxy.DeleteBatchPoolAsync(Pool.PoolId, cancellationToken);
+                    _ = _batchPools.RemovePoolFromList(this);
                 }
             }
         }
@@ -440,7 +441,13 @@ namespace TesApi.Web
             _ = await dataRepo.CreateItemAsync(Data);
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0063:Use simple 'using' statement", Justification = "Legibility/Maintainability: maintain code pattern inside method.")]
+        private ValueTask ServicePoolForceRemoveAsync(CancellationToken cancellationToken)
+        {
+            IsAvailable = false;
+            _isRemoved = true;
+            return ServicePoolUpdateAsync(cancellationToken);
+        }
+
         private async ValueTask ServicePoolUpdateAsync(CancellationToken cancellationToken = default)
         {
             if (_isRemoved)
