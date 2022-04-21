@@ -1081,7 +1081,7 @@ namespace CromwellOnAzureDeployer
                      new Server(
                         location: "westus2",
                         version: "8.0.21",
-                        sku: new Sku("Standard_D2ds_v4", "GeneralPurpose"),
+                        sku: new Sku("Standard_B1ms", "Burstable"),
                         administratorLogin: "cromwell",
                         administratorLoginPassword: MySqlServerPassword
                    )));
@@ -1124,6 +1124,12 @@ namespace CromwellOnAzureDeployer
                 await unlockChangeScript.ExecuteAsync();
             }
 
+            // Remove Firewall Rule for Current Machine.
+            await Execute(
+                $"Deleting Firewall Rule...",
+                () => mySQLManagementClient.FirewallRules.BeginDeleteAsync(
+                    configuration.ResourceGroupName, MySqlServerName, "AllowLocalIP"));
+ 
             return mySQLManagementClient;
         }
 
