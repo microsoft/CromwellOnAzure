@@ -178,6 +178,7 @@ namespace TesApi.Web
             var changed = false;
             if (!Data.Equals(((BatchPool)other).Data))
             {
+                logger.LogDebug("Updating metadata for '{PoolId}'", Pool.PoolId);
                 using var dataRepo = CreatePoolDataRepository();
                 await dataRepo.UpdateItemAsync(Data);
                 changed = true;
@@ -185,6 +186,7 @@ namespace TesApi.Web
 
             if (!PendingReservations.SequenceEqual(((BatchPool)other).PendingReservations))
             {
+                logger.LogDebug("Updating pending reservation list for '{PoolId}'", Pool.PoolId);
                 using var pendRepo = CreatePendingReservationRepository();
                 foreach (var reservation in PendingReservations)
                 {

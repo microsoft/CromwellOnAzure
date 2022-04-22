@@ -1592,6 +1592,8 @@ namespace TesApi.Web
                 {
                     if (Pool is null)
                     {
+                        logger.LogDebug("Pool '{PoolId}' is being removed because BatchPool constructor could not locate pool in the repository.", PoolId);
+                        changes = true;
                         RemovePoolFromRepository();
                     }
                     else
@@ -1600,6 +1602,7 @@ namespace TesApi.Web
                         var storedPool = batchPools.GetPoolOrDefault(PoolId);
                         if (!poolExists)
                         {
+                            logger.LogDebug("Pool '{PoolId}' is being removed because no pool by that name is active.", PoolId);
                             changes = true;
                             RemovePoolFromRepository();
                             poolsToDelete = poolsToDelete.Append(storedPool);
@@ -1607,6 +1610,7 @@ namespace TesApi.Web
                         }
                         else if (storedPool is null)
                         {
+                            logger.LogDebug("Pool '{PoolId}' from the repository is being added to the local store.", PoolId);
                             changes = true;
                             poolsToSyncState = poolsToSyncState.Append(Pool);
                             batchPools.Add(Pool);
@@ -1648,6 +1652,7 @@ namespace TesApi.Web
                     {
                         if (!poolList.Pools.Contains(poolId))
                         {
+                            logger.LogDebug("Pool '{PoolId}' from the local store is being added to the repository.", poolId);
                             changes = true;
                             if (poolLists.TryGetValue(poolGroup.Key, out var list))
                             {
@@ -1666,6 +1671,7 @@ namespace TesApi.Web
                     }
                     else if (activePools.Contains(poolId))
                     {
+                        logger.LogDebug("Pool '{PoolId}' from the local store is being added to the repository.", poolId);
                         changes = true;
                         poolLists.Add(poolGroup.Key,
                             (true, new()
@@ -1676,6 +1682,7 @@ namespace TesApi.Web
                     }
                     else
                     {
+                        logger.LogDebug("Pool '{PoolId}' is being removed because no pool by that name is active.", poolId);
                         changes = true;
                         poolsToDelete = poolsToDelete.Append(pool);
                     }
