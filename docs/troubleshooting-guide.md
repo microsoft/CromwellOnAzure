@@ -292,7 +292,7 @@ This is applicable if the VM and storage account are in different Azure tenants,
 
 1. Add a [SAS url for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file. The SAS token can be at the account or container level and may be read-only or read-write depending on the usage.
     ```
-    https://<yourstorageaccountname>.blob.core.windows.net:443/<yourcontainername>?<sastoken>
+    https://<yourstorageaccountname>.blob.core.windows.net/<yourcontainername>?<sastoken>
     ```
 
 2. Save the changes and restart the VM
