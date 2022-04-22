@@ -713,7 +713,7 @@ namespace TesApi.Web
         /// <summary>
         /// Simple <see cref="CloudPool"/> metadata.
         /// </summary>
-        public sealed class PoolData : RepositoryItem<PoolData>
+        public sealed class PoolData : RepositoryItem<PoolData>, IEquatable<PoolData>
         {
             /// <summary>
             /// Batch pool id.
@@ -756,12 +756,40 @@ namespace TesApi.Web
             /// </summary>
             [DataMember(Name = "reserved")]
             public List<string> Reservations { get; set; }
+
+            /// <summary>
+            /// Determines whether the specified object is equal to the current object.
+            /// </summary>
+            /// <param name="data">The <see cref="PoolData"/> to compare with the current object.</param>
+            /// <returns>true if the specified object is equal to the current object; otherwise, false.</returns>
+            public bool Equals(PoolData data)
+                => data is not null
+                && PoolId == data.PoolId
+                && IsAvailable == data.IsAvailable
+                && Created == data.Created
+                && Changed == data.Changed
+                && RequestedDedicatedNodes == data.RequestedDedicatedNodes
+                && RequestedLowPriorityNodes == data.RequestedLowPriorityNodes
+                && (Reservations?.SequenceEqual(data.Reservations) ?? data.Reservations is null);
+
+            /// <inheritdoc/>
+            public override bool Equals(object obj)
+                => obj switch
+                {
+                    null => false,
+                    PoolData item => Equals(item),
+                    _ => false,
+                };
+
+            /// <inheritdoc/>
+            public override int GetHashCode()
+                => Tuple.Create(PoolId, IsAvailable, Created, Changed, RequestedDedicatedNodes, RequestedLowPriorityNodes, Reservations).GetHashCode();
         }
 
         /// <summary>
         /// Pending reservation for a needed <see cref="ComputeNode"/>.
         /// </summary>
-        public class PendingReservationItem : RepositoryItem<PendingReservationItem>
+        public class PendingReservationItem : RepositoryItem<PendingReservationItem>, IEquatable<PendingReservationItem>
         {
             /// <summary>
             /// TES job id.
@@ -786,6 +814,31 @@ namespace TesApi.Web
             /// </summary>
             [DataMember(Name = "requested")]
             public bool IsRequested { get; set; }
+
+            /// <summary>
+            /// Determines whether the specified object is equal to the current object.
+            /// </summary>
+            /// <param name="other">The <see cref="PendingReservationItem"/> to compare with the current object.</param>
+            /// <returns>true if the specified object is equal to the current object; otherwise, false.</returns>
+            public bool Equals(PendingReservationItem other)
+                => other is not null
+                && JobId == other.JobId
+                && Created == other.Created
+                && IsDedicated == other.IsDedicated
+                && IsRequested == other.IsRequested;
+
+            /// <inheritdoc/>
+            public override bool Equals(object obj)
+                => obj switch
+                {
+                    null => false,
+                    PendingReservationItem item => Equals(item),
+                    _ => false,
+                };
+
+            /// <inheritdoc/>
+            public override int GetHashCode()
+                => Tuple.Create(JobId, Created, IsDedicated, IsRequested).GetHashCode();
         }
         #endregion
     }

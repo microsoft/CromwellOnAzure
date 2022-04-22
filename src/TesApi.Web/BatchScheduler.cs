@@ -1795,7 +1795,7 @@ namespace TesApi.Web
         /// <summary>
         /// List of Azure Batch account pools stored in CosmosDB
         /// </summary>
-        public class PoolList : RepositoryItem<PoolList>
+        public class PoolList : RepositoryItem<PoolList>, IEquatable<PoolList>
         {
             /// <summary>
             /// <see cref="BatchScheduler.GetOrAddAsync(string, Func{string, ValueTask{BatchModels.Pool}})"/> "key" parameter.
@@ -1808,6 +1808,29 @@ namespace TesApi.Web
             /// </summary>
             [DataMember(Name = "pools")]
             public List<string> Pools { get; set; }
+
+            /// <summary>
+            /// Determines whether the specified object is equal to the current object.
+            /// </summary>
+            /// <param name="other">The <see cref="PoolList"/> to compare with the current object.</param>
+            /// <returns>true if the specified object is equal to the current object; otherwise, false.</returns>
+            public bool Equals(PoolList other)
+                => other is not null
+                && Key == other.Key
+                && (Pools?.SequenceEqual(other.Pools) ?? false);
+
+            /// <inheritdoc/>
+            public override bool Equals(object obj)
+                => obj switch
+                {
+                    null => false,
+                    PoolList item => Equals(item),
+                    _ => false,
+                };
+
+            /// <inheritdoc/>
+            public override int GetHashCode()
+                => Tuple.Create(Key, Pools).GetHashCode();
         }
         #endregion
 
