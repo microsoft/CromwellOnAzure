@@ -251,6 +251,11 @@ namespace CromwellOnAzureDeployer
                             throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
                         }
 
+                        if (accountNames.TryGetValue("CosmosDbDatabaseId", out var cosmosDbDatabaseId))
+                        {
+                            configuration.CosmosDbDatabaseId = cosmosDbDatabaseId;
+                        }
+
                         cosmosDb = (await azureSubscriptionClient.CosmosDBAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName))
                             .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase))
                                 ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
@@ -1431,7 +1436,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
-            var tesDb = await cosmosDb.GetSqlDatabaseAsync(Constants.CosmosDbDatabaseId);
+            var tesDb = await cosmosDb.GetSqlDatabaseAsync(configuration.CosmosDbDatabaseId);
             var taskContainer = await tesDb.GetSqlContainerAsync(Constants.CosmosDbContainerId);
             var requestThroughput = await taskContainer.GetThroughputSettingsAsync();
 
@@ -1443,7 +1448,7 @@ namespace CromwellOnAzureDeployer
                 // If the container has request throughput setting configured, and it is currently manual, set it to auto
                 await Execute(
                     $"Switching the throughput setting for CosmosDb container 'Tasks' in database 'TES' from Manual to Autoscale...",
-                    () => cosmosClient.SwitchContainerRequestThroughputToAutoAsync(Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId));
+                    () => cosmosClient.SwitchContainerRequestThroughputToAutoAsync(configuration.CosmosDbDatabaseId, Constants.CosmosDbContainerId));
             }
         }
 
