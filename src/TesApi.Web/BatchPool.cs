@@ -195,12 +195,14 @@ namespace TesApi.Web
                     {
                         if (!reservationItem.Equals(reservation.Value.Source))
                         {
+                            logger.LogDebug("Updating reservation {JobId}", reservation.Value.Source.JobId);
                             _ = await pendRepo.UpdateItemAsync(reservation.Value.Source);
                             changed = true;
                         }
                     }
                     else
                     {
+                        logger.LogDebug("Adding reservation {JobId}", reservation.Value.Source.JobId);
                         _ = await pendRepo.CreateItemAsync(reservation.Value.Source);
                         changed = true;
                     }
@@ -210,6 +212,7 @@ namespace TesApi.Web
                 {
                     if (!PendingReservations.ContainsKey(reservation.JobId))
                     {
+                        logger.LogDebug("Removing reservation {JobId}", reservation.JobId);
                         await pendRepo.DeleteItemAsync(reservation.JobId);
                         changed = true;
                     }
@@ -439,6 +442,7 @@ namespace TesApi.Web
 
         private async ValueTask ServicePoolCreateAsync(CancellationToken cancellationToken = default)
         {
+            logger.LogDebug("Adding pool {PoolId} to repository", Data.PoolId);
             using var dataRepo = CreatePoolDataRepository();
             _ = await dataRepo.CreateItemAsync(Data);
         }
@@ -457,8 +461,10 @@ namespace TesApi.Web
                 using var pendRepo = CreatePendingReservationRepository();
                 await foreach (var job in pendRepo.GetItemsAsync(r => true, 256, cancellationToken).SelectAwait(r => ValueTask.FromResult(r.JobId)).WithCancellation(cancellationToken))
                 {
+                    logger.LogDebug("Removing registration {JobId} from repository", job);
                     await pendRepo.DeleteItemAsync(job);
                 }
+                logger.LogDebug("Removing pool {PoolId} from repository", Data.PoolId);
                 using var dataRepo = CreatePoolDataRepository();
                 await dataRepo.DeleteItemAsync(Data.GetId());
                 return;
@@ -474,6 +480,7 @@ namespace TesApi.Web
             {
                 await foreach (var job in resvRepo.GetItemsAsync(r => !PendingReservations.Keys.Contains(r.JobId), 256, cancellationToken).SelectAwait(r => ValueTask.FromResult(r.JobId)).WithCancellation(cancellationToken))
                 {
+                    logger.LogDebug("Removing registration {JobId} from repository", job);
                     await resvRepo.DeleteItemAsync(job);
                 }
 
@@ -481,10 +488,12 @@ namespace TesApi.Web
                 {
                     if (await resvRepo.TryGetItemAsync(item.Key))
                     {
+                        logger.LogDebug("Updating registration {JobId} in repository", item.Value.Source.JobId);
                         _ = await resvRepo.UpdateItemAsync(item.Value.Source);
                     }
                     else
                     {
+                        logger.LogDebug("Adding registration {JobId} to repository", item.Value.Source.JobId);
                         _ = await resvRepo.CreateItemAsync(item.Value.Source);
                     }
                 }
@@ -492,6 +501,7 @@ namespace TesApi.Web
 
             using (var dataRepo = CreatePoolDataRepository())
             {
+                logger.LogDebug("Updating pool {PoolId} in repository", Data.PoolId);
                 _ = await dataRepo.UpdateItemAsync(Data);
             }
         }

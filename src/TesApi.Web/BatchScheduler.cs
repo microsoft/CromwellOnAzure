@@ -107,6 +107,7 @@ namespace TesApi.Web
 
             if (!this.enableBatchAutopool)
             {
+                batchPools = new(this.logger);
                 _poolListRepository = poolListRepository;
                 _poolFactory = poolFactory;
             }
@@ -1486,7 +1487,7 @@ namespace TesApi.Web
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
 
         #region BatchPools
-        private readonly BatchPoolsCollection batchPools = new();
+        private readonly BatchPoolsCollection batchPools;
 
         private bool TryGet(string poolId, out IBatchPool batchPool)
         {
@@ -1592,7 +1593,7 @@ namespace TesApi.Web
                 {
                     if (Pool is null)
                     {
-                        logger.LogDebug("Pool '{PoolId}' is being removed because BatchPool constructor could not locate pool in the repository.", PoolId);
+                        logger.LogDebug("Pool '{PoolId}' is being removed because BatchPool constructor could not locate the pool in the repository.", PoolId);
                         changes = true;
                         RemovePoolFromRepository();
                     }
@@ -1602,7 +1603,7 @@ namespace TesApi.Web
                         var storedPool = batchPools.GetPoolOrDefault(PoolId);
                         if (!poolExists)
                         {
-                            logger.LogDebug("Pool '{PoolId}' is being removed because no pool by that name is active.", PoolId);
+                            logger.LogDebug("Pool '{PoolId}' from the repository is being removed because no pool by that name is active.", PoolId);
                             changes = true;
                             RemovePoolFromRepository();
                             poolsToDelete = poolsToDelete.Append(storedPool);
@@ -1682,7 +1683,7 @@ namespace TesApi.Web
                     }
                     else
                     {
-                        logger.LogDebug("Pool '{PoolId}' is being removed because no pool by that name is active.", poolId);
+                        logger.LogDebug("Pool '{PoolId}' from the local store is being removed because no pool by that name is active.", poolId);
                         changes = true;
                         poolsToDelete = poolsToDelete.Append(pool);
                     }
@@ -1704,9 +1705,7 @@ namespace TesApi.Web
                 }));
 
             changes |= (await Task.WhenAll(poolsToUpdate.Select(pair => pair.Local.UpdateIfNeeded(pair.Remote, cancellationToken).AsTask()))).Any(f => f);
-
             await Task.WhenAll(poolsToSyncState.Select(p => p.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize, cancellationToken).AsTask()));
-
             return changes;
         }
 
@@ -1836,6 +1835,10 @@ namespace TesApi.Web
 
         private class BatchPoolsCollection : IEnumerable<IBatchPool>
         {
+            private readonly ILogger logger;
+            public BatchPoolsCollection(ILogger logger)
+                => this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
             #region KeyedPoolCollection
             private class KeyedPoolCollection : KeyedCollection<string, ISet<IBatchPool>>
             {
@@ -1855,6 +1858,7 @@ namespace TesApi.Web
 
             public void Add(IBatchPool pool)
             {
+                logger.LogDebug("Adding pool {PoolId}", pool.Pool.PoolId);
                 if (pools.TryGetValue(GetKeyFromPoolId(pool.Pool.PoolId), out var list))
                 {
                     list.Add(pool);
@@ -1879,9 +1883,12 @@ namespace TesApi.Web
                             }
                         }
 
+                        logger.LogDebug("Removed pool {PoolId}", pool.Pool.PoolId);
                         return true;
                     }
                 }
+
+                logger.LogDebug("Unable to remove pool {PoolId}", pool.Pool.PoolId);
                 return false;
             }
 

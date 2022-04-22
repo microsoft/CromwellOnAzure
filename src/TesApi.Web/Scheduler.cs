@@ -171,7 +171,23 @@ namespace TesApi.Web
             {
                 try
                 {
-                    var isModified = await batchScheduler.ProcessTesTaskAsync(tesTask);
+                    var isModified = false;
+                    try
+                    {
+                        isModified = await batchScheduler.ProcessTesTaskAsync(tesTask);
+                    }
+                    catch (Exception exc)
+                    {
+                        if (++tesTask.ErrorCount > 3) // TODO: Should we increment this for exceptions here (current behaviour) or the attempted executions on the batch?
+                        {
+                            tesTask.State = TesState.SYSTEMERROREnum;
+                            tesTask.EndTime = DateTimeOffset.UtcNow;
+                            tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
+                        }
+
+                        logger.LogError(exc, $"TES Task '{tesTask.Id}' threw an exception.");
+                        await repository.UpdateItemAsync(tesTask);
+                    }
 
                     if (isModified)
                     {
@@ -192,17 +208,28 @@ namespace TesApi.Web
                         await repository.UpdateItemAsync(tesTask);
                     }
                 }
-                catch (Exception exc)
+                catch (Microsoft.Azure.Cosmos.CosmosException exc)
                 {
-                    if (++tesTask.ErrorCount > 3) // TODO: Should we increment this for exceptions here (current behaviour) or the attempted executions on the batch?
+                    var currentTesTask = await repository.GetItemOrDefaultAsync(tesTask.Id);
+                    if (exc.StatusCode == System.Net.HttpStatusCode.PreconditionFailed)
                     {
-                        tesTask.State = TesState.SYSTEMERROREnum;
-                        tesTask.EndTime = DateTimeOffset.UtcNow;
-                        tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
+                        logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw an exception attempting to set state: {tesTask.State}. Another actor had set current state: {currentTesTask?.State}");
+                        currentTesTask?.SetWarning("ConcurrencyWriteFailure", tesTask.State.ToString(), exc.Message, exc.StackTrace);
+                    }
+                    else
+                    {
+                        logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw {exc.GetType().FullName}: '{exc.Message}'. Stack trace: {exc.StackTrace}");
+                        currentTesTask?.SetWarning("UnknownError", exc.Message, exc.StackTrace);
                     }
 
-                    logger.LogError(exc, $"TES Task '{tesTask.Id}' threw an exception.");
-                    await repository.UpdateItemAsync(tesTask);
+                    if (currentTesTask is not null)
+                    {
+                        await repository.UpdateItemAsync(currentTesTask);
+                    }
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw {exc.GetType().FullName}: '{exc.Message}'. Stack trace: {exc.StackTrace}");
                 }
             }
 
