@@ -784,7 +784,9 @@ namespace CromwellOnAzureDeployer
             var triggerDeployment = await client.CreateNamespacedDeploymentAsync(triggerDeploymentBody, "default");
             var mysqlDeployment = await client.CreateNamespacedDeploymentAsync(mysqlDeploymentBody, "default");
             var mysqlService = await client.CreateNamespacedServiceAsync(mysqlServiceBody, "default");
-
+            var cromwellDeployment = await client.CreateNamespacedDeploymentAsync(cromwellDeploymentBody, "default");
+            var cromwellService = await client.CreateNamespacedServiceAsync(cromwellServiceBody, "default");
+            
             var pods = await client.ListNamespacedPodAsync("default");
             var mysqlPod = pods.Items.Where(x => x.Metadata.Name.Contains("mysql")).FirstOrDefault(); //.Metadata.Name;
             
@@ -816,14 +818,7 @@ namespace CromwellOnAzureDeployer
 
             await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, "default", "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" }, true, printHandler, CancellationToken.None);
             await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, "default", "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }, true, printHandler, CancellationToken.None);
-            //await CopyFileToPodAsync(client, mysqlPod, "default", "mysqldb", Utility.GetFileStream("scripts", "mysql", "init-user.sql"), "/cromwellazure/mysql-init/init-user.sql");
-            //await CopyFileToPodAsync(client, mysqlPod, "default", "mysqldb", Utility.GetFileStream("scripts", "mysql", "unlock-change-log.sql"), "/cromwellazure/mysql-init/unlock-change-log.sql");
-
-            var cromwellDeployment = await client.CreateNamespacedDeploymentAsync(cromwellDeploymentBody, "default");
-            var cromwellService = await client.CreateNamespacedServiceAsync(cromwellServiceBody, "default");
-
-            //await client.NamespacedPodExecAsync(cromwellPod.Metadata.Name, "default", "cromwell", new string[] { "ls", "-l", "/dataset" }, true, printHandler, CancellationToken.None);
-        }
+       }
 
         private Dictionary<string, string> GetSettingsDict()
         {
