@@ -871,11 +871,6 @@ namespace CromwellOnAzureDeployer
             var csiBlobNode = Yaml.LoadFromString<V1DaemonSet>(Utility.GetFileContent("scripts", "k8s", "csi", "csi-blob-node.yaml"));
             objects.Add(csiBlobNode);
 
-            var blobContainer = csiBlobNode.Spec.Template.Spec.Containers.Where(container => container.Name == "blob").FirstOrDefault();
-            var proxyArg = blobContainer.Args.Where(arg => arg.Equals("--enable-blobfuse-proxy=false")).FirstOrDefault();
-            blobContainer.Args.Remove(proxyArg);
-            blobContainer.Args.Add("--enable-blobfuse-proxy=true");
-
             var @switch = new Dictionary<Type, Action<object>> {
                 { typeof(V1Service), (value) => client.CreateNamespacedService((V1Service)value, "kube-system") },
                 { typeof(V1ServiceAccount), (value) => client.CreateNamespacedServiceAccount((V1ServiceAccount)value, "kube-system") },
