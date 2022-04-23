@@ -742,6 +742,7 @@ namespace CromwellOnAzureDeployer
                     },
                     Provisioner = "blob.csi.azure.com",
                     VolumeBindingMode = "Immediate",
+                    ReclaimPolicy = "Retain",
                     Parameters = new Dictionary<string, string>()
                     {
                         {"resourceGroup", resourceGroup},
