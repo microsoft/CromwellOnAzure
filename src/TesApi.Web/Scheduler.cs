@@ -76,71 +76,30 @@ namespace TesApi.Web
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (usingBatchPools)
+                try
                 {
-                    try
+                    if (usingBatchPools)
                     {
                         await UpdateBatchPools(stoppingToken);
                     }
-                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                    {
-                        break;
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.LogError(exc, exc.Message);
-                    }
-                }
 
-                try
-                {
                     await OrchestrateTesTasksOnBatch(stoppingToken);
+
+                    if (usingBatchPools)
+                    {
+                        await ServiceBatchPools(stoppingToken);
+                        await UpdateBatchPools(stoppingToken);
+                    }
+
+                    await Task.Delay(runInterval, stoppingToken);
                 }
-                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                catch (TaskCanceledException)
                 {
                     break;
                 }
                 catch (Exception exc)
                 {
                     logger.LogError(exc, exc.Message);
-                }
-
-                if (usingBatchPools)
-                {
-                    //try
-                    //{
-                    //    await UpdateBatchPools(stoppingToken);
-                    //}
-                    //catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                    //{
-                    //    break;
-                    //}
-                    //catch (Exception exc)
-                    //{
-                    //    logger.LogError(exc, exc.Message);
-                    //}
-
-                    try
-                    {
-                        await ServiceBatchPools(stoppingToken);
-                    }
-                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                    {
-                        break;
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.LogError(exc, exc.Message);
-                    }
-                }
-
-                try
-                {
-                    await Task.Delay(runInterval, stoppingToken);
-                }
-                catch (TaskCanceledException)
-                {
-                    break;
                 }
             }
 

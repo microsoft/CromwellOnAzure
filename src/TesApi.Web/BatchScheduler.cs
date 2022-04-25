@@ -1613,7 +1613,9 @@ namespace TesApi.Web
                         changes = true;
                     }
                     //else
-                    //{ }
+                    //{
+                    //    changes |= batchPools.First(b => poolData.PoolId.Equals(b.Pool.PoolId, StringComparison.Ordinal)).UpdateIfNeeded()
+                    //}
                 }
             }
 

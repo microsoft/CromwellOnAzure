@@ -485,7 +485,9 @@ namespace TesApi.Web
         {
             IsAvailable = false;
             _isRemoved = true;
-            return ServicePoolUpdateAsync(cancellationToken);
+            //return ServicePoolUpdateAsync(cancellationToken);
+            _ = _batchPools.RemovePoolFromList(this);
+            return ValueTask.CompletedTask;
         }
 
         private async ValueTask ServicePoolUpdateAsync(CancellationToken cancellationToken = default)
@@ -505,12 +507,27 @@ namespace TesApi.Web
             }
 
             var previousHashCode = RepositoryItem.GetHashCode();
+
+            if (RepositoryItem.IsAvailable != IsAvailable) { logger.LogTrace("IsAvailable is different"); }
             RepositoryItem.IsAvailable = IsAvailable;
+
+            if (RepositoryItem.Changed != Changed) { logger.LogTrace("Changed is different"); }
             RepositoryItem.Changed = Changed;
+
+            if (RepositoryItem.RequestedDedicatedNodes != TargetDedicated) { logger.LogTrace("TargetDedicated is different"); }
             RepositoryItem.RequestedDedicatedNodes = TargetDedicated;
+
+            if (RepositoryItem.RequestedLowPriorityNodes != TargetLowPriority) { logger.LogTrace("TargetLowPriority is different"); }
             RepositoryItem.RequestedLowPriorityNodes = TargetLowPriority;
-            RepositoryItem.Reservations = ReservedComputeNodes.Select(a => a.Affinity.AffinityId).ToList();
-            RepositoryItem.PendingReservations = PendingReservations.Select(p => new PendingReservationItem { JobId = p.Key, Created = p.Value.QueuedTime, IsDedicated = !p.Value.IsLowPriority, IsRequested = p.Value.IsRequested }).ToList();
+
+            var reservations = ReservedComputeNodes.Select(a => a.Affinity.AffinityId).ToList();
+            if (!RepositoryItem.Reservations.SequenceEqual(reservations)) { logger.LogTrace("ReservedComputeNodes is different"); }
+            RepositoryItem.Reservations = reservations;
+
+            var pendingReservations = PendingReservations.Select(p => new PendingReservationItem { JobId = p.Key, Created = p.Value.QueuedTime, IsDedicated = !p.Value.IsLowPriority, IsRequested = p.Value.IsRequested }).ToList();
+            if (!RepositoryItem.PendingReservations.SequenceEqual(pendingReservations)) { logger.LogTrace("PendingReservations is different"); }
+            RepositoryItem.PendingReservations = pendingReservations;
+
             if (RepositoryItem.GetHashCode() == previousHashCode)
             {
                 return;
