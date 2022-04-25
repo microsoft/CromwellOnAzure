@@ -142,7 +142,7 @@ namespace Tes.Repository
         /// <inheritdoc/>
         public async Task<T> UpdateItemAsync(T item)
         {
-            // Note: Refactor to use native CosmosDB partial updates when available. 
+            // TODO: Refactor to use native CosmosDB partial updates when available.
             // See https://feedback.azure.com/forums/263030-azure-cosmos-db/suggestions/6693091-be-able-to-do-partial-updates-on-document?page=1&per_page=20
             var requestOptions = new ItemRequestOptions { IfMatchEtag = item.ETag };
             item.PartitionKey = this.partitionKeyValue;

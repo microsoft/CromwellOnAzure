@@ -107,22 +107,22 @@ namespace TesApi.Web
 
                 if (usingBatchPools)
                 {
-                    try
-                    {
-                        await ServiceBatchPools(stoppingToken);
-                    }
-                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                    {
-                        break;
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.LogError(exc, exc.Message);
-                    }
+                    //try
+                    //{
+                    //    await UpdateBatchPools(stoppingToken);
+                    //}
+                    //catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    //{
+                    //    break;
+                    //}
+                    //catch (Exception exc)
+                    //{
+                    //    logger.LogError(exc, exc.Message);
+                    //}
 
                     try
                     {
-                        await UpdateBatchPools(stoppingToken);
+                        await ServiceBatchPools(stoppingToken);
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                     {

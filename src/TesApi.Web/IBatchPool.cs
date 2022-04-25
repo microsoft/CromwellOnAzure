@@ -10,7 +10,7 @@ namespace TesApi.Web
     /// <summary>
     /// Represents a pool in an Azure Batch Account.
     /// </summary>
-    public interface IBatchPool
+    public interface IBatchPool : IHasRepositoryItem<BatchPool.PoolData>
     {
         /// <summary>
         /// TODO
@@ -80,10 +80,10 @@ namespace TesApi.Web
         /// </summary>
         enum ServiceKind
         {
-            /// <summary>
-            /// Save the pool as new
-            /// </summary>
-            Create,
+            ///// <summary>
+            ///// Save the pool as new
+            ///// </summary>
+            //Create,
 
             /// <summary>
             /// Save the pool as update

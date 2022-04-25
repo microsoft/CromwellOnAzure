@@ -65,7 +65,7 @@ namespace TesApi.Web
                 return new(cosmosDbEndpoint, cosmosDbKey);
             })
             .AddSingleton<BatchPoolFactory>()
-            .AddSingleton<PoolRepositoryFactory>()
+            //.AddSingleton<PoolRepositoryFactory>()
 
             .AddControllers()
             .AddNewtonsoftJson(opts =>
@@ -83,7 +83,8 @@ namespace TesApi.Web
             .AddSingleton(sp =>
             {
                 var cosmos = sp.GetService<CosmosCredentials>();
-                return (IRepository<BatchScheduler.PoolList>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<BatchScheduler.PoolList>>(sp, new CosmosDbRepository<BatchScheduler.PoolList>(cosmos.CosmosDbEndpoint, cosmos.CosmosDbKey, Constants.CosmosDbDatabaseId, BatchScheduler.CosmosDbContainerId, Constants.CosmosDbPartitionId));
+                //return (IRepository<BatchScheduler.PoolList>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<BatchScheduler.PoolList>>(sp, new CosmosDbRepository<BatchScheduler.PoolList>(cosmos.CosmosDbEndpoint, cosmos.CosmosDbKey, Constants.CosmosDbDatabaseId, BatchScheduler.CosmosDbContainerId, Constants.CosmosDbPartitionId));
+                return (IRepository<BatchPool.PoolData>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<BatchPool.PoolData>>(sp, new CosmosDbRepository<BatchPool.PoolData>(cosmos.CosmosDbEndpoint, cosmos.CosmosDbKey, Constants.CosmosDbDatabaseId, BatchScheduler.CosmosDbContainerId, Constants.CosmosDbPartitionId));
             })
 
             .AddSingleton<IBatchScheduler, BatchScheduler>()

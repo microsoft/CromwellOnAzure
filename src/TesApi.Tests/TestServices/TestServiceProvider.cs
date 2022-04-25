@@ -78,9 +78,9 @@ namespace TesApi.Tests.TestServices
         internal Mock<IAzureProxy> AzureProxy { get; private set; }
         //internal Mock<IBatchPools> BatchPools { get; private set; }
         internal Mock<IRepository<TesTask>> TesTaskRepository { get; private set; }
-        internal Mock<IRepository<BatchScheduler.PoolList>> PoolListRepository { get; private set; }
+        //internal Mock<IRepository<BatchScheduler.PoolList>> PoolListRepository { get; private set; }
         internal Mock<IRepository<BatchPool.PoolData>> PoolDataRepository { get; private set; }
-        internal Mock<IRepository<BatchPool.PendingReservationItem>> PendingReservationRepository { get; private set; }
+        //internal Mock<IRepository<BatchPool.PendingReservationItem>> PendingReservationRepository { get; private set; }
         internal Mock<IStorageAccessProvider> StorageAccessProvider { get; private set; }
 
 
@@ -97,9 +97,9 @@ namespace TesApi.Tests.TestServices
                 .AddSingleton(s => wrapAzureProxy ? ActivatorUtilities.CreateInstance<CachingWithRetriesAzureProxy>(s, GetAzureProxy(azureProxy).Object) : GetAzureProxy(azureProxy).Object)
                 .AddSingleton(_ => GetTesTaskRepository(tesTaskRepository).Object)
                 .AddSingleton(_ => new CosmosCredentials(batchPoolRepositoryArgs.endpoint ?? "endpoint", batchPoolRepositoryArgs.key ?? "key"))
-                .AddSingleton(s => GetRepository<BatchScheduler.PoolList>(s, s.GetService<CosmosCredentials>(), ParseRepositoryArgs(batchPoolRepositoryArgs)))
+                //.AddSingleton(s => GetRepository<BatchScheduler.PoolList>(s, s.GetService<CosmosCredentials>(), ParseRepositoryArgs(batchPoolRepositoryArgs)))
                 .AddSingleton(s => GetRepository<BatchPool.PoolData>(s, s.GetService<CosmosCredentials>(), ParseRepositoryArgs(batchPoolRepositoryArgs)))
-                .AddSingleton(s => GetRepository<BatchPool.PendingReservationItem>(s, s.GetService<CosmosCredentials>(), ParseRepositoryArgs(batchPoolRepositoryArgs)))
+                //.AddSingleton(s => GetRepository<BatchPool.PendingReservationItem>(s, s.GetService<CosmosCredentials>(), ParseRepositoryArgs(batchPoolRepositoryArgs)))
                 .AddSingleton(s => mockStorageAccessProvider ? GetStorageAccessProvider(storageAccessProvider).Object : ActivatorUtilities.CreateInstance<StorageAccessProvider>(s))
                 .AddSingleton<IAppCache>(_ => new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()))))
                 .AddTransient<ILogger<T>>(_ => NullLogger<T>.Instance)
@@ -109,7 +109,7 @@ namespace TesApi.Tests.TestServices
                 .AddSingleton<TestRepositoryStorage>()
                 .AddSingleton<BatchPoolFactory>()
                 .AddSingleton<IBatchScheduler, BatchScheduler>()
-                .AddSingleton(s => ActivatorUtilities.CreateInstance<PoolRepositoryFactory>(s, typeof(TestRepository<BatchPool.PoolData>), typeof(TestRepository<BatchPool.PendingReservationItem>)))
+                //.AddSingleton(s => ActivatorUtilities.CreateInstance<PoolRepositoryFactory>(s, typeof(TestRepository<BatchPool.PoolData>), typeof(TestRepository<BatchPool.PendingReservationItem>)))
             .BuildServiceProvider();
 
         private static IRepository<I> GetRepository<I>(IServiceProvider serviceProvider, CosmosCredentials credentials, object[] args) where I : RepositoryItem<I>
