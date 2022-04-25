@@ -342,14 +342,14 @@ namespace TesApi.Tests
             var pool = await AddPool(services.GetT());
             var nodes = new ComputeNode[]
             {
-                        GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
-                        GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedRunning", true, false),
-                        GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriRunning", false, false),
-                        GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedRunning", true, false),
-                        GenerateNode(pool.Pool.PoolId, "NodeOneLoPriIdle", false, true),
-                        GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedIdle", true, true),
-                        GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriIdle", false, true),
-                        GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, true),
+                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriRunning", false, false),
+                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedRunning", true, false),
+                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriRunning", false, false),
+                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedRunning", true, false),
+                GenerateNode(pool.Pool.PoolId, "NodeOneLoPriIdle", false, true),
+                GenerateNode(pool.Pool.PoolId, "NodeOneDedicatedIdle", true, true),
+                GenerateNode(pool.Pool.PoolId, "NodeTwoLoPriIdle", false, true),
+                GenerateNode(pool.Pool.PoolId, "NodeTwoDedicatedIdle", true, true),
             };
 
             azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodes;

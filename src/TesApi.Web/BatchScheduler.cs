@@ -73,7 +73,6 @@ namespace TesApi.Web
         //private readonly string defaultStorageAccountName;
         private readonly BatchPoolFactory _poolFactory;
         private readonly IRepository<BatchPool.PoolData> _poolDataRepository;
-        //private readonly IRepository<PoolList> _poolListRepository;
         private readonly Random random = new();
 
         /// <summary>
@@ -85,7 +84,7 @@ namespace TesApi.Web
         /// <param name="storageAccessProvider">Storage access provider <see cref="IStorageAccessProvider"/></param>
         /// <param name="poolDataRepository"></param>
         /// <param name="poolFactory"></param>
-        public BatchScheduler(ILogger<BatchScheduler> logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, IRepository<BatchPool.PoolData> poolDataRepository/*, IRepository<PoolList> poolListRepository*/, BatchPoolFactory poolFactory)
+        public BatchScheduler(ILogger<BatchScheduler> logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, IRepository<BatchPool.PoolData> poolDataRepository, BatchPoolFactory poolFactory)
         {
             this.logger = logger;
             this.azureProxy = azureProxy;
@@ -109,9 +108,8 @@ namespace TesApi.Web
 
             if (!this.enableBatchAutopool)
             {
-                batchPools = new(this.logger);
+                batchPools = new(this, this.logger);
                 _poolDataRepository = poolDataRepository;
-                //_poolListRepository = poolListRepository;
                 _poolFactory = poolFactory;
             }
 
@@ -1528,20 +1526,18 @@ namespace TesApi.Web
                 var uniquifier = new byte[8]; // This always becomes 13 chars, when you remove the three '=' at the end. We won't ever decode this, so we don't need the '='s
                 random.NextBytes(uniquifier);
                 var poolId = $"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"; // '-' is required by GetKeyFromPoolId()
-                //await AddPool(key, poolId);
                 try
                 {
-                    pool = _poolFactory.CreateNew(await azureProxy.CreateBatchPoolAsync(await valueFactory(poolId)), key, this);
+                    pool = _poolFactory.CreateNew(await azureProxy.CreateBatchPoolAsync(await valueFactory(poolId)), this);
                 }
                 catch (RequestFailedException ex) when (ex.Status == 0 && ex.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout)
                 {
                     // When that batch management API times out, it may or may not have created the pool. Add an inactive record to delete it if it did get created and try again later. That record will be removed later whether or not the pool was created.
-                    pool = _poolFactory.Retrieve(new BatchPool.PoolData { PoolId = poolId, IsAvailable = false, PendingReservations = new(), Reservations = new() }, key, this);
-                    AddPool(pool);
+                    pool = _poolFactory.Retrieve(new BatchPool.PoolData { PoolId = poolId, IsAvailable = false, PendingReservations = new(), Reservations = new() }, this);
+                    _ = await AddPoolAsync(pool);
                     throw new AzureBatchQuotaMaxedOutException($"Pool creation timed out");
                 }
-                //await pool.ServicePoolAsync(IBatchPool.ServiceKind.Create);
-                AddPool(pool);
+                _ = await AddPoolAsync(pool);
             }
             return pool;
 
@@ -1605,17 +1601,13 @@ namespace TesApi.Web
                     else if (!batchPools.Any(p => poolData.PoolId.Equals(p.Pool.PoolId)))
                     {
                         logger.LogDebug("Pool '{PoolId}' from the repository is being added to the local store.", poolData.PoolId);
-                        var pool = _poolFactory.Retrieve(poolData, poolGroup.Key, this);
-                        if (batchPools.Add(pool))
+                        var pool = _poolFactory.Retrieve(poolData, this);
+                        if (await batchPools.AddAsync(pool, true))
                         {
                             await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize, cancellationToken);
                         }
                         changes = true;
                     }
-                    //else
-                    //{
-                    //    changes |= batchPools.First(b => poolData.PoolId.Equals(b.Pool.PoolId, StringComparison.Ordinal)).UpdateIfNeeded()
-                    //}
                 }
             }
 
@@ -1640,14 +1632,12 @@ namespace TesApi.Web
                         pool.ReplaceRepositoryItem(await _poolDataRepository.CreateItemAsync(pool.RepositoryItem));
                         changes = true;
                     }
-                    //else
-                    //{ }
                 }
             }
 
             foreach (var pool in localPoolsToRemove)
             {
-                _ = batchPools.Remove(pool);
+                _ = await batchPools.RemoveAsync(pool);
                 changes = true;
             }
 
@@ -1663,211 +1653,17 @@ namespace TesApi.Web
             }
 
             return changes;
-
-
-            //var changes = false;
-            //var poolLists = new Dictionary<string, (bool New, PoolList PoolList)>();
-            //var poolsToDelete = Enumerable.Empty<IBatchPool>();
-            //var poolsToUpdate = Enumerable.Empty<(IBatchPool Local, IBatchPool Remote)>();
-            //var poolsToSyncState = Enumerable.Empty<IBatchPool>();
-
-            //await foreach (var poolGroup in _poolListRepository.GetItemsAsync(p => true, 256, cancellationToken).WithCancellation(cancellationToken))
-            //{
-            //    var activePools = (await azureProxy.GetActivePoolIdsAsync($"{poolGroup.Key}-", TimeSpan.Zero, cancellationToken)).ToList();
-            //    foreach (var (PoolId, Pool) in poolGroup.Pools.Zip(await GetPoolsAsyncAdapter(poolGroup)))
-            //    {
-            //        if (Pool is null)
-            //        {
-            //            logger.LogDebug("Pool '{PoolId}' is being removed because BatchPool constructor could not locate the pool in the repository.", PoolId);
-            //            changes = true;
-            //            RemovePoolFromRepository();
-            //        }
-            //        else
-            //        {
-            //            var poolExists = activePools.Contains(PoolId);
-            //            var storedPool = batchPools.GetPoolOrDefault(PoolId);
-            //            if (!poolExists)
-            //            {
-            //                logger.LogDebug("Pool '{PoolId}' from the repository is being removed because no pool by that name is active.", PoolId);
-            //                changes = true;
-            //                RemovePoolFromRepository();
-            //                poolsToDelete = poolsToDelete.Append(storedPool);
-            //                await Pool.ServicePoolAsync(IBatchPool.ServiceKind.ForceRemove, cancellationToken);
-            //            }
-            //            else if (storedPool is null)
-            //            {
-            //                logger.LogDebug("Pool '{PoolId}' from the repository is being added to the local store.", PoolId);
-            //                changes = true;
-            //                poolsToSyncState = poolsToSyncState.Append(Pool);
-            //                var poolList = batchPools.PoolLists[poolGroup.Key].Pools;
-            //                if (!poolList.Contains(PoolId)) { poolList.Add(PoolId); }
-            //                batchPools.Add(Pool);
-            //            }
-            //            else
-            //            {
-            //                poolsToUpdate = poolsToUpdate.Append((storedPool, Pool));
-            //            }
-            //        }
-
-            //        void RemovePoolFromRepository()
-            //        {
-            //            changes = true;
-            //            if (poolLists.TryGetValue(poolGroup.Key, out var poolList))
-            //            {
-            //                poolList.PoolList.Pools.Remove(PoolId);
-            //            }
-            //            else
-            //            {
-            //                poolLists.Add(poolGroup.Key,
-            //                    (false, new()
-            //                    {
-            //                        Key = poolGroup.Key,
-            //                        Pools = new(poolGroup.Pools.Where(id => !PoolId.Equals(id, StringComparison.Ordinal)))
-            //                    }));
-            //            }
-            //        }
-            //    }
-            //}
-
-            //foreach (var poolGroup in batchPools.GetGroups())
-            //{
-            //    var activePools = (await azureProxy.GetActivePoolIdsAsync($"{poolGroup.Key}-", TimeSpan.Zero, cancellationToken)).ToList();
-            //    foreach (var pool in poolGroup.Value)
-            //    {
-            //        var poolId = pool.Pool.PoolId;
-            //        PoolList poolList = default;
-            //        if (await _poolListRepository.TryGetItemAsync(poolGroup.Key, l => poolList = l))
-            //        {
-            //            if (!poolList.Pools.Contains(poolId))
-            //            {
-            //                logger.LogDebug("Pool '{PoolId}' from the local store is being added to the repository.", poolId);
-            //                changes = true;
-            //                if (poolLists.TryGetValue(poolGroup.Key, out var list))
-            //                {
-            //                    list.PoolList.Pools.Add(poolId);
-            //                }
-            //                else
-            //                {
-            //                    poolLists.Add(poolGroup.Key,
-            //                        (false, new()
-            //                        {
-            //                            Key = poolGroup.Key,
-            //                            Pools = new(poolList.Pools.Append(poolId))
-            //                        }));
-            //                }
-            //            }
-            //        }
-            //        else if (activePools.Contains(poolId))
-            //        {
-            //            logger.LogDebug("Pool '{PoolId}' from the local store is being added to the repository.", poolId);
-            //            changes = true;
-            //            poolLists.Add(poolGroup.Key,
-            //                (true, new()
-            //                {
-            //                    Key = poolGroup.Key,
-            //                    Pools = new(Enumerable.Empty<string>().Append(poolId))
-            //                }));
-            //        }
-            //        else
-            //        {
-            //            logger.LogDebug("Pool '{PoolId}' from the local store is being removed because no pool by that name is active.", poolId);
-            //            changes = true;
-            //            poolsToDelete = poolsToDelete.Append(pool);
-            //        }
-            //    }
-            //}
-
-            //await Task.WhenAll(poolsToDelete.Where(p => p is not null).Select(async p =>
-            //{
-            //    await p.ServicePoolAsync(IBatchPool.ServiceKind.ForceRemove, cancellationToken);
-            //    _ = batchPools.Remove(p);
-            //}));
-
-            //await Task.WhenAll(poolLists.Select(
-            //    item => item switch
-            //    {
-            //        var x when x.Value.New => AddPoolList(item.Key, item.Value.PoolList),
-            //        var x when x.Value.PoolList.Pools.Count == 0 => RemovePoolList(item.Key),
-            //        _ => UpdatePoolList(item.Key, item.Value.PoolList),
-            //    }));
-
-            //changes |= (await Task.WhenAll(poolsToUpdate.Select(pair => pair.Local.UpdateIfNeeded(pair.Remote, cancellationToken).AsTask()))).Any(f => f);
-            //await Task.WhenAll(poolsToSyncState.Select(p => p.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize, cancellationToken).AsTask()));
-            //return changes;
-
-            //async Task AddPoolList(string key, PoolList list)
-            //{
-            //    if (!batchPools.PoolLists.TryAdd(key, list))
-            //    {
-            //        await MergePoolLists(key, list);
-            //    }
-
-            //    _ = await _poolListRepository.CreateItemAsync(batchPools.PoolLists[key]);
-            //}
-
-            //Task RemovePoolList(string key)
-            //{
-            //    _ = batchPools.PoolLists.Remove(key);
-            //    return _poolListRepository.DeleteItemAsync(key);
-            //}
-
-            //async Task UpdatePoolList(string key, PoolList list)
-            //{
-            //    if (!batchPools.PoolLists.TryAdd(key, list))
-            //    {
-            //        await MergePoolLists(key, list);
-            //    }
-
-            //    _ = await _poolListRepository.UpdateItemAsync(batchPools.PoolLists[key]);
-            //}
-
-            //async Task MergePoolLists(string key, PoolList list)
-            //{
-            //    var remote = (await _poolListRepository.GetItemOrDefaultAsync(key)) ?? (batchPools.PoolLists.TryGetValue(key, out var list1) ? list1 : default);
-
-            //    if (remote is null)
-            //    {
-            //        remote = list;
-            //    }
-            //    else
-            //    {
-            //        remote.Pools = list.Pools;
-            //    }
-
-            //    batchPools.PoolLists[key] = remote;
-            //}
         }
 
         /// <inheritdoc/>
         public IAsyncEnumerable<IBatchPool> GetPoolsAsync()
             => batchPools.ToAsyncEnumerable();
 
-        private void AddPool(IBatchPool pool)
-            => batchPools.Add(pool);
-
-        //private async ValueTask AddPool(string key, string poolId)
-        //{
-        //    if (batchPools.PoolLists.TryGetValue(key, out var list))
-        //    {
-        //        list.Pools.Add(poolId);
-        //    }
-        //    else
-        //    {
-        //        list = new PoolList { Key = key, Pools = Enumerable.Empty<string>().Append(poolId).ToList() };
-        //        batchPools.PoolLists.Add(key, list);
-        //    }
-
-        //    if (!await _poolListRepository.TryGetItemAsync(key, async l => { l.Pools.Add(poolId); await _poolListRepository.UpdateItemAsync(l); }))
-        //    {
-        //        await _poolListRepository.CreateItemAsync(new PoolList { Key = key, Pools = new(Enumerable.Empty<string>().Append(poolId)) });
-        //    }
-        //}
+        private ValueTask<bool> AddPoolAsync(IBatchPool pool)
+            => batchPools.AddAsync(pool, false);
 
         private IAsyncEnumerable<IBatchPool> GetPoolsAsyncAdapter(IAsyncEnumerable<BatchPool.PoolData> poolList)
             => GetPoolsAsync(poolList.ToEnumerable()).ToAsyncEnumerable();
-
-        //private ValueTask<IEnumerable<IBatchPool>> GetPoolsAsyncAdapter(PoolList poolList)
-        //    => ValueTask.FromResult(GetPoolsAsync(poolList.Key, poolList.Pools));
 
         private IEnumerable<IBatchPool> GetPoolsAsync(IEnumerable<BatchPool.PoolData> pools)
         {
@@ -1877,7 +1673,7 @@ namespace TesApi.Web
             {
                 try
                 {
-                    return _poolFactory.Retrieve(id, GetKeyFromPoolId(id.PoolId), this);
+                    return _poolFactory.Retrieve(id, this);
                 }
                 catch (ArgumentNullException)
                 {
@@ -1885,23 +1681,6 @@ namespace TesApi.Web
                 }
             }
         }
-
-        //private IEnumerable<IBatchPool> GetPoolsAsync(string key, IEnumerable<string> pools)
-        //{
-        //    return pools.Select(Retrieve);
-
-        //    IBatchPool Retrieve(string id)
-        //    {
-        //        try
-        //        {
-        //            return _poolFactory.Retrieve(id, key, this);
-        //        }
-        //        catch (ArgumentNullException)
-        //        {
-        //            return default;
-        //        }
-        //    }
-        //}
 
         private static string GetKeyFromPoolId(string poolId)
             => poolId[..poolId.LastIndexOf('-')];
@@ -1929,68 +1708,24 @@ namespace TesApi.Web
             => GetOrAddAsync(key, valueFactory);
 
         /// <inheritdoc/>
-        bool IBatchPoolsImpl.RemovePoolFromList(IBatchPool pool)
-            => batchPools.Remove(pool);
+        ValueTask<bool> IBatchPoolsImpl.RemovePoolFromListAsync(IBatchPool pool)
+            => batchPools.RemoveAsync(pool);
 
         /// <inheritdoc/>
         IEnumerable<string> IBatchPoolsImpl.GetPoolGroupKeys()
             => batchPools.Keys;
         #endregion
 
-        //#region Repository classes
-        ///// <summary>
-        ///// List of Azure Batch account pools stored in CosmosDB
-        ///// </summary>
-        //public class PoolList : RepositoryItem<PoolList>, IEquatable<PoolList>
-        //{
-        //    /// <summary>
-        //    /// <see cref="BatchScheduler.GetOrAddAsync(string, Func{string, ValueTask{BatchModels.Pool}})"/> "key" parameter.
-        //    /// </summary>
-        //    [DataMember(Name = "id")]
-        //    public string Key { get; set; }
-
-        //    /// <summary>
-        //    /// List of PoolId (<seealso cref="BatchPool.PoolData"/>)
-        //    /// </summary>
-        //    [DataMember(Name = "pools")]
-        //    public List<string> Pools { get; set; }
-
-        //    /// <inheritdoc/>
-        //    public bool Equals(PoolList other)
-        //        => other is not null
-        //        && Key == other.Key
-        //        && (Pools?.SequenceEqual(other.Pools) ?? false);
-
-        //    /// <inheritdoc/>
-        //    public override bool Equals(object obj)
-        //        => obj switch
-        //        {
-        //            null => false,
-        //            PoolList item => Equals(item),
-        //            _ => false,
-        //        };
-
-        //    /// <inheritdoc/>
-        //    public override int GetHashCode()
-        //        => GetHashCodeFromData(Key, Pools);
-
-        //    /// <summary>
-        //    /// Generates hashcode for a <see cref="PoolList"/> with the relevant data.
-        //    /// </summary>
-        //    /// <param name="key"></param>
-        //    /// <param name="pools"></param>
-        //    /// <returns></returns>
-        //    public static int GetHashCodeFromData(string key, List<string> pools)
-        //        => Tuple.Create(key, pools).GetHashCode();
-        //}
-        //#endregion
-
         private class BatchPools : KeyedGroupWithRepositoryElements<IBatchPool, BatchPool.PoolData>
         {
             private readonly ILogger logger;
-            public BatchPools(ILogger logger)
+            private readonly BatchScheduler batchScheduler;
+            public BatchPools(BatchScheduler batchScheduler, ILogger logger)
                 : base(p => p is null ? default : GetKeyFromPoolId(p.Pool.PoolId), StringComparer.Ordinal)
-                => this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            {
+                this.batchScheduler = batchScheduler;
+                this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            }
 
             protected override Func<IEnumerable<IBatchPool>, GroupableSet<IBatchPool>> CreateSetFunc
                 => e => new(e, new BatchPoolEqualityComparer());
@@ -1998,16 +1733,37 @@ namespace TesApi.Web
             public IBatchPool GetPoolOrDefault(string poolId)
                 => TryGetValue(GetKeyFromPoolId(poolId), out var batchPools) ? batchPools.FirstOrDefault(p => p.Pool.PoolId.Equals(poolId, StringComparison.Ordinal)) : default;
 
-            public override bool Add(IBatchPool element)
+            public async ValueTask<bool> AddAsync(IBatchPool element, bool isFromRepsitory)
             {
-                var result = base.Add(element);
+                var result = Add(element);
+                if (!isFromRepsitory)
+                {
+                    try
+                    {
+                        element.ReplaceRepositoryItem(await batchScheduler._poolDataRepository.CreateItemAsync(element.RepositoryItem));
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Error adding pool {PoolId} repository record", element.Pool.PoolId);
+                    }
+                }
+
                 logger.LogDebug("Adding pool {PoolId} returned {Result}", element.Pool.PoolId, result);
                 return result;
             }
 
-            public override bool Remove(IBatchPool element)
+            public async ValueTask<bool> RemoveAsync(IBatchPool element)
             {
-                var result = base.Remove(element);
+                var result = Remove(element);
+                try
+                {
+                    await batchScheduler._poolDataRepository.DeleteItemAsync(element.Pool.PoolId);
+                }
+                catch(Exception ex)
+                {
+                    logger.LogError(ex, "Error removing pool {PoolId} repository record", element.Pool.PoolId);
+                }
+
                 logger.LogDebug("Removing pool {PoolId} returned {Result}", element.Pool.PoolId, result);
                 return result;
             }
@@ -2070,7 +1826,7 @@ namespace TesApi.Web
     }
 
     /// <summary>
-    /// Internal access to batch pool related methods for <see cref="BatchPool"/> and tests.
+    /// Internal access to batch pool related methods for <see cref="BatchPool"/> and also unit/module tests.
     /// </summary>
     internal interface IBatchPoolsImpl
     {
@@ -2098,7 +1854,7 @@ namespace TesApi.Web
         /// <returns>True if the requested <paramref name="batchPool"/> was found, False otherwise.</returns>
         bool TryGet(string poolId, out IBatchPool batchPool);
 
-        bool RemovePoolFromList(IBatchPool pool);
+        ValueTask<bool> RemovePoolFromListAsync(IBatchPool pool);
 
         IEnumerable<string> GetPoolGroupKeys();
     }

@@ -18,6 +18,7 @@ using Tes.Repository;
 
 namespace TesApi.Web
 {
+    // Used for unit/module testing
     internal interface IBatchPoolImpl
     {
         int TestTargetDedicated { get; set; }
@@ -197,64 +198,21 @@ namespace TesApi.Web
             }
         }
 
-        /// <inheritdoc/>
-        public async ValueTask<bool> UpdateIfNeeded(IBatchPool other, CancellationToken cancellationToken)
-        {
-            var changed = false;
-            var scratch = new PoolData { PoolId = other.RepositoryItem.PoolId, Created = other.RepositoryItem.Created };
-            SetPoolData(other as BatchPool, scratch);
-            if (RepositoryItem.GetHashCode() != other.RepositoryItem.GetHashCode())
-            {
-                logger.LogDebug("Updating metadata for '{PoolId}'", Pool.PoolId);
-                ((IHasRepositoryItem<PoolData>)this).ReplaceRepositoryItem(other.RepositoryItem);
-                changed = true;
-            }
+        ///// <inheritdoc/>
+        //public async ValueTask<bool> UpdateIfNeeded(IBatchPool other, CancellationToken cancellationToken)
+        //{
+        //    var changed = false;
+        //    var scratch = new PoolData { PoolId = other.RepositoryItem.PoolId, Created = other.RepositoryItem.Created };
+        //    SetPoolData(other as BatchPool, scratch);
+        //    if (RepositoryItem.GetHashCode() != other.RepositoryItem.GetHashCode())
+        //    {
+        //        logger.LogDebug("Updating metadata for '{PoolId}'", Pool.PoolId);
+        //        ((IHasRepositoryItem<PoolData>)this).ReplaceRepositoryItem(other.RepositoryItem);
+        //        changed = true;
+        //    }
 
-            //if (!RepositoryItem.Equals(((BatchPool)other).RepositoryItem))
-            //{
-            //    logger.LogDebug("Updating metadata for '{PoolId}'", Pool.PoolId);
-                //using var dataRepo = CreatePoolDataRepository();
-                //await dataRepo.UpdateItemAsync(RepositoryItem);
-            //    changed = true;
-            //}
-
-            //if (!PendingReservations.SequenceEqual(((BatchPool)other).PendingReservations))
-            //{
-            //    logger.LogDebug("Updating pending reservation list for '{PoolId}'", Pool.PoolId);
-                //using var pendRepo = CreatePendingReservationRepository();
-                //foreach (var reservation in PendingReservations)
-                //{
-                //    PendingReservationItem reservationItem = default;
-                //    if (await pendRepo.TryGetItemAsync(reservation.Key, item => reservationItem = item))
-                //    {
-                //        if (!reservationItem.Equals(reservation.Value.Source))
-                //        {
-                //            logger.LogDebug("Updating reservation {JobId}", reservation.Value.Source.JobId);
-                //            _ = await pendRepo.UpdateItemAsync(reservation.Value.Source);
-                //            changed = true;
-                //        }
-                //    }
-                //    else
-                //    {
-                //        logger.LogDebug("Adding reservation {JobId}", reservation.Value.Source.JobId);
-                //        _ = await pendRepo.CreateItemAsync(reservation.Value.Source);
-                //        changed = true;
-                //    }
-                //}
-
-                //await foreach (var reservation in pendRepo.GetItemsAsync(i => true, 256, cancellationToken).WithCancellation(cancellationToken))
-                //{
-                //    if (!PendingReservations.ContainsKey(reservation.JobId))
-                //    {
-                //        logger.LogDebug("Removing reservation {JobId}", reservation.JobId);
-                //        await pendRepo.DeleteItemAsync(reservation.JobId);
-                //        changed = true;
-                //    }
-                //}
-            //}
-
-            return changed;
-        }
+        //    return changed;
+        //}
 
         /// <inheritdoc/>
         public async ValueTask ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState)
@@ -306,7 +264,6 @@ namespace TesApi.Web
         public ValueTask ServicePoolAsync(IBatchPool.ServiceKind serviceKind, CancellationToken cancellationToken = default)
             => serviceKind switch
             {
-                //IBatchPool.ServiceKind.Create => ServicePoolCreateAsync(cancellationToken),
                 IBatchPool.ServiceKind.Update => ServicePoolUpdateAsync(cancellationToken),
                 IBatchPool.ServiceKind.SyncSize => ServicePoolSyncSizeAsync(cancellationToken),
                 IBatchPool.ServiceKind.Resize => ServicePoolResizeAsync(cancellationToken),
@@ -469,41 +426,24 @@ namespace TesApi.Web
                 {
                     _isRemoved = true;
                     await azureProxy.DeleteBatchPoolAsync(Pool.PoolId, cancellationToken);
-                    _ = _batchPools.RemovePoolFromList(this);
+                    _ = await _batchPools.RemovePoolFromListAsync(this);
                 }
             }
         }
 
-        //private async ValueTask ServicePoolCreateAsync(CancellationToken cancellationToken = default)
-        //{
-        //    //logger.LogDebug("Adding pool {PoolId} to repository", RepositoryItem.PoolId);
-        //    //using var dataRepo = CreatePoolDataRepository();
-        //    //_ = await dataRepo.CreateItemAsync(RepositoryItem);
-        //}
-
-        private ValueTask ServicePoolForceRemoveAsync(CancellationToken cancellationToken)
+        private async ValueTask ServicePoolForceRemoveAsync(CancellationToken _1)
         {
             IsAvailable = false;
             _isRemoved = true;
-            //return ServicePoolUpdateAsync(cancellationToken);
-            _ = _batchPools.RemovePoolFromList(this);
-            return ValueTask.CompletedTask;
+            _ = await _batchPools.RemovePoolFromListAsync(this);
         }
 
-        private async ValueTask ServicePoolUpdateAsync(CancellationToken cancellationToken = default)
+        private ValueTask ServicePoolUpdateAsync(CancellationToken _1 = default)
         {
             if (_isRemoved)
             {
-                //using var pendRepo = CreatePendingReservationRepository();
-                //await foreach (var job in pendRepo.GetItemsAsync(r => true, 256, cancellationToken).SelectAwait(r => ValueTask.FromResult(r.JobId)).WithCancellation(cancellationToken))
-                //{
-                //    logger.LogDebug("Removing registration {JobId} from repository", job);
-                //    await pendRepo.DeleteItemAsync(job);
-                //}
                 logger.LogDebug("Removing pool {PoolId} from repository", RepositoryItem.PoolId);
-                //using var dataRepo = CreatePoolDataRepository();
-                //await dataRepo.DeleteItemAsync(RepositoryItem.GetId());
-                return;
+                return ValueTask.CompletedTask;
             }
 
             var previousHashCode = RepositoryItem.GetHashCode();
@@ -530,37 +470,12 @@ namespace TesApi.Web
 
             if (RepositoryItem.GetHashCode() == previousHashCode)
             {
-                return;
+                logger.LogDebug("Should not be updating pool {PoolId} in repository ({HasChanges})", RepositoryItem.PoolId, _hasChangesRepository.HasChanges);
+                return ValueTask.CompletedTask;
             }
 
-            //using (var resvRepo = CreatePendingReservationRepository())
-            //{
-            //    await foreach (var job in resvRepo.GetItemsAsync(r => !PendingReservations.Keys.Contains(r.JobId), 256, cancellationToken).SelectAwait(r => ValueTask.FromResult(r.JobId)).WithCancellation(cancellationToken))
-            //    {
-            //        logger.LogDebug("Removing registration {JobId} from repository", job);
-            //        await resvRepo.DeleteItemAsync(job);
-            //    }
-
-            //    foreach (var item in PendingReservations)
-            //    {
-            //        if (await resvRepo.TryGetItemAsync(item.Key))
-            //        {
-            //            logger.LogDebug("Updating registration {JobId} in repository", item.Value.Source.JobId);
-            //            _ = await resvRepo.UpdateItemAsync(item.Value.Source);
-            //        }
-            //        else
-            //        {
-            //            logger.LogDebug("Adding registration {JobId} to repository", item.Value.Source.JobId);
-            //            _ = await resvRepo.CreateItemAsync(item.Value.Source);
-            //        }
-            //    }
-            //}
-
-            //using (var dataRepo = CreatePoolDataRepository())
-            //{
-                logger.LogDebug("Updating pool {PoolId} in repository", RepositoryItem.PoolId);
-            //    _ = await dataRepo.UpdateItemAsync(RepositoryItem);
-            //}
+            logger.LogDebug("Should be updating pool {PoolId} in repository ({HasChanges})", RepositoryItem.PoolId, _hasChangesRepository.HasChanges);
+            return ValueTask.CompletedTask;
         }
         #endregion
 
@@ -569,14 +484,12 @@ namespace TesApi.Web
         /// Constructor of <see cref="BatchPool"/>
         /// </summary>
         /// <param name="poolInformation"></param>
-        /// <param name="key"></param>
         /// <param name="batchPools"></param>
-        /// <!--param name="repositoryFactory"></param-->
         /// <param name="configuration"></param>
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
         /// <exception cref="ArgumentException"></exception>
-        public BatchPool(PoolInformation poolInformation, string key, IBatchScheduler batchPools/*, PoolRepositoryFactory repositoryFactory*/, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+        public BatchPool(PoolInformation poolInformation, IBatchScheduler batchPools, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
             : this(new()
                 {
                     PoolId = poolInformation.PoolId,
@@ -586,10 +499,8 @@ namespace TesApi.Web
                     PendingReservations = new(),
                     Changed = DateTime.UtcNow // Please keep this at the bottom of this initialization list
                 },
-                key,
                 poolInformation,
                 batchPools,
-                //repositoryFactory,
                 configuration,
                 azureProxy,
                 logger)
@@ -599,34 +510,23 @@ namespace TesApi.Web
         /// Constructor of <see cref="BatchPool"/>
         /// </summary>
         /// <param name="poolData"></param>
-        /// <param name="key"></param>
         /// <param name="batchPools"></param>
-        /// <!--param name="repositoryFactory"></param-->
         /// <param name="configuration"></param>
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
-        public BatchPool(PoolData poolData, string key, IBatchScheduler batchPools/*, PoolRepositoryFactory repositoryFactory*/, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
-            : this(poolData, //new Func<PoolData>(() =>
-                //{
-                //    //using var dataRepo = repositoryFactory.GetPoolDataRepositoryFactory(key).CreateRepository();
-                //    //return dataRepo.GetItemOrDefaultAsync(poolId).Result;
-                //})(),
-                key,
+        public BatchPool(PoolData poolData, IBatchScheduler batchPools, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+            : this(poolData,
                 new PoolInformation { PoolId = poolData.PoolId },
                 batchPools,
-                //repositoryFactory,
                 configuration,
                 azureProxy,
                 logger)
         { }
 
-        private BatchPool(PoolData data, string key, PoolInformation poolId, IBatchScheduler batchPools/*, PoolRepositoryFactory repositoryFactory*/, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+        private BatchPool(PoolData data, PoolInformation poolId, IBatchScheduler batchPools, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
         {
             RepositoryItem = data ?? throw new ArgumentNullException(nameof(data));
             Pool = poolId ?? throw new ArgumentNullException(nameof(poolId));
-
-            //CreatePoolDataRepository = () => repositoryFactory.GetPoolDataRepositoryFactory(key).CreateRepository();
-            //CreatePendingReservationRepository = () => repositoryFactory.GetPoolPendingReservationRepositoryFactory(poolId.PoolId).CreateRepository();
 
             _idleNodeCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdleNodeTime", 5)); // TODO: set this to an appropriate value
             _idlePoolCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdlePoolTime", 30)); // TODO: set this to an appropriate value
@@ -645,21 +545,11 @@ namespace TesApi.Web
 
             PendingReservations = RepositoryItem.PendingReservations.ToDictionary(p => p.JobId, p => new PendingReservation(p));
 
-            //using var pendResRepo = CreatePendingReservationRepository();
-            //PendingReservations = pendResRepo
-            //    .GetItemsAsync(r => true)
-            //    .Result
-            //    .Select(i => new PendingReservation(i))
-            //    .ToDictionary(i => ((IPendingReservation)i).JobId);
-
             ResizeDirty = false;
         }
         #endregion
 
         #region Implementation state
-        //private readonly Func<IRepository<PoolData>> CreatePoolDataRepository;
-        //private readonly Func<IRepository<PendingReservationItem>> CreatePendingReservationRepository;
-
         private readonly HasChangesRepositoryItem<PoolData> _hasChangesRepository;
 
         private readonly ILogger logger;
@@ -682,7 +572,6 @@ namespace TesApi.Web
 
         private readonly IBatchPoolsImpl _batchPools;
         private readonly IAzureProxy azureProxy;
-        //private IHasChangesRepositoryItem<PoolData> _hasChangesRepository;
 
         private IDictionary<string, PendingReservation> PendingReservations { get; }
         private List<EquatableAffinityInformation> ReservedComputeNodes { get; }
@@ -746,7 +635,6 @@ namespace TesApi.Web
         #endregion
 
         #region IBatchPoolImpl
-        // For testing
         int IBatchPoolImpl.TestNodeReservationCount => ReservedComputeNodes.Count;
         int IBatchPoolImpl.TestPendingReservationsCount => PendingReservations.Count;
 
@@ -879,7 +767,6 @@ namespace TesApi.Web
             /// <returns></returns>
             public static int GetHashCodeFromData(string poolId, bool isAvailable, DateTime created, DateTime changed, int requestedDedicatedNodes, int requestedLowPriorityNodes, List<string> reservations, List<PendingReservationItem> pendingReservations)
                 => Tuple.Create(poolId, isAvailable, created, changed, requestedDedicatedNodes, requestedLowPriorityNodes, reservations, pendingReservations).GetHashCode();
-
         }
 
         /// <summary>

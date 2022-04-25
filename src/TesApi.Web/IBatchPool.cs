@@ -12,13 +12,13 @@ namespace TesApi.Web
     /// </summary>
     public interface IBatchPool : IHasRepositoryItem<BatchPool.PoolData>
     {
-        /// <summary>
-        /// TODO
-        /// </summary>
-        /// <param name="other"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        ValueTask<bool> UpdateIfNeeded(IBatchPool other, CancellationToken cancellationToken);
+        ///// <summary>
+        ///// TODO
+        ///// </summary>
+        ///// <param name="other"></param>
+        ///// <param name="cancellationToken"></param>
+        ///// <returns></returns>
+        //ValueTask<bool> UpdateIfNeeded(IBatchPool other, CancellationToken cancellationToken);
 
         /// <summary>
         /// Indicates that the pool is available for new jobs/tasks.
@@ -80,11 +80,6 @@ namespace TesApi.Web
         /// </summary>
         enum ServiceKind
         {
-            ///// <summary>
-            ///// Save the pool as new
-            ///// </summary>
-            //Create,
-
             /// <summary>
             /// Save the pool as update
             /// </summary>
