@@ -228,8 +228,9 @@ namespace TesApi.Web
         {
             var pools = await batchScheduler.GetPoolsAsync().ToListAsync(cancellationToken);
 
-            if (!pools.Any())
+            if (0 == pools.Count)
             {
+                logger.LogTrace("No pools found.");
                 return;
             }
 

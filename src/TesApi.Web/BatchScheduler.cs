@@ -1582,13 +1582,29 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public async ValueTask<bool> UpdateBatchPools(CancellationToken cancellationToken)
         {
+            var msg = string.Empty;
+            foreach (var pool in batchPools)
+            {
+                msg += ", '" + pool.Pool.PoolId + "'";
+            }
+
+            if (msg.Length > 0)
+            {
+                msg = $"LocalStore contains: {msg[2..]}";
+            }
+            else
+            {
+                msg = "LocalStore is empty";
+            }
+
             var changes = false;
             var remotePools = Enumerable.Empty<string>();
             var remotePoolsToRemove = Enumerable.Empty<BatchPool.PoolData>();
-            await foreach (var poolGroup in _poolDataRepository.GetItemsAsync(p => true, 256, cancellationToken).GroupByAwait(p => ValueTask.FromResult(GetKeyFromPoolId(p.PoolId))).WithCancellation(cancellationToken))
+            foreach (var poolGroup in (await _poolDataRepository.GetItemsAsync(p => true)).GroupBy(p => GetKeyFromPoolId(p.PoolId)))
+            //await foreach (var poolGroup in _poolDataRepository.GetItemsAsync(p => true, 256, cancellationToken).GroupByAwait(p => ValueTask.FromResult(GetKeyFromPoolId(p.PoolId))).WithCancellation(cancellationToken))
             {
                 var activePools = (await azureProxy.GetActivePoolIdsAsync($"{poolGroup.Key}-", TimeSpan.Zero, cancellationToken)).ToList();
-                await foreach (var poolData in poolGroup)
+                /*await */foreach (var poolData in poolGroup)
                 {
                     var poolExists = activePools.Contains(poolData.PoolId);
                     remotePools = remotePools.Append(poolData.PoolId);
@@ -1598,8 +1614,9 @@ namespace TesApi.Web
                         logger.LogDebug("Pool '{PoolId}' is being removed because no pool by that name is active.", poolData.PoolId);
                         remotePoolsToRemove = remotePoolsToRemove.Append(poolData);
                     }
-                    else if (!batchPools.Any(p => poolData.PoolId.Equals(p.Pool.PoolId)))
+                    else if (!batchPools.Select(p => p.Pool.PoolId).Contains(poolData.PoolId))
                     {
+                        logger.LogTrace(msg);
                         logger.LogDebug("Pool '{PoolId}' from the repository is being added to the local store.", poolData.PoolId);
                         var pool = _poolFactory.Retrieve(poolData, this);
                         if (await batchPools.AddAsync(pool, true))
@@ -1663,26 +1680,6 @@ namespace TesApi.Web
         private ValueTask<bool> AddPoolAsync(IBatchPool pool)
             => batchPools.AddAsync(pool, false);
 
-        private IAsyncEnumerable<IBatchPool> GetPoolsAsyncAdapter(IAsyncEnumerable<BatchPool.PoolData> poolList)
-            => GetPoolsAsync(poolList.ToEnumerable()).ToAsyncEnumerable();
-
-        private IEnumerable<IBatchPool> GetPoolsAsync(IEnumerable<BatchPool.PoolData> pools)
-        {
-            return pools.Select(Retrieve);
-
-            IBatchPool Retrieve(BatchPool.PoolData id)
-            {
-                try
-                {
-                    return _poolFactory.Retrieve(id, this);
-                }
-                catch (ArgumentNullException)
-                {
-                    return default;
-                }
-            }
-        }
-
         private static string GetKeyFromPoolId(string poolId)
             => poolId[..poolId.LastIndexOf('-')];
 
@@ -1717,7 +1714,7 @@ namespace TesApi.Web
             => batchPools.Keys;
         #endregion
 
-        private class BatchPools : KeyedGroupWithRepositoryElements<IBatchPool, BatchPool.PoolData>
+        private class BatchPools : KeyedGroupWithRepositoryElements<IBatchPool, GroupablSetWithRepositoryElements<IBatchPool, BatchPool.PoolData>, BatchPool.PoolData>
         {
             private readonly ILogger logger;
             private readonly BatchScheduler batchScheduler;
@@ -1728,7 +1725,7 @@ namespace TesApi.Web
                 this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             }
 
-            protected override Func<IEnumerable<IBatchPool>, GroupableSet<IBatchPool>> CreateSetFunc
+            protected override Func<IEnumerable<IBatchPool>, GroupablSetWithRepositoryElements<IBatchPool, BatchPool.PoolData>> CreateSetFunc
                 => e => new(e, new BatchPoolEqualityComparer());
 
             public IBatchPool GetPoolOrDefault(string poolId)
