@@ -40,44 +40,9 @@ spec:
           volumeMounts:
             - mountPath: /cromwell-tmp
               name: cromwell-tmp-claim2
-            - mountPath: /configuration
-              name: configuration-claim1
-            - mountPath: /cromwell-executions
-              name: cromwell-executions-claim1
-            - mountPath: /cromwell-workflow-logs
-              name: cromwell-workflow-logs-claim1
-            - mountPath: /workflows
-              name: workflows-claim1
-            - mountPath: /inputs
-              name: inputs-claim1
-            - mountPath: /outputs
-              name: outputs-claim1
-            - mountPath: /datasettestinputs/dataset
-              name: dataset-claim1
       restartPolicy: Always
       volumes:
         - name: cromwell-tmp-claim2
           persistentVolumeClaim:
             claimName: cromwell-tmp-claim2
-        - name: configuration-claim1
-          persistentVolumeClaim:
-            claimName: configuration-claim1
-        - name: cromwell-executions-claim1
-          persistentVolumeClaim:
-            claimName: cromwell-executions-claim1
-        - name: cromwell-workflow-logs-claim1
-          persistentVolumeClaim:
-            claimName: cromwell-workflow-logs-claim1
-        - name: workflows-claim1
-          persistentVolumeClaim:
-            claimName: workflows-claim1
-        - name: inputs-claim1
-          persistentVolumeClaim:
-            claimName: inputs-claim1
-        - name: outputs-claim1
-          persistentVolumeClaim:
-            claimName: outputs-claim1
-        - name: dataset-claim1
-          persistentVolumeClaim:
-            claimName: pvc-blob-dataset
 status: {}

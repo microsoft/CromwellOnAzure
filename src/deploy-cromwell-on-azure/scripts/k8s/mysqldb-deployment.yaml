@@ -40,19 +40,9 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/mysql
               name: mysqldb-data-claim3
-            - mountPath: /cromwellazure
-              name: cromwellazure-claim1
-            - mountPath: /configuration
-              name: configuration-pvc-blob
       restartPolicy: Always
       volumes:
         - name: mysqldb-data-claim3
           persistentVolumeClaim:
             claimName: mysqldb-data-claim3
-        - name: cromwellazure-claim1
-          persistentVolumeClaim:
-            claimName: cromwellazure-claim1
-        - name: configuration-pvc-blob
-          persistentVolumeClaim:
-            claimName: configuration-pvc-blob
 status: {}

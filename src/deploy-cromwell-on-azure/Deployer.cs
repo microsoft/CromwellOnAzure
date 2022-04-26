@@ -49,6 +49,7 @@ using ICSharpCode.SharpZipLib.GZip;
 using ICSharpCode.SharpZipLib.Tar;
 using System.Security.Cryptography;
 using System.Net.WebSockets;
+using Azure.Storage.Blobs;
 
 namespace CromwellOnAzureDeployer
 {
@@ -655,9 +656,8 @@ namespace CromwellOnAzureDeployer
             // Install CSI driver. 
             await InstallCSIBlobDriver(client);
 
-            var claim1Body = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "cromwellazure-claim1.yaml"));
-            var claim2Body = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "cromwell-tmp-claim2.yaml"));
-            var claim3Body = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "mysqldb-data-claim3.yaml"));
+            var cromwellTempClaim = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "cromwell-tmp-claim2.yaml"));
+            var mysqlDataClaim = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "mysqldb-data-claim3.yaml"));
 
             var tesDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "tes-deployment.yaml"));
             var triggerDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "triggerservice-deployment.yaml"));
@@ -667,6 +667,26 @@ namespace CromwellOnAzureDeployer
             var tesServiceBody = Yaml.LoadFromString<V1Service>(Utility.GetFileContent("scripts", "k8s", "tes-service.yaml"));
             var mysqlServiceBody = Yaml.LoadFromString<V1Service>(Utility.GetFileContent("scripts", "k8s", "mysqldb-service.yaml"));
             var cromwellServiceBody = Yaml.LoadFromString<V1Service>(Utility.GetFileContent("scripts", "k8s", "cromwell-service.yaml"));
+
+            if (tesDeploymentBody.Spec.Template.Spec.Containers.First().VolumeMounts == null)
+            {
+                tesDeploymentBody.Spec.Template.Spec.Containers.First().VolumeMounts = new List<V1VolumeMount>();
+            }
+
+            if (tesDeploymentBody.Spec.Template.Spec.Volumes == null)
+            {
+                tesDeploymentBody.Spec.Template.Spec.Volumes = new List<V1Volume>();
+            }
+
+            var configurationMountName = $"{storageAccount.Name}-configuration-claim1";
+            var executionsMountName = $"{storageAccount.Name}-cromwell-executions-claim1";
+            var workflowLogsMountName = $"{storageAccount.Name}-cromwell-workflow-logs-claim1";
+
+            AddStaticVolumeClaim(mysqlDeploymentBody, configurationMountName, "/configuration");
+            AddStaticVolumeClaim(cromwellDeploymentBody, configurationMountName, "/configuration");
+            AddStaticVolumeClaim(cromwellDeploymentBody, executionsMountName, "/cromwell-executions");
+            AddStaticVolumeClaim(cromwellDeploymentBody, workflowLogsMountName, "/cromwell-workflow-logs");
+
 
             // Example to set Environment Variables for trigger service.
             var triggerEnv = new List<V1EnvVar>();
@@ -704,87 +724,26 @@ namespace CromwellOnAzureDeployer
             tesEnv.Add(new V1EnvVar("ExternalStorageContainers", "https://datasettestinputs.blob.core.windows.net/dataset?sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D"));
             tesDeploymentBody.Spec.Template.Spec.Containers.First().Env = tesEnv;
 
-            var claim1 = await client.CreateNamespacedPersistentVolumeClaimAsync(claim1Body, "default");
-            var claim2 = await client.CreateNamespacedPersistentVolumeClaimAsync(claim2Body, "default");
-            var claim3 = await client.CreateNamespacedPersistentVolumeClaimAsync(claim3Body, "default");
-
-            await client.CreateNamespacedSecretAsync(new V1Secret()
+            foreach (var env in tesEnv)
             {
-                Metadata = new V1ObjectMeta()
-                {
-                    Name = "azure-secret"
-                },
-                StringData = new Dictionary<string, string> {
-                    {"azurestorageaccountname", storageAccount.Name},
-                    {"azurestorageaccountkey", storageAccount.Key}
-                },
-                Type = "Opaque",
-                Kind = "Secret",
-            }, "default");
-
-            await client.CreateNamespacedSecretAsync(new V1Secret()
-            {
-                Metadata = new V1ObjectMeta()
-                {
-                    Name = "sas-secret-datasettestinputs"
-                },
-                StringData = new Dictionary<string, string> {
-                    {"azurestorageaccountname", "datasettestinputs"},
-                    {"azurestorageaccountsastoken", "sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D"}
-                },
-                Type = "Opaque",
-                Kind = "Secret",
-            }, "default");
-
-
-            var containersToMount = new List<string>() { "configuration", "cromwell-executions", "cromwell-workflow-logs", "inputs", "outputs", "workflows" };
-            foreach (var container in containersToMount)
-            {
-                var storageClassBody = new V1StorageClass()
-                {
-                    Metadata = new V1ObjectMeta()
-                    {
-                        Name = $"blob-{container}"
-                    },
-                    Provisioner = "blob.csi.azure.com",
-                    VolumeBindingMode = "Immediate",
-                    ReclaimPolicy = "Retain",
-                    Parameters = new Dictionary<string, string>()
-                    {
-                        {"resourceGroup", resourceGroup},
-                        {"storageAccount", storageAccount.Name},
-                        {"containerName", container}
-                    }
-                };
-                await client.CreateStorageClassAsync(storageClassBody);
-
-                var pvc = new V1PersistentVolumeClaim()
-                {
-                    Metadata = new V1ObjectMeta()
-                    {
-                        Name = $"{container}-claim1"
-                    },
-                    Spec = new V1PersistentVolumeClaimSpec()
-                    {
-                        AccessModes = new List<string>() { "ReadWriteMany" },
-                        StorageClassName = storageClassBody.Metadata.Name,
-                        Resources = new V1ResourceRequirements()
-                        {
-                            Requests = new Dictionary<string, ResourceQuantity>()
-                            {
-                                { "storage", new ResourceQuantity("10Gi") }
-                            }
-                        }
-                    }
-                };
-
-                await client.CreateNamespacedPersistentVolumeClaimAsync(pvc, "default");
+                RefreshableConsole.WriteLine($"{env.Name}: {env.Value}");
             }
 
-            var datasetPvBody = Yaml.LoadFromString<V1PersistentVolume>(Utility.GetFileContent("scripts", "k8s", "csi", "pv-blobfuse-csi-dataset.yaml"));
-            var datasetClaimBody = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "csi", "pvc-blob-csi-dataset.yaml"));
-            await client.CreatePersistentVolumeAsync(datasetPvBody);
-            await client.CreateNamespacedPersistentVolumeClaimAsync(datasetClaimBody, "default");
+            await client.CreateNamespacedPersistentVolumeClaimAsync(cromwellTempClaim, "default");
+            await client.CreateNamespacedPersistentVolumeClaimAsync(mysqlDataClaim, "default");
+
+            var containers = await GetContainersToMount(storageAccount);
+            foreach (var container in containers)
+            {
+                if (!string.IsNullOrEmpty(container.SasToken))
+                {
+                    await CreateContainerMountWithSas(container, resourceGroup, client, tesDeploymentBody);
+                }
+                else
+                {
+                    await CreateContainerMountWithManagedId(container, resourceGroup, client, tesDeploymentBody);
+                }
+            }
 
             var tesDeployment = await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, "default");
             var tesService = await client.CreateNamespacedServiceAsync(tesServiceBody, "default");
@@ -793,13 +752,13 @@ namespace CromwellOnAzureDeployer
             var mysqlService = await client.CreateNamespacedServiceAsync(mysqlServiceBody, "default");
             var cromwellDeployment = await client.CreateNamespacedDeploymentAsync(cromwellDeploymentBody, "default");
             var cromwellService = await client.CreateNamespacedServiceAsync(cromwellServiceBody, "default");
-            
+
             var pods = await client.ListNamespacedPodAsync("default");
             var mysqlPod = pods.Items.Where(x => x.Metadata.Name.Contains("mysql")).FirstOrDefault(); //.Metadata.Name;
-            
+
             // Wait for mysql pod to transition to running to run setup sql scripts.
-            while(mysqlPod == null ||
-                mysqlPod.Status == null || 
+            while (mysqlPod == null ||
+                mysqlPod.Status == null ||
                 mysqlPod.Status.ContainerStatuses == null ||
                 mysqlPod.Status.ContainerStatuses.FirstOrDefault() == null ||
                 !(mysqlPod.Status.ContainerStatuses.FirstOrDefault().Started ?? false))
@@ -825,7 +784,213 @@ namespace CromwellOnAzureDeployer
 
             await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, "default", "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" }, true, printHandler, CancellationToken.None);
             await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, "default", "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }, true, printHandler, CancellationToken.None);
-       }
+        }
+
+        private static void AddStaticVolumeClaim(V1Deployment deploymentBody, string configurationMountName, string path)
+        {
+            deploymentBody.Spec.Template.Spec.Volumes.Add(new V1Volume()
+            {
+                Name = configurationMountName,
+                PersistentVolumeClaim = new V1PersistentVolumeClaimVolumeSource()
+                {
+                    ClaimName = configurationMountName
+                }
+            });
+            deploymentBody.Spec.Template.Spec.Containers.First().VolumeMounts.Add(new V1VolumeMount()
+            {
+                MountPath = path,
+                Name = configurationMountName
+            });
+        }
+
+        private async Task CreateContainerMountWithSas(MountableContainer container, string resourceGroup, IKubernetes client, V1Deployment tesDeployment)
+        {
+            var secretName = $"sas-secret-{container.StorageAccount}-{container.ContainerName}";
+            var volumeName = $"pv-blob-{container.StorageAccount}-{container.ContainerName}";
+            var claimName = $"{container.StorageAccount}-{container.ContainerName}-claim1";
+
+            await client.CreateNamespacedSecretAsync(new V1Secret()
+            {
+                Metadata = new V1ObjectMeta()
+                {
+                    Name = secretName
+                },
+                StringData = new Dictionary<string, string> {
+                    {"azurestorageaccountname", container.StorageAccount},
+                    {"azurestorageaccountsastoken", container.SasToken}
+                },
+                Type = "Opaque",
+                Kind = "Secret",
+            }, "default");
+
+            await client.CreatePersistentVolumeAsync(new V1PersistentVolume()
+            {
+                Metadata = new V1ObjectMeta()
+                {
+                    Name = volumeName
+                },
+                Spec = new V1PersistentVolumeSpec()
+                {
+                    AccessModes = new List<string>() { "ReadWriteMany" },
+                    PersistentVolumeReclaimPolicy = "Retain",
+                    Capacity = new Dictionary<string, ResourceQuantity>()
+                    {
+                        { "storage", new ResourceQuantity("10Gi") }
+                    },
+                    Csi = new V1CSIPersistentVolumeSource()
+                    {
+                        Driver = "blob.csi.azure.com",
+                        ReadOnlyProperty = false,
+                        VolumeHandle = $"volume-{container.StorageAccount}-{container.ContainerName}-{new Random().Next(10000)}",
+                        VolumeAttributes = new Dictionary<string, string>()
+                        {
+                            { "containerName", container.ContainerName }
+                        },
+                        NodeStageSecretRef = new V1SecretReference()
+                        {
+                            Name = $"sas-secret-{container.StorageAccount}-{container.ContainerName}",
+                            NamespaceProperty = "default"
+                        }
+                    }
+                }
+            });
+
+            await client.CreateNamespacedPersistentVolumeClaimAsync(new V1PersistentVolumeClaim()
+            {
+                Metadata = new V1ObjectMeta()
+                {
+                    Name = claimName
+                },
+                Spec = new V1PersistentVolumeClaimSpec()
+                {
+                    AccessModes = new List<string>() { "ReadWriteMany" },
+                    VolumeName = volumeName,
+                    StorageClassName = "",
+                    Resources = new V1ResourceRequirements()
+                    {
+                        Requests = new Dictionary<string, ResourceQuantity>()
+                            {
+                                { "storage", new ResourceQuantity("10Gi") }
+                            }
+                    }
+                }
+            }, "default");
+
+            AddStaticVolumeClaim(tesDeployment, claimName, $"/{container.StorageAccount}/{container.ContainerName}");
+        }
+
+        private async Task CreateContainerMountWithManagedId(MountableContainer container, string resouceGroup, IKubernetes client, V1Deployment tesDeployment)
+        {
+            var pvcName = $"{container.StorageAccount}-{container.ContainerName}-claim1";
+            var storageAccount = await GetExistingStorageAccountAsync(container.StorageAccount);
+            await client.CreateNamespacedSecretAsync(new V1Secret()
+            {
+                Metadata = new V1ObjectMeta()
+                {
+                    Name = $"sa-secret-{container.StorageAccount}-{container.ContainerName}"
+                },
+                StringData = new Dictionary<string, string> {
+                    {"azurestorageaccountname", storageAccount.Name},
+                    {"azurestorageaccountkey", storageAccount.Key}
+                },
+                Type = "Opaque",
+                Kind = "Secret",
+            }, "default");
+
+            var storageClassBody = new V1StorageClass()
+            {
+                Metadata = new V1ObjectMeta()
+                {
+                    Name = $"blob-{container.ContainerName}"
+                },
+                Provisioner = "blob.csi.azure.com",
+                VolumeBindingMode = "Immediate",
+                ReclaimPolicy = "Retain",
+                Parameters = new Dictionary<string, string>()
+                    {
+                        {"resourceGroup", resouceGroup},
+                        {"storageAccount", container.StorageAccount},
+                        {"containerName", container.ContainerName}
+                    }
+            };
+            await client.CreateStorageClassAsync(storageClassBody);
+
+            var pvc = new V1PersistentVolumeClaim()
+            {
+                Metadata = new V1ObjectMeta()
+                {
+                    Name = pvcName
+                },
+                Spec = new V1PersistentVolumeClaimSpec()
+                {
+                    AccessModes = new List<string>() { "ReadWriteMany" },
+                    StorageClassName = storageClassBody.Metadata.Name,
+                    Resources = new V1ResourceRequirements()
+                    {
+                        Requests = new Dictionary<string, ResourceQuantity>()
+                            {
+                                { "storage", new ResourceQuantity("10Gi") }
+                            }
+                    }
+                }
+            };
+
+            AddStaticVolumeClaim(tesDeployment, pvcName, $"/{container.StorageAccount}/{container.ContainerName}");
+            await client.CreateNamespacedPersistentVolumeClaimAsync(pvc, "default");
+        }
+
+        private async Task<List<MountableContainer>> GetContainersToMount(IStorageAccount storageAccount)
+        {
+            var containers = new HashSet<MountableContainer>();
+            var exclusion = new HashSet<MountableContainer>();
+            var wildCardAccounts = new List<string>();
+            var contents = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName);
+            foreach(var line in contents.Split("\n", StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (line.StartsWith("#"))
+                {
+                    continue;
+                }
+
+                if (line.StartsWith("-"))
+                {
+                    var parts = line.Split("/", StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        exclusion.Add(new MountableContainer() { StorageAccount = parts[0], ContainerName = parts[1] });
+                    }
+                }
+
+                if (line.StartsWith("/"))
+                {
+                    var parts = line.Split("/", StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        if (string.Equals(parts[1], "*"))
+                        {
+                            wildCardAccounts.Add(parts[0]);
+                        }
+                        else
+                        {
+                            containers.Add(new MountableContainer() { StorageAccount = parts[0], ContainerName = parts[1] });
+                        }
+                    }
+                }
+
+                if (line.StartsWith("http"))
+                {
+                    var blobUrl = new BlobUriBuilder(new Uri(line));
+                    var blobHostStorageAccount = blobUrl.Host.Split(".").First();
+                    containers.Add(new MountableContainer() { 
+                        StorageAccount = blobHostStorageAccount, 
+                        ContainerName = blobUrl.BlobContainerName,
+                        SasToken = blobUrl.Sas.ToString()
+                    });
+                }
+            }
+            containers.ExceptWith(exclusion);
+            return containers.ToList();
+        }
 
         private Dictionary<string, string> GetSettingsDict()
         {
@@ -853,7 +1018,6 @@ namespace CromwellOnAzureDeployer
         /// <returns></returns>
         private async Task InstallCSIBlobDriver(IKubernetes client)
         {
-            // Install CSI driver. 
             var typeMap = new Dictionary<string, Type>();
             typeMap.Add("v1/Pod", typeof(V1Pod));
             typeMap.Add("v1/Service", typeof(V1Service));
@@ -2457,6 +2621,13 @@ namespace CromwellOnAzureDeployer
                 Reason = reason;
                 DisplayExample = displayExample;
             }
+        }
+
+        private class MountableContainer
+        {
+            public string StorageAccount { get; set; }
+            public string ContainerName { get; set; }
+            public string SasToken { get; set; }
         }
     }
 }

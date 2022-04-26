@@ -32,16 +32,6 @@ spec:
             - containerPort: 80
           resources: {}
           volumeMounts:
-            - mountPath: /datasettestinputs/dataset
-              name: dataset-claim1
-            - mountPath: /outputs
-              name: outputs-claim1
       restartPolicy: Always
       volumes:
-        - name: outputs-claim1
-          persistentVolumeClaim:
-            claimName: outputs-claim1
-        - name: dataset-claim1
-          persistentVolumeClaim:
-            claimName: pvc-blob-dataset
 status: {}
