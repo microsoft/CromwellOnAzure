@@ -18,7 +18,14 @@ namespace CromwellOnAzureDeployer
         public string VmOsName { get; set; } = "UbuntuServer";
         public string VmOsVersion { get; set; } = "18.04-LTS";
         public string VmSize { get; set; } = "Standard_D3_v2";
-        public string VnetAddressSpace { get; set; } = "10.0.0.0/24";
+        public string VnetAddressSpace { get; set; } = "10.0.0.0/16"; // 10.0.0.0 - 10.0.255.255, 65536 IPs
+        // Address space for CoA services. 
+        public string SubnetAddressSpace { get; set; } = "10.0.0.0/24"; // 10.0.0.0 - 10.0.0.255, 256 IPs
+        // Address space for kubernetes system services, must not overlap with any subnet.
+        public string KubernetesServiceCidr = "10.0.4.0/22"; // 10.0.4.0 -> 10.0.7.255, 1024 IPs
+        public string KubernetesDnsServiceIP = "10.0.4.10";
+        public string KubernetesDockerBridgeCidr = "172.17.0.1/16"; // 172.17.0.0 - 172.17.255.255, 65536 IPs
+
         public string VmUsername { get; set; } = "vmadmin";
         public string VmPassword { get; set; }
         public string ResourceGroupName { get; set; }

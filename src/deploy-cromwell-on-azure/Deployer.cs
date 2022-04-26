@@ -414,7 +414,7 @@ namespace CromwellOnAzureDeployer
                         if (vnetAndSubnet == null)
                         {
                             configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                            vnetAndSubnet = await CreateVnetAsync(resourceGroup, configuration.VnetName, configuration.VnetAddressSpace);
+                            vnetAndSubnet = await CreateVnetAsync(resourceGroup, configuration.VnetName, configuration.VnetAddressSpace, configuration.SubnetAddressSpace);
                         }
 
                         if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
@@ -602,6 +602,11 @@ namespace CromwellOnAzureDeployer
             cluster.Location = configuration.RegionName;
             cluster.DnsPrefix = configuration.AksCluserName;
             cluster.NetworkProfile = new ContainerServiceNetworkProfile();
+            cluster.NetworkProfile.NetworkPlugin = NetworkPlugin.Azure;
+            cluster.NetworkProfile.ServiceCidr = configuration.KubernetesServiceCidr;
+            cluster.NetworkProfile.DnsServiceIP = configuration.KubernetesDnsServiceIP;
+            cluster.NetworkProfile.DockerBridgeCidr = configuration.KubernetesDockerBridgeCidr;
+            cluster.NetworkProfile.NetworkPolicy = NetworkPolicy.Azure;
             cluster.Identity = new ManagedClusterIdentity(managedIdentity.PrincipalId, managedIdentity.TenantId, Microsoft.Azure.Management.ContainerService.Models.ResourceIdentityType.UserAssigned);
             cluster.Identity.UserAssignedIdentities = new Dictionary<string, ManagedClusterIdentityUserAssignedIdentitiesValue>();
             cluster.Identity.UserAssignedIdentities.Add(managedIdentity.Id, new ManagedClusterIdentityUserAssignedIdentitiesValue(managedIdentity.PrincipalId, managedIdentity.ClientId));
@@ -622,6 +627,7 @@ namespace CromwellOnAzureDeployer
                 EnableNodePublicIP = true,
                 OsType = "Linux",
                 Mode = "System",
+                VnetSubnetID = virtualNetwork.Subnets[subnetName].Inner.Id
             });
 
             var result = await Execute(
@@ -1443,7 +1449,7 @@ namespace CromwellOnAzureDeployer
             return Execute($"Creating Linux VM: {configuration.VmName}...", () => vmDefinitionPart2.CreateAsync(cts.Token));
         }
 
-        private Task<(INetwork virtualNetwork, string subnetName)> CreateVnetAsync(IResourceGroup resourceGroup, string name, string addressSpace)
+        private Task<(INetwork virtualNetwork, string subnetName)> CreateVnetAsync(IResourceGroup resourceGroup, string name, string vnetAddressSpace, string subnetAddressSpace)
             => Execute(
                 $"Creating virtual network: {name}...",
                 async () =>
@@ -1452,8 +1458,8 @@ namespace CromwellOnAzureDeployer
                         .Define(name)
                         .WithRegion(configuration.RegionName)
                         .WithExistingResourceGroup(resourceGroup)
-                        .WithAddressSpace(addressSpace)
-                        .DefineSubnet("subnet1").WithAddressPrefix(addressSpace).Attach()
+                        .WithAddressSpace(vnetAddressSpace)
+                        .DefineSubnet("subnet1").WithAddressPrefix(subnetAddressSpace).Attach()
                         .CreateAsync();
 
                     return (vnet, "subnet1");
