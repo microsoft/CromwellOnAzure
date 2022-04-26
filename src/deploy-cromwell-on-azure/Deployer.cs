@@ -363,9 +363,9 @@ namespace CromwellOnAzureDeployer
                             configuration.VmPassword = Utility.GeneratePassword();
                         }
 
-                        if (string.IsNullOrWhiteSpace(configuration.AksCluserName))
+                        if (string.IsNullOrWhiteSpace(configuration.AksClusterName))
                         {
-                            configuration.AksCluserName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 25);
+                            configuration.AksClusterName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 25);
                         }
 
                         await RegisterResourceProvidersAsync();
@@ -601,7 +601,7 @@ namespace CromwellOnAzureDeployer
             //cluster.AddonProfiles.Add("monitoring", new ManagedClusterAddonProfile(true, new Dictionary<string, string>() {{ "logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id }}));
             //cluster.PodIdentityProfile.Enabled = true;
             cluster.Location = configuration.RegionName;
-            cluster.DnsPrefix = configuration.AksCluserName;
+            cluster.DnsPrefix = configuration.AksClusterName;
             cluster.NetworkProfile = new ContainerServiceNetworkProfile();
             cluster.NetworkProfile.NetworkPlugin = NetworkPlugin.Azure;
             cluster.NetworkProfile.ServiceCidr = configuration.KubernetesServiceCidr;
@@ -632,11 +632,11 @@ namespace CromwellOnAzureDeployer
             });
 
             var result = await Execute(
-                $"Creating AKS Cluster: {configuration.AksCluserName}...",
-                () => containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksCluserName, cluster));
+                $"Creating AKS Cluster: {configuration.AksClusterName}...",
+                () => containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksClusterName, cluster));
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
-            var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup, configuration.AksCluserName);
+            var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup, configuration.AksClusterName);
             var kubeConfigFile = new FileInfo("kubeconfig.txt");
             var contents = Encoding.Default.GetString(creds.Kubeconfigs.First().Value);
             var writer = kubeConfigFile.CreateText();
@@ -648,10 +648,8 @@ namespace CromwellOnAzureDeployer
             var k8sConfig = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
             IKubernetes client = new Kubernetes(k8sConfig);
 
-            var poolIdentity = await azureSubscriptionClient.Identities.GetByResourceGroupAsync(result.NodeResourceGroup, $"{configuration.AksCluserName}-agentpool");
+            var poolIdentity = await azureSubscriptionClient.Identities.GetByResourceGroupAsync(result.NodeResourceGroup, $"{configuration.AksClusterName}-agentpool");
             await AssignVmAsContributorToStorageAccountAsync(poolIdentity, resourceGroupObject);
-            await AssignVmAsContributorToStorageAccountAsync(poolIdentity, storageAccount);
-            await AssignVmAsDataReaderToStorageAccountAsync(poolIdentity, storageAccount);
 
             // Install CSI driver. 
             await InstallCSIBlobDriver(client);
@@ -686,7 +684,6 @@ namespace CromwellOnAzureDeployer
             AddStaticVolumeClaim(cromwellDeploymentBody, configurationMountName, "/configuration");
             AddStaticVolumeClaim(cromwellDeploymentBody, executionsMountName, "/cromwell-executions");
             AddStaticVolumeClaim(cromwellDeploymentBody, workflowLogsMountName, "/cromwell-workflow-logs");
-
 
             // Example to set Environment Variables for trigger service.
             var triggerEnv = new List<V1EnvVar>();
