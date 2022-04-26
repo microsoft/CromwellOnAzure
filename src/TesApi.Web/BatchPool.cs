@@ -448,25 +448,43 @@ namespace TesApi.Web
 
             var previousHashCode = RepositoryItem.GetHashCode();
 
-            if (RepositoryItem.IsAvailable != IsAvailable) { logger.LogTrace("IsAvailable is different"); }
-            RepositoryItem.IsAvailable = IsAvailable;
+            if (RepositoryItem.IsAvailable != IsAvailable)
+            {
+                logger.LogTrace("IsAvailable is different");
+                RepositoryItem.IsAvailable = IsAvailable;
+            }
 
-            if (RepositoryItem.Changed != Changed) { logger.LogTrace("Changed is different"); }
-            RepositoryItem.Changed = Changed;
+            if (RepositoryItem.Changed != Changed)
+            {
+                logger.LogTrace("Changed is different");
+                RepositoryItem.Changed = Changed;
+            }
 
-            if (RepositoryItem.RequestedDedicatedNodes != TargetDedicated) { logger.LogTrace("TargetDedicated is different"); }
-            RepositoryItem.RequestedDedicatedNodes = TargetDedicated;
+            if (RepositoryItem.RequestedDedicatedNodes != TargetDedicated)
+            {
+                logger.LogTrace("TargetDedicated is different");
+                RepositoryItem.RequestedDedicatedNodes = TargetDedicated;
+            }
 
-            if (RepositoryItem.RequestedLowPriorityNodes != TargetLowPriority) { logger.LogTrace("TargetLowPriority is different"); }
-            RepositoryItem.RequestedLowPriorityNodes = TargetLowPriority;
+            if (RepositoryItem.RequestedLowPriorityNodes != TargetLowPriority)
+            {
+                logger.LogTrace("TargetLowPriority is different");
+                RepositoryItem.RequestedLowPriorityNodes = TargetLowPriority;
+            }
 
             var reservations = ReservedComputeNodes.Select(a => a.Affinity.AffinityId).ToList();
-            if (!RepositoryItem.Reservations.SequenceEqual(reservations)) { logger.LogTrace("ReservedComputeNodes is different"); }
-            RepositoryItem.Reservations = reservations;
+            if (!RepositoryItem.Reservations.SequenceEqual(reservations))
+            {
+                logger.LogTrace("ReservedComputeNodes is different");
+                RepositoryItem.Reservations = reservations;
+            }
 
             var pendingReservations = PendingReservations.Select(p => new PendingReservationItem { JobId = p.Key, Created = p.Value.QueuedTime, IsDedicated = !p.Value.IsLowPriority, IsRequested = p.Value.IsRequested }).ToList();
-            if (!RepositoryItem.PendingReservations.SequenceEqual(pendingReservations)) { logger.LogTrace("PendingReservations is different"); }
-            RepositoryItem.PendingReservations = pendingReservations;
+            if (!RepositoryItem.PendingReservations.SequenceEqual(pendingReservations))
+            {
+                logger.LogTrace("PendingReservations is different");
+                RepositoryItem.PendingReservations = pendingReservations;
+            }
 
             if (RepositoryItem.GetHashCode() == previousHashCode)
             {

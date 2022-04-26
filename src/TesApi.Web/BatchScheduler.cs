@@ -1648,6 +1648,7 @@ namespace TesApi.Web
                     logger.LogDebug("Updating pool '{PoolId}'.", pool.Pool.PoolId);
                     pool.ReplaceRepositoryItem(await _poolDataRepository.UpdateItemAsync(pool.RepositoryItem));
                     pool.ChangesRepositoryItem.ResetChanges();
+                    logger.LogDebug("Updated pool '{PoolId}' ({HasChanges}).", pool.Pool.PoolId, pool.ChangesRepositoryItem.HasChanges);
                 }));
                 changes = true;
             }
