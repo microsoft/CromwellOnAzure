@@ -535,16 +535,14 @@ namespace TesApi.Web
             this.azureProxy = azureProxy;
             this.logger = logger;
             _batchPools = batchPools as IBatchPoolsImpl ?? throw new ArgumentException("batchPools must be of type IBatchPoolsImpl", nameof(batchPools));
+            _hasChangesRepository = new(this);
 
-            _hasChangesRepository = new(RepositoryItem);
             Changed = RepositoryItem.Changed;
             IsAvailable = RepositoryItem.IsAvailable;
             TargetDedicated = RepositoryItem.RequestedDedicatedNodes;
             TargetLowPriority = RepositoryItem.RequestedLowPriorityNodes;
             ReservedComputeNodes = RepositoryItem.Reservations.Select<string, EquatableAffinityInformation>(r => new(new(r))).ToList();
-
             PendingReservations = RepositoryItem.PendingReservations.ToDictionary(p => p.JobId, p => new PendingReservation(p));
-
             ResizeDirty = false;
         }
         #endregion

@@ -49,29 +49,29 @@ namespace TesApi.Web
     }
 
     /// <inheritdoc/>
-    public class HasChangesRepositoryItem<TRepositoryItem> : IHasChangesRepositoryItem<TRepositoryItem> where TRepositoryItem : RepositoryItem<TRepositoryItem>
+    public class HasChangesRepositoryItem<T> : IHasChangesRepositoryItem<T> where T : RepositoryItem<T>
     {
-        private readonly TRepositoryItem _repositoryItem;
+        private readonly IHasRepositoryItem<T> _repositoryItemOwner;
         private int _checkpoint;
 
         /// <summary>
         /// TODO
         /// </summary>
-        /// <param name="repositoryItem"></param>
+        /// <param name="repositoryItemOwner"></param>
         /// <exception cref="ArgumentNullException"></exception>
-        public HasChangesRepositoryItem(TRepositoryItem repositoryItem)
+        public HasChangesRepositoryItem(IHasRepositoryItem<T> repositoryItemOwner)
         {
-            _repositoryItem = repositoryItem ?? throw new ArgumentNullException(nameof(repositoryItem));
-            _checkpoint = repositoryItem.GetHashCode();
+            _repositoryItemOwner = repositoryItemOwner ?? throw new ArgumentNullException(nameof(repositoryItemOwner));
+            ResetChanges();
         }
 
         /// <inheritdoc/>
         public bool HasChanges
-            => _checkpoint != _repositoryItem.GetHashCode();
+            => _checkpoint != _repositoryItemOwner.RepositoryItem.GetHashCode();
 
         /// <inheritdoc/>
         public void ResetChanges()
-            => _checkpoint = _repositoryItem.GetHashCode();
+            => _checkpoint = _repositoryItemOwner.RepositoryItem.GetHashCode();
     }
 
     /// <summary>
