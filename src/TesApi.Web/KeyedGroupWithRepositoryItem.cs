@@ -19,7 +19,7 @@ namespace TesApi.Web
     public abstract class KeyedGroup<TElement, TSet> : IEnumerable<TElement> where TSet : GroupableSet<TElement>
     {
         #region Private implementation
-        private readonly KeyedCollectionWithRepositoryItem _sets;
+        private readonly KeyedCollectionWrapper _sets;
 
         private bool CreateSet(TElement element)
         {
@@ -40,12 +40,6 @@ namespace TesApi.Web
 
         #region Protected implementation
         /// <summary>
-        /// TODO:
-        /// </summary>
-        protected IReadOnlyDictionary<string, TSet> Dictionary
-            => new ReadOnlyDictionary<string, TSet>(_sets.Dictionary ?? Enumerable.Empty<KeyValuePair<string, TSet>>().ToDictionary(p => p.Key, p => p.Value));
-
-        /// <summary>
         /// A method that creates new <see cref="GroupablSetWithRepositoryElements{TElement, TRepositoryItem}"/> objects.
         /// </summary>
         protected abstract Func<IEnumerable<TElement>, TSet> CreateSetFunc { get; }
@@ -57,7 +51,7 @@ namespace TesApi.Web
         /// </summary>
         /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="KeyValuePair{TKey, TValue}"/> where <see cref="KeyValuePair{TKey, TValue}.Value"/> is an <see cref="GroupablSetWithRepositoryElements{TElement, TRepositoryItem}"/> object.</returns>
         public virtual IEnumerable<KeyValuePair<string, TSet>> GetGroups()
-            => Dictionary;
+            => _sets.GetGroups();
 
 
         /// <summary>
@@ -97,7 +91,7 @@ namespace TesApi.Web
         /// Gets an <see cref="IEnumerable{T}"/> containing the keys of this object.
         /// </summary>
         public virtual IEnumerable<string> Keys
-            => Dictionary.Keys;
+            => _sets.Keys;
 
         /// <summary>
         /// Tries to get an item from the collection using the specified key.
@@ -170,127 +164,149 @@ namespace TesApi.Web
         #endregion
 
         #region Embedded classes
-        private class KeyedCollectionWithRepositoryItem : KeyedCollection<string, TSet>
+        private class KeyedCollectionWrapper : KeyedCollection<string, TSet>
         {
             public Func<TElement, string> GetKeyForItemFunc { get; }
-            public new IDictionary<string, TSet> Dictionary
-                => base.Dictionary;
 
-            public KeyedCollectionWithRepositoryItem(Func<TElement, string> getKeyForItemFunc, IEqualityComparer<string> comparer = default)
+            public virtual IEnumerable<KeyValuePair<string, TSet>> GetGroups()
+                => Dictionary;
+
+            public virtual IEnumerable<string> Keys
+                => Dictionary.Keys;
+
+            public KeyedCollectionWrapper(Func<TElement, string> getKeyForItemFunc, IEqualityComparer<string> comparer = default)
                 : base(comparer ?? StringComparer.Ordinal)
                 => GetKeyForItemFunc = getKeyForItemFunc ?? throw new ArgumentNullException(nameof(getKeyForItemFunc));
+
+            #region Overrides
+            private readonly Dictionary<TSet, string> keyMap = new();
+
             protected override string GetKeyForItem(TSet item)
-                => GetKeyForItemFunc(item.FirstOrDefault());
+            {
+                if (keyMap.TryGetValue(item, out var key))
+                {
+                    return key;
+                }
+
+                key = GetKeyForItemFunc(item.First());
+                keyMap.Add(item, key);
+                return key;
+            }
+
+            protected override void ClearItems()
+            {
+                base.ClearItems();
+                keyMap.Clear();
+            }
+
+            protected override void RemoveItem(int index)
+            {
+                var item = Items[index];
+                base.RemoveItem(index);
+                keyMap.Remove(item);
+            }
+            #endregion
         }
         #endregion
     }
 
-    /// <summary>
-    /// TODO
-    /// </summary>
-    /// <typeparam name="TElement"></typeparam>
-    /// <typeparam name="TSet"></typeparam>
-    public abstract class KeyedGroupRepositoryItem<TElement, TSet> : RepositoryItem<KeyedGroupRepositoryItem<TElement, TSet>>, IEnumerable<TElement> where TSet : GroupableSet<TElement>
-    {
-        #region Private implementation
-        private readonly WrappedKeyedGroup _group;
+    ///// <summary>
+    ///// TODO
+    ///// </summary>
+    ///// <typeparam name="TElement"></typeparam>
+    ///// <typeparam name="TSet"></typeparam>
+    //public abstract class KeyedGroupRepositoryItem<TElement, TSet> : RepositoryItem<KeyedGroupRepositoryItem<TElement, TSet>>, IEnumerable<TElement> where TSet : GroupableSet<TElement>
+    //{
+    //    #region Private implementation
+    //    private readonly WrappedKeyedGroup _group;
 
-        private class WrappedKeyedGroup : KeyedGroup<TElement, TSet>
-        {
-            public WrappedKeyedGroup(Func<TElement, string> getKeyForItemFunc, IEqualityComparer<string> comparer = null) : base(getKeyForItemFunc, comparer) { }
+    //    private class WrappedKeyedGroup : KeyedGroup<TElement, TSet>
+    //    {
+    //        public WrappedKeyedGroup(Func<TElement, string> getKeyForItemFunc, IEqualityComparer<string> comparer = null) : base(getKeyForItemFunc, comparer) { }
 
-            internal IReadOnlyDictionary<string, TSet> WrappedDictionary
-                => base.Dictionary;
+    //        internal Func<IEnumerable<TElement>, TSet> WrappedCreateSetFunc { get; set; }
+    //        protected override Func<IEnumerable<TElement>, TSet> CreateSetFunc
+    //            => WrappedCreateSetFunc;
+    //    }
+    //    #endregion
 
-            internal Func<IEnumerable<TElement>, TSet> WrappedCreateSetFunc { get; set; }
-            protected override Func<IEnumerable<TElement>, TSet> CreateSetFunc
-                => WrappedCreateSetFunc;
-        }
-        #endregion
+    //    #region Constructors
+    //    /// <summary>
+    //    /// Initializes a new instance of the <see cref="KeyedGroupRepositoryItem{TElement, TSet}"/> class that uses the specified key extraction method and the specified equality comparer.
+    //    /// </summary>
+    //    /// <param name="getKeyForItemFunc">A method that extracts the key from the specified element.</param>
+    //    /// <param name="comparer">The implementation of the <see cref="IEqualityComparer{T}"/> generic interface to use when comparing keys, or null to use the default equality comparer for the type of the key, obtained from <see cref="EqualityComparer{T}.Default"/>.</param>
+    //    protected KeyedGroupRepositoryItem(Func<TElement, string> getKeyForItemFunc, IEqualityComparer<string> comparer = default)
+    //    {
+    //        _group = new(getKeyForItemFunc, comparer);
+    //        _group.WrappedCreateSetFunc = CreateSetFunc;
+    //    }
+    //    #endregion
 
-        #region Constructors
-        /// <summary>
-        /// Initializes a new instance of the <see cref="KeyedGroupRepositoryItem{TElement, TSet}"/> class that uses the specified key extraction method and the specified equality comparer.
-        /// </summary>
-        /// <param name="getKeyForItemFunc">A method that extracts the key from the specified element.</param>
-        /// <param name="comparer">The implementation of the <see cref="IEqualityComparer{T}"/> generic interface to use when comparing keys, or null to use the default equality comparer for the type of the key, obtained from <see cref="EqualityComparer{T}.Default"/>.</param>
-        protected KeyedGroupRepositoryItem(Func<TElement, string> getKeyForItemFunc, IEqualityComparer<string> comparer = default)
-        {
-            _group = new(getKeyForItemFunc, comparer);
-            _group.WrappedCreateSetFunc = CreateSetFunc;
-        }
-        #endregion
+    //    #region Protected implementation
+    //    /// <summary>
+    //    /// A method that creates new <see cref="GroupablSetWithRepositoryElements{TElement, TRepositoryItem}"/> objects.
+    //    /// </summary>
+    //    protected abstract Func<IEnumerable<TElement>, TSet> CreateSetFunc { get; }
+    //    #endregion
 
-        #region Protected implementation
-        /// <summary>
-        /// TODO:
-        /// </summary>
-        protected IReadOnlyDictionary<string, TSet> Dictionary
-            => _group.WrappedDictionary;
+    //    #region Public implementation
+    //    /// <summary>
+    //    /// Database identifier
+    //    /// </summary>
+    //    [DataMember(Name = "id")]
+    //    public string Id { get; set; }
 
-        /// <summary>
-        /// A method that creates new <see cref="GroupablSetWithRepositoryElements{TElement, TRepositoryItem}"/> objects.
-        /// </summary>
-        protected abstract Func<IEnumerable<TElement>, TSet> CreateSetFunc { get; }
-        #endregion
-
-        #region Public implementation
-        /// <summary>
-        /// Database identifier
-        /// </summary>
-        [DataMember(Name = "id")]
-        public string Id { get; set; }
-
-        /// <summary>
-        /// Enumerates all elements grouped by their computed keys
-        /// </summary>
-        /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="KeyValuePair{TKey, TValue}"/> where <see cref="KeyValuePair{TKey, TValue}.Value"/> is an <see cref="GroupablSetWithRepositoryElements{TElement, TRepositoryItem}"/> object.</returns>
-        public virtual IEnumerable<KeyValuePair<string, TSet>> GetGroups()
-            => _group.GetGroups();
+    //    /// <summary>
+    //    /// Enumerates all elements grouped by their computed keys
+    //    /// </summary>
+    //    /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="KeyValuePair{TKey, TValue}"/> where <see cref="KeyValuePair{TKey, TValue}.Value"/> is an <see cref="GroupablSetWithRepositoryElements{TElement, TRepositoryItem}"/> object.</returns>
+    //    public virtual IEnumerable<KeyValuePair<string, TSet>> GetGroups()
+    //        => _group.GetGroups();
 
 
-        /// <summary>
-        /// Adds the specified element to a set.
-        /// </summary>
-        /// <param name="element">The element to add to the set.</param>
-        /// <returns>true if the element is added to this object; false if the element is already present.</returns>
-        public virtual bool Add(TElement element)
-            => _group.Add(element);
+    //    /// <summary>
+    //    /// Adds the specified element to a set.
+    //    /// </summary>
+    //    /// <param name="element">The element to add to the set.</param>
+    //    /// <returns>true if the element is added to this object; false if the element is already present.</returns>
+    //    public virtual bool Add(TElement element)
+    //        => _group.Add(element);
 
-        /// <summary>
-        /// Removes the first occurrence of a specific object from this object.
-        /// </summary>
-        /// <param name="element">The object to remove from this object.</param>
-        /// <returns>true if item was successfully removed from this object; otherwise, false. This method also returns false if item is not found in this object.</returns>
-        /// <exception cref="InvalidOperationException">This object is corrupt.</exception>
-        public virtual bool Remove(TElement element)
-            => _group.Remove(element);
+    //    /// <summary>
+    //    /// Removes the first occurrence of a specific object from this object.
+    //    /// </summary>
+    //    /// <param name="element">The object to remove from this object.</param>
+    //    /// <returns>true if item was successfully removed from this object; otherwise, false. This method also returns false if item is not found in this object.</returns>
+    //    /// <exception cref="InvalidOperationException">This object is corrupt.</exception>
+    //    public virtual bool Remove(TElement element)
+    //        => _group.Remove(element);
 
-        /// <summary>
-        /// Gets an <see cref="IEnumerable{T}"/> containing the keys of this object.
-        /// </summary>
-        public virtual IEnumerable<string> Keys
-            => _group.Keys;
+    //    /// <summary>
+    //    /// Gets an <see cref="IEnumerable{T}"/> containing the keys of this object.
+    //    /// </summary>
+    //    public virtual IEnumerable<string> Keys
+    //        => _group.Keys;
 
-        /// <summary>
-        /// Tries to get an item from the collection using the specified key.
-        /// </summary>
-        /// <param name="key">The key of the item to search in the collection.</param>
-        /// <param name="set">When this method returns true, the item from the collection that matches the provided key; when this method returns false, the default value for the type of the collection.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="key"/> is null.</exception>
-        /// <returns>true if an item for the specified key was found in the collection; otherwise, false.</returns>
-        public virtual bool TryGetValue(string key, out TSet set)
-            => _group.TryGetValue(key, out set);
-        #endregion
+    //    /// <summary>
+    //    /// Tries to get an item from the collection using the specified key.
+    //    /// </summary>
+    //    /// <param name="key">The key of the item to search in the collection.</param>
+    //    /// <param name="set">When this method returns true, the item from the collection that matches the provided key; when this method returns false, the default value for the type of the collection.</param>
+    //    /// <exception cref="ArgumentNullException"><paramref name="key"/> is null.</exception>
+    //    /// <returns>true if an item for the specified key was found in the collection; otherwise, false.</returns>
+    //    public virtual bool TryGetValue(string key, out TSet set)
+    //        => _group.TryGetValue(key, out set);
+    //    #endregion
 
-        #region IEnumerable
-        IEnumerator<TElement> IEnumerable<TElement>.GetEnumerator()
-            => ((IEnumerable<TElement>)_group).GetEnumerator();
+    //    #region IEnumerable
+    //    IEnumerator<TElement> IEnumerable<TElement>.GetEnumerator()
+    //        => ((IEnumerable<TElement>)_group).GetEnumerator();
 
-        IEnumerator IEnumerable.GetEnumerator()
-            => ((IEnumerable)_group).GetEnumerator();
-        #endregion
-    }
+    //    IEnumerator IEnumerable.GetEnumerator()
+    //        => ((IEnumerable)_group).GetEnumerator();
+    //    #endregion
+    //}
 
     /// <summary>
     /// TODO
@@ -307,14 +323,6 @@ namespace TesApi.Web
         /// <param name="getKeyForItemFunc">A method that extracts the key from the specified element.</param>
         /// <param name="comparer">The implementation of the <see cref="IEqualityComparer{T}"/> generic interface to use when comparing keys, or null to use the default equality comparer for the type of the key, obtained from <see cref="EqualityComparer{T}.Default"/>.</param>
         protected KeyedGroupWithRepositoryElements(Func<TElement, string> getKeyForItemFunc, IEqualityComparer<string> comparer = default) : base(getKeyForItemFunc, comparer) { }
-        #endregion
-
-        #region Protected implementation
-        /// <summary>
-        /// TODO:
-        /// </summary>
-        protected new IReadOnlyDictionary<string, GroupablSetWithRepositoryElements<TElement, TRepositoryItem>> Dictionary
-            => (IReadOnlyDictionary<string, GroupablSetWithRepositoryElements<TElement, TRepositoryItem>>)base.Dictionary;
         #endregion
 
         #region Public methods

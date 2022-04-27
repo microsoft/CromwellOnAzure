@@ -27,6 +27,26 @@ namespace TesApi.Tests
         private static readonly Regex downloadFilesBlobxferRegex = new(@"path='([^']*)' && url='([^']*)' && blobxfer download");
         private static readonly Regex downloadFilesWgetRegex = new(@"path='([^']*)' && url='([^']*)' && mkdir .* wget");
 
+
+        [TestCategory("Batch Pools")]
+        [TestMethod]
+        public async Task LocalPoolCacheAccessesNewPoolsAfterAllPoolsRemovedWithSameKey()
+        {
+            using var serviceProvider = GetServiceProvider();
+            var batchScheduler = serviceProvider.GetT();
+            var pools = (IBatchPoolsImpl)batchScheduler;
+            var pool = await AddPool(pools);
+            var key = pools.GetPoolGroupKeys().First();
+            Assert.IsTrue(await pools.RemovePoolFromListAsync(pool));
+            Assert.AreEqual(0, pools.GetPoolGroupKeys().Count());
+
+            pool = await pools.GetOrAddAsync(key, id => ValueTask.FromResult(new Pool(name: id)));
+
+            Assert.AreEqual(1, pools.GetPoolGroupKeys().Count());
+            Assert.IsTrue(pools.TryGet(pool.Pool.PoolId, out var pool1));
+            Assert.AreSame(pool, pool1);
+        }
+
         [TestCategory("Batch Pools")]
         [TestMethod]
         public async Task GetOrAddDoesNotAddExistingAvailablePool()
