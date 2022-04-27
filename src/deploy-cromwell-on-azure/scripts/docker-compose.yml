@@ -37,9 +37,9 @@ services:
       - MarthaUrl=$MarthaUrl
       - MarthaKeyVaultName=$MarthaKeyVaultName
       - MarthaSecretName=$MarthaSecretName
-      - BatchPoolIdleNodeTime=$BatchPoolIdleNodeTime
-      - BatchPoolIdlePoolTime=$BatchPoolIdlePoolTime
-      - BatchPoolRotationForcedTime=$BatchPoolRotationForcedTime
+      - BatchPoolIdleNodeMinutes=$BatchPoolIdleNodeMinutes
+      - BatchPoolIdlePoolMinutes=$BatchPoolIdlePoolMinutes
+      - BatchPoolRotationForcedDays=$BatchPoolRotationForcedDays
     expose:
       - "80"
     volumes:

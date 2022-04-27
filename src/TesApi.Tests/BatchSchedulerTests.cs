@@ -56,13 +56,13 @@ namespace TesApi.Tests
             var info = await AddPool(pools);
             var keyCount = ((IBatchPoolsImpl)pools).GetPoolGroupKeys().Count();
             var key = ((IBatchPoolsImpl)pools).GetPoolGroupKeys().First();
-            var count = await pools.GetPoolsAsync().CountAsync();
+            var count = pools.GetPools().Count();
             serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>()), Times.Once);
 
             var pool = await ((IBatchPoolsImpl)pools).GetOrAddAsync(key, id => ValueTask.FromResult(new Pool(name: id)));
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
 
-            Assert.AreEqual(await pools.GetPoolsAsync().CountAsync(), count);
+            Assert.AreEqual(pools.GetPools().Count(), count);
             Assert.AreEqual(((IBatchPoolsImpl)pools).GetPoolGroupKeys().Count(), keyCount);
             //Assert.AreSame(info, pool);
             Assert.AreEqual(info.Pool.PoolId, pool.Pool.PoolId);
@@ -80,12 +80,12 @@ namespace TesApi.Tests
             await info.ServicePoolAsync(IBatchPool.ServiceKind.Update);
             var keyCount = ((IBatchPoolsImpl)pools).GetPoolGroupKeys().Count();
             var key = ((IBatchPoolsImpl)pools).GetPoolGroupKeys().First();
-            var count = await pools.GetPoolsAsync().CountAsync();
+            var count = pools.GetPools().Count();
 
             var pool = await ((IBatchPoolsImpl)pools).GetOrAddAsync(key, id => ValueTask.FromResult(new Pool(name: id)));
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
 
-            Assert.AreNotEqual(await pools.GetPoolsAsync().CountAsync(), count);
+            Assert.AreNotEqual(pools.GetPools().Count(), count);
             Assert.AreEqual(((IBatchPoolsImpl)pools).GetPoolGroupKeys().Count(), keyCount);
             //Assert.AreNotSame(info, pool);
             Assert.AreNotEqual(info.Pool.PoolId, pool.Pool.PoolId);
@@ -162,13 +162,13 @@ namespace TesApi.Tests
             ((IBatchPoolImpl)pool).TestSetAvailable(false);
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
             Assert.IsFalse(((IBatchPoolsImpl)pools).IsPoolAvailable("key1"));
-            Assert.IsTrue(await pools.GetPoolsAsync().AnyAsync());
+            Assert.IsTrue(pools.GetPools().Any());
 
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
 
             Assert.AreEqual(pool.Pool.PoolId, poolId);
             Assert.IsFalse(((IBatchPoolsImpl)pools).IsPoolAvailable("key1"));
-            Assert.IsFalse(await pools.GetPoolsAsync().AnyAsync());
+            Assert.IsFalse(pools.GetPools().Any());
         }
 
 

@@ -1674,8 +1674,8 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public IAsyncEnumerable<IBatchPool> GetPoolsAsync()
-            => batchPools.ToAsyncEnumerable();
+        public IEnumerable<IBatchPool> GetPools()
+            => batchPools;
 
         private ValueTask<bool> AddPoolAsync(IBatchPool pool)
             => batchPools.AddAsync(pool, false);

@@ -25,7 +25,7 @@ namespace TesApi.Web
         /// Enumerates all the managed batch pools.
         /// </summary>
         /// <returns></returns>
-        IAsyncEnumerable<IBatchPool> GetPoolsAsync();
+        IEnumerable<IBatchPool> GetPools();
 
         /// <summary>
         /// Synchronizes the CosmosDB storage of batch pool metadata

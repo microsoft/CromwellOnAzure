@@ -119,7 +119,7 @@ namespace TesApi.Web
                         || (t.State == TesState.CANCELEDEnum && t.IsCancelRequested)))
                 .ToList();
 
-            if (!tesTasks.Any())
+            if (0 == tesTasks.Count)
             {
                 return;
             }
@@ -213,7 +213,7 @@ namespace TesApi.Web
             }
             catch (Exception exc)
             {
-                logger.LogError(exc, "UpdateBatchPools threw an exception.");
+                logger.LogError(exc, "UpdateBatchPools threw an exception in UpdateBatchPools.");
             }
 
             logger.LogDebug($"UpdateBatchPools completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
@@ -226,11 +226,10 @@ namespace TesApi.Web
         /// <returns></returns>
         private async Task ServiceBatchPools(CancellationToken cancellationToken)
         {
-            var pools = await batchScheduler.GetPoolsAsync().ToListAsync(cancellationToken);
+            var pools = batchScheduler.GetPools().ToList();
 
             if (0 == pools.Count)
             {
-                logger.LogTrace("No pools found.");
                 return;
             }
 
@@ -244,7 +243,7 @@ namespace TesApi.Web
                 }
                 catch (Exception exc)
                 {
-                    logger.LogError(exc, "Batch pool {PoolId} threw an exception.", pool.Pool?.PoolId);
+                    logger.LogError(exc, "Batch pool {PoolId} threw an exception in ServiceBatchPools.", pool.Pool?.PoolId);
                 }
             }
 

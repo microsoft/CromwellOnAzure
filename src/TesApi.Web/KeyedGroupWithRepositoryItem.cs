@@ -169,10 +169,10 @@ namespace TesApi.Web
             public Func<TElement, string> GetKeyForItemFunc { get; }
 
             public virtual IEnumerable<KeyValuePair<string, TSet>> GetGroups()
-                => Dictionary;
+                => Dictionary ?? Enumerable.Empty<KeyValuePair<string, TSet>>();
 
             public virtual IEnumerable<string> Keys
-                => Dictionary.Keys;
+                => Dictionary?.Keys ?? Enumerable.Empty<string>();
 
             public KeyedCollectionWrapper(Func<TElement, string> getKeyForItemFunc, IEqualityComparer<string> comparer = default)
                 : base(comparer ?? StringComparer.Ordinal)

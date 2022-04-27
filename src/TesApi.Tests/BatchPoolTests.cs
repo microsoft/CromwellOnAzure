@@ -736,9 +736,9 @@ namespace TesApi.Tests
         private static IEnumerable<(string Key, string Value)> GetMockConfig()
             => Enumerable
                 .Empty<(string Key, string Value)>()
-                .Append(("BatchPoolIdleNodeTime", "0.3"))
-                .Append(("BatchPoolIdlePoolTime", "0.6"))
-                .Append(("BatchPoolRotationForcedTime", "0.000694444"));
+                .Append(("BatchPoolIdleNodeMinutes", "0.3"))
+                .Append(("BatchPoolIdlePoolMinutes", "0.6"))
+                .Append(("BatchPoolRotationForcedDays", "0.000694444"));
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         static async IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(ComputeNode[] nodes, string id, ODATADetailLevel detail, Action<string, ODATADetailLevel> validate, Predicate<ComputeNode> select = default)

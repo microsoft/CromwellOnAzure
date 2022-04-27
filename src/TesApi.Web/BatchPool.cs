@@ -51,17 +51,41 @@ namespace TesApi.Web
         {
             SetPoolData(this, replacementItem);
             RepositoryItem = replacementItem;
-            logger.LogDebug("Repository item replaced.");
         }
 
         private static void SetPoolData(BatchPool pool, PoolData data)
         {
-            data.Changed = pool.Changed;
-            data.IsAvailable = pool.IsAvailable;
-            data.RequestedDedicatedNodes = pool.TargetDedicated;
-            data.RequestedLowPriorityNodes = pool.TargetLowPriority;
-            data.Reservations = pool.ReservedComputeNodes.Select(a => a.Affinity.AffinityId).ToList();
-            data.PendingReservations = pool.PendingReservations.Select(p => new PendingReservationItem { JobId = p.Key, Created = p.Value.QueuedTime, IsRequested = p.Value.IsRequested, IsDedicated = !p.Value.IsLowPriority }).ToList();
+            if (data.Changed != pool.Changed)
+            {
+                data.Changed = pool.Changed;
+            }
+
+            if (data.IsAvailable != pool.IsAvailable)
+            {
+                data.IsAvailable = pool.IsAvailable;
+            }
+
+            if (data.RequestedDedicatedNodes != pool.TargetDedicated)
+            {
+                data.RequestedDedicatedNodes = pool.TargetDedicated;
+            }
+
+            if (data.RequestedLowPriorityNodes != pool.TargetLowPriority)
+            {
+                data.RequestedLowPriorityNodes = pool.TargetLowPriority;
+            }
+
+            var reservations = pool.ReservedComputeNodes.Select(a => a.Affinity.AffinityId).ToList();
+            if (!data.Reservations.SequenceEqual(reservations))
+            {
+                data.Reservations = reservations;
+            }
+
+            var pendingReservations = pool.PendingReservations.Select(p => new PendingReservationItem { JobId = p.Key, Created = p.Value.QueuedTime, IsDedicated = !p.Value.IsLowPriority, IsRequested = p.Value.IsRequested }).ToList();
+            if (!data.PendingReservations.SequenceEqual(pendingReservations))
+            {
+                data.PendingReservations = pendingReservations;
+            }
         }
 
         /// <inheritdoc/>
@@ -197,22 +221,6 @@ namespace TesApi.Web
                 ServicePoolUpdateAsync().AsTask().Wait();
             }
         }
-
-        ///// <inheritdoc/>
-        //public async ValueTask<bool> UpdateIfNeeded(IBatchPool other, CancellationToken cancellationToken)
-        //{
-        //    var changed = false;
-        //    var scratch = new PoolData { PoolId = other.RepositoryItem.PoolId, Created = other.RepositoryItem.Created };
-        //    SetPoolData(other as BatchPool, scratch);
-        //    if (RepositoryItem.GetHashCode() != other.RepositoryItem.GetHashCode())
-        //    {
-        //        logger.LogDebug("Updating metadata for '{PoolId}'", Pool.PoolId);
-        //        ((IHasRepositoryItem<PoolData>)this).ReplaceRepositoryItem(other.RepositoryItem);
-        //        changed = true;
-        //    }
-
-        //    return changed;
-        //}
 
         /// <inheritdoc/>
         public async ValueTask ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState)
@@ -405,8 +413,7 @@ namespace TesApi.Web
             }
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "Pattern")]
-        private ValueTask ServicePoolRotateAsync(CancellationToken cancellationToken = default)
+        private ValueTask ServicePoolRotateAsync(CancellationToken _1 = default)
         {
             if (IsAvailable)
             {
@@ -442,57 +449,10 @@ namespace TesApi.Web
         {
             if (_isRemoved)
             {
-                logger.LogDebug("Removing pool {PoolId} from repository", RepositoryItem.PoolId);
                 return ValueTask.CompletedTask;
             }
 
-            var previousHashCode = RepositoryItem.GetHashCode();
-
-            if (RepositoryItem.IsAvailable != IsAvailable)
-            {
-                logger.LogTrace("IsAvailable is different");
-                RepositoryItem.IsAvailable = IsAvailable;
-            }
-
-            if (RepositoryItem.Changed != Changed)
-            {
-                logger.LogTrace("Changed is different");
-                RepositoryItem.Changed = Changed;
-            }
-
-            if (RepositoryItem.RequestedDedicatedNodes != TargetDedicated)
-            {
-                logger.LogTrace("TargetDedicated is different");
-                RepositoryItem.RequestedDedicatedNodes = TargetDedicated;
-            }
-
-            if (RepositoryItem.RequestedLowPriorityNodes != TargetLowPriority)
-            {
-                logger.LogTrace("TargetLowPriority is different");
-                RepositoryItem.RequestedLowPriorityNodes = TargetLowPriority;
-            }
-
-            var reservations = ReservedComputeNodes.Select(a => a.Affinity.AffinityId).ToList();
-            if (!RepositoryItem.Reservations.SequenceEqual(reservations))
-            {
-                logger.LogTrace("ReservedComputeNodes is different");
-                RepositoryItem.Reservations = reservations;
-            }
-
-            var pendingReservations = PendingReservations.Select(p => new PendingReservationItem { JobId = p.Key, Created = p.Value.QueuedTime, IsDedicated = !p.Value.IsLowPriority, IsRequested = p.Value.IsRequested }).ToList();
-            if (!RepositoryItem.PendingReservations.SequenceEqual(pendingReservations))
-            {
-                logger.LogTrace("PendingReservations is different");
-                RepositoryItem.PendingReservations = pendingReservations;
-            }
-
-            if (RepositoryItem.GetHashCode() == previousHashCode)
-            {
-                logger.LogDebug("Should not be updating pool {PoolId} in repository ({HasChanges})", RepositoryItem.PoolId, _hasChangesRepository.HasChanges);
-                return ValueTask.CompletedTask;
-            }
-
-            logger.LogDebug("Should be updating pool {PoolId} in repository ({HasChanges})", RepositoryItem.PoolId, _hasChangesRepository.HasChanges);
+            SetPoolData(this, RepositoryItem);
             return ValueTask.CompletedTask;
         }
         #endregion
@@ -546,9 +506,9 @@ namespace TesApi.Web
             RepositoryItem = data ?? throw new ArgumentNullException(nameof(data));
             Pool = poolId ?? throw new ArgumentNullException(nameof(poolId));
 
-            _idleNodeCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdleNodeTime", 5)); // TODO: set this to an appropriate value
-            _idlePoolCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdlePoolTime", 30)); // TODO: set this to an appropriate value
-            _forcePoolRotationAge = TimeSpan.FromDays(configuration.GetValue<double>("BatchPoolRotationForcedTime", 60)); // TODO: set this to an appropriate value
+            _idleNodeCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdleNodeMinutes", 0.125));
+            _idlePoolCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdlePoolMinutes", 0.125));
+            _forcePoolRotationAge = TimeSpan.FromDays(configuration.GetValue<double>("BatchPoolRotationForcedDays", 60));
 
             this.azureProxy = azureProxy;
             this.logger = logger;
