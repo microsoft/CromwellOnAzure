@@ -12,18 +12,15 @@ namespace TesApi.Web
     /// </summary>
     public interface IBatchPool : IHasRepositoryItem<BatchPool.PoolData>
     {
-        ///// <summary>
-        ///// TODO
-        ///// </summary>
-        ///// <param name="other"></param>
-        ///// <param name="cancellationToken"></param>
-        ///// <returns></returns>
-        //ValueTask<bool> UpdateIfNeeded(IBatchPool other, CancellationToken cancellationToken);
-
         /// <summary>
         /// Indicates that the pool is available for new jobs/tasks.
         /// </summary>
         bool IsAvailable { get; }
+
+        /// <summary>
+        /// Indicates that the pool is not scheduled for unrun jobs.
+        /// </summary>
+        bool HasNoReservations { get; }
 
         /// <summary>
         /// Provides the <see cref="PoolInformation"/> for the pool.

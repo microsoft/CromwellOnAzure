@@ -92,6 +92,10 @@ namespace TesApi.Web
         public bool IsAvailable { get; private set; } = true;
 
         /// <inheritdoc/>
+        public bool HasNoReservations
+            => PendingReservations.Count == 0 && ReservedComputeNodes.Count == 0;
+
+        /// <inheritdoc/>
         public PoolInformation Pool { get; }
 
         /// <inheritdoc/>
@@ -165,7 +169,7 @@ namespace TesApi.Web
                 await ServicePoolUpdateAsync(cancellationToken);
             }
 
-            throw new AzureBatchQuotaMaxedOutException("Pool is being resized for this job");
+            throw new AzureBatchQuotaMaxedOutException("Pool is being resized for this task");
 
             AffinityInformation TryAssignNode(ComputeNode node)
             {
@@ -418,8 +422,8 @@ namespace TesApi.Web
             if (IsAvailable)
             {
                 var now = DateTime.UtcNow;
-                IsAvailable = Creation + _forcePoolRotationAge >= now &&
-                    !(Changed + _idlePoolCheck < now && TargetDedicated == 0 && TargetLowPriority == 0 && PendingReservations.Count == 0);
+                IsAvailable = Creation + _forcePoolRotationAge > now &&
+                    (Changed + _idlePoolCheck > now || TargetDedicated != 0 || TargetLowPriority != 0 || PendingReservations.Count != 0);
             }
             return ValueTask.CompletedTask;
         }
@@ -429,7 +433,7 @@ namespace TesApi.Web
             if (!IsAvailable)
             {
                 var (lowPriorityNodes, dedicatedNodes) = await azureProxy.GetCurrentComputeNodesAsync(Pool.PoolId, cancellationToken);
-                if ((lowPriorityNodes is null || lowPriorityNodes == 0) && (dedicatedNodes is null || dedicatedNodes == 0) && PendingReservations.Count == 0 && ReservedComputeNodes.Count == 0)
+                if ((lowPriorityNodes is null || lowPriorityNodes == 0) && (dedicatedNodes is null || dedicatedNodes == 0) && HasNoReservations)
                 {
                     _isRemoved = true;
                     await azureProxy.DeleteBatchPoolAsync(Pool.PoolId, cancellationToken);

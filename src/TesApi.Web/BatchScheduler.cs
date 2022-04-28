@@ -4,20 +4,19 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Data;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Runtime.Serialization;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+
 using Azure;
+
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -26,7 +25,7 @@ using Newtonsoft.Json;
 using Tes.Extensions;
 using Tes.Models;
 using Tes.Repository;
-using YamlDotNet.Serialization;
+
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
 
 namespace TesApi.Web
@@ -1538,10 +1537,11 @@ namespace TesApi.Web
                 }
                 catch (RequestFailedException ex) when (ex.Status == 0 && ex.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout)
                 {
-                    // When that batch management API times out, it may or may not have created the pool. Add an inactive record to delete it if it did get created and try again later. That record will be removed later whether or not the pool was created.
-                    pool = _poolFactory.Retrieve(new BatchPool.PoolData { PoolId = poolId, IsAvailable = false, PendingReservations = new(), Reservations = new() }, this);
-                    _ = await AddPoolAsync(pool);
-                    throw new AzureBatchQuotaMaxedOutException($"Pool creation timed out");
+                    await HandleTimeout(poolId);
+                }
+                catch (Exception ex) when (IsInnermostExceptionSocketException125(ex))
+                {
+                    await HandleTimeout(poolId);
                 }
                 _ = await AddPoolAsync(pool);
             }
@@ -1549,6 +1549,24 @@ namespace TesApi.Web
 
             static bool Available(IBatchPool pool)
                 => pool.IsAvailable;
+
+            async Task HandleTimeout(string poolId)
+            {
+                // When the batch management API creating the pool times out, it may or may not have created the pool. Add an inactive record to delete it if it did get created and try again later. That record will be removed later whether or not the pool was created.
+                pool = _poolFactory.Retrieve(new BatchPool.PoolData { PoolId = poolId, IsAvailable = false, PendingReservations = new(), Reservations = new() }, this);
+                _ = await AddPoolAsync(pool);
+                throw new AzureBatchQuotaMaxedOutException($"Pool creation timed out");
+            }
+
+            static bool IsInnermostExceptionSocketException125(Exception ex)
+            {
+                // errno: ECANCELED 125 Operation canceled
+                for (var e = ex; e is System.Net.Sockets.SocketException /*se && se.ErrorCode == 125*/; e = e.InnerException)
+                {
+                    if (e.InnerException is null) { return false; }
+                }
+                return true;
+            }
 
             static string ConvertToBase32(byte[] bytes) // https://datatracker.ietf.org/doc/html/rfc4648#section-6
             {
@@ -1660,6 +1678,25 @@ namespace TesApi.Web
             }
 
             return changes;
+        }
+
+        /// <inheritdoc/>
+        public async ValueTask<IEnumerable<Task>> GetShutdownCandidatePools(CancellationToken cancellationToken)
+        {
+            try
+            {
+                _ = await UpdateBatchPools(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exc)
+            {
+                logger.LogError(exc, "UpdateBatchPools threw an exception in GetShutdownCandidatePools.");
+            }
+
+            return (await Task.WhenAll(batchPools.Where(p => p.IsAvailable && p.HasNoReservations).Select(async p => (p.Pool.PoolId, CurrentNodes: await azureProxy.GetCurrentComputeNodesAsync(p.Pool.PoolId)))))
+                .Select(t => (t.PoolId, Dedicated: t.CurrentNodes.dedicatedNodes ?? 0, LowPriority: t.CurrentNodes.lowPriorityNodes ?? 0))
+                .Where(t => t.Dedicated == 0 && t.LowPriority == 0)
+                //.Concat(batchPools.Where(p => !p.IsAvailable).Select(p => (p.Pool.PoolId, 0, 0)))
+                .Select(t => azureProxy.DeleteBatchPoolAsync(t.PoolId));
         }
 
         /// <inheritdoc/>

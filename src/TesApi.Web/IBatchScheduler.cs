@@ -35,6 +35,13 @@ namespace TesApi.Web
         ValueTask<bool> UpdateBatchPools(CancellationToken cancellationToken);
 
         /// <summary>
+        /// Provides a list of pools that can safely be disposed of.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        ValueTask<IEnumerable<Task>> GetShutdownCandidatePools(CancellationToken cancellationToken);
+
+        /// <summary>
         /// Retrieves the requested batch pool.
         /// </summary>
         /// <param name="poolId">The <see cref="Microsoft.Azure.Batch.PoolInformation.PoolId"/> of the requested <paramref name="batchPool"/>.</param>
