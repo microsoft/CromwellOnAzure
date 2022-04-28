@@ -41,6 +41,7 @@ namespace TesApi.Web
         /// </summary>
         public const string CosmosDbContainerId = "Pools";
 
+        private static readonly Guid PoolNameNamespace = new("719FCE51-66D8-4822-AC04-746E56B95893");
         private const string AzureSupportUrl = "https://portal.azure.com/#blade/Microsoft_Azure_Support/HelpAndSupportBlade/newsupportrequest";
         private const int DefaultCoreCount = 1;
         private const int DefaultMemoryGb = 2;
@@ -305,10 +306,12 @@ namespace TesApi.Web
 
                 var IsIdentityProvided = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true;
                 var identityResourceId = IsIdentityProvided ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
-                // TODO: -_0-9A-Za-z <-- it would appear that both inputs are already constrained to this requirment, but it would be best to fully confirm or even better assume that one of the inputs may broaden in the future.
-                var poolName = IsIdentityProvided
+
+                var poolName = GeneratePoolName(
+                    IsIdentityProvided
                     ? $"{virtualMachineInfo.VmSize}-{Path.GetFileName(identityResourceId)}"
-                    : virtualMachineInfo.VmSize;
+                    : virtualMachineInfo.VmSize);
+
                 await CheckBatchAccountQuotas(virtualMachineInfo, poolName);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
@@ -397,6 +400,9 @@ namespace TesApi.Web
                 }
             }
         }
+
+        private static string GeneratePoolName(string name)
+            => $"CoA-TES-{PoolNameNamespace.GenerateGuid(name)}-pool";
 
         /// <summary>
         /// Gets the current state of the Azure Batch task
@@ -1582,29 +1588,13 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public async ValueTask<bool> UpdateBatchPools(CancellationToken cancellationToken)
         {
-            var msg = string.Empty;
-            foreach (var pool in batchPools)
-            {
-                msg += ", '" + pool.Pool.PoolId + "'";
-            }
-
-            if (msg.Length > 0)
-            {
-                msg = $"LocalStore contains: {msg[2..]}";
-            }
-            else
-            {
-                msg = "LocalStore is empty";
-            }
-
             var changes = false;
             var remotePools = Enumerable.Empty<string>();
             var remotePoolsToRemove = Enumerable.Empty<BatchPool.PoolData>();
             foreach (var poolGroup in (await _poolDataRepository.GetItemsAsync(p => true)).GroupBy(p => GetKeyFromPoolId(p.PoolId)))
-            //await foreach (var poolGroup in _poolDataRepository.GetItemsAsync(p => true, 256, cancellationToken).GroupByAwait(p => ValueTask.FromResult(GetKeyFromPoolId(p.PoolId))).WithCancellation(cancellationToken))
             {
                 var activePools = (await azureProxy.GetActivePoolIdsAsync($"{poolGroup.Key}-", TimeSpan.Zero, cancellationToken)).ToList();
-                /*await */foreach (var poolData in poolGroup)
+                foreach (var poolData in poolGroup)
                 {
                     var poolExists = activePools.Contains(poolData.PoolId);
                     remotePools = remotePools.Append(poolData.PoolId);
@@ -1616,7 +1606,6 @@ namespace TesApi.Web
                     }
                     else if (!batchPools.Select(p => p.Pool.PoolId).Contains(poolData.PoolId))
                     {
-                        logger.LogTrace(msg);
                         logger.LogDebug("Pool '{PoolId}' from the repository is being added to the local store.", poolData.PoolId);
                         var pool = _poolFactory.Retrieve(poolData, this);
                         if (await batchPools.AddAsync(pool, true))

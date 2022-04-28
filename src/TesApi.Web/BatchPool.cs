@@ -506,9 +506,9 @@ namespace TesApi.Web
             RepositoryItem = data ?? throw new ArgumentNullException(nameof(data));
             Pool = poolId ?? throw new ArgumentNullException(nameof(poolId));
 
-            _idleNodeCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdleNodeMinutes", 0.125));
-            _idlePoolCheck = TimeSpan.FromMinutes(configuration.GetValue<double>("BatchPoolIdlePoolMinutes", 0.125));
-            _forcePoolRotationAge = TimeSpan.FromDays(configuration.GetValue<double>("BatchPoolRotationForcedDays", 60));
+            _idleNodeCheck = TimeSpan.FromMinutes(GetConfigurationValue(configuration, "BatchPoolIdleNodeMinutes", 0.125));
+            _idlePoolCheck = TimeSpan.FromMinutes(GetConfigurationValue(configuration, "BatchPoolIdlePoolMinutes", 0.125));
+            _forcePoolRotationAge = TimeSpan.FromDays(GetConfigurationValue(configuration, "BatchPoolRotationForcedDays", 60));
 
             this.azureProxy = azureProxy;
             this.logger = logger;
@@ -522,6 +522,13 @@ namespace TesApi.Web
             ReservedComputeNodes = RepositoryItem.Reservations.Select<string, EquatableAffinityInformation>(r => new(new(r))).ToList();
             PendingReservations = RepositoryItem.PendingReservations.ToDictionary(p => p.JobId, p => new PendingReservation(p));
             ResizeDirty = false;
+
+            // IConfiguration.GetValue<double>(string key, double defaultValue) throws an exception if the value is defined as blank
+            static double GetConfigurationValue(IConfiguration configuration, string key, double defaultValue)
+            {
+                var value = configuration.GetValue(key, string.Empty);
+                return string.IsNullOrWhiteSpace(value) ? defaultValue : double.Parse(value);
+            }
         }
         #endregion
 
