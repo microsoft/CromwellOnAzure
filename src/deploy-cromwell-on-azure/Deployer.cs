@@ -433,6 +433,7 @@ namespace CromwellOnAzureDeployer
                             await WritePersonalizedFilesToStorageAccountAsync(storageAccount, managedIdentity.Name);
                             await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
+                            await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                         });
 
                         Task compute = null;
@@ -609,9 +610,8 @@ namespace CromwellOnAzureDeployer
             cluster.Identity = new ManagedClusterIdentity(managedIdentity.PrincipalId, managedIdentity.TenantId, Microsoft.Azure.Management.ContainerService.Models.ResourceIdentityType.UserAssigned);
             cluster.Identity.UserAssignedIdentities = new Dictionary<string, ManagedClusterIdentityUserAssignedIdentitiesValue>();
             cluster.Identity.UserAssignedIdentities.Add(managedIdentity.Id, new ManagedClusterIdentityUserAssignedIdentitiesValue(managedIdentity.PrincipalId, managedIdentity.ClientId));
-            //cluster.IdentityProfile = new Dictionary<string, ManagedClusterPropertiesIdentityProfileValue>();
-            //cluster.IdentityProfile.Add("kubeletidentity", new ManagedClusterPropertiesIdentityProfileValue(managedIdentity.Id, managedIdentity.ClientId, managedIdentity.PrincipalId));
-            //cluster.PodIdentityProfile = new ManagedClusterPodIdentityProfile(true, true, new List<ManagedClusterPodIdentity>() { new ManagedClusterPodIdentity(managedIdentity.Name, "default", new UserAssignedIdentity(managedIdentity.Id, managedIdentity.ClientId, managedIdentity.PrincipalId)) });
+            cluster.IdentityProfile = new Dictionary<string, ManagedClusterPropertiesIdentityProfileValue>();
+            cluster.IdentityProfile.Add("kubeletidentity", new ManagedClusterPropertiesIdentityProfileValue(managedIdentity.Id, managedIdentity.ClientId, managedIdentity.PrincipalId));
             cluster.AgentPoolProfiles = new List<ManagedClusterAgentPoolProfile>();
             cluster.AgentPoolProfiles.Add(new ManagedClusterAgentPoolProfile()
             {
@@ -645,9 +645,6 @@ namespace CromwellOnAzureDeployer
 
             var k8sConfig = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
             IKubernetes client = new Kubernetes(k8sConfig);
-
-            var poolIdentity = await azureSubscriptionClient.Identities.GetByResourceGroupAsync(result.NodeResourceGroup, $"{configuration.AksClusterName}-agentpool");
-            await AssignVmAsContributorToStorageAccountAsync(poolIdentity, resourceGroupObject);
 
             // Install CSI driver. 
             await InstallCSIBlobDriver(client);
@@ -686,7 +683,7 @@ namespace CromwellOnAzureDeployer
             // Example to set Environment Variables for trigger service.
             var triggerEnv = new List<V1EnvVar>();
             triggerEnv.Add(new V1EnvVar("DefaultStorageAccountName", configuration.StorageAccountName));
-            triggerEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", $"RunAs=App;AppId={poolIdentity.ClientId}"));
+            triggerEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", $"RunAs=App;AppId={managedIdentity.ClientId}"));
             triggerEnv.Add(new V1EnvVar("ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName));
             triggerEnv.Add(new V1EnvVar("CosmosDbAccountName", configuration.CosmosDbAccountName));
             triggerDeploymentBody.Spec.Template.Spec.Containers.First().Env = triggerEnv;
@@ -695,7 +692,7 @@ namespace CromwellOnAzureDeployer
 
             var tesEnv = new List<V1EnvVar>();
             tesEnv.Add(new V1EnvVar("DefaultStorageAccountName", configuration.StorageAccountName));
-            tesEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", $"RunAs=App;AppId={poolIdentity.ClientId}"));
+            tesEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", $"RunAs=App;AppId={managedIdentity.ClientId}"));
             tesEnv.Add(new V1EnvVar("ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName));
             tesEnv.Add(new V1EnvVar("CosmosDbAccountName", configuration.CosmosDbAccountName));
 
@@ -1424,6 +1421,23 @@ namespace CromwellOnAzureDeployer
                         return;
                     }
                 });
+
+
+        private Task AssignManagedIdOperatorToResourceAsync(IIdentity managedIdentity, IResource resource)
+        {
+            // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#managed-identity-operator
+            var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/f1a07417-d97a-45cb-824c-7a7467783830";
+
+            return Execute(
+                $"Assigning Storage Blob Data Reader role for VM to Storage Account resource scope...",
+                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
+                    () => azureSubscriptionClient.AccessManagement.RoleAssignments
+                        .Define(Guid.NewGuid().ToString())
+                        .ForObjectId(managedIdentity.PrincipalId)
+                        .WithRoleDefinition(roleDefinitionId)
+                        .WithResourceScope(resource)
+                        .CreateAsync(cts.Token)));
+        }
 
         private Task AssignVmAsDataReaderToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
         {
