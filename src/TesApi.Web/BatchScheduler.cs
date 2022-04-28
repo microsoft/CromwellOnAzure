@@ -1607,64 +1607,104 @@ namespace TesApi.Web
         public async ValueTask<bool> UpdateBatchPools(CancellationToken cancellationToken)
         {
             var changes = false;
-            var remotePools = Enumerable.Empty<string>();
-            var remotePoolsToRemove = Enumerable.Empty<BatchPool.PoolData>();
-            foreach (var poolGroup in (await _poolDataRepository.GetItemsAsync(p => true)).GroupBy(p => GetKeyFromPoolId(p.PoolId)))
-            {
-                var activePools = (await azureProxy.GetActivePoolIdsAsync($"{poolGroup.Key}-", TimeSpan.Zero, cancellationToken)).ToList();
-                foreach (var poolData in poolGroup)
-                {
-                    var poolExists = activePools.Contains(poolData.PoolId);
-                    remotePools = remotePools.Append(poolData.PoolId);
+            var activePoolsByKey = new Dictionary<string, List<string>>();
+            var localPools = new List<string>();
+            var remotePools = new List<string>();
+            var poolsToRemove = Enumerable.Empty<Task>();
 
-                    if (!poolExists)
-                    {
-                        logger.LogDebug("Pool '{PoolId}' is being removed because no pool by that name is active.", poolData.PoolId);
-                        remotePoolsToRemove = remotePoolsToRemove.Append(poolData);
-                    }
-                    else if (!batchPools.Select(p => p.Pool.PoolId).Contains(poolData.PoolId))
-                    {
-                        logger.LogDebug("Pool '{PoolId}' from the repository is being added to the local store.", poolData.PoolId);
-                        var pool = _poolFactory.Retrieve(poolData, this);
-                        if (await batchPools.AddAsync(pool, true))
-                        {
-                            await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize, cancellationToken);
-                        }
-                        changes = true;
-                    }
+            // Get pool metadata from both known sources
+            var remoteGroups = (await _poolDataRepository.GetItemsAsync(p => true)).GroupBy(p => GetKeyFromPoolId(p.PoolId)).ToList();
+            var localGroups = batchPools.GetGroups().ToList();
+
+            // Remove pools no longer active in batch account while gathering information needed by the rest of this method
+            foreach (var group in remoteGroups)
+            {
+                _ = await GetActivePools(group.Key);
+                foreach (var pool in group)
+                {
+                    remotePools.Add(pool.PoolId);
                 }
             }
 
-            await Task.WhenAll(remotePoolsToRemove.Select(p => _poolDataRepository.DeleteItemAsync(p.PoolId)));
-            remotePools = remotePools.ToList();
-            var localPoolsToRemove = Enumerable.Empty<IBatchPool>();
-            foreach (var poolGroup in batchPools.GetGroups())
+            foreach (var group in localGroups)
             {
-                var activePools = (await azureProxy.GetActivePoolIdsAsync($"{poolGroup.Key}-", TimeSpan.Zero, cancellationToken)).ToList();
-                foreach (var pool in poolGroup.Value)
+                var activePools = await GetActivePools(group.Key);
+                foreach(var pool in group.Value)
                 {
-                    var poolExists = activePools.Contains(pool.Pool.PoolId);
-
-                    if (!poolExists)
+                    if (!activePools.Contains(pool.Pool.PoolId))
                     {
                         logger.LogDebug("Pool '{PoolId}' is being removed because no pool by that name is active.", pool.Pool.PoolId);
-                        localPoolsToRemove = localPoolsToRemove.Append(pool);
-                    }
-                    else if (!remotePools.Contains(pool.Pool.PoolId))
-                    {
-                        logger.LogDebug("Pool '{PoolId}' from the local store is being added to the repository.", pool.Pool.PoolId);
-                        pool.ReplaceRepositoryItem(await _poolDataRepository.CreateItemAsync(pool.RepositoryItem));
+                        poolsToRemove = poolsToRemove.Append(batchPools.RemoveAsync(pool).AsTask());
+                        _ = remotePools.Remove(pool.Pool.PoolId);
                         changes = true;
+                    }
+                    else
+                    {
+                        localPools.Add(pool.Pool.PoolId);
                     }
                 }
             }
 
-            foreach (var pool in localPoolsToRemove)
+            foreach (var pool in remotePools)
             {
-                _ = await batchPools.RemoveAsync(pool);
+                if (!activePoolsByKey.Values.SelectMany(g => g).Contains(pool))
+                {
+                    logger.LogDebug("Pool '{PoolId}' is being removed because no pool by that name is active.", pool);
+                    poolsToRemove = poolsToRemove.Append(_poolDataRepository.DeleteItemAsync(pool));
+                    changes = true;
+                }
+            }
+
+            // Add pools found in remote repository not present in local memory
+            foreach (var poolData in remoteGroups.SelectMany(g => g).Where(p => remotePools.Contains(p.PoolId)))
+            {
+                if (!batchPools.Select(p => p.Pool.PoolId).Contains(poolData.PoolId))
+                {
+                    logger.LogDebug("Pool '{PoolId}' from the repository is being added to the local store.", poolData.PoolId);
+                    var pool = _poolFactory.Retrieve(poolData, this);
+                    changes = true;
+                    if (await batchPools.AddAsync(pool, true))
+                    {
+                        await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize, cancellationToken);
+                    }
+                }
+            }
+
+            // Add pools found in local memory not present in remote repository
+            foreach (var pool in localGroups.Select(t => t.Value).SelectMany(g => g).Where(p => localPools.Contains(p.Pool.PoolId)))
+            {
+                if (!remotePools.Contains(pool.Pool.PoolId))
+                {
+                    logger.LogDebug("Pool '{PoolId}' from the local store is being added to the repository.", pool.Pool.PoolId);
+                    pool.ReplaceRepositoryItem(await _poolDataRepository.CreateItemAsync(pool.RepositoryItem));
+                    changes = true;
+                }
+            }
+
+            // Update remote repository with all metadata updates
+            if (await UpdateBatchPoolsMetadata())
+            {
                 changes = true;
             }
 
+            // Wait for pool metadata deletions to complete.
+            await Task.WhenAll(poolsToRemove);
+
+            return changes;
+
+            async Task<List<string>> GetActivePools(string key)
+            {
+                if (!activePoolsByKey.TryGetValue(key, out var pools))
+                {
+                    pools = (await azureProxy.GetActivePoolIdsAsync($"{key}-", TimeSpan.Zero, cancellationToken)).ToList();
+                    activePoolsByKey.Add(key, pools);
+                }
+                return pools;
+            }
+        }
+
+        private async Task<bool> UpdateBatchPoolsMetadata()
+        {
             if (batchPools.HasChanges)
             {
                 await Task.WhenAll(batchPools.Where(e => e.ChangesRepositoryItem.HasChanges).Select(async pool =>
@@ -1672,31 +1712,22 @@ namespace TesApi.Web
                     logger.LogDebug("Updating pool '{PoolId}'.", pool.Pool.PoolId);
                     pool.ReplaceRepositoryItem(await _poolDataRepository.UpdateItemAsync(pool.RepositoryItem));
                     pool.ChangesRepositoryItem.ResetChanges();
-                    logger.LogDebug("Updated pool '{PoolId}' ({HasChanges}).", pool.Pool.PoolId, pool.ChangesRepositoryItem.HasChanges);
                 }));
-                changes = true;
+                return true;
             }
-
-            return changes;
+            return false;
         }
 
         /// <inheritdoc/>
         public async ValueTask<IEnumerable<Task>> GetShutdownCandidatePools(CancellationToken cancellationToken)
         {
-            try
-            {
-                _ = await UpdateBatchPools(cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception exc)
-            {
-                logger.LogError(exc, "UpdateBatchPools threw an exception in GetShutdownCandidatePools.");
-            }
+            _ = await UpdateBatchPoolsMetadata(); // TODO: consider moving the actions called by the method in this line to be called by IBatchPool.ServicePoolAsync() 
 
-            return (await Task.WhenAll(batchPools.Where(p => p.IsAvailable && p.HasNoReservations).Select(async p => (p.Pool.PoolId, CurrentNodes: await azureProxy.GetCurrentComputeNodesAsync(p.Pool.PoolId)))))
-                .Select(t => (t.PoolId, Dedicated: t.CurrentNodes.dedicatedNodes ?? 0, LowPriority: t.CurrentNodes.lowPriorityNodes ?? 0))
-                .Where(t => t.Dedicated == 0 && t.LowPriority == 0)
-                //.Concat(batchPools.Where(p => !p.IsAvailable).Select(p => (p.Pool.PoolId, 0, 0)))
-                .Select(t => azureProxy.DeleteBatchPoolAsync(t.PoolId));
+            return (await batchPools
+                .ToAsyncEnumerable()
+                .WhereAwait(async p => await p.CanBeDeleted(cancellationToken))
+                .ToListAsync(cancellationToken))
+                .Select(t => azureProxy.DeleteBatchPoolAsync(t.Pool.PoolId));
         }
 
         /// <inheritdoc/>

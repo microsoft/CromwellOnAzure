@@ -18,9 +18,10 @@ namespace TesApi.Web
         bool IsAvailable { get; }
 
         /// <summary>
-        /// Indicates that the pool is not scheduled for unrun jobs.
+        /// Indicates that the pool is not scheduled to run tasks nor running tasks.
         /// </summary>
-        bool HasNoReservations { get; }
+        /// <param name="cancellationToken"></param>
+        Task<bool> CanBeDeleted(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Provides the <see cref="PoolInformation"/> for the pool.

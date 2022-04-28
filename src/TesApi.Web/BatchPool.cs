@@ -92,8 +92,29 @@ namespace TesApi.Web
         public bool IsAvailable { get; private set; } = true;
 
         /// <inheritdoc/>
-        public bool HasNoReservations
-            => PendingReservations.Count == 0 && ReservedComputeNodes.Count == 0;
+        public async Task<bool> CanBeDeleted(CancellationToken cancellationToken = default)
+        {
+            if (!HasNoReservations)
+            {
+                return false;
+            }
+
+            await foreach (var node in azureProxy.ListComputeNodesAsync(Pool.PoolId, new ODATADetailLevel(selectClause: "state")).WithCancellation(cancellationToken))
+            {
+                switch (node.State)
+                {
+                    case ComputeNodeState.Rebooting:
+                    case ComputeNodeState.Reimaging:
+                    case ComputeNodeState.Running:
+                    case ComputeNodeState.Creating:
+                    case ComputeNodeState.Starting:
+                    case ComputeNodeState.WaitingForStartTask:
+                        return false;
+                }
+            }
+
+            return true;
+        }
 
         /// <inheritdoc/>
         public PoolInformation Pool { get; }
@@ -545,6 +566,8 @@ namespace TesApi.Web
         private DateTime Changed { get; set; }
 
         private bool _isRemoved;
+        private bool HasNoReservations
+            => PendingReservations.Count == 0 && ReservedComputeNodes.Count == 0;
 
         private readonly TimeSpan _idleNodeCheck;
         private readonly TimeSpan _idlePoolCheck;
