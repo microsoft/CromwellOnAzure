@@ -596,10 +596,8 @@ namespace CromwellOnAzureDeployer
             var containerServiceClient = new ContainerServiceClient(azureCredentials);
             containerServiceClient.SubscriptionId = configuration.SubscriptionId;
             var cluster = new ManagedCluster();
-            // Log analytics setup, not currently working. 
-            //cluster.AddonProfiles = new Dictionary<string, ManagedClusterAddonProfile>();
-            //cluster.AddonProfiles.Add("monitoring", new ManagedClusterAddonProfile(true, new Dictionary<string, string>() {{ "logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id }}));
-            //cluster.PodIdentityProfile.Enabled = true;
+            cluster.AddonProfiles = new Dictionary<string, ManagedClusterAddonProfile>();
+            cluster.AddonProfiles.Add("omsagent", new ManagedClusterAddonProfile(true, new Dictionary<string, string>() {{ "logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id }}));
             cluster.Location = configuration.RegionName;
             cluster.DnsPrefix = configuration.AksClusterName;
             cluster.NetworkProfile = new ContainerServiceNetworkProfile();
