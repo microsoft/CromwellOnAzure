@@ -308,6 +308,7 @@ namespace CromwellOnAzureDeployer
                             if (!newSettingsAdded)
                             {
                                 await AddNewSettingsAsync(sshConnectionInfo);
+                                newSettingsAdded = true;
                             }
                         }
                     }

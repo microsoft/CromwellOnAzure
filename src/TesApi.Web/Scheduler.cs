@@ -97,7 +97,7 @@ namespace TesApi.Web
 
                     await Task.Delay(runInterval, stoppingToken);
                 }
-                catch (TaskCanceledException)
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
                     break;
                 }
@@ -185,7 +185,7 @@ namespace TesApi.Web
                     var currentTesTask = await repository.GetItemOrDefaultAsync(tesTask.Id);
                     if (exc.StatusCode == System.Net.HttpStatusCode.PreconditionFailed)
                     {
-                        logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw an exception attempting to set state: {tesTask.State}. Another actor had set current state: {currentTesTask?.State}");
+                        logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw an exception attempting to set state: {tesTask.State}. Another actor set state: {currentTesTask?.State}");
                         currentTesTask?.SetWarning("ConcurrencyWriteFailure", tesTask.State.ToString(), exc.Message, exc.StackTrace);
                     }
                     else

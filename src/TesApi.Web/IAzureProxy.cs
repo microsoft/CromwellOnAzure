@@ -20,7 +20,7 @@ namespace TesApi.Web
         /// <summary>
         /// Gets CosmosDB endpoint and key
         /// </summary>
-        /// <param name="cosmosDbAccountName"></param>
+        /// <param name="cosmosDbAccountName">The CosmosDB account's name</param>
         /// <returns>The CosmosDB endpoint and key of the specified account</returns>
         Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName);
 
@@ -37,7 +37,7 @@ namespace TesApi.Web
         /// <param name="jobId"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
-        /// <param name="getBatchPool"></param>
+        /// <param name="getBatchPool">Method to retrieve the <see cref="IBatchPool"/> corresponding to <paramref name="poolInformation"/>.</param>
         Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, IBatchScheduler.TryGetBatchPool getBatchPool);
 
         /// <summary>
@@ -55,27 +55,28 @@ namespace TesApi.Web
         Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName);
 
         /// <summary>
-        /// Creates a Pool in Azure Batch that is NOT an AutoPool
+        /// Creates an Azure Batch pool who's lifecycle must be manually managed
         /// </summary>
+        /// <param name="poolInfo">Contains information about a pool. <see cref="BatchModels.ProxyResource.Name"/> becomes the <see cref="CloudPool.Id"/></param>
         Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo);
 
         /// <summary>
-        /// Get the current states of the Azure Batch job and task corresponding to the given TES task
+        /// Gets the combined state of Azure Batch job, task and pool that corresponds to the given TES task
         /// </summary>
         /// <param name="tesTaskId">The unique ID of the TES task</param>
-        /// <returns>A higher-level abstraction of the current state of the Azure Batch task</returns>
+        /// <returns>Job state information</returns>
         Task<AzureBatchJobAndTaskState> GetBatchJobAndTaskStateAsync(string tesTaskId);
 
         /// <summary>
         /// Deletes an Azure Batch job
         /// </summary>
         /// <param name="taskId">The unique TES task ID</param>
-        /// <param name="getBatchPool"></param>
-        /// <param name="cancellationToken"></param>
+        /// <param name="getBatchPool">Method to retrieve the <see cref="IBatchPool"/> corresponding to the pool that last ran <paramref name="taskId"/>.</param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         Task DeleteBatchJobAsync(string taskId, IBatchScheduler.TryGetBatchPool getBatchPool, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Get Batch account quota
+        /// Gets the batch quotas
         /// </summary>
         /// <returns><see cref="AzureBatchAccountQuotas"/></returns>
         Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync();
@@ -99,9 +100,9 @@ namespace TesApi.Web
         int GetBatchActiveJobCount();
 
         /// <summary>
-        /// Gets the price and resource summary of all available VMs in a region
+        /// Get/sets cached value for the price and resource summary of all available VMs in a region for the <see cref="BatchModels.BatchAccount"/>.
         /// </summary>
-        /// <returns><see cref="Tes.Models.VirtualMachineInformation"/> for available VMs in a region.</returns>
+        /// <returns><see cref="VirtualMachineInformation"/> for available VMs in a region.</returns>
         Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync();
 
         /// <summary>
@@ -144,18 +145,25 @@ namespace TesApi.Web
         /// <summary>
         /// Gets the ids of completed Batch jobs older than specified timespan
         /// </summary>
+        /// <param name="oldestJobAge"></param>
         /// <returns>List of Batch job ids</returns>
         Task<IEnumerable<string>> ListOldJobsToDeleteAsync(TimeSpan oldestJobAge);
 
         /// <summary>
         /// Gets the ids of orphaned Batch jobs older than specified timespan
+        /// These jobs are active for prolonged period of time, have auto pool, NoAction termination option, and no tasks
         /// </summary>
+        /// <param name="minJobAge"></param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns>List of Batch job ids</returns>
         Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Gets the list of active pool ids matching the prefix and with creation time older than the minAge
         /// </summary>
+        /// <param name="prefix"></param>
+        /// <param name="minAge"></param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns>Active pool ids</returns>
         Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken);
 
@@ -182,41 +190,41 @@ namespace TesApi.Web
         IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null);
 
         /// <summary>
-        /// Deletes the specified computeNodes
+        /// Deletes the specified ComputeNodes
         /// </summary>
         /// <param name="poolId">The id of the pool.</param>
-        /// <param name="computeNodes"></param>
+        /// <param name="computeNodes">Enumerable list of <see cref="ComputeNode"/>s to delete.</param>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         Task DeleteBatchComputeNodesAsync(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// TODO
+        /// Gets the <see cref="AllocationState"/> which indicates what node allocation activity is occurring on the pool
         /// </summary>
         /// <param name="poolId">The id of the pool.</param>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
-        Task<Microsoft.Azure.Batch.Common.AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
+        Task<AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// TODO
+        /// Reinstalls the operating system on the specified compute node
         /// </summary>
         /// <param name="poolId">The id of the pool.</param>
         /// <param name="computeNodeId"></param>
         /// <param name="reimageOption"></param>
-        /// <param name="cancellationToken"></param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// TODO
+        /// Gets the configured numbers of compute nodes in the pool
         /// </summary>
         /// <param name="poolId">The id of the pool.</param>
         /// <returns></returns>
         (int TargetLowPriority, int TargetDedicated) GetComputeNodeTargets(string poolId);
 
         /// <summary>
-        /// TODO
+        /// Resizes the specified pool
         /// </summary>
         /// <param name="poolId">The id of the pool.</param>
         /// <param name="targetLowPriorityComputeNodes"></param>
@@ -226,7 +234,7 @@ namespace TesApi.Web
         Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// TODO
+        /// Gets the numbers of compute nodes currently in the pool
         /// </summary>
         /// <param name="poolId">The id of the pool.</param>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>

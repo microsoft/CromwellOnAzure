@@ -116,11 +116,7 @@ namespace TesApi.Web
             return null;
         }
 
-        /// <summary>
-        /// Gets CosmosDB endpoint and key
-        /// </summary>
-        /// <param name="cosmosDbAccountName"></param>
-        /// <returns>The CosmosDB endpoint and key of the specified account</returns>
+        /// <inheritdoc/>
         public async Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName)
         {
             var azureClient = await GetAzureManagementClientAsync();
@@ -140,11 +136,7 @@ namespace TesApi.Web
             return (account.DocumentEndpoint, key);
         }
 
-        /// <summary>
-        /// Gets a new Azure Batch job id to schedule another task
-        /// </summary>
-        /// <param name="tesTaskId">The unique TES task ID</param>
-        /// <returns>The next logical, new Azure Batch job ID</returns>
+        /// <inheritdoc/>
         public async Task<string> GetNextBatchJobIdAsync(string tesTaskId)
         {
             var jobFilter = new ODATADetailLevel
@@ -162,10 +154,7 @@ namespace TesApi.Web
         }
 
 
-        /// <summary>
-        /// Gets the counts of active batch nodes, grouped by VmSize
-        /// </summary>
-        /// <returns>Batch node counts</returns>
+        /// <inheritdoc/>
         public IEnumerable<AzureBatchNodeCount> GetBatchActiveNodeCountByVmSize()
             => batchClient.PoolOperations.ListPools()
                 .Select(p => new
@@ -177,10 +166,7 @@ namespace TesApi.Web
                 .GroupBy(x => x.VirtualMachineSize)
                 .Select(grp => new AzureBatchNodeCount { VirtualMachineSize = grp.Key, DedicatedNodeCount = grp.Sum(x => x.DedicatedNodeCount), LowPriorityNodeCount = grp.Sum(x => x.LowPriorityNodeCount) });
 
-        /// <summary>
-        /// Gets the count of active batch pools
-        /// </summary>
-        /// <returns>Count of active batch pools</returns>
+        /// <inheritdoc/>
         public int GetBatchActivePoolCount()
         {
             var activePoolsFilter = new ODATADetailLevel
@@ -192,10 +178,7 @@ namespace TesApi.Web
             return batchClient.PoolOperations.ListPools(activePoolsFilter).Count();
         }
 
-        /// <summary>
-        /// Gets the count of active batch jobs
-        /// </summary>
-        /// <returns>Count of active batch jobs</returns>
+        /// <inheritdoc/>
         public int GetBatchActiveJobCount()
         {
             var activeJobsFilter = new ODATADetailLevel
@@ -207,10 +190,7 @@ namespace TesApi.Web
             return batchClient.JobOperations.ListJobs(activeJobsFilter).Count();
         }
 
-        /// <summary>
-        /// Gets the batch quotas
-        /// </summary>
-        /// <returns>Batch quotas</returns>
+        /// <inheritdoc/>
         public async Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
         {
             try
@@ -235,14 +215,7 @@ namespace TesApi.Web
             }
         }
 
-        /// <summary>
-        /// Creates a new Azure Batch job
-        /// </summary>
-        /// <param name="jobId"></param>
-        /// <param name="cloudTask"></param>
-        /// <param name="poolInformation"></param>
-        /// <param name="getBatchPool"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, IBatchScheduler.TryGetBatchPool getBatchPool)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
@@ -277,11 +250,7 @@ namespace TesApi.Web
             }
         }
 
-        /// <summary>
-        /// Gets the combined state of Azure Batch job, task and pool that corresponds to the given TES task
-        /// </summary>
-        /// <param name="tesTaskId">The unique TES task ID</param>
-        /// <returns>Job state information</returns>
+        /// <inheritdoc/>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1826:Do not use Enumerable methods on indexable collections", Justification = "FirstOrDefault() is straightforward, the alternative is less clear.")]
         public async Task<AzureBatchJobAndTaskState> GetBatchJobAndTaskStateAsync(string tesTaskId)
         {
@@ -406,12 +375,7 @@ namespace TesApi.Web
             }
         }
 
-        /// <summary>
-        /// Deletes an Azure Batch job
-        /// </summary>
-        /// <param name="tesTaskId">The unique TES task ID</param>
-        /// <param name="getBatchPool"></param>
-        /// <param name="cancellationToken"></param>
+        /// <inheritdoc/>
         public async Task DeleteBatchJobAsync(string tesTaskId, IBatchScheduler.TryGetBatchPool getBatchPool, CancellationToken cancellationToken = default)
         {
             var jobFilter = new ODATADetailLevel
@@ -447,10 +411,7 @@ namespace TesApi.Web
             }
         }
 
-        /// <summary>
-        /// Gets the ids of completed Batch jobs older than specified timespan
-        /// </summary>
-        /// <returns>List of Batch job ids</returns>
+        /// <inheritdoc/>
         public async Task<IEnumerable<string>> ListOldJobsToDeleteAsync(TimeSpan oldestJobAge)
         {
             var filter = new ODATADetailLevel
@@ -462,11 +423,7 @@ namespace TesApi.Web
             return (await batchClient.JobOperations.ListJobs(filter).ToListAsync()).Select(c => c.Id);
         }
 
-        /// <summary>
-        /// Gets the ids of orphaned Batch jobs older than the specified timespan
-        /// These jobs are active for prolonged period of time, have auto pool, NoAction termination option, and no tasks
-        /// </summary>
-        /// <returns>List of Batch job ids</returns>
+        /// <inheritdoc/>
         public async Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge, CancellationToken cancellationToken = default)
         {
             var filter = new ODATADetailLevel
@@ -483,10 +440,7 @@ namespace TesApi.Web
             return noActionTesjobsWithNoTasks.Select(j => j.Id);
         }
 
-        /// <summary>
-        /// Gets the list of active pool ids matching the prefix and with creation time older than the minAge
-        /// </summary>
-        /// <returns>Active pool ids</returns>
+        /// <inheritdoc/>
         public async Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken = default)
         {
             var activePoolsFilter = new ODATADetailLevel
@@ -498,33 +452,21 @@ namespace TesApi.Web
             return (await batchClient.PoolOperations.ListPools(activePoolsFilter).ToListAsync(cancellationToken)).Select(p => p.Id);
         }
 
-        /// <summary>
-        /// Gets the list of pool ids referenced by the jobs
-        /// </summary>
-        /// <returns>Pool ids</returns>
+        /// <inheritdoc/>
         public async Task<IEnumerable<string>> GetPoolIdsReferencedByJobsAsync(CancellationToken cancellationToken = default)
             => (await batchClient.JobOperations.ListJobs(new ODATADetailLevel(selectClause: "executionInfo")).ToListAsync(cancellationToken))
                 .Where(j => !string.IsNullOrEmpty(j.ExecutionInformation?.PoolId))
                 .Select(j => j.ExecutionInformation.PoolId);
 
-        /// <summary>
-        /// Deletes the specified computeNodes
-        /// </summary>
+        /// <inheritdoc/>
         public Task DeleteBatchComputeNodesAsync(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken = default)
             => batchClient.PoolOperations.RemoveFromPoolAsync(poolId, computeNodes, deallocationOption: ComputeNodeDeallocationOption.TaskCompletion, cancellationToken: cancellationToken);
 
-        /// <summary>
-        /// Deletes the specified pool
-        /// </summary>
+        /// <inheritdoc/>
         public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default)
             => batchClient.PoolOperations.DeletePoolAsync(poolId, cancellationToken: cancellationToken);
 
-        /// <summary>
-        /// TODO
-        /// </summary>
-        /// <param name="poolId"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public async Task<AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
             => (await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState"), cancellationToken: cancellationToken)).AllocationState;
 
@@ -545,12 +487,7 @@ namespace TesApi.Web
         //    }
         //}
 
-        /// <summary>
-        /// TODO
-        /// </summary>
-        /// <param name="poolId"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public async Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default)
         {
             var pool = await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "currentLowPriorityNodes,currentDedicatedNodes"), cancellationToken: cancellationToken);
@@ -564,21 +501,13 @@ namespace TesApi.Web
             return (pool.TargetLowPriorityComputeNodes ?? 0, pool.TargetDedicatedComputeNodes ?? 0);
         }
 
-        /// <summary>
-        /// TODO
-        /// </summary>
-        /// <param name="poolId"></param>
-        /// <param name="targetLowPriorityComputeNodes"></param>
-        /// <param name="targetDedicatedComputeNodes"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public async Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default)
             => await batchClient.PoolOperations.ResizePoolAsync(poolId, targetDedicatedComputeNodes: targetDedicatedComputeNodes, targetLowPriorityComputeNodes: targetLowPriorityComputeNodes, cancellationToken: cancellationToken);
 
         /// <summary>
         /// Gets the list of container registries that the TES server has access to
         /// </summary>
-        /// <returns>List of container registries</returns>
         private async Task<IEnumerable<ContainerRegistryInfo>> GetAccessibleContainerRegistriesAsync()
         {
             var azureClient = await GetAzureManagementClientAsync();
@@ -619,11 +548,7 @@ namespace TesApi.Web
             return infos;
         }
 
-        /// <summary>
-        /// Gets the list of storage accounts that the TES server has access to
-        /// </summary>
-        /// <returns>List of storage accounts</returns>
-        public async Task<IEnumerable<StorageAccountInfo>> GetAccessibleStorageAccountsAsync()
+        private static async Task<IEnumerable<StorageAccountInfo>> GetAccessibleStorageAccountsAsync()
         {
             var azureClient = await GetAzureManagementClientAsync();
 
@@ -637,11 +562,7 @@ namespace TesApi.Web
                 .ToList();
         }
 
-        /// <summary>
-        /// Gets the primary key of the given storage account
-        /// </summary>
-        /// <param name="storageAccountInfo">Storage account info</param>
-        /// <returns>The primary key</returns>
+        /// <inheritdoc/>
         public async Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
         {
             try
@@ -658,37 +579,19 @@ namespace TesApi.Web
             }
         }
 
-        /// <summary>
-        /// Uploads the text content to a blob
-        /// </summary>
-        /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
-        /// <param name="content">Blob content</param>
-        /// <returns>A task to await</returns>
+        /// <inheritdoc/>
         public Task UploadBlobAsync(Uri blobAbsoluteUri, string content)
             => new CloudBlockBlob(blobAbsoluteUri).UploadTextAsync(content);
 
-        /// <summary>
-        /// Uploads the file content to a blob
-        /// </summary>
-        /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
-        /// <param name="filePath">File path</param>
-        /// <returns>A task to await</returns>
+        /// <inheritdoc/>
         public Task UploadBlobFromFileAsync(Uri blobAbsoluteUri, string filePath)
             => new CloudBlockBlob(blobAbsoluteUri).UploadFromFileAsync(filePath);
 
-        /// <summary>
-        /// Downloads a blob
-        /// </summary>
-        /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
-        /// <returns>Blob content</returns>
+        /// <inheritdoc/>
         public Task<string> DownloadBlobAsync(Uri blobAbsoluteUri)
             => new CloudBlockBlob(blobAbsoluteUri).DownloadTextAsync();
 
-        /// <summary>
-        /// Gets the list of blobs in the given directory
-        /// </summary>
-        /// <param name="directoryUri">Directory Uri</param>
-        /// <returns>List of blob paths</returns>
+        /// <inheritdoc/>
         public async Task<IEnumerable<string>> ListBlobsAsync(Uri directoryUri)
         {
             var blob = new CloudBlockBlob(directoryUri);
@@ -708,25 +611,15 @@ namespace TesApi.Web
             return results;
         }
 
-        /// <summary>
-        /// Get/sets cached value for the price and resource summary of all available VMs in a region for the <see cref="BatchModels.BatchAccount"/>.
-        /// </summary>
-        /// <returns><see cref="VirtualMachineInformation"/> for available VMs in a region.</returns>
+        /// <inheritdoc/>
         public async Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync()
             => (await GetVmSizesAndPricesRawAsync()).ToList();
 
-        /// <summary>
-        /// Checks if a local file exists
-        /// </summary>
+        /// <inheritdoc/>
         public bool LocalFileExists(string path)
             => File.Exists(path);
 
-        /// <summary>
-        /// Reads the content of the Common Workflow Language (CWL) file associated with the parent workflow of the TES task
-        /// </summary>
-        /// <param name="workflowId">Parent workflow</param>
-        /// <param name="content">Content of the file</param>
-        /// <returns>True if file was found</returns>
+        /// <inheritdoc/>
         public bool TryReadCwlFile(string workflowId, out string content)
         {
             var fileName = $"cwl_temp_file_{workflowId}.cwl";
@@ -879,11 +772,7 @@ namespace TesApi.Web
             return azureClient;
         }
 
-        /// <summary>
-        /// Creates an Azure Batch pool who's lifecycle must be manually managed
-        /// </summary>
-        /// <param name="poolInfo">Contains information about a pool. <see cref="BatchModels.ProxyResource.Name"/> becomes the <see cref="CloudPool.Id"/></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public async Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo)
         {
             try

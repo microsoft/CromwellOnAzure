@@ -3,12 +3,10 @@
 
 using System;
 using System.Collections.Generic;
-//using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
-//using Polly;
 using Polly.Retry;
 
 // TODO: move this to Common.csproj?

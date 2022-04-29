@@ -71,6 +71,7 @@ namespace TesApi.Web
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
         //private readonly string defaultStorageAccountName;
+        private readonly string hostname;
         private readonly BatchPoolFactory _poolFactory;
         private readonly IRepository<BatchPool.PoolData> _poolDataRepository;
         private readonly Random random = new();
@@ -111,6 +112,8 @@ namespace TesApi.Web
                 batchPools = new(this, this.logger);
                 _poolDataRepository = poolDataRepository;
                 _poolFactory = poolFactory;
+                hostname = GetStringValue(configuration, "HOSTNAME");
+                logger.LogInformation($"hostname: {hostname}");
             }
 
             this.batchNodeInfo = new BatchNodeInfo
@@ -400,8 +403,8 @@ namespace TesApi.Web
             }
         }
 
-        private static string GeneratePoolName(string name)
-            => $"CoA-TES-{PoolNameNamespace.GenerateGuid(name)}-pool";
+        private string GeneratePoolName(string name)
+            => $"CoA-TES-{PoolNameNamespace.GenerateGuid(hostname + name)}-pool";
 
         /// <summary>
         /// Gets the current state of the Azure Batch task
@@ -1721,7 +1724,7 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public async ValueTask<IEnumerable<Task>> GetShutdownCandidatePools(CancellationToken cancellationToken)
         {
-            _ = await UpdateBatchPoolsMetadata(); // TODO: consider moving the actions called by the method in this line to be called by IBatchPool.ServicePoolAsync() 
+            _ = await UpdateBatchPoolsMetadata(); // TODO: consider moving the actions called by the method in this line to be called by IBatchPool.ServicePoolAsync()
 
             return (await batchPools
                 .ToAsyncEnumerable()
@@ -1771,7 +1774,7 @@ namespace TesApi.Web
             => batchPools.Keys;
         #endregion
 
-        private class BatchPools : KeyedGroupWithRepositoryElements<IBatchPool, GroupablSetWithRepositoryElements<IBatchPool, BatchPool.PoolData>, BatchPool.PoolData>
+        private class BatchPools : KeyedGroupWithRepositoryElements<IBatchPool, GroupableSetWithRepositoryElements<IBatchPool, BatchPool.PoolData>, BatchPool.PoolData>
         {
             private readonly ILogger logger;
             private readonly BatchScheduler batchScheduler;
@@ -1782,7 +1785,7 @@ namespace TesApi.Web
                 this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             }
 
-            protected override Func<IEnumerable<IBatchPool>, GroupablSetWithRepositoryElements<IBatchPool, BatchPool.PoolData>> CreateSetFunc
+            protected override Func<IEnumerable<IBatchPool>, GroupableSetWithRepositoryElements<IBatchPool, BatchPool.PoolData>> CreateSetFunc
                 => e => new(e, new BatchPoolEqualityComparer());
 
             public IBatchPool GetPoolOrDefault(string poolId)

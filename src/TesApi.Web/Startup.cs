@@ -94,11 +94,17 @@ namespace TesApi.Web
                 {
                     Version = "0.3.0",
                     Title = "Task Execution Service",
-                    Description = "Task Execution Service (ASP.NET Core 3.1)",
+                    Description = "Task Execution Service (ASP.NET 5.0)",
                     Contact = new OpenApiContact()
                     {
                         Name = "Microsoft Genomics",
                         Url = new Uri("https://github.com/microsoft/CromwellOnAzure")
+                    },
+                    License = new OpenApiLicense()
+                    {
+                        Name = "MIT License",
+                        // Identifier = "MIT" //TODO: when available, remove Url -- https://spec.openapis.org/oas/v3.1.0#fixed-fields-2
+                        Url = new("https://spdx.org/licenses/MIT", UriKind.Absolute)
                     },
                 });
                 c.CustomSchemaIds(type => type.FullName);
@@ -175,15 +181,15 @@ namespace TesApi.Web
     }
 
     /// <summary>
-    /// TODO
+    /// Metadata to access an Azure Cosmos DB.
     /// </summary>
     public sealed class CosmosCredentials
     {
         /// <summary>
-        /// TODO
+        /// Creates a <see cref="CosmosCredentials"/>.
         /// </summary>
-        /// <param name="cosmosDbEndpoint"></param>
-        /// <param name="cosmosDbKey"></param>
+        /// <param name="cosmosDbEndpoint">The connection endpoint for the CosmosDB database account</param>
+        /// <param name="cosmosDbKey">The Base 64 encoded value of the primary read-write key</param>
         /// <exception cref="ArgumentNullException"></exception>
         public CosmosCredentials(string cosmosDbEndpoint, string cosmosDbKey)
         {
@@ -192,12 +198,12 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// TODO
+        /// Gets the connection endpoint for the CosmosDB database account.
         /// </summary>
         public string CosmosDbEndpoint { get; }
 
         /// <summary>
-        /// TODO
+        /// Gets Base 64 encoded value of the primary read-write key.
         /// </summary>
         public string CosmosDbKey { get; }
     }

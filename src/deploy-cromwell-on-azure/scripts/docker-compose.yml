@@ -40,6 +40,7 @@ services:
       - BatchPoolIdleNodeMinutes=$BatchPoolIdleNodeMinutes
       - BatchPoolIdlePoolMinutes=$BatchPoolIdlePoolMinutes
       - BatchPoolRotationForcedDays=$BatchPoolRotationForcedDays
+      - HOSTNAME=$HOSTNAME
     expose:
       - "80"
     volumes:

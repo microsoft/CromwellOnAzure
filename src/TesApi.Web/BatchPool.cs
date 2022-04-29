@@ -39,9 +39,7 @@ namespace TesApi.Web
     public sealed class BatchPool : IBatchPool, IBatchPoolImpl
     {
         #region IBatchPool
-        /// <summary>
-        /// TODO
-        /// </summary>
+        /// <inheritdoc/>
         public PoolData RepositoryItem { get; private set; }
 
         IHasChangesRepositoryItem<PoolData> IHasRepositoryItem<PoolData>.ChangesRepositoryItem
@@ -618,7 +616,7 @@ namespace TesApi.Web
 
         private class EquatableAffinityInformation : IEquatable<EquatableAffinityInformation>
         {
-            private const StringComparison Comparison = StringComparison.OrdinalIgnoreCase; // TODO: change/rationize
+            private const StringComparison Comparison = StringComparison.Ordinal;
 
             public EquatableAffinityInformation(AffinityInformation affinityInformation)
                 => Affinity = affinityInformation ?? throw new ArgumentNullException(nameof(affinityInformation));
