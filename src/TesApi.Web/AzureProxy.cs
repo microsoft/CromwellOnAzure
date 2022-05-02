@@ -479,7 +479,7 @@ namespace TesApi.Web
                 case ComputeNodeState.Idle:
                 case ComputeNodeState.Running:
                     // Currently, `Reimage` "can be invoked only on Pools created with the cloud service configuration property." [third line of content](https://docs.microsoft.com/en-us/rest/api/batchservice/compute-node/reimage).
-                    await computeNode.ReimageAsync(reimageOption: reimageOption, cancellationToken: cancellationToken);
+                    //await computeNode.ReimageAsync(reimageOption: reimageOption, cancellationToken: cancellationToken);
                     return true;
                 default:
                     return false;
