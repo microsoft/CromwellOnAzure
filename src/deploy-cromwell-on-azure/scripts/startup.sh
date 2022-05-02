@@ -23,7 +23,7 @@ function write_log() {
 write_log "CromwellOnAzure startup log"
 write_log
 
-if [[ -z "$HOSTNAME" ]] export HOSTNAME=`uname -n`
+[[ -z "$HOSTNAME" ]] && export HOSTNAME=`uname -n`
 
 write_log "Stopping Docker containers to mount Azure Storage containers via blobfuse..."
 docker-compose down
