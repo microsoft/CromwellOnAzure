@@ -639,7 +639,10 @@ namespace TesApi.Web
         /// <returns>True if the TES task was changed.</returns>
         private async Task<bool> HandleTesTaskTransitionAsync(TesTask tesTask, CombinedBatchTaskInfo combinedBatchTaskInfo)
         {
-            await ScheduleReimage(combinedBatchTaskInfo.ComputeNodeInformation, combinedBatchTaskInfo.BatchTaskState);
+            if (!enableBatchAutopool)
+            {
+                await ScheduleReimage(combinedBatchTaskInfo.ComputeNodeInformation, combinedBatchTaskInfo.BatchTaskState, combinedBatchTaskInfo.AffinityInformation);
+            }
 
             // TODO: Here we need just need to apply actions
             // When task is executed the following may be touched:
@@ -1593,13 +1596,13 @@ namespace TesApi.Web
             }
         }
 
-        private ValueTask ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState)
+        private ValueTask ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState, AffinityInformation affinityInformation)
         {
             if (!enableBatchAutopool && nodeInformation is not null)
             {
                 if (TryGet(nodeInformation.PoolId, out var pool))
                 {
-                    return pool.ScheduleReimage(nodeInformation, taskState);
+                    return pool.ScheduleReimage(nodeInformation, taskState, affinityInformation);
                 }
             }
 

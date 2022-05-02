@@ -246,16 +246,24 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async ValueTask ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState)
+        public async ValueTask ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState, AffinityInformation affinityInformation)
         {
             if (nodeInformation is not null)
             {
-                var affinity = new AffinityInformation(nodeInformation.AffinityId);
+                var affinity = new AffinityInformation(nodeInformation?.AffinityId);
                 if (ReservedComputeNodes.Contains(affinity))
                 {
                     switch (taskState)
                     {
                         case BatchTaskState.Initializing:
+                            if (nodeInformation is not null && nodeInformation.AffinityId != affinityInformation.AffinityId)
+                            {
+                                if (!ReservedComputeNodes.Contains(affinity))
+                                {
+                                    ReservedComputeNodes.Add(affinity);
+                                }
+                                ReleaseNode(affinityInformation);
+                            }
                             break;
 
                         case BatchTaskState.Running:

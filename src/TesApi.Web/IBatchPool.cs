@@ -68,10 +68,11 @@ namespace TesApi.Web
         /// Schedules reimaging of the compute node.
         /// </summary>
         /// <param name="nodeInformation">Descriptor of the compute node to reimage.</param>
-        /// <param name="taskState"></param>
+        /// <param name="taskState">Current state of the task.</param>
+        /// <param name="affinityInformation">Task assigned compute node affinity.</param>
         /// <returns></returns>
         /// <remarks>This needs to be called as soon as possible after the compute node enters the 'Running' state. It's safe to call at any time as well as repeatedly.</remarks>
-        ValueTask ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState);
+        ValueTask ScheduleReimage(ComputeNodeInformation nodeInformation, BatchTaskState taskState, AffinityInformation affinityInformation);
 
         /// <summary>
         /// Types of maintenance calls offered by the <see cref="IBatchPool.ServicePoolAsync(ServiceKind, CancellationToken)"/> service method.
