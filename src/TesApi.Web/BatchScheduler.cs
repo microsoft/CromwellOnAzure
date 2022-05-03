@@ -306,13 +306,9 @@ namespace TesApi.Web
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
-                var IsIdentityProvided = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true;
-                var identityResourceId = IsIdentityProvided ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
+                var identityResourceId = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
 
-                var poolName = GeneratePoolName(
-                    IsIdentityProvided
-                    ? $"{virtualMachineInfo.VmSize}-{Path.GetFileName(identityResourceId)}"
-                    : virtualMachineInfo.VmSize);
+                var poolName = GeneratePoolName($"{virtualMachineInfo.VmSize}-{identityResourceId}");
 
                 await CheckBatchAccountQuotas(virtualMachineInfo, poolName);
 

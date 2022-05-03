@@ -339,7 +339,7 @@ namespace TesApi.Tests
 
             Assert.IsNull(poolInformation.AutoPoolSpecification);
             Assert.IsNotNull(poolInformation.PoolId);
-            Assert.AreEqual("CoA-TES-acd7cde1-948d-5824-923c-a0738dd8e33f-pool-", poolInformation.PoolId[0..^13]);
+            Assert.AreEqual("CoA-TES-231c9f01-9776-5a84-8b08-57fc74ec08f9-pool-", poolInformation.PoolId[0..^13]);
             Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
             Assert.IsTrue(((IBatchPoolsImpl)batchScheduler).TryGet(poolInformation.PoolId, out var pool1));
             Assert.IsTrue(((IBatchPoolImpl)pool1).TestIsNodeReserved(cloudTask.AffinityInformation.AffinityId));
