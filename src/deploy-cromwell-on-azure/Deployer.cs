@@ -721,8 +721,8 @@ namespace CromwellOnAzureDeployer
                 RefreshableConsole.WriteLine($"{env.Name}: {env.Value}");
             }
 
-            await client.CreateNamespacedPersistentVolumeClaimAsync(cromwellTempClaim, "default");
-            await client.CreateNamespacedPersistentVolumeClaimAsync(mysqlDataClaim, "default");
+            await client.CreateNamespacedPersistentVolumeClaimAsync(cromwellTempClaim, configuration.AksCoANamespace);
+            await client.CreateNamespacedPersistentVolumeClaimAsync(mysqlDataClaim, configuration.AksCoANamespace);
 
             var containers = await GetContainersToMount(storageAccount);
             foreach (var container in containers)
@@ -737,15 +737,17 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-            var tesDeployment = await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, "default");
-            var tesService = await client.CreateNamespacedServiceAsync(tesServiceBody, "default");
-            var triggerDeployment = await client.CreateNamespacedDeploymentAsync(triggerDeploymentBody, "default");
-            var mysqlDeployment = await client.CreateNamespacedDeploymentAsync(mysqlDeploymentBody, "default");
-            var mysqlService = await client.CreateNamespacedServiceAsync(mysqlServiceBody, "default");
-            var cromwellDeployment = await client.CreateNamespacedDeploymentAsync(cromwellDeploymentBody, "default");
-            var cromwellService = await client.CreateNamespacedServiceAsync(cromwellServiceBody, "default");
 
-            var pods = await client.ListNamespacedPodAsync("default");
+            await client.ReplaceNamespacedDeploymentAsync(tesDeploymentBody, "tes", configuration.AksCoANamespace);
+            var tesDeployment = await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, configuration.AksCoANamespace);
+            var tesService = await client.CreateNamespacedServiceAsync(tesServiceBody, configuration.AksCoANamespace);
+            var triggerDeployment = await client.CreateNamespacedDeploymentAsync(triggerDeploymentBody, configuration.AksCoANamespace);
+            var mysqlDeployment = await client.CreateNamespacedDeploymentAsync(mysqlDeploymentBody, configuration.AksCoANamespace);
+            var mysqlService = await client.CreateNamespacedServiceAsync(mysqlServiceBody, configuration.AksCoANamespace);
+            var cromwellDeployment = await client.CreateNamespacedDeploymentAsync(cromwellDeploymentBody, configuration.AksCoANamespace);
+            var cromwellService = await client.CreateNamespacedServiceAsync(cromwellServiceBody, configuration.AksCoANamespace);
+
+            var pods = await client.ListNamespacedPodAsync(configuration.AksCoANamespace);
             var mysqlPod = pods.Items.Where(x => x.Metadata.Name.Contains("mysql")).FirstOrDefault(); //.Metadata.Name;
 
             // Wait for mysql pod to transition to running to run setup sql scripts.
@@ -756,7 +758,7 @@ namespace CromwellOnAzureDeployer
                 !(mysqlPod.Status.ContainerStatuses.FirstOrDefault().Started ?? false))
             {
                 await Task.Delay(System.TimeSpan.FromSeconds(15));
-                pods = await client.ListNamespacedPodAsync("default");
+                pods = await client.ListNamespacedPodAsync(configuration.AksCoANamespace);
                 mysqlPod = pods.Items.Where(x => x.Metadata.Name.Contains("mysql")).First();
             }
             await Task.Delay(System.TimeSpan.FromSeconds(30));
@@ -774,8 +776,8 @@ namespace CromwellOnAzureDeployer
                 }
             });
 
-            await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, "default", "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" }, true, printHandler, CancellationToken.None);
-            await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, "default", "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }, true, printHandler, CancellationToken.None);
+            await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, configuration.AksCoANamespace, "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" }, true, printHandler, CancellationToken.None);
+            await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, configuration.AksCoANamespace, "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }, true, printHandler, CancellationToken.None);
         }
 
         private static void AddStaticVolumeClaim(V1Deployment deploymentBody, string configurationMountName, string path)
@@ -813,7 +815,7 @@ namespace CromwellOnAzureDeployer
                 },
                 Type = "Opaque",
                 Kind = "Secret",
-            }, "default");
+            }, configuration.AksCoANamespace);
 
             await client.CreatePersistentVolumeAsync(new V1PersistentVolume()
             {
@@ -841,7 +843,7 @@ namespace CromwellOnAzureDeployer
                         NodeStageSecretRef = new V1SecretReference()
                         {
                             Name = $"sas-secret-{container.StorageAccount}-{container.ContainerName}",
-                            NamespaceProperty = "default"
+                            NamespaceProperty = configuration.AksCoANamespace
                         }
                     }
                 }
@@ -866,7 +868,7 @@ namespace CromwellOnAzureDeployer
                             }
                     }
                 }
-            }, "default");
+            }, configuration.AksCoANamespace);
 
             AddStaticVolumeClaim(tesDeployment, claimName, $"/{container.StorageAccount}/{container.ContainerName}");
         }
@@ -887,7 +889,7 @@ namespace CromwellOnAzureDeployer
                 },
                 Type = "Opaque",
                 Kind = "Secret",
-            }, "default");
+            }, configuration.AksCoANamespace);
 
             var storageClassBody = new V1StorageClass()
             {
@@ -928,7 +930,7 @@ namespace CromwellOnAzureDeployer
             };
 
             AddStaticVolumeClaim(tesDeployment, pvcName, $"/{container.StorageAccount}/{container.ContainerName}");
-            await client.CreateNamespacedPersistentVolumeClaimAsync(pvc, "default");
+            await client.CreateNamespacedPersistentVolumeClaimAsync(pvc, configuration.AksCoANamespace);
         }
 
         private async Task<List<MountableContainer>> GetContainersToMount(IStorageAccount storageAccount)

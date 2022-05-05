@@ -38,6 +38,7 @@ namespace CromwellOnAzureDeployer
         public string VmName { get; set; }
         public bool UseAks { get; set; }
         public string AksClusterName { get; set; }
+        public string AksCoANamespace { get; set; } = "default";
         public bool Silent { get; set; }
         public bool DeleteResourceGroupOnFailure { get; set; }
         public string CromwellVersion { get; set; }
