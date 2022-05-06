@@ -721,6 +721,28 @@ namespace CromwellOnAzureDeployer
                 RefreshableConsole.WriteLine($"{env.Name}: {env.Value}");
             }
 
+
+            if (!string.Equals(configuration.AksCoANamespace, "default", StringComparison.OrdinalIgnoreCase))
+            {
+                V1Namespace existing = null;
+                try
+                {
+                    existing = await client.ReadNamespaceStatusAsync(configuration.AksCoANamespace);
+                }
+                catch (HttpOperationException e) { }
+
+                if (existing == null)
+                {
+                    await client.CreateNamespaceAsync(new V1Namespace()
+                    {
+                        Metadata = new V1ObjectMeta()
+                        {
+                            Name = configuration.AksCoANamespace
+                        }
+                    });
+                }
+            }
+
             await client.CreateNamespacedPersistentVolumeClaimAsync(cromwellTempClaim, configuration.AksCoANamespace);
             await client.CreateNamespacedPersistentVolumeClaimAsync(mysqlDataClaim, configuration.AksCoANamespace);
 
@@ -737,8 +759,6 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-
-            await client.ReplaceNamespacedDeploymentAsync(tesDeploymentBody, "tes", configuration.AksCoANamespace);
             var tesDeployment = await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, configuration.AksCoANamespace);
             var tesService = await client.CreateNamespacedServiceAsync(tesServiceBody, configuration.AksCoANamespace);
             var triggerDeployment = await client.CreateNamespacedDeploymentAsync(triggerDeploymentBody, configuration.AksCoANamespace);
@@ -1012,6 +1032,8 @@ namespace CromwellOnAzureDeployer
         /// <returns></returns>
         private async Task InstallCSIBlobDriver(IKubernetes client)
         {
+            // TODO check if CSI driver is already installed?
+
             var typeMap = new Dictionary<string, Type>();
             typeMap.Add("v1/Pod", typeof(V1Pod));
             typeMap.Add("v1/Service", typeof(V1Service));
