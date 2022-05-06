@@ -50,6 +50,7 @@ using ICSharpCode.SharpZipLib.Tar;
 using System.Security.Cryptography;
 using System.Net.WebSockets;
 using Azure.Storage.Blobs;
+using Microsoft.Azure.Management.ContainerService.Fluent;
 
 namespace CromwellOnAzureDeployer
 {
@@ -125,6 +126,7 @@ namespace CromwellOnAzureDeployer
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
                 IResourceGroup resourceGroup = null;
+                ManagedCluster aksCluster = null;
                 BatchAccount batchAccount = null;
                 IGenericResource logAnalyticsWorkspace = null;
                 IGenericResource appInsights = null;
@@ -146,6 +148,7 @@ namespace CromwellOnAzureDeployer
                         RefreshableConsole.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
                         var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
+                        var existingAksCluster = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
 
                         if (!existingVms.Any())
                         {
@@ -327,6 +330,7 @@ namespace CromwellOnAzureDeployer
                         ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
+                        aksCluster = await ValidateAndGetExistingAKSClusterAsync();
 
                         if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
                         {
@@ -439,7 +443,11 @@ namespace CromwellOnAzureDeployer
                         Task compute = null;
                         if (configuration.UseAks)
                         {
-                            compute = CreateAKS(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName, storageAccount);
+                            if (aksCluster == null)
+                            {
+                                aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName);
+                            }
+                            compute = DeployCoAServicesToCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName, storageAccount);
                         }
                         else
                         {
@@ -590,7 +598,27 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task CreateAKS(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, IStorageAccount storageAccount)
+        private async Task<ManagedCluster> ValidateAndGetExistingAKSClusterAsync()
+        {
+            if (configuration.BatchAccountName == null)
+            {
+                return null;
+            }
+
+            return (await GetExistingAKSClusterAsync(configuration.AksClusterName))
+                ?? throw new ValidationException($"If AKS cluster name is provided, the cluster must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+
+        }
+
+        private async Task<ManagedCluster> GetExistingAKSClusterAsync(string aksClusterName)
+        {
+            return (await Task.WhenAll(subscriptionIds.Select(s => new ContainerServiceClient(tokenCredentials) { SubscriptionId = s }.ManagedClusters.ListAsync())))
+                            .SelectMany(a => a)
+                            .SingleOrDefault(a => a.Name.Equals(aksClusterName, StringComparison.OrdinalIgnoreCase) && a.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
+
+        }
+
+        private async Task<ManagedCluster> ProvisionManagedCluster(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName)
         {
             string resourceGroup = resourceGroupObject.Name;
             string nodePoolName = "nodepool1";
@@ -629,9 +657,17 @@ namespace CromwellOnAzureDeployer
                 VnetSubnetID = virtualNetwork.Subnets[subnetName].Inner.Id
             });
 
-            var result = await Execute(
+            return await Execute(
                 $"Creating AKS Cluster: {configuration.AksClusterName}...",
                 () => containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksClusterName, cluster));
+        }
+
+
+        private async Task DeployCoAServicesToCluster(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, IStorageAccount storageAccount)
+        {
+            string resourceGroup = resourceGroupObject.Name;
+            var containerServiceClient = new ContainerServiceClient(azureCredentials);
+            containerServiceClient.SubscriptionId = configuration.SubscriptionId;
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
             var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup, configuration.AksClusterName);
