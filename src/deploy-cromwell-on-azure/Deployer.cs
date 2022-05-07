@@ -68,6 +68,7 @@ namespace CromwellOnAzureDeployer
         private const string ConfigurationContainerName = "configuration";
         private const string CromwellConfigurationFileName = "cromwell-application.conf";
         private const string ContainersToMountFileName = "containers-to-mount";
+        private const string AccountsFileName = "account-names";
         private const string AllowedVmSizesFileName = "allowed-vm-sizes";
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
@@ -148,104 +149,85 @@ namespace CromwellOnAzureDeployer
                         RefreshableConsole.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
                         var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
-                        var existingAksCluster = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
-
-                        if (!existingVms.Any())
-                        {
-                            throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any virtual machines.");
-                        }
-
-                        if (existingVms.Count() > 1 && string.IsNullOrWhiteSpace(configuration.VmName))
-                        {
-                            throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. {nameof(configuration.VmName)} must be provided.");
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(configuration.VmName))
-                        {
-                            linuxVm = existingVms.FirstOrDefault(vm => vm.Name.Equals(configuration.VmName, StringComparison.OrdinalIgnoreCase));
-
-                            if (linuxVm == null)
-                            {
-                                throw new ValidationException($"Virtual machine {configuration.VmName} does not exist in resource group {configuration.ResourceGroupName}.");
-                            }
-                        }
-                        else
-                        {
-                            linuxVm = existingVms.Single();
-                        }
-
-                        configuration.VmName = linuxVm.Name;
-                        configuration.RegionName = linuxVm.RegionName;
-                        configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() == null;
+                        var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
+                        var useAks = existingAksCluster != null;
 
                         networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault();
 
-                        if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup == null)
+                        Dictionary<string, string> accountNames = null;
+                        if (useAks)
                         {
-                            if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
+                            // Read account names from storage 
+                            // AKS needs to provide storage account name to upgrade??
+
+                            accountNames = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName));
+                        }   
+                        else
+                        {
+                            if (!existingVms.Any())
                             {
-                                configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                                throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any virtual machines.");
                             }
 
-                            networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
-                            await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
-                        }
-
-                        await EnableSsh(networkSecurityGroup);
-
-                        sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
-
-                        await WaitForSshConnectivityAsync(sshConnectionInfo);
-
-                        bool? retrievedKeepSshPortOpen = null;
-                        try
-                        {
-                            if (!configuration.KeepSshPortOpen.HasValue)
+                            if (existingVms.Count() > 1 && string.IsNullOrWhiteSpace(configuration.VmName))
                             {
-                                retrievedKeepSshPortOpen = await GetInstalledKeepSshPortOpenAsync(sshConnectionInfo);
+                                throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. {nameof(configuration.VmName)} must be provided.");
                             }
-                        }
-                        finally
-                        {
-                            configuration.KeepSshPortOpen ??= retrievedKeepSshPortOpen;
-                        }
 
-                        await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
+                            if (!string.IsNullOrWhiteSpace(configuration.VmName))
+                            {
+                                linuxVm = existingVms.FirstOrDefault(vm => vm.Name.Equals(configuration.VmName, StringComparison.OrdinalIgnoreCase));
 
-                        var accountNames = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
+                                if (linuxVm == null)
+                                {
+                                    throw new ValidationException($"Virtual machine {configuration.VmName} does not exist in resource group {configuration.ResourceGroupName}.");
+                                }
+                            }
+                            else
+                            {
+                                linuxVm = existingVms.Single();
+                            }
+
+                            configuration.VmName = linuxVm.Name;
+                            configuration.RegionName = linuxVm.RegionName;
+                            configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() == null;
+
+                            if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup == null)
+                            {
+                                if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
+                                {
+                                    configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                                }
+
+                                networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
+                                await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
+                            }
+
+                            await EnableSsh(networkSecurityGroup);
+
+                            sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
+
+                            await WaitForSshConnectivityAsync(sshConnectionInfo);
+
+                            bool? retrievedKeepSshPortOpen = null;
+                            try
+                            {
+                                if (!configuration.KeepSshPortOpen.HasValue)
+                                {
+                                    retrievedKeepSshPortOpen = await GetInstalledKeepSshPortOpenAsync(sshConnectionInfo);
+                                }
+                            }
+                            finally
+                            {
+                                configuration.KeepSshPortOpen ??= retrievedKeepSshPortOpen;
+                            }
+
+                            accountNames = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
+                        }
 
                         if (!accountNames.Any())
                         {
                             throw new ValidationException($"Could not retrieve account names from virtual machine {configuration.VmName}.");
-                        }
-
-                        if (!accountNames.TryGetValue("ManagedIdentityClientId", out var existingUserManagedIdentity))
-                        {
-                            managedIdentity = await ReplaceSystemManagedIdentityWithUserManagedIdentityAsync(resourceGroup, linuxVm);
-                        }
-                        else
-                        {
-                            managedIdentity = await linuxVm.UserAssignedManagedServiceIdentityIds.Select(GetIdentityByIdAsync).FirstOrDefault(MatchesClientId);
-
-                            if (managedIdentity is null)
-                            {
-                                throw new ValidationException($"The managed identity, referenced by the VM configuration retrieved from virtual machine {configuration.VmName}, does not exist or is not accessible to the current user. ");
-                            }
-
-                            Task<IIdentity> GetIdentityByIdAsync(string id) => azureSubscriptionClient.Identities.GetByIdAsync(id);
-
-                            bool MatchesClientId(Task<IIdentity> identity)
-                            {
-                                try
-                                {
-                                    return existingUserManagedIdentity.Equals(identity.Result.ClientId, StringComparison.OrdinalIgnoreCase);
-                                }
-                                catch
-                                {
-                                    _ = identity.Exception;
-                                    return false;
-                                }
-                            }
                         }
 
                         if (!accountNames.TryGetValue("BatchAccountName", out var batchAccountName))
@@ -279,48 +261,13 @@ namespace CromwellOnAzureDeployer
 
                         configuration.CosmosDbAccountName = cosmosDbAccountName;
 
-                        await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
-
-                        var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
-
-                        if (installedVersion == null)
+                        if (existingAksCluster != null)
                         {
-                            // If upgrading from pre-2.1 version, patch the installed Cromwell configuration file (disable call caching and default to preemptible)
-                            await PatchCromwellConfigurationFileV200Async(storageAccount);
-                            await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
+                            await UpgradeAKSDeployment(resourceGroup, existingAksCluster, storageAccount);
                         }
-
-                        if (installedVersion == null || installedVersion < new Version(2, 1))
+                        else
                         {
-                            await PatchContainersToMountFileV210Async(storageAccount, managedIdentity.Name);
-                        }
-
-                        if (installedVersion == null || installedVersion < new Version(2, 2))
-                        {
-                            await PatchContainersToMountFileV220Async(storageAccount);
-                        }
-
-                        if (installedVersion == null || installedVersion < new Version(2, 4))
-                        {
-                            await PatchContainersToMountFileV240Async(storageAccount);
-                            await PatchAccountNamesFileV240Async(sshConnectionInfo, managedIdentity);
-                        }
-
-                        if (installedVersion == null || installedVersion < new Version(2, 5))
-                        {
-                            await MitigateChaosDbV250Async(cosmosDb);
-                        }
-
-                        if (installedVersion == null || installedVersion < new Version(3, 0))
-                        {
-                            await PatchCromwellConfigurationFileV300Async(storageAccount);
-                            await AddNewSettingsV300Async(sshConnectionInfo);
-                            await UpgradeBlobfuseV300Async(sshConnectionInfo);
-                            await DisableDockerServiceV300Async(sshConnectionInfo);
-
-                            RefreshableConsole.WriteLine($"It's recommended to update the default CoA storage account to a General Purpose v2 account.", ConsoleColor.Yellow);
-                            RefreshableConsole.WriteLine($"To do that, navigate to the storage account in the Azure Portal,", ConsoleColor.Yellow);
-                            RefreshableConsole.WriteLine($"Configuration tab, and click 'Upgrade.'", ConsoleColor.Yellow);
+                            await UpgradeVMDeployment(resourceGroup, accountNames, sshConnectionInfo, storageAccount, cosmosDb);
                         }
                     }
 
@@ -598,9 +545,95 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private async Task UpgradeVMDeployment(IResourceGroup resourceGroup, Dictionary<string, string> accountNames, ConnectionInfo sshConnectionInfo, IStorageAccount storageAccount, ICosmosDBAccount cosmosDb)
+        {
+            IVirtualMachine linuxVm = null;
+            IIdentity managedIdentity = null;
+
+            await ConfigureVmAsync(sshConnectionInfo, null);
+
+            if (!accountNames.TryGetValue("ManagedIdentityClientId", out var existingUserManagedIdentity))
+            {
+                managedIdentity = await ReplaceSystemManagedIdentityWithUserManagedIdentityAsync(resourceGroup, linuxVm);
+            }
+            else
+            {
+                managedIdentity = await linuxVm.UserAssignedManagedServiceIdentityIds.Select(GetIdentityByIdAsync).FirstOrDefault(MatchesClientId);
+
+                if (managedIdentity is null)
+                {
+                    throw new ValidationException($"The managed identity, referenced by the VM configuration retrieved from virtual machine {configuration.VmName}, does not exist or is not accessible to the current user. ");
+                }
+
+                Task<IIdentity> GetIdentityByIdAsync(string id) => azureSubscriptionClient.Identities.GetByIdAsync(id);
+
+                bool MatchesClientId(Task<IIdentity> identity)
+                {
+                    try
+                    {
+                        return existingUserManagedIdentity.Equals(identity.Result.ClientId, StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch
+                    {
+                        _ = identity.Exception;
+                        return false;
+                    }
+                }
+            }
+
+            await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
+
+            var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
+
+            if (installedVersion == null)
+            {
+                // If upgrading from pre-2.1 version, patch the installed Cromwell configuration file (disable call caching and default to preemptible)
+                await PatchCromwellConfigurationFileV200Async(storageAccount);
+                await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
+            }
+
+            if (installedVersion == null || installedVersion < new Version(2, 1))
+            {
+                await PatchContainersToMountFileV210Async(storageAccount, managedIdentity.Name);
+            }
+
+            if (installedVersion == null || installedVersion < new Version(2, 2))
+            {
+                await PatchContainersToMountFileV220Async(storageAccount);
+            }
+
+            if (installedVersion == null || installedVersion < new Version(2, 4))
+            {
+                await PatchContainersToMountFileV240Async(storageAccount);
+                await PatchAccountNamesFileV240Async(sshConnectionInfo, managedIdentity);
+            }
+
+            if (installedVersion == null || installedVersion < new Version(2, 5))
+            {
+                await MitigateChaosDbV250Async(cosmosDb);
+            }
+
+            if (installedVersion == null || installedVersion < new Version(3, 0))
+            {
+                await PatchCromwellConfigurationFileV300Async(storageAccount);
+                await AddNewSettingsV300Async(sshConnectionInfo);
+                await UpgradeBlobfuseV300Async(sshConnectionInfo);
+                await DisableDockerServiceV300Async(sshConnectionInfo);
+
+                RefreshableConsole.WriteLine($"It's recommended to update the default CoA storage account to a General Purpose v2 account.", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine($"To do that, navigate to the storage account in the Azure Portal,", ConsoleColor.Yellow);
+                RefreshableConsole.WriteLine($"Configuration tab, and click 'Upgrade.'", ConsoleColor.Yellow);
+            }
+        }
+
+        private Task UpgradeAKSDeployment(ManagedCluster existingAksCluster)
+        {
+            throw new NotImplementedException();
+        }
+
         private async Task<ManagedCluster> ValidateAndGetExistingAKSClusterAsync()
         {
-            if (configuration.BatchAccountName == null)
+            if (configuration.AksClusterName == null)
             {
                 return null;
             }
@@ -1372,18 +1405,22 @@ namespace CromwellOnAzureDeployer
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod -aG docker {configuration.VmUsername}");
                 });
 
-        private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
-            => await UploadFilesToVirtualMachineAsync(
-                sshConnectionInfo,
-                new[] {
-                    (Utility.GetFileContent("scripts", "env-01-account-names.txt")
+        private string GetAccountNames(IIdentity managedIdentity)
+        {
+            return Utility.GetFileContent("scripts", "env-01-account-names.txt")
                         .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
                         .Replace("{CosmosDbAccountName}", configuration.CosmosDbAccountName)
                         .Replace("{BatchAccountName}", configuration.BatchAccountName)
                         .Replace("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName)
-                        .Replace("{ManagedIdentityClientId}", managedIdentity.ClientId),
-                    $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
+                        .Replace("{ManagedIdentityClientId}", managedIdentity.ClientId);
+        }
 
+        private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
+            => await UploadFilesToVirtualMachineAsync(
+                sshConnectionInfo,
+                new[] {
+                    (GetAccountNames(managedIdentity),
+                    $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
                     (Utility.GetFileContent("scripts", "env-04-settings.txt"),
                     $"{CromwellAzureRootDir}/env-04-settings.txt", false)
                 });
