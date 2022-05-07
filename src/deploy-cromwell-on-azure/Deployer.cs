@@ -43,8 +43,6 @@ using Renci.SshNet.Common;
 using Microsoft.Azure.Management.ContainerService.Models;
 using k8s;
 using k8s.Models;
-using k8s.KubeConfigModels;
-using System.Buffers.Text;
 using ICSharpCode.SharpZipLib.GZip;
 using ICSharpCode.SharpZipLib.Tar;
 using System.Security.Cryptography;
@@ -158,9 +156,15 @@ namespace CromwellOnAzureDeployer
                         if (useAks)
                         {
                             // Read account names from storage 
-                            // AKS needs to provide storage account name to upgrade??
+                            if (string.IsNullOrEmpty(configuration.StorageAccountName))
+                            {
+                                throw new ValidationException("StorageAccountName must be provided when upgrading an AKS based deployment.");
+                            }
 
-                            accountNames = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName));
+                            storageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName)
+                                ?? throw new ValidationException($"Storage account {configuration.StorageAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+
+                            accountNames = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, AccountsFileName));
                         }   
                         else
                         {
@@ -223,6 +227,16 @@ namespace CromwellOnAzureDeployer
                             }
 
                             accountNames = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
+
+                            if (!accountNames.TryGetValue("DefaultStorageAccountName", out var storageAccountName))
+                            {
+                                throw new ValidationException($"Could not retrieve the default storage account name from virtual machine {configuration.VmName}.");
+                            }
+
+                            storageAccount = await GetExistingStorageAccountAsync(storageAccountName)
+                                ?? throw new ValidationException($"Storage account {storageAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+
+                            configuration.StorageAccountName = storageAccountName;
                         }
 
                         if (!accountNames.Any())
@@ -239,16 +253,6 @@ namespace CromwellOnAzureDeployer
                             ?? throw new ValidationException($"Batch account {batchAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
                         configuration.BatchAccountName = batchAccountName;
-
-                        if (!accountNames.TryGetValue("DefaultStorageAccountName", out var storageAccountName))
-                        {
-                            throw new ValidationException($"Could not retrieve the default storage account name from virtual machine {configuration.VmName}.");
-                        }
-
-                        storageAccount = await GetExistingStorageAccountAsync(storageAccountName)
-                            ?? throw new ValidationException($"Storage account {storageAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
-
-                        configuration.StorageAccountName = storageAccountName;
 
                         if (!accountNames.TryGetValue("CosmosDbAccountName", out var cosmosDbAccountName))
                         {
@@ -395,6 +399,7 @@ namespace CromwellOnAzureDeployer
                                 aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName);
                             }
                             compute = DeployCoAServicesToCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName, storageAccount);
+                            await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AccountsFileName, GetAccountNames(managedIdentity));
                         }
                         else
                         {
@@ -626,7 +631,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private Task UpgradeAKSDeployment(ManagedCluster existingAksCluster)
+        private Task UpgradeAKSDeployment(IResourceGroup resourceGropu, ManagedCluster existingAksCluster, IStorageAccount storageAccount)
         {
             throw new NotImplementedException();
         }
