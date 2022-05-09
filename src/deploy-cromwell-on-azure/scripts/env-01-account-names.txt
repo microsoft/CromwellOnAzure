@@ -3,4 +3,4 @@ CosmosDbAccountName={CosmosDbAccountName}
 BatchAccountName={BatchAccountName}
 ApplicationInsightsAccountName={ApplicationInsightsAccountName}
 ManagedIdentityClientId={ManagedIdentityClientId}
-MySqlServerName ={MySqlServerName}
+MySqlServerName={MySqlServerName}

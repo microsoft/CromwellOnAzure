@@ -36,6 +36,7 @@ write_log
 
 storage_account_name=${kv["DefaultStorageAccountName"]}
 managed_identity_client_id=${kv["ManagedIdentityClientId"]}
+mysql_server_name=${kv["MySqlServerName"]}
 
 write_log "Checking account access (this could take awhile due to role assignment propagation delay)..."
 
@@ -111,6 +112,14 @@ kv["CromwellImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{
 kv["TesImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TesImageName"]})
 kv["TriggerServiceImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TriggerServiceImageName"]})
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
+
+write_log "Removing db lock if managed mysql"
+if [ -n "$mysql_server_name" ]; then
+    fully_qualified_server_name=$mysql_server_name.mysql.database.azure.com
+    mysql_server_password=${kv["MySqlServerPassword"]}
+    lockTableExists=$(mysql -u 'cromwell' -p$mysql_server_password cromwell_db -h $fully_qualified_server_name -P 3306 -e "SELECT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'cromwell_db' AND table_name = 'DATABASECHANGELOGLOCK') AS '' ")
+    [[ $lockTableExists -eq '1' ]] && mysql -u 'cromwell' -p$mysql_server_password cromwell_db -h $fully_qualified_server_name -P 3306 -e "UPDATE cromwell_db.DATABASECHANGELOGLOCK SET LOCKED = 0, LOCKGRANTED = null, LOCKEDBY = null WHERE ID = 1" || :
+fi
 
 write_log "Running docker-compose up"
 mkdir -p /mnt/cromwell-tmp

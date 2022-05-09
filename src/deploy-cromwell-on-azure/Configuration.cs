@@ -18,7 +18,9 @@ namespace CromwellOnAzureDeployer
         public string VmOsName { get; set; } = "UbuntuServer";
         public string VmOsVersion { get; set; } = "18.04-LTS";
         public string VmSize { get; set; } = "Standard_D3_v2";
-        public string VnetAddressSpace { get; set; } = "10.0.0.0/24";
+        public string VnetAddressSpace { get; set; } = "10.1.0.0/16";
+        public string VmSubnetAddressSpace { get; set; } = "10.1.0.0/24";
+        public string MySqlSubnetAddressSpace { get; set; } = "10.1.1.0/24";
         public string VmUsername { get; set; } = "vmadmin";
         public string VmPassword { get; set; }
         public string ResourceGroupName { get; set; }
@@ -49,7 +51,7 @@ namespace CromwellOnAzureDeployer
         public string BlobxferImageName { get; set; } = null;
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool? KeepSshPortOpen { get; set; } = null;
-        public bool? ProvisionMySQLOnAzure { get; set; } = null;
+        public bool? ProvisionMySqlOnAzure { get; set; } = null;
 
         public static Configuration BuildConfiguration(string[] args)
         {
