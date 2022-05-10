@@ -2423,6 +2423,14 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
+            void ThrowIfEitherNotProvidedForUpdate(string attributeValue1, string attributeName1, string attributeValue2, string attributeName2)
+            {
+                if (configuration.Update && string.IsNullOrWhiteSpace(attributeValue1) && string.IsNullOrWhiteSpace(attributeValue2))
+                {
+                    throw new ValidationException($"Either {attributeName1} or {attributeName2} is required for update.", false);
+                }
+            }
+
             void ThrowIfNotProvided(string attributeValue, string attributeName)
             {
                 if (string.IsNullOrWhiteSpace(attributeValue))
@@ -2461,10 +2469,9 @@ namespace CromwellOnAzureDeployer
             ThrowIfNotProvidedForInstall(configuration.RegionName, nameof(configuration.RegionName));
 
             ThrowIfNotProvidedForUpdate(configuration.ResourceGroupName, nameof(configuration.ResourceGroupName));
-            ThrowIfNotProvidedForUpdate(configuration.VmPassword, nameof(configuration.VmPassword));
+            ThrowIfEitherNotProvidedForUpdate(configuration.VmPassword, nameof(configuration.VmPassword), configuration.AksClusterName, nameof(configuration.AksClusterName));
 
             ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
-            ThrowIfProvidedForUpdate(configuration.StorageAccountName, nameof(configuration.StorageAccountName));
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
             ThrowIfProvidedForUpdate(configuration.CosmosDbAccountName, nameof(configuration.CosmosDbAccountName));
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
