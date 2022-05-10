@@ -28,6 +28,8 @@ using Microsoft.Azure.Management.MySQL.FlexibleServers;
 using Microsoft.Azure.Management.MySQL.FlexibleServers.Models;
 using Microsoft.Azure.Management.Network.Fluent;
 using Microsoft.Azure.Management.Network.Fluent.Models;
+using Microsoft.Azure.Management.ResourceGraph;
+using Microsoft.Azure.Management.ResourceGraph.Models;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
@@ -65,7 +67,6 @@ namespace CromwellOnAzureDeployer
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
         private const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
-        private const string VmSubnetName = "vmsubnet";
 
         private const string SshNsgRuleName = "SSH";
 
@@ -89,12 +90,10 @@ namespace CromwellOnAzureDeployer
         private Microsoft.Azure.Management.Fluent.Azure.IAuthenticated azureClient { get; set; }
         private IResourceManager resourceManagerClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
+        private IMySQLManagementClient mySQLManagementClient { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
         private bool SkipBillingReaderRoleAssignment { get; set; }
-        private string MySqlServerName { get; set; }
-        private string MySqlServerPassword { get; set; }
         private bool isResourceGroupCreated { get; set; }
-        private string MySqlSubnetName { get; set; }
 
         public Deployer(Configuration configuration)
         {
@@ -119,9 +118,7 @@ namespace CromwellOnAzureDeployer
                 azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                 subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
-                MySqlServerName = configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15) : String.Empty;
-                MySqlServerPassword = Utility.GeneratePassword();
-                MySqlSubnetName = configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? "mysqlsubnet" : String.Empty;
+                mySQLManagementClient = new MySQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
@@ -130,7 +127,7 @@ namespace CromwellOnAzureDeployer
                 IGenericResource logAnalyticsWorkspace = null;
                 IGenericResource appInsights = null;
                 ICosmosDBAccount cosmosDb = null;
-                IMySQLManagementClient mySQLServer = null;
+                Server mySQLServer = null;
                 IStorageAccount storageAccount = null;
                 IVirtualMachine linuxVm = null;
                 INetworkSecurityGroup networkSecurityGroup = null;
@@ -269,7 +266,7 @@ namespace CromwellOnAzureDeployer
 
                         // Note: Current behavior is to block switching from Docker MySQL to Azure MySQL on Update.
                         // However we do ancitipate including this change, this code is here to facilitate this future behavior.
-                        MySqlServerName = accountNames.GetValueOrDefault("MySqlServerName");
+                        configuration.MySqlServerName = accountNames.GetValueOrDefault("MySqlServerName");
                         //configuration.ProvisionMySqlOnAzure = !string.IsNullOrEmpty(MySqlServerName);
 
                         var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
@@ -321,6 +318,10 @@ namespace CromwellOnAzureDeployer
                         ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
+
+                        // Configuration preferences not currently settable by user.
+                        configuration.MySqlServerName = configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15) : String.Empty;
+                        configuration.MySqlServerPassword = Utility.GeneratePassword();
 
                         if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
                         {
@@ -388,7 +389,7 @@ namespace CromwellOnAzureDeployer
 
                         if (vnetAndSubnet is not null)
                         {
-                            ConsoleEx.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.vmSubnetName}");
+                            ConsoleEx.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.vmSubnet}");
                         }
 
                         if (storageAccount is not null)
@@ -404,6 +405,8 @@ namespace CromwellOnAzureDeployer
                         if (vnetAndSubnet is null)
                         {
                             configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                            configuration.MySqlSubnetName = String.IsNullOrEmpty(configuration.MySqlSubnetName) && configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? configuration.DefaultMySqlSubnetName : configuration.MySqlSubnetName;
+                            configuration.VmSubnetName = String.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
                             vnetAndSubnet = await CreateVnetAndSubnetsAsync(resourceGroup);
                         }
 
@@ -420,7 +423,7 @@ namespace CromwellOnAzureDeployer
                             Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
                             Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
                             Task.Run(async () => { 
-                                if(configuration.ProvisionMySqlOnAzure.GetValueOrDefault()) { mySQLServer = await CreateAndProvisionMySQLServerAsync(vnetAndSubnet.Value.mySqlSubnet.Inner.Id); }
+                                if(configuration.ProvisionMySqlOnAzure == true) { mySQLServer = await CreateMySqlServerAndDatabaseAsync(mySQLManagementClient, vnetAndSubnet.Value.mySqlSubnet); }
                             }),
 
                             Task.Run(async () =>
@@ -438,7 +441,7 @@ namespace CromwellOnAzureDeployer
                                 });
                             }),
 
-                            Task.Run(() => CreateVirtualMachineAsync(managedIdentity, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnetName.Name)
+                            Task.Run(() => CreateVirtualMachineAsync(managedIdentity, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name)
                                 .ContinueWith(async t =>
                                     {
                                         linuxVm = t.Result;
@@ -839,13 +842,13 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{BatchAccountName}", configuration.BatchAccountName),
                         new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
                         new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
-                        new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? MySqlServerName : String.Empty),
+                        new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? configuration.MySqlServerName : String.Empty),
                     }, "scripts", "env-01-account-names.txt"),
                     $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
                     (Utility.PersonalizeContent(new []
                     {
-                        new Utility.ConfigReplaceTextItem("{MySqlServerPassword}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? MySqlServerPassword : String.Empty),
+                        new Utility.ConfigReplaceTextItem("{MySqlServerPassword}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? configuration.MySqlServerPassword : String.Empty),
                     }, "scripts", "env-04-settings.txt"),
                     $"{CromwellAzureRootDir}/env-04-settings.txt", false),
                 });
@@ -1032,8 +1035,8 @@ namespace CromwellOnAzureDeployer
                     }, "scripts", ContainersToMountFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
-                        new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? $"{MySqlServerName}.mysql.database.azure.com" : "mysqldb"),
-                        new Utility.ConfigReplaceTextItem("{MySqlServerPassword}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? MySqlServerPassword : "cromwell"),
+                        new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? $"{configuration.MySqlServerName}.mysql.database.azure.com" : "mysqldb"),
+                        new Utility.ConfigReplaceTextItem("{MySqlServerPassword}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? configuration.MySqlServerPassword : "cromwell"),
                         new Utility.ConfigReplaceTextItem("{MySqlUseSSL}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? "true" : "false"),
                     }, "scripts", CromwellConfigurationFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
@@ -1073,33 +1076,41 @@ namespace CromwellOnAzureDeployer
                     .WithWriteReplication(Region.Create(configuration.RegionName))
                     .CreateAsync(cts.Token));
 
-        private async Task<IMySQLManagementClient> CreateAndProvisionMySQLServerAsync(string subnetId)
+        private async Task<Server> CreateMySqlServerAndDatabaseAsync(IMySQLManagementClient mySqlManagementClient, ISubnet subnet)
         {
-            var mySQLManagementClient = new MySQLManagementClient(azureCredentials)
-            { SubscriptionId = configuration.SubscriptionId };
+            // Confirm subnet has MySQL delegation.
+            if (!subnet.Inner.Delegations.Any())
+            {
+                subnet.Parent.Update().UpdateSubnet(subnet.Name).WithDelegation("Microsoft.DBforMySQL/flexibleServers");
+                await subnet.Parent.Update().ApplyAsync();
+            }
 
             // Create Server.
+            Server server = null;
             await Execute(
-                $"Creating MySQL On Azure Server Instance: {MySqlServerName} With Password: {MySqlServerPassword}...",
-                () => mySQLManagementClient.Servers.CreateAsync(
-                     configuration.ResourceGroupName, MySqlServerName,
-                     new Server(
-                        location: configuration.RegionName,
-                        version: "8.0.21",
-                        sku: new Sku("Standard_B1ms", "Burstable"),
-                        administratorLogin: "cromwell",
-                        administratorLoginPassword: MySqlServerPassword,
-                        network: new Network(publicNetworkAccess: "Disabled", delegatedSubnetResourceId: subnetId)
-                   )));
-            
+                $"Creating MySQL On Azure Server Instance: {configuration.MySqlServerName} With Password: {configuration.MySqlServerPassword}...",
+                async () =>
+                {
+                    server = await mySqlManagementClient.Servers.CreateAsync(
+                        configuration.ResourceGroupName, configuration.MySqlServerName,
+                        new Server(
+                           location: configuration.RegionName,
+                           version: configuration.MySqlVersion,
+                           sku: new Sku(configuration.MySqlSkuName, configuration.MySqlTier),
+                           administratorLogin: "cromwell",
+                           administratorLoginPassword: configuration.MySqlServerPassword,
+                           network: new Network(publicNetworkAccess: "Disabled", delegatedSubnetResourceId: subnet.Inner.Id)
+                        ));
+                });
+
             // Create Database.
             await Execute(
-                $"Creating MySQL On Azure Server Databse: cromwell_db...",
-                () => mySQLManagementClient.Databases.CreateOrUpdateAsync(
-               configuration.ResourceGroupName, MySqlServerName, "cromwell_db",
+                $"Creating MySQL On Azure Server Database: cromwell_db...",
+                () => mySqlManagementClient.Databases.CreateOrUpdateAsync(
+               configuration.ResourceGroupName, configuration.MySqlServerName, configuration.MySqlDatabaseName,
                new Database()));
  
-            return mySQLManagementClient;
+            return server;
         }
 
         private Task AssignVmAsBillingReaderToSubscriptionAsync(IIdentity managedIdentity)
@@ -1167,15 +1178,15 @@ namespace CromwellOnAzureDeployer
                     .WithRegion(configuration.RegionName)
                     .WithExistingResourceGroup(resourceGroup)
                     .WithAddressSpace(configuration.VnetAddressSpace)
-                    .DefineSubnet(VmSubnetName).WithAddressPrefix(configuration.VmSubnetAddressSpace).Attach();
+                    .DefineSubnet(configuration.VmSubnetName).WithAddressPrefix(configuration.VmSubnetAddressSpace).Attach();
 
-                vnetDefinition = !String.IsNullOrEmpty(MySqlSubnetName)
-                    ? vnetDefinition.DefineSubnet(MySqlSubnetName).WithAddressPrefix(configuration.MySqlSubnetAddressSpace).WithDelegation("Microsoft.DBforMySQL/flexibleServers").Attach()
+                vnetDefinition = configuration.ProvisionMySqlOnAzure.GetValueOrDefault()
+                    ? vnetDefinition.DefineSubnet(configuration.MySqlSubnetName).WithAddressPrefix(configuration.MySqlSubnetAddressSpace).WithDelegation("Microsoft.DBforMySQL/flexibleServers").Attach()
                     : vnetDefinition;
 
                 var vnet = await vnetDefinition.CreateAsync();
 
-                return (vnet, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(MySqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value);
+                return (vnet, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.MySqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value);
             });
 
         private Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync(IResourceGroup resourceGroup, string networkSecurityGroupName)
@@ -1244,7 +1255,7 @@ namespace CromwellOnAzureDeployer
                 () => networkInterface.Update().WithExistingNetworkSecurityGroup(networkSecurityGroup).ApplyAsync()
             );
 
-        private Task ExecuteQueriesOnAzureMySqlDb(ConnectionInfo sshConnectionInfo, IMySQLManagementClient mySQLServer)
+        private Task ExecuteQueriesOnAzureMySqlDb(ConnectionInfo sshConnectionInfo, Server mySQLServer)
         => Execute(
             $"Executing scripts on cromwell_db.",
             async () => {
@@ -1253,8 +1264,7 @@ namespace CromwellOnAzureDeployer
                 {
                     new Utility.ConfigReplaceRegExItemText("^CREATE USER 'cromwell'@'%'.*$", String.Empty, RegexOptions.Multiline),
                 }, "scripts", "mysql", "init-user.sql");
-        var server = await mySQLServer.Servers.GetAsync(configuration.ResourceGroupName, MySqlServerName);
-                return await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"mysql -u cromwell -p'{MySqlServerPassword}' -h {server.FullyQualifiedDomainName} -P 3306 -D cromwell_db -e \"{initScript}\"");
+                return await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"mysql -u cromwell -p'{configuration.MySqlServerPassword}' -h {mySQLServer.FullyQualifiedDomainName} -P 3306 -D cromwell_db -e \"{initScript}\"");
             });
 
         private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
@@ -1647,30 +1657,30 @@ namespace CromwellOnAzureDeployer
                 ?? throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
         }
 
-        private async Task<(INetwork virtualNetwork, ISubnet vmSubnetName, ISubnet mySqlSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
+        private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet mySqlSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
         {
             return null;
             static bool AllOrNoneSet(params string[] values) => values.All(v => !string.IsNullOrEmpty(v)) || values.All(v => string.IsNullOrEmpty(v));
             static bool NoneSet(params string[] values) => values.All(v => string.IsNullOrEmpty(v));
 
-            if (NoneSet(configuration.VnetResourceGroupName, configuration.VnetName, VmSubnetName))
+            if (NoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName))
             {
                 if (configuration.PrivateNetworking.GetValueOrDefault())
                 {
-                    throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)} and {nameof(VmSubnetName)} are required when using private networking.");
+                    throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)} and {nameof(configuration.VmSubnetName)} are required when using private networking.");
                 }
 
                 return null;
             }
 
-            if (configuration.ProvisionMySqlOnAzure == true && !AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, VmSubnetName, MySqlSubnetName))
+            if (configuration.ProvisionMySqlOnAzure == true && !AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName, configuration.MySqlSubnetName))
             {
-                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)}, {nameof(VmSubnetName)} and {nameof(MySqlSubnetName)} are required when using an existing virtual network and {nameof(configuration.ProvisionMySqlOnAzure)} is set.");
+                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)}, {nameof(configuration.VmSubnetName)} and {nameof(configuration.MySqlSubnetName)} are required when using an existing virtual network and {nameof(configuration.ProvisionMySqlOnAzure)} is set.");
             }
 
-            if (!AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, VmSubnetName))
+            if (!AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName))
             {
-                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)} and {nameof(VmSubnetName)} are required when using an existing virtual network.");
+                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)} and {nameof(configuration.VmSubnetName)} are required when using an existing virtual network.");
             }
 
             if (!(await azureSubscriptionClient.ResourceGroups.ListAsync(true)).Any(rg => rg.Name.Equals(configuration.VnetResourceGroupName, StringComparison.OrdinalIgnoreCase)))
@@ -1690,22 +1700,40 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException($"Virtual network '{configuration.VnetName}' must be in the same region that you are deploying to ({configuration.RegionName}).");
             }
 
-            var vmSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
+            var vmSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
 
             if (vmSubnet == null)
             {
-                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{VmSubnetName}'");
+                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.VmSubnetName}'");
             }
 
-            var mySqlSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(MySqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
+            var resourceGraphClient = new ResourceGraphClient(tokenCredentials);
+            var mySqlSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.MySqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
 
-            if (configuration.ProvisionMySqlOnAzure == true && mySqlSubnet == null)
+            if (configuration.ProvisionMySqlOnAzure == true)
             {
-                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{MySqlSubnetName}'");
-            }
+                if (mySqlSubnet == null)
+                {
+                    throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.MySqlSubnetName}'");
+                }
 
-            // Check that MySqlSubnetName has no other resources and that delegation can be done. Or require that delegation is set already.
-            // also private DNS zone needs to be created, there is also virtual network link (do these cost?)
+                var delegatedServices = mySqlSubnet.Inner.Delegations.Select(d => d.ServiceName);
+                var hasOtherDelegations = delegatedServices.Any(s => s != "Microsoft.DBforMySQL/flexibleServers");
+                var hasNoDelegations = delegatedServices.Count() == 0;
+
+                if (hasOtherDelegations)
+                {
+                    throw new ValidationException($"Subnet '{configuration.MySqlSubnetName}' can have 'Microsoft.DBforMySQL/flexibleServers' delegation only.");
+                }
+
+                var resourcesInMySqlSubnetQuery = $"where type =~ 'Microsoft.Network/networkInterfaces' | where properties.ipConfigurations[0].properties.subnet.id == '{mySqlSubnet.Inner.Id}'";
+                var resourcesExist = (await resourceGraphClient.ResourcesAsync(new QueryRequest(new[] { configuration.SubscriptionId }, resourcesInMySqlSubnetQuery))).TotalRecords > 0;
+
+                if (hasNoDelegations && resourcesExist)
+                {
+                    throw new ValidationException($"Subnet '{configuration.MySqlSubnetName}' must be either empty or have 'Microsoft.DBforMySQL/flexibleServers' delegation.");
+                }
+            }
 
             return (vnet, vmSubnet, mySqlSubnet);
         }
