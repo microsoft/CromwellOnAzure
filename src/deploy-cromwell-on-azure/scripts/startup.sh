@@ -116,9 +116,11 @@ rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 write_log "Removing db lock if managed mysql"
 if [ -n "$mysql_server_name" ]; then
     fully_qualified_server_name=$mysql_server_name.mysql.database.azure.com
-    mysql_server_password=${kv["MySqlServerPassword"]}
-    lockTableExists=$(mysql -u 'cromwell' -p$mysql_server_password cromwell_db -h $fully_qualified_server_name -P 3306 -e "SELECT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'cromwell_db' AND table_name = 'DATABASECHANGELOGLOCK') AS '' ")
-    [[ $lockTableExists -eq '1' ]] && mysql -u 'cromwell' -p$mysql_server_password cromwell_db -h $fully_qualified_server_name -P 3306 -e "UPDATE cromwell_db.DATABASECHANGELOGLOCK SET LOCKED = 0, LOCKGRANTED = null, LOCKEDBY = null WHERE ID = 1" || :
+    mysql_db_name=${kv["MySqlDatabaseName"]}
+    mysql_user_login=${kv["MySqlUserLogin"]}
+    mysql_user_password=${kv["MySqlUserPassword"]}
+    lockTableExists=$(mysql -u $mysql_user_login -p$mysql_user_password $mysql_db_name -h $fully_qualified_server_name -P 3306 -e "SELECT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = '$mysql_db_name' AND table_name = 'DATABASECHANGELOGLOCK') AS '' ")
+    [[ $lockTableExists -eq '1' ]] && mysql -u $mysql_user_login -p$mysql_user_password $mysql_db_name -h $fully_qualified_server_name -P 3306 -e "UPDATE $mysql_db_name.DATABASECHANGELOGLOCK SET LOCKED = 0, LOCKGRANTED = null, LOCKEDBY = null WHERE ID = 1" || :
 fi
 
 write_log "Running docker-compose up"

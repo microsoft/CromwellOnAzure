@@ -9,4 +9,3 @@ BatchNodeAgentSkuId=batch.node.ubuntu 20.04
 MarthaUrl=
 MarthaKeyVaultName=
 MarthaSecretName=
-MySqlServerPassword={MySqlServerPassword}

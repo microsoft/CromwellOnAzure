@@ -67,6 +67,7 @@
     <EmbeddedResource Include="scripts\env-03-external-images.txt" />
     <EmbeddedResource Include="scripts\env-04-settings.txt" />
     <EmbeddedResource Include="scripts\env-12-local-my-sql-db.txt" />
+    <EmbeddedResource Include="scripts\env-13-my-sql-db.txt" />
     <EmbeddedResource Include="scripts\install-cromwellazure.sh" />
     <EmbeddedResource Include="scripts\mount-data-disk.sh" />
     <EmbeddedResource Include="scripts\mount.blobfuse" />
