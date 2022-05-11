@@ -97,10 +97,10 @@ write_log "Mounted containers:"
 findmnt -t fuse
 write_log
 
-k=docker-compose.*.yml
-readarray -t files < <(compgen -G "$k")
-k="${files[@]}"
-kv["COMPOSE_FILE"]="docker-compose.yml:${k//${IFS:0:1}/:}"
+compose_files=(docker-compose.*.yml)
+compose_files=("docker-compose.yml" "${compose_files[@]}")
+kv["COMPOSE_FILE"]=$(IFS=:; echo "${compose_files[*]}")
+
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 
 write_log "Running docker-compose pull"
