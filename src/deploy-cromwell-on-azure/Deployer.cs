@@ -354,12 +354,6 @@ namespace CromwellOnAzureDeployer
 
                         var vnetAndSubnet = await ValidateAndGetExistingVirtualNetworkAsync();
 
-                        RefreshableConsole.WriteLine();
-                        RefreshableConsole.WriteLine($"VM host: {configuration.VmName}.{configuration.RegionName}.cloudapp.azure.com");
-                        RefreshableConsole.WriteLine($"VM username: {configuration.VmUsername}");
-                        RefreshableConsole.WriteLine($"VM password: {configuration.VmPassword}");
-                        RefreshableConsole.WriteLine();
-
                         if (string.IsNullOrWhiteSpace(configuration.ResourceGroupName))
                         {
                             configuration.ResourceGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
@@ -424,6 +418,11 @@ namespace CromwellOnAzureDeployer
                         }
                         else
                         {
+                            RefreshableConsole.WriteLine();
+                            RefreshableConsole.WriteLine($"VM host: {configuration.VmName}.{configuration.RegionName}.cloudapp.azure.com");
+                            RefreshableConsole.WriteLine($"VM username: {configuration.VmUsername}");
+                            RefreshableConsole.WriteLine($"VM password: {configuration.VmPassword}");
+                            RefreshableConsole.WriteLine();
                             compute = CreateVirtualMachineAsync(managedIdentity, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName)
                                 .ContinueWith(async t =>
                                 {
@@ -445,10 +444,10 @@ namespace CromwellOnAzureDeployer
 
                         await Task.WhenAll(new Task[]
                         {
-                        Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync()),
-                        Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
-                        Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
-                        Task.Run(async () => await compute)
+                            Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync()),
+                            Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
+                            Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
+                            Task.Run(async () => await compute)
                         }) ;
 
                         await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
