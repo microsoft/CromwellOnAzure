@@ -66,7 +66,7 @@ namespace CromwellOnAzureDeployer
         private const string ConfigurationContainerName = "configuration";
         private const string CromwellConfigurationFileName = "cromwell-application.conf";
         private const string ContainersToMountFileName = "containers-to-mount";
-        private const string AccountsFileName = "account-names";
+        private const string CoASettingsFileName = "settings";
         private const string AllowedVmSizesFileName = "allowed-vm-sizes";
         private const string InputsContainerName = "inputs";
         private const string CromwellAzureRootDir = "/data/cromwellazure";
@@ -177,7 +177,7 @@ namespace CromwellOnAzureDeployer
 
                             }
 
-                            accountNames = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, AccountsFileName));
+                            accountNames = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CoASettingsFileName));
                         }   
                         else
                         {
@@ -288,7 +288,7 @@ namespace CromwellOnAzureDeployer
                             managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
-                            await UpgradeAKSDeployment(managedIdentity, resourceGroup, storageAccount);
+                            await UpgradeAKSDeployment(managedIdentity, accountNames, resourceGroup, storageAccount);
                         }
                         else
                         {
@@ -409,12 +409,16 @@ namespace CromwellOnAzureDeployer
                         Task compute = null;
                         if (configuration.UseAks)
                         {
-                            if (aksCluster == null)
+                            compute = Task.Run(async () =>
                             {
-                                aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName);
-                            }
-                            compute = DeployCoAServicesToCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName, storageAccount);
-                            await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AccountsFileName, GetAccountNames(managedIdentity));
+                                var settings = GetSettingsDict(managedIdentity);
+                                if (aksCluster == null)
+                                {
+                                    aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName);
+                                }
+                                await DeployCoAServicesToCluster(resourceGroup, settings, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName, storageAccount);
+                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CoASettingsFileName, Utility.DictionaryToDelimitedText(settings));
+                            });
                         }
                         else
                         {
@@ -651,7 +655,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task UpgradeAKSDeployment(IIdentity managedIdentity, IResourceGroup resourceGroup, IStorageAccount storageAccount)
+        private async Task UpgradeAKSDeployment(IIdentity managedIdentity, Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount)
         {
 
             var containerServiceClient = new ContainerServiceClient(azureCredentials);
@@ -668,8 +672,7 @@ namespace CromwellOnAzureDeployer
             var k8sConfig = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
             IKubernetes client = new Kubernetes(k8sConfig);
 
-            var tesDeploymentBody = await BuildTesDeployment(managedIdentity, storageAccount, resourceGroup.Name, client);
-
+            var tesDeploymentBody = await BuildTesDeployment(settings, storageAccount, resourceGroup.Name, client);
             var tesDeployment = await client.ReplaceNamespacedDeploymentAsync(tesDeploymentBody, "tes", configuration.AksCoANamespace);
         }
 
@@ -737,7 +740,7 @@ namespace CromwellOnAzureDeployer
                 () => containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksClusterName, cluster));
         }
 
-        private async Task<V1Deployment> BuildTesDeployment(IIdentity managedIdentity, IStorageAccount storageAccount, string resourceGroup, IKubernetes client)
+        private async Task<V1Deployment> BuildTesDeployment(Dictionary<string, string> settings, IStorageAccount storageAccount, string resourceGroup, IKubernetes client)
         {
             var tesDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "tes-deployment.yaml"));
             if (tesDeploymentBody.Spec.Template.Spec.Containers.First().VolumeMounts == null)
@@ -750,37 +753,11 @@ namespace CromwellOnAzureDeployer
                 tesDeploymentBody.Spec.Template.Spec.Volumes = new List<V1Volume>();
             }
 
-            var settings = GetSettingsDict();
-
+            var externalStorageContainers = new StringBuilder();
             var tesEnv = new List<V1EnvVar>();
-            tesEnv.Add(new V1EnvVar("DefaultStorageAccountName", configuration.StorageAccountName));
-            tesEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", $"RunAs=App;AppId={managedIdentity.ClientId}"));
-            tesEnv.Add(new V1EnvVar("ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName));
-            tesEnv.Add(new V1EnvVar("CosmosDbAccountName", configuration.CosmosDbAccountName));
-
-            tesEnv.Add(new V1EnvVar("AzureOfferDurableId", settings["AzureOfferDurableId"]));
-            tesEnv.Add(new V1EnvVar("BatchAccountName", configuration.BatchAccountName));
-            tesEnv.Add(new V1EnvVar("BatchNodesSubnetId", configuration.BatchNodesSubnetId));
-            tesEnv.Add(new V1EnvVar("BlobxferImageName", configuration.BlobxferImageName));
-            tesEnv.Add(new V1EnvVar("CromwellImageName", settings["CromwellImageName"]));
-            tesEnv.Add(new V1EnvVar("CromwellImageSha", "")); //$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["CromwellImageName"]})
-            tesEnv.Add(new V1EnvVar("CromwellOnAzureVersion", settings["CromwellOnAzureVersion"]));
-            tesEnv.Add(new V1EnvVar("DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress.ToString()));
-            tesEnv.Add(new V1EnvVar("DisableBatchScheduling", settings["DisableBatchScheduling"]));
-            tesEnv.Add(new V1EnvVar("DockerInDockerImageName", configuration.DockerInDockerImageName));
-            tesEnv.Add(new V1EnvVar("MySqlImageName", settings["MySqlImageName"]));
-            tesEnv.Add(new V1EnvVar("MySqlImageSha", ""));
-            tesEnv.Add(new V1EnvVar("TesImageName", settings["TesImageName"]));
-            tesEnv.Add(new V1EnvVar("TesImageSha", ""));
-            tesEnv.Add(new V1EnvVar("TriggerServiceImageName", settings["TriggerServiceImageName"]));
-            tesEnv.Add(new V1EnvVar("TriggerServiceImageSha", ""));
-            tesEnv.Add(new V1EnvVar("UsePreemptibleVmsOnly", settings["UsePreemptibleVmsOnly"]));
-            tesEnv.Add(new V1EnvVar("ExternalStorageContainers", "https://datasettestinputs.blob.core.windows.net/dataset?sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D"));
-            tesDeploymentBody.Spec.Template.Spec.Containers.First().Env = tesEnv;
-
-            foreach (var env in tesEnv)
+            foreach(var setting in settings)
             {
-                RefreshableConsole.WriteLine($"{env.Name}: {env.Value}");
+                tesEnv.Add(new V1EnvVar(setting.Key, setting.Value));
             }
 
             var existingContainers = new HashSet<MountableContainer>(await GetExistingContainers(client));
@@ -810,12 +787,15 @@ namespace CromwellOnAzureDeployer
                 if (!string.IsNullOrEmpty(container.SasToken))
                 {
                     await CreateContainerMountWithSas(container, resourceGroup, client, tesDeploymentBody);
+                    externalStorageContainers.Append($"https://{container.StorageAccount}.blob.core.windows.net/{container.ContainerName}?{container.SasToken};");
                 }
                 else
                 {
                     await CreateContainerMountWithManagedId(container, resourceGroup, client, tesDeploymentBody);
                 }
             }
+            tesEnv.Add(new V1EnvVar("ExternalStorageContainers", externalStorageContainers.ToString()));
+            tesDeploymentBody.Spec.Template.Spec.Containers.First().Env = tesEnv;
 
             return tesDeploymentBody;
         }
@@ -858,7 +838,7 @@ namespace CromwellOnAzureDeployer
             return list;
         }
 
-        private async Task DeployCoAServicesToCluster(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, IStorageAccount storageAccount)
+        private async Task DeployCoAServicesToCluster(IResource resourceGroupObject, Dictionary<string, string> settings, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, IStorageAccount storageAccount)
         {
             string resourceGroup = resourceGroupObject.Name;
             var containerServiceClient = new ContainerServiceClient(azureCredentials);
@@ -902,10 +882,10 @@ namespace CromwellOnAzureDeployer
 
             // Example to set Environment Variables for trigger service.
             var triggerEnv = new List<V1EnvVar>();
-            triggerEnv.Add(new V1EnvVar("DefaultStorageAccountName", configuration.StorageAccountName));
-            triggerEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", $"RunAs=App;AppId={managedIdentity.ClientId}"));
-            triggerEnv.Add(new V1EnvVar("ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName));
-            triggerEnv.Add(new V1EnvVar("CosmosDbAccountName", configuration.CosmosDbAccountName));
+            triggerEnv.Add(new V1EnvVar("DefaultStorageAccountName", settings["DefaultStorageAccountName"]));
+            triggerEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", settings["AzureServicesAuthConnectionString"]));
+            triggerEnv.Add(new V1EnvVar("ApplicationInsightsAccountName", settings["ApplicationInsightsAccountName"]));
+            triggerEnv.Add(new V1EnvVar("CosmosDbAccountName", settings["CosmosDbAccountName"]));
             triggerDeploymentBody.Spec.Template.Spec.Containers.First().Env = triggerEnv;
 
             if (!string.Equals(configuration.AksCoANamespace, "default", StringComparison.OrdinalIgnoreCase))
@@ -932,7 +912,7 @@ namespace CromwellOnAzureDeployer
             await client.CreateNamespacedPersistentVolumeClaimAsync(cromwellTempClaim, configuration.AksCoANamespace);
             await client.CreateNamespacedPersistentVolumeClaimAsync(mysqlDataClaim, configuration.AksCoANamespace);
 
-            var tesDeploymentBody = await BuildTesDeployment(managedIdentity, storageAccount, resourceGroup, client);
+            var tesDeploymentBody = await BuildTesDeployment(settings, storageAccount, resourceGroup, client);
 
             var tesDeployment = await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, configuration.AksCoANamespace);
             var tesService = await client.CreateNamespacedServiceAsync(tesServiceBody, configuration.AksCoANamespace);
@@ -1201,7 +1181,7 @@ namespace CromwellOnAzureDeployer
             return containers.ToList();
         }
 
-        private Dictionary<string, string> GetSettingsDict()
+        private Dictionary<string, string> GetSettingsDict(IIdentity managedIdentity)
         {
             var files = new string[] { "env-00-coa-version.txt", "env-01-account-names.txt", "env-02-internal-images.txt", "env-03-external-images.txt", "env-04-settings.txt" };
             var settings = new Dictionary<string, string>();
@@ -1217,6 +1197,36 @@ namespace CromwellOnAzureDeployer
                     }
                 }
             }
+
+            // env 05-12
+            if (!string.IsNullOrWhiteSpace(configuration.CromwellVersion))
+            {
+                settings["CromwellImageName"] = $"broadinstitute/cromwell:{configuration.CromwellVersion}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuration.TesImageName))
+            {
+                settings["TesImageName"] = configuration.TesImageName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuration.TriggerServiceImageName))
+            {
+                settings["TriggerServiceImageName"] = configuration.TriggerServiceImageName;
+            }
+            settings["BatchNodesSubnetId"] = configuration.BatchNodesSubnetId;
+            settings["DockerInDockerImageName"] = configuration.DockerInDockerImageName;
+            settings["BlobxferImageName"] = configuration.BlobxferImageName;
+            settings["DisableBatchNodesPublicIpAddress"] = configuration.DisableBatchNodesPublicIpAddress.Value.ToString();
+            settings["KeepSshPortOpen"] = configuration.KeepSshPortOpen.Value.ToString();
+
+            settings["DefaultStorageAccountName"] = configuration.StorageAccountName;
+            settings["CosmosDbAccountName"] = configuration.CosmosDbAccountName;
+            settings["BatchAccountName"] = configuration.BatchAccountName;
+            settings["ApplicationInsightsAccountName"] = configuration.ApplicationInsightsAccountName;
+            settings["ManagedIdentityClientId"] = managedIdentity.ClientId;
+
+            settings["AzureServicesAuthConnectionString"] = $"RunAs=App;AppId={managedIdentity.ClientId}";
+
             return settings;
         }
 
