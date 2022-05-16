@@ -829,7 +829,7 @@ namespace CromwellOnAzureDeployer
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo {CromwellAzureRootDir}/install-cromwellazure.sh");
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod -aG docker {configuration.VmUsername}");
 
-                    if(!string.IsNullOrEmpty(configuration.MySqlServerName))
+                    if(configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
                     {
                         await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y mysql-client");
                     }
