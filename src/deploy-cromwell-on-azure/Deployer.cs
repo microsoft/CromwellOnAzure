@@ -1659,7 +1659,6 @@ namespace CromwellOnAzureDeployer
 
         private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet mySqlSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
         {
-            return null;
             static bool AllOrNoneSet(params string[] values) => values.All(v => !string.IsNullOrEmpty(v)) || values.All(v => string.IsNullOrEmpty(v));
             static bool NoneSet(params string[] values) => values.All(v => string.IsNullOrEmpty(v));
 
