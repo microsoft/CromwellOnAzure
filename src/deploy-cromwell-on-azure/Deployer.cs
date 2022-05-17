@@ -288,7 +288,7 @@ namespace CromwellOnAzureDeployer
                             managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
-                            await UpgradeAKSDeployment(managedIdentity, accountNames, resourceGroup, storageAccount);
+                            await UpgradeAKSDeployment(accountNames, resourceGroup, storageAccount);
                         }
                         else
                         {
@@ -655,8 +655,10 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task UpgradeAKSDeployment(IIdentity managedIdentity, Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount)
+        private async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount)
         {
+            // Override any configuration that is used by the update.
+            UpdateSettingsFromConfiguration(settings);
 
             var containerServiceClient = new ContainerServiceClient(azureCredentials);
             containerServiceClient.SubscriptionId = configuration.SubscriptionId;
@@ -674,6 +676,15 @@ namespace CromwellOnAzureDeployer
 
             var tesDeploymentBody = await BuildTesDeployment(settings, storageAccount, resourceGroup.Name, client);
             var tesDeployment = await client.ReplaceNamespacedDeploymentAsync(tesDeploymentBody, "tes", configuration.AksCoANamespace);
+
+            var triggerServiceDeploymentBody = BuildTriggerServiceDeployment(settings);
+            var triggerServiceDeployment = await client.ReplaceNamespacedDeploymentAsync(triggerServiceDeploymentBody, "triggerservice", configuration.AksCoANamespace);
+
+            var cromwellDeploymentBody = BuildCromwellDeployment(settings, storageAccount.Name);
+            var cromwellDeployment = await client.ReplaceNamespacedDeploymentAsync(cromwellDeploymentBody, "cromwell", configuration.AksCoANamespace);
+
+            var mysqlDeploymentBody = BuildMysqlDeployment(settings, storageAccount.Name);
+            var mysqlDeployment = await client.ReplaceNamespacedDeploymentAsync(mysqlDeploymentBody, "mysql", configuration.AksCoANamespace);
         }
 
         private async Task<ManagedCluster> ValidateAndGetExistingAKSClusterAsync()
@@ -751,6 +762,11 @@ namespace CromwellOnAzureDeployer
             if (tesDeploymentBody.Spec.Template.Spec.Volumes == null)
             {
                 tesDeploymentBody.Spec.Template.Spec.Volumes = new List<V1Volume>();
+            }
+
+            if (!string.IsNullOrWhiteSpace(settings["TesImageName"]))
+            {
+                tesDeploymentBody.Spec.Template.Spec.Containers.First().Image = settings["TesImageName"];
             }
 
             var externalStorageContainers = new StringBuilder();
@@ -863,30 +879,9 @@ namespace CromwellOnAzureDeployer
             var cromwellTempClaim = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "cromwell-tmp-claim2.yaml"));
             var mysqlDataClaim = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "mysqldb-data-claim3.yaml"));
 
-            var triggerDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "triggerservice-deployment.yaml"));
-            var cromwellDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "cromwell-deployment.yaml"));
-            var mysqlDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "mysqldb-deployment.yaml"));
-
             var tesServiceBody = Yaml.LoadFromString<V1Service>(Utility.GetFileContent("scripts", "k8s", "tes-service.yaml"));
             var mysqlServiceBody = Yaml.LoadFromString<V1Service>(Utility.GetFileContent("scripts", "k8s", "mysqldb-service.yaml"));
             var cromwellServiceBody = Yaml.LoadFromString<V1Service>(Utility.GetFileContent("scripts", "k8s", "cromwell-service.yaml"));
-
-            var configurationMountName = $"{storageAccount.Name}-configuration-blob-claim1";
-            var executionsMountName = $"{storageAccount.Name}-cromwell-executions-blob-claim1";
-            var workflowLogsMountName = $"{storageAccount.Name}-cromwell-workflow-logs-blob-claim1";
-
-            AddStaticVolumeClaim(mysqlDeploymentBody, configurationMountName, "/configuration");
-            AddStaticVolumeClaim(cromwellDeploymentBody, configurationMountName, "/configuration");
-            AddStaticVolumeClaim(cromwellDeploymentBody, executionsMountName, "/cromwell-executions");
-            AddStaticVolumeClaim(cromwellDeploymentBody, workflowLogsMountName, "/cromwell-workflow-logs");
-
-            // Example to set Environment Variables for trigger service.
-            var triggerEnv = new List<V1EnvVar>();
-            triggerEnv.Add(new V1EnvVar("DefaultStorageAccountName", settings["DefaultStorageAccountName"]));
-            triggerEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", settings["AzureServicesAuthConnectionString"]));
-            triggerEnv.Add(new V1EnvVar("ApplicationInsightsAccountName", settings["ApplicationInsightsAccountName"]));
-            triggerEnv.Add(new V1EnvVar("CosmosDbAccountName", settings["CosmosDbAccountName"]));
-            triggerDeploymentBody.Spec.Template.Spec.Containers.First().Env = triggerEnv;
 
             if (!string.Equals(configuration.AksCoANamespace, "default", StringComparison.OrdinalIgnoreCase))
             {
@@ -913,6 +908,9 @@ namespace CromwellOnAzureDeployer
             await client.CreateNamespacedPersistentVolumeClaimAsync(mysqlDataClaim, configuration.AksCoANamespace);
 
             var tesDeploymentBody = await BuildTesDeployment(settings, storageAccount, resourceGroup, client);
+            var triggerDeploymentBody = BuildTriggerServiceDeployment(settings);
+            var cromwellDeploymentBody = BuildCromwellDeployment(settings, storageAccount.Name);
+            var mysqlDeploymentBody = BuildMysqlDeployment(settings, storageAccount.Name);
 
             var tesDeployment = await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, configuration.AksCoANamespace);
             var tesService = await client.CreateNamespacedServiceAsync(tesServiceBody, configuration.AksCoANamespace);
@@ -953,6 +951,54 @@ namespace CromwellOnAzureDeployer
 
             await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, configuration.AksCoANamespace, "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" }, true, printHandler, CancellationToken.None);
             await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, configuration.AksCoANamespace, "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }, true, printHandler, CancellationToken.None);
+        }
+
+        private V1Deployment BuildMysqlDeployment(Dictionary<string, string> settings, string storageAccountName)
+        {
+            var configurationMountName = $"{storageAccountName}-configuration-blob-claim1";
+            var mysqlDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "mysqldb-deployment.yaml"));
+            AddStaticVolumeClaim(mysqlDeploymentBody, configurationMountName, "/configuration");
+
+            if (!string.IsNullOrWhiteSpace(settings["MySqlImageName"]))
+            {
+                mysqlDeploymentBody.Spec.Template.Spec.Containers.First().Image = settings["MySqlImageName"];
+            }
+            return mysqlDeploymentBody;
+        }
+
+        private V1Deployment BuildCromwellDeployment(Dictionary<string, string> settings, string storageAccountName)
+        {
+            var configurationMountName = $"{storageAccountName}-configuration-blob-claim1";
+            var executionsMountName = $"{storageAccountName}-cromwell-executions-blob-claim1";
+            var workflowLogsMountName = $"{storageAccountName}-cromwell-workflow-logs-blob-claim1";
+            var cromwellDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "cromwell-deployment.yaml"));
+            AddStaticVolumeClaim(cromwellDeploymentBody, configurationMountName, "/configuration");
+            AddStaticVolumeClaim(cromwellDeploymentBody, executionsMountName, "/cromwell-executions");
+            AddStaticVolumeClaim(cromwellDeploymentBody, workflowLogsMountName, "/cromwell-workflow-logs");
+
+            if (!string.IsNullOrWhiteSpace(settings["CromwellImageName"]))
+            {
+                cromwellDeploymentBody.Spec.Template.Spec.Containers.First().Image = settings["CromwellImageName"];
+            }
+            return cromwellDeploymentBody;
+        }
+
+        private V1Deployment BuildTriggerServiceDeployment(Dictionary<string, string> settings)
+        {
+            var triggerDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "triggerservice-deployment.yaml"));
+            // Example to set Environment Variables for trigger service.
+            var triggerEnv = new List<V1EnvVar>();
+            triggerEnv.Add(new V1EnvVar("DefaultStorageAccountName", settings["DefaultStorageAccountName"]));
+            triggerEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", settings["AzureServicesAuthConnectionString"]));
+            triggerEnv.Add(new V1EnvVar("ApplicationInsightsAccountName", settings["ApplicationInsightsAccountName"]));
+            triggerEnv.Add(new V1EnvVar("CosmosDbAccountName", settings["CosmosDbAccountName"]));
+            triggerDeploymentBody.Spec.Template.Spec.Containers.First().Env = triggerEnv;
+
+            if (!string.IsNullOrWhiteSpace(settings["TriggerServiceImageName"]))
+            {
+                triggerDeploymentBody.Spec.Template.Spec.Containers.First().Image = settings["TriggerServiceImageName"];
+            }
+            return triggerDeploymentBody;
         }
 
         private static void AddStaticVolumeClaim(V1Deployment deploymentBody, string configurationMountName, string path)
@@ -1199,20 +1245,7 @@ namespace CromwellOnAzureDeployer
             }
 
             // env 05-12
-            if (!string.IsNullOrWhiteSpace(configuration.CromwellVersion))
-            {
-                settings["CromwellImageName"] = $"broadinstitute/cromwell:{configuration.CromwellVersion}";
-            }
-
-            if (!string.IsNullOrWhiteSpace(configuration.TesImageName))
-            {
-                settings["TesImageName"] = configuration.TesImageName;
-            }
-
-            if (!string.IsNullOrWhiteSpace(configuration.TriggerServiceImageName))
-            {
-                settings["TriggerServiceImageName"] = configuration.TriggerServiceImageName;
-            }
+            UpdateSettingsFromConfiguration(settings);
             settings["BatchNodesSubnetId"] = configuration.BatchNodesSubnetId;
             settings["DockerInDockerImageName"] = configuration.DockerInDockerImageName;
             settings["BlobxferImageName"] = configuration.BlobxferImageName;
@@ -1228,6 +1261,24 @@ namespace CromwellOnAzureDeployer
             settings["AzureServicesAuthConnectionString"] = $"RunAs=App;AppId={managedIdentity.ClientId}";
 
             return settings;
+        }
+
+        private void UpdateSettingsFromConfiguration(Dictionary<string, string> settings)
+        {
+            if (!string.IsNullOrWhiteSpace(configuration.CromwellVersion))
+            {
+                settings["CromwellImageName"] = $"broadinstitute/cromwell:{configuration.CromwellVersion}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuration.TesImageName))
+            {
+                settings["TesImageName"] = configuration.TesImageName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuration.TriggerServiceImageName))
+            {
+                settings["TriggerServiceImageName"] = configuration.TriggerServiceImageName;
+            }
         }
 
         /// <summary>
