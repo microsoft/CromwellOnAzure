@@ -265,7 +265,7 @@ namespace CromwellOnAzureDeployer
                 {
                     return false;
                 }
-                await Task.Delay(System.TimeSpan.FromSeconds(15));
+                await Task.Delay(TimeSpan.FromSeconds(15));
                 deployments = await client.ListNamespacedDeploymentAsync(configuration.AksCoANamespace);
                 deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
             }
@@ -622,108 +622,6 @@ namespace CromwellOnAzureDeployer
 
             var mysqlDeploymentBody = BuildMysqlDeployment(settings, storageAccount.Name);
             var mysqlDeployment = await client.ReplaceNamespacedDeploymentAsync(mysqlDeploymentBody, "mysqldb", configuration.AksCoANamespace);
-        }
-
-        /// <summary>
-        /// https://github.com/kubernetes-client/csharp/pull/671/commits/475f75e0655b988c8c1421717bb408b68f16521e
-        /// </summary>
-        /// <param name="name"></param>
-        /// <param name="namespace"></param>
-        /// <param name="container"></param>
-        /// <param name="sourceFilePath"></param>
-        /// <param name="destinationFilePath"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
-        /// <exception cref="IOException"></exception>
-        public async Task<int> CopyFileToPodAsync(IKubernetes client, string name, string @namespace, string container, Stream inputStream, string destinationFilePath, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            // All other parameters are being validated by MuxedStreamNamespacedPodExecAsync called by NamespacedPodExecAsync
-            if (inputStream == null)
-            {
-                throw new ArgumentException($"{nameof(inputStream)} cannot be null");
-            }
-
-            if (string.IsNullOrWhiteSpace(destinationFilePath))
-            {
-                throw new ArgumentException($"{nameof(destinationFilePath)} cannot be null or whitespace");
-            }
-
-            // The callback which processes the standard input, standard output and standard error of exec method
-            var handler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
-            {
-                var fileInfo = new FileInfo(destinationFilePath);
-
-                try
-                {
-                    using (var outputStream = new MemoryStream())
-                    {
-                        using (var gZipOutputStream = new GZipOutputStream(outputStream))
-                        using (var tarOutputStream = new TarOutputStream(gZipOutputStream))
-                        {
-                            // To avoid gZipOutputStream to close the memoryStream
-                            gZipOutputStream.IsStreamOwner = false;
-
-                            var fileSize = inputStream.Length;
-                            var entry = TarEntry.CreateTarEntry(fileInfo.Name);
-                            entry.Size = fileSize;
-
-                            tarOutputStream.PutNextEntry(entry);
-
-                            // this is copied from TarArchive.WriteEntryCore
-                            byte[] localBuffer = new byte[32 * 1024];
-                            while (true)
-                            {
-                                int numRead = inputStream.Read(localBuffer, 0, localBuffer.Length);
-                                if (numRead <= 0)
-                                {
-                                    break;
-                                }
-
-                                tarOutputStream.Write(localBuffer, 0, numRead);
-                            }
-
-                            tarOutputStream.CloseEntry();
-                        }
-
-                        outputStream.Position = 0;
-                        using (var cryptoStream = new CryptoStream(stdIn, new ToBase64Transform(), CryptoStreamMode.Write))
-                        {
-                            outputStream.CopyTo(cryptoStream);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    throw new IOException($"Copy command failed: {ex.Message}");
-                }
-
-                using (var errorReader = new StreamReader(stdError))
-                {
-                    if (errorReader.Peek() != -1)
-                    {
-                        var error = await errorReader.ReadToEndAsync().ConfigureAwait(false);
-                        throw new IOException($"Copy command failed: {error}");
-                    }
-                }
-            });
-
-            var destinationFileInfo = new FileInfo(destinationFilePath);
-            var destinationFolder = Path.GetDirectoryName(destinationFilePath);
-
-            if (string.IsNullOrEmpty(destinationFolder))
-            {
-                destinationFolder = ".";
-            }
-
-            return await client.NamespacedPodExecAsync(
-                name,
-                @namespace,
-                container,
-                new string[] { "sh", "-c", $"base64 -d | tar xzmf - -C {destinationFolder}" },
-                true,
-                handler,
-                cancellationToken);
         }
 
         private class MountableContainer
