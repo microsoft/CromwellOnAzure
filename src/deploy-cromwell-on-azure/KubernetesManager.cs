@@ -239,12 +239,12 @@ namespace CromwellOnAzureDeployer
             {
                 using (var reader = new StreamReader(stdOut))
                 {
-                    RefreshableConsole.Write(reader.ReadToEnd());
+                    ConsoleEx.Write(reader.ReadToEnd());
                 }
 
                 using (var reader = new StreamReader(stdError))
                 {
-                    RefreshableConsole.Write(reader.ReadToEnd());
+                    ConsoleEx.Write(reader.ReadToEnd());
                 }
             });
 

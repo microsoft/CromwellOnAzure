@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -72,12 +72,12 @@ namespace TesApi.Tests
 
         private static Mock<IAzureProxy> GetMockAzureProxy()
         {
-            var vmInfos = new List<VirtualMachineInfo> {
-                    new VirtualMachineInfo { VmSize = "VmSize1", VmFamily = "VmFamily1", LowPriority = false, NumberOfCores = 2, MemoryInGB = 3, ResourceDiskSizeInGB = 20, PricePerHour = 11 },
-                    new VirtualMachineInfo { VmSize = "VmSize1", VmFamily = "VmFamily1", LowPriority = true, NumberOfCores = 2, MemoryInGB = 3, ResourceDiskSizeInGB = 20, PricePerHour = 22 },
-                    new VirtualMachineInfo { VmSize = "VmSize2", VmFamily = "VmFamily2", LowPriority = false, NumberOfCores = 4, MemoryInGB = 6, ResourceDiskSizeInGB = 40, PricePerHour = 33 },
-                    new VirtualMachineInfo { VmSize = "VmSize2", VmFamily = "VmFamily2", LowPriority = true, NumberOfCores = 4, MemoryInGB = 6, ResourceDiskSizeInGB = 40, PricePerHour = 44 },
-                    new VirtualMachineInfo { VmSize = "VmSize3", VmFamily = "VmFamily3", LowPriority = false, NumberOfCores = 8, MemoryInGB = 12, ResourceDiskSizeInGB = 80, PricePerHour = 55 }
+            var vmInfos = new List<VirtualMachineInformation> {
+                    new VirtualMachineInformation { VmSize = "VmSize1", VmFamily = "VmFamily1", LowPriority = false, NumberOfCores = 2, MemoryInGB = 3, ResourceDiskSizeInGB = 20, PricePerHour = 11 },
+                    new VirtualMachineInformation { VmSize = "VmSize1", VmFamily = "VmFamily1", LowPriority = true, NumberOfCores = 2, MemoryInGB = 3, ResourceDiskSizeInGB = 20, PricePerHour = 22 },
+                    new VirtualMachineInformation { VmSize = "VmSize2", VmFamily = "VmFamily2", LowPriority = false, NumberOfCores = 4, MemoryInGB = 6, ResourceDiskSizeInGB = 40, PricePerHour = 33 },
+                    new VirtualMachineInformation { VmSize = "VmSize2", VmFamily = "VmFamily2", LowPriority = true, NumberOfCores = 4, MemoryInGB = 6, ResourceDiskSizeInGB = 40, PricePerHour = 44 },
+                    new VirtualMachineInformation { VmSize = "VmSize3", VmFamily = "VmFamily3", LowPriority = false, NumberOfCores = 8, MemoryInGB = 12, ResourceDiskSizeInGB = 80, PricePerHour = 55 }
                 };
 
             var dedicatedCoreQuotaPerVMFamily = new[] { new VirtualMachineFamilyCoreQuota("VmFamily1", 100), new VirtualMachineFamilyCoreQuota("VmFamily2", 0), new VirtualMachineFamilyCoreQuota("VmFamily3", 300) };

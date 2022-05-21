@@ -22,8 +22,8 @@ namespace TesApi.Web
         // Input.content
         // TaskLog.system_logs
         // plus additional custom fields added to support running TES with Cromwell on Azure
-        private static readonly List<Tuple<Type, string>> PropertiesToSkip = new List<Tuple<Type, string>>
-            {
+        private static readonly List<Tuple<Type, string>> PropertiesToSkip = new()
+        {
                 Tuple.Create(typeof(TesExecutorLog), nameof(TesExecutorLog.Stdout)),
                 Tuple.Create(typeof(TesExecutorLog), nameof(TesExecutorLog.Stderr)),
                 Tuple.Create(typeof(TesInput), nameof(TesInput.Content)),
@@ -39,7 +39,7 @@ namespace TesApi.Web
         /// <summary>
         /// Instance of the resolver
         /// </summary>
-        public static readonly BasicTesTaskContractResolver Instance = new BasicTesTaskContractResolver();
+        public static readonly BasicTesTaskContractResolver Instance = new();
 
         /// <summary>
         /// Overridden CreateProperty in order to skip specific properties

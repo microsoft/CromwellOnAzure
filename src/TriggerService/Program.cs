@@ -21,9 +21,7 @@ namespace TriggerService
     internal class Program
     {
         public static async Task Main()
-        {
-            await InitAndRunAsync();
-        }
+            => await InitAndRunAsync();
 
         private static async Task InitAndRunAsync()
         {
@@ -89,7 +87,7 @@ namespace TriggerService
                 .SelectMany(a => a)
                 .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase));
 
-            if (account == null)
+            if (account is null)
             {
                 throw new Exception($"CosmosDB account '{cosmosDbAccountName} does not exist or the TES app service does not have Account Reader role on the account.");
             }
@@ -113,8 +111,6 @@ namespace TriggerService
         }
 
         private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
-        {
-            return new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
-        }
+            => new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
     }
 }

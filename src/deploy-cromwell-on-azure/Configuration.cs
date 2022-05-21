@@ -9,7 +9,20 @@ using Microsoft.Extensions.Configuration;
 
 namespace CromwellOnAzureDeployer
 {
-    public class Configuration
+    public class Configuration : UserAccessibleConfiguration
+    {
+        public string MySqlServerName { get; set; }
+        public string MySqlServerPassword { get; set; }
+        public string MySqlDatabaseName { get; set; } = "cromwell_db";
+        public string MySqlAdministratorLogin { get; set; } = "cromwell";
+        public string MySqlAdministratorLoginPassword { get; set; }
+        public string MySqlSkuName { get; set; } = "Standard_B1s";
+        public string MySqlTier { get; set; } = "Burstable";
+        public string DefaultVmSubnetName { get; set; } = "vmsubnet";
+        public string DefaultMySqlSubnetName { get; set; } = "mysqlsubnet";
+        public string MySqlVersion { get; set; } = "8.0.21";
+    }
+    public abstract class UserAccessibleConfiguration
     {
         public string SubscriptionId { get; set; }
         public string RegionName { get; set; }
@@ -20,7 +33,8 @@ namespace CromwellOnAzureDeployer
         public string VmSize { get; set; } = "Standard_D3_v2";
         public string VnetAddressSpace { get; set; } = "10.0.0.0/16"; // 10.0.0.0 - 10.0.255.255, 65536 IPs
         // Address space for CoA services. 
-        public string SubnetAddressSpace { get; set; } = "10.0.0.0/24"; // 10.0.0.0 - 10.0.0.255, 256 IPs
+        public string VmSubnetAddressSpace { get; set; } = "10.0.0.0/24"; // 10.0.0.0 - 10.0.0.255, 256 IPs
+        public string MySqlSubnetAddressSpace { get; set; } = "10.0.1.0/24"; // 10.0.1.0 - 10.0.1.255, 256 IPs
         // Address space for kubernetes system services, must not overlap with any subnet.
         public string KubernetesServiceCidr = "10.0.4.0/22"; // 10.0.4.0 -> 10.0.7.255, 1024 IPs
         public string KubernetesDnsServiceIP = "10.0.4.10";
@@ -52,6 +66,8 @@ namespace CromwellOnAzureDeployer
         public string VnetResourceGroupName { get; set; }
         public string VnetName { get; set; }
         public string SubnetName { get; set; }
+        public string VmSubnetName { get; set; }
+        public string MySqlSubnetName { get; set; }
         public bool? PrivateNetworking { get; set; } = null;
         public string Tags { get; set; } = null;
         public string BatchNodesSubnetId { get; set; } = null;
@@ -59,6 +75,7 @@ namespace CromwellOnAzureDeployer
         public string BlobxferImageName { get; set; } = null;
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool? KeepSshPortOpen { get; set; } = null;
+        public bool? ProvisionMySqlOnAzure { get; set; } = null;
 
         public static Configuration BuildConfiguration(string[] args)
         {
@@ -72,7 +89,7 @@ namespace CromwellOnAzureDeployer
             }
 
             var configurationSource = configBuilder.AddCommandLine(args).Build();
-            var configurationProperties = typeof(Configuration).GetTypeInfo().DeclaredProperties.Select(p => p.Name).ToList();
+            var configurationProperties = typeof(UserAccessibleConfiguration).GetTypeInfo().DeclaredProperties.Select(p => p.Name).ToList();
 
             var invalidArguments = configurationSource.Providers
                 .SelectMany(p => p.GetChildKeys(new List<string>(), null))

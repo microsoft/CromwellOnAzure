@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -17,7 +20,6 @@ namespace TesApi.Web
     public class StorageAccessProvider : IStorageAccessProvider
     {
         private readonly ILogger logger;
-        private readonly IConfiguration configuration;
         private readonly IAzureProxy azureProxy;
         private const string CromwellPathPrefix = "/cromwell-executions/";
         private readonly string defaultStorageAccountName;
@@ -33,7 +35,6 @@ namespace TesApi.Web
         public StorageAccessProvider(ILogger logger, IConfiguration configuration, IAzureProxy azureProxy)
         {
             this.logger = logger;
-            this.configuration = configuration;
             this.azureProxy = azureProxy;
 
             this.defaultStorageAccountName = configuration["DefaultStorageAccountName"];    // This account contains the cromwell-executions container
@@ -51,7 +52,7 @@ namespace TesApi.Web
                         return null;
                     }
                 })
-                .Where(storageAccountInfo => storageAccountInfo != null)
+                .Where(storageAccountInfo => storageAccountInfo is not null)
                 .ToList();
         }
 
@@ -85,15 +86,11 @@ namespace TesApi.Web
 
         /// <inheritdoc />
         public async Task UploadBlobAsync(string blobRelativePath, string content)
-        {
-            await this.azureProxy.UploadBlobAsync(new Uri(await MapLocalPathToSasUrlAsync(blobRelativePath, true)), content);
-        }
+            => await this.azureProxy.UploadBlobAsync(new Uri(await MapLocalPathToSasUrlAsync(blobRelativePath, true)), content);
 
         /// <inheritdoc />
         public async Task UploadBlobFromFileAsync(string blobRelativePath, string sourceLocalFilePath)
-        {
-            await this.azureProxy.UploadBlobFromFileAsync(new Uri(await MapLocalPathToSasUrlAsync(blobRelativePath, true)), sourceLocalFilePath);
-        }
+            => await this.azureProxy.UploadBlobFromFileAsync(new Uri(await MapLocalPathToSasUrlAsync(blobRelativePath, true)), sourceLocalFilePath);
 
         /// <inheritdoc />
         public async Task<bool> IsPublicHttpUrl(string uriString)
@@ -105,7 +102,7 @@ namespace TesApi.Web
                 return false;
             }
 
-            if (HttpUtility.ParseQueryString(uri.Query).Get("sig") != null)
+            if (HttpUtility.ParseQueryString(uri.Query).Get("sig") is not null)
             {
                 return true;
             }
@@ -196,7 +193,7 @@ namespace TesApi.Web
             {
                 var storageAccountInfo = await azureProxy.GetStorageAccountInfoAsync(accountName);
 
-                if (storageAccountInfo != null)
+                if (storageAccountInfo is not null)
                 {
                     onSuccess?.Invoke(storageAccountInfo);
                     return true;
@@ -220,7 +217,7 @@ namespace TesApi.Web
                 c.AccountName.Equals(accountName, StringComparison.OrdinalIgnoreCase)
                 && (string.IsNullOrEmpty(c.ContainerName) || c.ContainerName.Equals(containerName, StringComparison.OrdinalIgnoreCase)));
 
-            return result != null;
+            return result is not null;
         }
 
         private class ExternalStorageContainerInfo

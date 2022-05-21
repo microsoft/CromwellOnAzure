@@ -237,6 +237,7 @@ bool     Update =   false; | Y | Y | Y | Set to true if you want to update your 
 bool     PrivateNetworking = false; | Y | Y | N | Available starting version 2.2. Set to true to create the host VM without public IP address. If set, VnetResourceGroupName, VnetName and SubnetName must be provided (and already exist). The deployment must be initiated from a machine that has access to that subnet.
 bool     KeepSshPortOpen =   false; | Y | Y | Y | Available starting version 3.0. Set to true if you need to keep the SSH port accessible on the host VM while deployer is not running (not recommended). 
 string   LogAnalyticsArmId | Y | N | N | Arm resource id for an exising Log Analytics workspace, workspace is used for App Insights - Not required, a workspace will be generated automatically if not provided.
+bool     ProvisionMySQLOnAzure =   false; | Y | N | N | Triggers whether to use Docker MySQL or Azure MySQL when provisioning the database.
 
 ### Use a specific Cromwell version
 #### Before deploying Cromwell on Azure
@@ -292,7 +293,7 @@ This is applicable if the VM and storage account are in different Azure tenants,
 
 1. Add a [SAS url for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file. The SAS token can be at the account or container level and may be read-only or read-write depending on the usage.
     ```
-    https://<yourstorageaccountname>.blob.core.windows.net:443/<yourcontainername>?<sastoken>
+    https://<yourstorageaccountname>.blob.core.windows.net/<yourcontainername>?<sastoken>
     ```
 
 2. Save the changes and restart the VM

@@ -1,0 +1,1 @@
+﻿WaitForMySqlDbCommand=/wait-for-it/wait-for-it.sh mysqldb:3306 -t 255 --

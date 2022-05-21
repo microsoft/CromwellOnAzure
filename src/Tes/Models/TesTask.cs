@@ -111,33 +111,30 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("class TesTask {\n");
-            sb.Append("  Id: ").Append(Id).Append("\n");
-            sb.Append("  State: ").Append(State).Append("\n");
-            sb.Append("  Name: ").Append(Name).Append("\n");
-            sb.Append("  Description: ").Append(Description).Append("\n");
-            sb.Append("  Inputs: ").Append(Inputs).Append("\n");
-            sb.Append("  Outputs: ").Append(Outputs).Append("\n");
-            sb.Append("  Resources: ").Append(Resources).Append("\n");
-            sb.Append("  Executors: ").Append(Executors).Append("\n");
-            sb.Append("  Volumes: ").Append(Volumes).Append("\n");
-            sb.Append("  Tags: ").Append(Tags).Append("\n");
-            sb.Append("  Logs: ").Append(Logs).Append("\n");
-            sb.Append("  CreationTime: ").Append(CreationTime).Append("\n");
-            sb.Append("}\n");
-            return sb.ToString();
-        }
+
+            =>  new StringBuilder()
+                .Append("class TesTask {\n")
+                .Append("  Id: ").Append(Id).Append('\n')
+                .Append("  State: ").Append(State).Append('\n')
+                .Append("  Name: ").Append(Name).Append('\n')
+                .Append("  Description: ").Append(Description).Append('\n')
+                .Append("  Inputs: ").Append(Inputs).Append('\n')
+                .Append("  Outputs: ").Append(Outputs).Append('\n')
+                .Append("  Resources: ").Append(Resources).Append('\n')
+                .Append("  Executors: ").Append(Executors).Append('\n')
+                .Append("  Volumes: ").Append(Volumes).Append('\n')
+                .Append("  Tags: ").Append(Tags).Append('\n')
+                .Append("  Logs: ").Append(Logs).Append('\n')
+                .Append("  CreationTime: ").Append(CreationTime).Append('\n')
+                .Append("}\n")
+                .ToString();
 
         /// <summary>
         /// Returns the JSON string presentation of the object
         /// </summary>
         /// <returns>JSON string presentation of the object</returns>
         public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
+            => JsonConvert.SerializeObject(this, Formatting.Indented);
 
         /// <summary>
         /// Returns true if objects are equal
@@ -145,19 +142,12 @@ namespace Tes.Models
         /// <param name="obj">Object to be compared</param>
         /// <returns>Boolean</returns>
         public override bool Equals(object obj)
-        {
-            if (obj is null)
+            => obj switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-
-            return obj.GetType() == GetType() && Equals((TesTask)obj);
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ => obj.GetType() == GetType() && Equals((TesTask)obj),
+            };
 
         /// <summary>
         /// Returns true if TesTask instances are equal
@@ -165,21 +155,14 @@ namespace Tes.Models
         /// <param name="other">Instance of TesTask to be compared</param>
         /// <returns>Boolean</returns>
         public bool Equals(TesTask other)
-        {
-            if (other is null)
+            => other switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, other))
-            {
-                return true;
-            }
-
-            return
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ =>
                 (
                     Id == other.Id ||
-                    Id != null &&
+                    Id is not null &&
                     Id.Equals(other.Id)
                 ) &&
                 (
@@ -188,55 +171,55 @@ namespace Tes.Models
                 ) &&
                 (
                     Name == other.Name ||
-                    Name != null &&
+                    Name is not null &&
                     Name.Equals(other.Name)
                 ) &&
                 (
                     Description == other.Description ||
-                    Description != null &&
+                    Description is not null &&
                     Description.Equals(other.Description)
                 ) &&
                 (
                     Inputs == other.Inputs ||
-                    Inputs != null &&
+                    Inputs is not null &&
                     Inputs.SequenceEqual(other.Inputs)
                 ) &&
                 (
                     Outputs == other.Outputs ||
-                    Outputs != null &&
+                    Outputs is not null &&
                     Outputs.SequenceEqual(other.Outputs)
                 ) &&
                 (
                     Resources == other.Resources ||
-                    Resources != null &&
+                    Resources is not null &&
                     Resources.Equals(other.Resources)
                 ) &&
                 (
                     Executors == other.Executors ||
-                    Executors != null &&
+                    Executors is not null &&
                     Executors.SequenceEqual(other.Executors)
                 ) &&
                 (
                     Volumes == other.Volumes ||
-                    Volumes != null &&
+                    Volumes is not null &&
                     Volumes.SequenceEqual(other.Volumes)
                 ) &&
                 (
                     Tags == other.Tags ||
-                    Tags != null &&
+                    Tags is not null &&
                     Tags.SequenceEqual(other.Tags)
                 ) &&
                 (
                     Logs == other.Logs ||
-                    Logs != null &&
+                    Logs is not null &&
                     Logs.SequenceEqual(other.Logs)
                 ) &&
                 (
                     CreationTime == other.CreationTime ||
-                    CreationTime != null &&
+                    CreationTime is not null &&
                     CreationTime.Equals(other.CreationTime)
-                );
-        }
+                ),
+            };
 
         /// <summary>
         /// Gets the hash code
@@ -248,58 +231,58 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Id != null)
+                if (Id is not null)
                 {
                     hashCode = hashCode * 59 + Id.GetHashCode();
                 }
 
                 hashCode = hashCode * 59 + State.GetHashCode();
-                if (Name != null)
+                if (Name is not null)
                 {
                     hashCode = hashCode * 59 + Name.GetHashCode();
                 }
 
-                if (Description != null)
+                if (Description is not null)
                 {
                     hashCode = hashCode * 59 + Description.GetHashCode();
                 }
 
-                if (Inputs != null)
+                if (Inputs is not null)
                 {
                     hashCode = hashCode * 59 + Inputs.GetHashCode();
                 }
 
-                if (Outputs != null)
+                if (Outputs is not null)
                 {
                     hashCode = hashCode * 59 + Outputs.GetHashCode();
                 }
 
-                if (Resources != null)
+                if (Resources is not null)
                 {
                     hashCode = hashCode * 59 + Resources.GetHashCode();
                 }
 
-                if (Executors != null)
+                if (Executors is not null)
                 {
                     hashCode = hashCode * 59 + Executors.GetHashCode();
                 }
 
-                if (Volumes != null)
+                if (Volumes is not null)
                 {
                     hashCode = hashCode * 59 + Volumes.GetHashCode();
                 }
 
-                if (Tags != null)
+                if (Tags is not null)
                 {
                     hashCode = hashCode * 59 + Tags.GetHashCode();
                 }
 
-                if (Logs != null)
+                if (Logs is not null)
                 {
                     hashCode = hashCode * 59 + Logs.GetHashCode();
                 }
 
-                if (CreationTime != null)
+                if (CreationTime is not null)
                 {
                     hashCode = hashCode * 59 + CreationTime.GetHashCode();
                 }
@@ -312,14 +295,10 @@ namespace Tes.Models
 #pragma warning disable 1591
 
         public static bool operator ==(TesTask left, TesTask right)
-        {
-            return Equals(left, right);
-        }
+            => Equals(left, right);
 
         public static bool operator !=(TesTask left, TesTask right)
-        {
-            return !Equals(left, right);
-        }
+            => !Equals(left, right);
 
 #pragma warning restore 1591
         #endregion Operators

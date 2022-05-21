@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -16,7 +19,7 @@ namespace TesApi.Web
     public class CachingWithRetriesRepository<T> : IRepository<T> where T : RepositoryItem<T>
     {
         private readonly IRepository<T> repository;
-        private readonly object cacheLock = new object();
+        private readonly object cacheLock = new();
         private readonly IMemoryCache cache = new MemoryCache(new MemoryCacheOptions());
         private readonly IList<object> itemsPredicateCachedKeys = new List<object>();
 
@@ -29,9 +32,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="repository"><see cref="IRepository{T}"/> to wrap with caching and retries</param>
         public CachingWithRetriesRepository(IRepository<T> repository)
-        {
-            this.repository = repository;
-        }
+            => this.repository = repository;
 
         /// <inheritdoc/>
         public async Task<T> CreateItemAsync(T item)
@@ -56,9 +57,7 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public async Task<bool> TryGetItemAsync(string id, Action<T> onSuccess)
         {
-            T repositoryItem = null;
-
-            if (cache.TryGetValue(id, out repositoryItem))
+            if (cache.TryGetValue(id, out T repositoryItem))
             {
                 onSuccess(repositoryItem);
                 return true;

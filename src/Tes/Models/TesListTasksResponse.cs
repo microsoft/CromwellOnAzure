@@ -45,23 +45,19 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("class TesListTasksResponse {\n");
-            sb.Append("  Tasks: ").Append(Tasks).Append("\n");
-            sb.Append("  NextPageToken: ").Append(NextPageToken).Append("\n");
-            sb.Append("}\n");
-            return sb.ToString();
-        }
+            => new StringBuilder()
+                .Append("class TesListTasksResponse {\n")
+                .Append("  Tasks: ").Append(Tasks).Append('\n')
+                .Append("  NextPageToken: ").Append(NextPageToken).Append('\n')
+                .Append("}\n")
+                .ToString();
 
         /// <summary>
         /// Returns the JSON string presentation of the object
         /// </summary>
         /// <returns>JSON string presentation of the object</returns>
         public string ToJson()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
+            => JsonConvert.SerializeObject(this, Formatting.Indented);
 
         /// <summary>
         /// Returns true if objects are equal
@@ -69,19 +65,12 @@ namespace Tes.Models
         /// <param name="obj">Object to be compared</param>
         /// <returns>Boolean</returns>
         public override bool Equals(object obj)
-        {
-            if (obj is null)
+            => obj switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-
-            return obj.GetType() == GetType() && Equals((TesListTasksResponse)obj);
-        }
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ => obj.GetType() == GetType() && Equals((TesListTasksResponse)obj),
+            };
 
         /// <summary>
         /// Returns true if TesListTasksResponse instances are equal
@@ -89,29 +78,22 @@ namespace Tes.Models
         /// <param name="other">Instance of TesListTasksResponse to be compared</param>
         /// <returns>Boolean</returns>
         public bool Equals(TesListTasksResponse other)
-        {
-            if (other is null)
+            => other switch
             {
-                return false;
-            }
-
-            if (ReferenceEquals(this, other))
-            {
-                return true;
-            }
-
-            return
+                var x when x is null => false,
+                var x when ReferenceEquals(this, x) => true,
+                _ =>
                 (
                     Tasks == other.Tasks ||
-                    Tasks != null &&
+                    Tasks is not null &&
                     Tasks.SequenceEqual(other.Tasks)
                 ) &&
                 (
                     NextPageToken == other.NextPageToken ||
-                    NextPageToken != null &&
+                    NextPageToken is not null &&
                     NextPageToken.Equals(other.NextPageToken)
-                );
-        }
+                ),
+            };
 
         /// <summary>
         /// Gets the hash code
@@ -123,12 +105,12 @@ namespace Tes.Models
             {
                 var hashCode = 41;
                 // Suitable nullity checks etc, of course :)
-                if (Tasks != null)
+                if (Tasks is not null)
                 {
                     hashCode = hashCode * 59 + Tasks.GetHashCode();
                 }
 
-                if (NextPageToken != null)
+                if (NextPageToken is not null)
                 {
                     hashCode = hashCode * 59 + NextPageToken.GetHashCode();
                 }
@@ -141,14 +123,10 @@ namespace Tes.Models
 #pragma warning disable 1591
 
         public static bool operator ==(TesListTasksResponse left, TesListTasksResponse right)
-        {
-            return Equals(left, right);
-        }
+            => Equals(left, right);
 
         public static bool operator !=(TesListTasksResponse left, TesListTasksResponse right)
-        {
-            return !Equals(left, right);
-        }
+            => !Equals(left, right);
 
 #pragma warning restore 1591
         #endregion Operators

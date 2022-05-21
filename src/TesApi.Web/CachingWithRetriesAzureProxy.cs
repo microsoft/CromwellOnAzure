@@ -32,7 +32,7 @@ namespace TesApi.Web
         /// <summary>
         /// Contructor to create a cache of <see cref="IAzureProxy"/>
         /// </summary>
-        /// <param name="azureProxy"><see cref="AzureProxy"/></param>
+        /// <param name="azureProxy"><see cref="IAzureProxy"/></param>
         /// <param name="cache">Lazy cache using <see cref="IAppCache"/></param>
         public CachingWithRetriesAzureProxy(IAzureProxy azureProxy, IAppCache cache)
         {
@@ -44,7 +44,7 @@ namespace TesApi.Web
         public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
         /// <inheritdoc/>
-        public Task DeleteBatchJobAsync(string taskId) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchJobAsync(taskId));
+        public Task DeleteBatchJobAsync(string taskId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.DeleteBatchJobAsync(taskId, ct), cancellationToken);
 
         /// <inheritdoc/>
         public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchPoolAsync(poolId, cancellationToken));
@@ -57,10 +57,8 @@ namespace TesApi.Web
 
         /// <inheritdoc/>
         public Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
-        {
-            return cache.GetOrAddAsync("batchAccountQuotas", () =>
+            => cache.GetOrAddAsync("batchAccountQuotas", () =>
                 asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetBatchAccountQuotasAsync()), DateTimeOffset.Now.AddHours(1));
-        }
 
         /// <inheritdoc/>
         public int GetBatchActiveJobCount() => retryPolicy.Execute(() => azureProxy.GetBatchActiveJobCount());
@@ -79,11 +77,11 @@ namespace TesApi.Web
         {
             var containerRegistryInfo = cache.Get<ContainerRegistryInfo>(imageName);
 
-            if (containerRegistryInfo == null)
+            if (containerRegistryInfo is null)
             {
                 containerRegistryInfo = await asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetContainerRegistryInfoAsync(imageName));
 
-                if (containerRegistryInfo != null)
+                if (containerRegistryInfo is not null)
                 {
                     cache.Add(imageName, containerRegistryInfo, DateTimeOffset.Now.AddHours(1));
                 }
@@ -100,21 +98,19 @@ namespace TesApi.Web
 
         /// <inheritdoc/>
         public Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
-        {
-            return cache.GetOrAddAsync(storageAccountInfo.Id, () =>
+            => cache.GetOrAddAsync(storageAccountInfo.Id, () =>
                 asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetStorageAccountKeyAsync(storageAccountInfo)), DateTimeOffset.Now.AddHours(1));
-        }
 
         /// <inheritdoc/>
         public async Task<StorageAccountInfo> GetStorageAccountInfoAsync(string storageAccountName)
         {
             var storageAccountInfo = cache.Get<StorageAccountInfo>(storageAccountName);
 
-            if (storageAccountInfo == null)
+            if (storageAccountInfo is null)
             {
                 storageAccountInfo = await asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetStorageAccountInfoAsync(storageAccountName));
 
-                if (storageAccountInfo != null)
+                if (storageAccountInfo is not null)
                 {
                     cache.Add(storageAccountName, storageAccountInfo, DateTimeOffset.MaxValue);
                 }
@@ -124,10 +120,8 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public Task<List<VirtualMachineInfo>> GetVmSizesAndPricesAsync()
-        {
-            return cache.GetOrAddAsync("vmSizesAndPrices", () => azureProxy.GetVmSizesAndPricesAsync(), DateTimeOffset.MaxValue);
-        }
+        public Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync()
+            => cache.GetOrAddAsync("vmSizesAndPrices", () => azureProxy.GetVmSizesAndPricesAsync(), DateTimeOffset.MaxValue);
 
         /// <inheritdoc/>
         public Task<IEnumerable<string>> ListBlobsAsync(Uri directoryUri) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListBlobsAsync(directoryUri));
@@ -136,7 +130,7 @@ namespace TesApi.Web
         public Task<IEnumerable<string>> ListOldJobsToDeleteAsync(TimeSpan oldestJobAge) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListOldJobsToDeleteAsync(oldestJobAge));
 
         /// <inheritdoc/>
-        public Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListOrphanedJobsToDeleteAsync(minJobAge));
+        public Task<IEnumerable<string>> ListOrphanedJobsToDeleteAsync(TimeSpan minJobAge, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.ListOrphanedJobsToDeleteAsync(minJobAge, ct), cancellationToken);
 
         /// <inheritdoc/>
         public Task UploadBlobAsync(Uri blobAbsoluteUri, string content) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.UploadBlobAsync(blobAbsoluteUri, content));
@@ -154,8 +148,8 @@ namespace TesApi.Web
         public bool TryReadCwlFile(string workflowId, out string content) => azureProxy.TryReadCwlFile(workflowId, out content);
 
         /// <inheritdoc/>
-        public Task CreateManualBatchPoolAsync(string poolName, string vmSize, bool isLowPriority, string executorImage, BatchNodeInfo nodeInfo, string dockerInDockerImageName, string blobxferImageName, string identityResourceId, bool disableBatchNodesPublicIpAddress, string batchNodesSubnetId, BatchNodeInfo xilinxFpgaBatchNodeInfo, bool isVmSizeXilinxFpga, string startTaskSasUrl, string startTaskPath)
-            => azureProxy.CreateManualBatchPoolAsync(poolName, vmSize, isLowPriority, executorImage, nodeInfo, dockerInDockerImageName, blobxferImageName, identityResourceId, disableBatchNodesPublicIpAddress, batchNodesSubnetId, xilinxFpgaBatchNodeInfo, isVmSizeXilinxFpga, startTaskSasUrl, startTaskPath);
+        public Task CreateManualBatchPoolAsync(string poolName, string vmSize, bool isLowPriority, string executorImage, BatchNodeInfo nodeInfo, string dockerInDockerImageName, string blobxferImageName, string identityResourceId, bool disableBatchNodesPublicIpAddress, string batchNodesSubnetId, string startTaskSasUrl, string startTaskPath)
+            => azureProxy.CreateManualBatchPoolAsync(poolName, vmSize, isLowPriority, executorImage, nodeInfo, dockerInDockerImageName, blobxferImageName, identityResourceId, disableBatchNodesPublicIpAddress, batchNodesSubnetId, startTaskSasUrl, startTaskPath);
 
         /// <inheritdoc/>
         public Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default)

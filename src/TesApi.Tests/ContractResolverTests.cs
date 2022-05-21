@@ -17,9 +17,7 @@ namespace TesApi.Tests
 
         [TestInitialize]
         public void Init()
-        {
-            tesTask = JsonConvert.DeserializeObject<TesTask>(File.ReadAllText("tesTaskExample.json"));
-        }
+            => tesTask = JsonConvert.DeserializeObject<TesTask>(File.ReadAllText("tesTaskExample.json"));
 
         [TestMethod]
         public void MinimalContractResolver_ReturnsMinimalJsonResult()

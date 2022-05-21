@@ -54,11 +54,16 @@ namespace TesApi.Web
         /// <summary>
         /// This method gets called by the runtime. Use this method to add services to the container.
         /// </summary>
-        /// <param name="services"></param>
+        /// <param name="services">The Microsoft.Extensions.DependencyInjection.IServiceCollection to add the services to.</param>
         public void ConfigureServices(IServiceCollection services)
         {
+            var (cache, azureProxy, cachingAzureProxy, storageAccessProvider, repository) = ConfigureServices();
+            ConfigureServices(services, cache, azureProxy, cachingAzureProxy, storageAccessProvider, repository);
+        }
+
+        private (IAppCache cache, AzureProxy azureProxy, IAzureProxy cachingAzureProxy, IStorageAccessProvider storageAccessProvider, IRepository<TesTask> repository) ConfigureServices()
+        {
             var cache = new CachingService();
-            services.AddSingleton<IAppCache>(cache);
 
             var azureProxy = new AzureProxy(Configuration["BatchAccountName"], azureOfferDurableId, loggerFactory.CreateLogger<AzureProxy>());
             IAzureProxy cachingAzureProxy = new CachingWithRetriesAzureProxy(azureProxy, cache);
@@ -67,25 +72,28 @@ namespace TesApi.Web
             var configurationUtils = new ConfigurationUtils(Configuration, cachingAzureProxy, storageAccessProvider, loggerFactory.CreateLogger<ConfigurationUtils>());
             configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync().Wait();
 
-            services.AddSingleton(cachingAzureProxy);
-            services.AddSingleton(azureProxy);
+            (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
+            var cosmosDbRepository = new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId);
 
-            services
+            return (cache, azureProxy, cachingAzureProxy, storageAccessProvider, cosmosDbRepository);
+        }
+
+        private void ConfigureServices(IServiceCollection services, IAppCache cache, AzureProxy azureProxy, IAzureProxy cachingAzureProxy, IStorageAccessProvider storageAccessProvider, IRepository<TesTask> repository)
+            => services.AddSingleton(cache)
+
+                .AddSingleton(cachingAzureProxy)
+                .AddSingleton(azureProxy)
+
                 .AddControllers()
                 .AddNewtonsoftJson(opts =>
                 {
                     opts.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
                     opts.SerializerSettings.Converters.Add(new StringEnumConverter(new CamelCaseNamingStrategy()));
-                });
+                }).Services
 
-            (var cosmosDbEndpoint, var cosmosDbKey) = azureProxy.GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
-            var cosmosDbRepository = new CosmosDbRepository<TesTask>(cosmosDbEndpoint, cosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId);
-            var repository = new CachingWithRetriesRepository<TesTask>(cosmosDbRepository);
+                .AddSingleton<IRepository<TesTask>>(new CachingWithRetriesRepository<TesTask>(repository))
+                .AddSingleton<IBatchScheduler>(new BatchScheduler(loggerFactory.CreateLogger<BatchScheduler>(), Configuration, cachingAzureProxy, storageAccessProvider))
 
-            services.AddSingleton<IRepository<TesTask>>(repository);
-            services.AddSingleton<IBatchScheduler>(new BatchScheduler(loggerFactory.CreateLogger<BatchScheduler>(), Configuration, cachingAzureProxy, storageAccessProvider));
-
-            services
                 .AddSwaggerGen(c =>
                 {
                     c.SwaggerDoc("0.3.0", new OpenApiInfo
@@ -102,47 +110,43 @@ namespace TesApi.Web
                     c.CustomSchemaIds(type => type.FullName);
                     c.IncludeXmlComments($"{AppContext.BaseDirectory}{Path.DirectorySeparatorChar}{Assembly.GetEntryAssembly().GetName().Name}.xml");
                     c.OperationFilter<GeneratePathParamsValidationFilter>();
-                });
+                })
 
-            services.AddHostedService<Scheduler>();
-            services.AddHostedService<DeleteCompletedBatchJobsHostedService>();
-            services.AddHostedService<DeleteOrphanedBatchJobsHostedService>();
-            services.AddHostedService<DeleteOrphanedAutoPoolsHostedService>();
-            services.AddHostedService<RefreshVMSizesAndPricesHostedService>();
+                .AddHostedService<Scheduler>()
+                .AddHostedService<DeleteCompletedBatchJobsHostedService>()
+                .AddHostedService<DeleteOrphanedBatchJobsHostedService>()
+                .AddHostedService<DeleteOrphanedAutoPoolsHostedService>()
+                .AddHostedService<RefreshVMSizesAndPricesHostedService>()
 
             // Configure AppInsights Azure Service when in PRODUCTION environment
-            if (hostingEnvironment.IsProduction())
-            {
-                var applicationInsightsAccountName = Configuration["ApplicationInsightsAccountName"];
-                var instrumentationKey = AzureProxy.GetAppInsightsInstrumentationKeyAsync(applicationInsightsAccountName).Result;
+                .IfThenElse(hostingEnvironment.IsProduction(),
+                    s =>
+                    {
+                        var applicationInsightsAccountName = Configuration["ApplicationInsightsAccountName"];
+                        var instrumentationKey = AzureProxy.GetAppInsightsInstrumentationKeyAsync(applicationInsightsAccountName).Result;
 
-                if (instrumentationKey != null)
-                {
-                    services.AddApplicationInsightsTelemetry(instrumentationKey);
-                }
-            }
-            else
-            {
-                services.AddApplicationInsightsTelemetry();
-            }
-        }
+                        if (instrumentationKey is not null)
+                        {
+                            return s.AddApplicationInsightsTelemetry(instrumentationKey);
+                        }
+
+                        return s;
+                    },
+                    s => s.AddApplicationInsightsTelemetry());
 
         /// <summary>
         /// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         /// </summary>
-        /// <param name="app"></param>
-        /// <param name="env"></param>
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-        {
-            app.UseRouting();
-            app.UseEndpoints(endpoints =>
+        /// <param name="app">An Microsoft.AspNetCore.Builder.IApplicationBuilder for the app to configure.</param>
+        public void Configure(IApplicationBuilder app)
+            => app.UseRouting()
+                .UseEndpoints(endpoints =>
                 {
                     endpoints.MapControllers();
-                });
+                })
 
-            app.UseHttpsRedirection();
+                .UseHttpsRedirection()
 
-            app
                 .UseDefaultFiles()
                 .UseStaticFiles()
                 .UseSwagger(c =>
@@ -152,18 +156,29 @@ namespace TesApi.Web
                 .UseSwaggerUI(c =>
                 {
                     c.SwaggerEndpoint("/swagger/0.3.0/openapi.json", "Task Execution Service");
-                });
+                })
 
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-                logger.LogInformation("Configuring for Development environment");
-            }
-            else
-            {
-                app.UseHsts();
-                logger.LogInformation("Configuring for Production environment");
-            }
-        }
+                .IfThenElse(hostingEnvironment.IsDevelopment(),
+                    s =>
+                    {
+                        var r = s.UseDeveloperExceptionPage();
+                        logger.LogInformation("Configuring for Development environment");
+                        return r;
+                    },
+                    s =>
+                    {
+                        var r = s.UseHsts();
+                        logger.LogInformation("Configuring for Production environment");
+                        return r;
+                    });
+    }
+
+    internal static class BooleanMethodSelectorExtensions
+    {
+        public static IApplicationBuilder IfThenElse(this IApplicationBuilder builder, bool @if, Func<IApplicationBuilder, IApplicationBuilder> then, Func<IApplicationBuilder, IApplicationBuilder> @else)
+            => @if ? then(builder) : @else(builder);
+
+        public static IServiceCollection IfThenElse(this IServiceCollection services, bool @if, Func<IServiceCollection, IServiceCollection> then, Func<IServiceCollection, IServiceCollection> @else)
+            => @if ? then(services) : @else(services);
     }
 }
