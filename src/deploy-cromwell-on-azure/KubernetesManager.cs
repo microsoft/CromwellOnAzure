@@ -18,9 +18,6 @@ using Microsoft.Azure.Management.Storage.Fluent;
 using Microsoft.Rest;
 using k8s;
 using k8s.Models;
-using ICSharpCode.SharpZipLib.GZip;
-using ICSharpCode.SharpZipLib.Tar;
-using System.Security.Cryptography;
 using Azure.Storage.Blobs;
 using Microsoft.Azure.Management.ContainerService.Fluent;
 using static Microsoft.Azure.Management.Fluent.Azure;
@@ -65,13 +62,20 @@ namespace CromwellOnAzureDeployer
                 tesDeploymentBody.Spec.Template.Spec.Containers.First().Image = settings["TesImageName"];
             }
 
-            var externalStorageContainers = new StringBuilder();
+
             var tesEnv = new List<V1EnvVar>();
             foreach (var setting in settings)
             {
                 tesEnv.Add(new V1EnvVar(setting.Key, setting.Value));
             }
+            tesDeploymentBody.Spec.Template.Spec.Containers.First().Env = tesEnv;
 
+            return tesDeploymentBody;
+        }
+
+        private async Task<string> CreateContainerMounts(IStorageAccount storageAccount, string resourceGroup, IKubernetes client, List<V1Deployment> deployments)
+        {
+            var externalStorageContainers = new StringBuilder();
             var existingContainers = new HashSet<MountableContainer>(await GetExistingContainers(client));
             var containers = new HashSet<MountableContainer>(await GetContainersToMount(storageAccount));
 
@@ -98,18 +102,16 @@ namespace CromwellOnAzureDeployer
             {
                 if (!string.IsNullOrEmpty(container.SasToken))
                 {
-                    await CreateContainerMountWithSas(container, resourceGroup, client, tesDeploymentBody);
+                    await CreateContainerMountWithSas(container, resourceGroup, client, deployments);
                     externalStorageContainers.Append($"https://{container.StorageAccount}.blob.core.windows.net/{container.ContainerName}?{container.SasToken};");
                 }
                 else
                 {
-                    await CreateContainerMountWithManagedId(container, resourceGroup, client, tesDeploymentBody);
+                    await CreateContainerMountWithManagedId(container, resourceGroup, client, deployments, storageAccount.Name);
                 }
             }
-            tesEnv.Add(new V1EnvVar("ExternalStorageContainers", externalStorageContainers.ToString()));
-            tesDeploymentBody.Spec.Template.Spec.Containers.First().Env = tesEnv;
 
-            return tesDeploymentBody;
+            return externalStorageContainers.ToString();
         }
 
         private async Task<List<MountableContainer>> GetExistingContainers(IKubernetes client)
@@ -150,7 +152,7 @@ namespace CromwellOnAzureDeployer
             return list;
         }
 
-        public async Task DeployCoAServicesToCluster(IResource resourceGroupObject, Dictionary<string, string> settings, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, IStorageAccount storageAccount)
+        public async Task<IKubernetes> GetKubernetesClient(IResource resourceGroupObject)
         {
             string resourceGroup = resourceGroupObject.Name;
             var containerServiceClient = new ContainerServiceClient(azureCredentials);
@@ -167,8 +169,12 @@ namespace CromwellOnAzureDeployer
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
 
             var k8sConfig = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
-            IKubernetes client = new Kubernetes(k8sConfig);
+            return new Kubernetes(k8sConfig);
+        }
 
+        public async Task DeployCoAServicesToCluster(IKubernetes client, IResource resourceGroupObject, Dictionary<string, string> settings, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, IStorageAccount storageAccount)
+        {
+            string resourceGroup = resourceGroupObject.Name;
             // Install CSI driver. 
             await InstallCSIBlobDriver(client);
 
@@ -200,7 +206,6 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-
             await client.CreateNamespacedPersistentVolumeClaimAsync(cromwellTempClaim, configuration.AksCoANamespace);
             await client.CreateNamespacedPersistentVolumeClaimAsync(mysqlDataClaim, configuration.AksCoANamespace);
 
@@ -208,6 +213,10 @@ namespace CromwellOnAzureDeployer
             var triggerDeploymentBody = BuildTriggerServiceDeployment(settings);
             var cromwellDeploymentBody = BuildCromwellDeployment(settings, storageAccount.Name);
             var mysqlDeploymentBody = BuildMysqlDeployment(settings, storageAccount.Name);
+
+            var deploymentsWithStorageMounts = new List<V1Deployment> { tesDeploymentBody, cromwellDeploymentBody };
+            var externalStorageContainers = await CreateContainerMounts(storageAccount, resourceGroup, client, deploymentsWithStorageMounts);
+            tesDeploymentBody.Spec.Template.Spec.Containers.First().Env.Add(new V1EnvVar("ExternalStorageContainers", externalStorageContainers.ToString()));
 
             var tesDeployment = await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, configuration.AksCoANamespace);
             var tesService = await client.CreateNamespacedServiceAsync(tesServiceBody, configuration.AksCoANamespace);
@@ -217,22 +226,14 @@ namespace CromwellOnAzureDeployer
             var cromwellDeployment = await client.CreateNamespacedDeploymentAsync(cromwellDeploymentBody, configuration.AksCoANamespace);
             var cromwellService = await client.CreateNamespacedServiceAsync(cromwellServiceBody, configuration.AksCoANamespace);
 
-
             var pods = await client.ListNamespacedPodAsync(configuration.AksCoANamespace);
             var mysqlPod = pods.Items.Where(x => x.Metadata.Name.Contains("mysql")).FirstOrDefault(); //.Metadata.Name;
 
-            // Wait for mysql pod to transition to running to run setup sql scripts.
-            while (mysqlPod == null ||
-                mysqlPod.Status == null ||
-                mysqlPod.Status.ContainerStatuses == null ||
-                mysqlPod.Status.ContainerStatuses.FirstOrDefault() == null ||
-                !(mysqlPod.Status.ContainerStatuses.FirstOrDefault().Started ?? false))
+            if (!await WaitForWorkloadWithTimeout(client, "mysqldb", TimeSpan.FromMinutes(3), cts.Token))
             {
-                await Task.Delay(System.TimeSpan.FromSeconds(15));
-                pods = await client.ListNamespacedPodAsync(configuration.AksCoANamespace);
-                mysqlPod = pods.Items.Where(x => x.Metadata.Name.Contains("mysql")).First();
+                throw new Exception("Timed out waiting for MySQL to start.");
             }
-            await Task.Delay(System.TimeSpan.FromSeconds(30));
+            await Task.Delay(TimeSpan.FromSeconds(30));
 
             var printHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
             {
@@ -249,6 +250,14 @@ namespace CromwellOnAzureDeployer
 
             await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, configuration.AksCoANamespace, "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" }, true, printHandler, CancellationToken.None);
             await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, configuration.AksCoANamespace, "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }, true, printHandler, CancellationToken.None);
+        }
+
+        public async Task WaitForCromwell(IKubernetes client)
+        {
+            if (!await WaitForWorkloadWithTimeout(client, "cromwell", TimeSpan.FromMinutes(3), cts.Token))
+            {
+                throw new Exception("Timed out waiting for Cromwell to start.");
+            }
         }
 
         private async Task<bool> WaitForWorkloadWithTimeout(IKubernetes client, string deploymentName, System.TimeSpan timeout, CancellationToken cancellationToken)
@@ -288,13 +297,7 @@ namespace CromwellOnAzureDeployer
 
         private V1Deployment BuildCromwellDeployment(Dictionary<string, string> settings, string storageAccountName)
         {
-            var configurationMountName = $"{storageAccountName}-configuration-blob-claim1";
-            var executionsMountName = $"{storageAccountName}-cromwell-executions-blob-claim1";
-            var workflowLogsMountName = $"{storageAccountName}-cromwell-workflow-logs-blob-claim1";
             var cromwellDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "cromwell-deployment.yaml"));
-            AddStaticVolumeClaim(cromwellDeploymentBody, configurationMountName, "/configuration");
-            AddStaticVolumeClaim(cromwellDeploymentBody, executionsMountName, "/cromwell-executions");
-            AddStaticVolumeClaim(cromwellDeploymentBody, workflowLogsMountName, "/cromwell-workflow-logs");
 
             if (!string.IsNullOrWhiteSpace(settings["CromwellImageName"]))
             {
@@ -338,7 +341,7 @@ namespace CromwellOnAzureDeployer
             });
         }
 
-        private async Task CreateContainerMountWithSas(MountableContainer container, string resourceGroup, IKubernetes client, V1Deployment tesDeployment)
+        private async Task CreateContainerMountWithSas(MountableContainer container, string resourceGroup, IKubernetes client, List<V1Deployment> deployments)
         {
             var secretName = $"sas-secret-{container.StorageAccount}-{container.ContainerName}";
             var volumeName = $"pv-blob-{container.StorageAccount}-{container.ContainerName}";
@@ -414,14 +417,26 @@ namespace CromwellOnAzureDeployer
                 }
             }, configuration.AksCoANamespace);
 
-            AddStaticVolumeClaim(tesDeployment, claimName, $"/{container.StorageAccount}/{container.ContainerName}");
+            foreach(var deployment in deployments)
+            {
+                AddStaticVolumeClaim(deployment, claimName, $"/{container.StorageAccount}/{container.ContainerName}");
+            }
         }
 
-        private async Task CreateContainerMountWithManagedId(MountableContainer container, string resouceGroup, IKubernetes client, V1Deployment tesDeployment)
+        private async Task CreateContainerMountWithManagedId(MountableContainer container, string resouceGroup, IKubernetes client, List<V1Deployment> deployments, string coaStorageAccount)
         {
             var sasSecretName = $"sa-secret-{container.StorageAccount}-{container.ContainerName}";
             var pvcName = $"{container.StorageAccount}-{container.ContainerName}-blob-claim1";
             var storageClassName = $"sc-blob-{container.StorageAccount}-{container.ContainerName}";
+            var path = string.Empty;
+            if (container.StorageAccount.Equals(coaStorageAccount, StringComparison.OrdinalIgnoreCase))
+            {
+                path = $"/{container.ContainerName}";
+            }
+            else
+            {
+                path = $"/{container.StorageAccount}/{container.ContainerName}";
+            }
 
             var storageAccount = await Deployer.GetExistingStorageAccountAsync(container.StorageAccount, azureClient, subscriptionIds, configuration);
             if (!(await KubernetesSecretExists(client, sasSecretName)))
@@ -479,7 +494,12 @@ namespace CromwellOnAzureDeployer
                 }
             };
 
-            AddStaticVolumeClaim(tesDeployment, pvcName, $"/{container.StorageAccount}/{container.ContainerName}");
+
+
+            foreach (var deployment in deployments)
+            {
+                AddStaticVolumeClaim(deployment, pvcName, path);
+            }
             await client.CreateNamespacedPersistentVolumeClaimAsync(pvc, configuration.AksCoANamespace);
         }
 
@@ -612,15 +632,17 @@ namespace CromwellOnAzureDeployer
             IKubernetes client = new Kubernetes(k8sConfig);
 
             var tesDeploymentBody = await BuildTesDeployment(settings, storageAccount, resourceGroup.Name, client);
-            var tesDeployment = await client.ReplaceNamespacedDeploymentAsync(tesDeploymentBody, "tes", configuration.AksCoANamespace);
-
             var triggerServiceDeploymentBody = BuildTriggerServiceDeployment(settings);
-            var triggerServiceDeployment = await client.ReplaceNamespacedDeploymentAsync(triggerServiceDeploymentBody, "triggerservice", configuration.AksCoANamespace);
-
             var cromwellDeploymentBody = BuildCromwellDeployment(settings, storageAccount.Name);
-            var cromwellDeployment = await client.ReplaceNamespacedDeploymentAsync(cromwellDeploymentBody, "cromwell", configuration.AksCoANamespace);
-
             var mysqlDeploymentBody = BuildMysqlDeployment(settings, storageAccount.Name);
+
+            var deploymentsWithStorageMounts = new List<V1Deployment> { tesDeploymentBody, cromwellDeploymentBody };
+            var externalStorageContainers = await CreateContainerMounts(storageAccount, resourceGroup.Name, client, deploymentsWithStorageMounts);
+            tesDeploymentBody.Spec.Template.Spec.Containers.First().Env.Add(new V1EnvVar("ExternalStorageContainers", externalStorageContainers.ToString()));
+
+            var tesDeployment = await client.ReplaceNamespacedDeploymentAsync(tesDeploymentBody, "tes", configuration.AksCoANamespace);
+            var triggerServiceDeployment = await client.ReplaceNamespacedDeploymentAsync(triggerServiceDeploymentBody, "triggerservice", configuration.AksCoANamespace);
+            var cromwellDeployment = await client.ReplaceNamespacedDeploymentAsync(cromwellDeploymentBody, "cromwell", configuration.AksCoANamespace);
             var mysqlDeployment = await client.ReplaceNamespacedDeploymentAsync(mysqlDeploymentBody, "mysqldb", configuration.AksCoANamespace);
         }
 

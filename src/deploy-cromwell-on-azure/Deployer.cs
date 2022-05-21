@@ -95,6 +95,7 @@ namespace CromwellOnAzureDeployer
         private bool SkipBillingReaderRoleAssignment { get; set; }
         private bool isResourceGroupCreated { get; set; }
         private KubernetesManager kubernetesManager {get; set;}
+        private IKubernetes kubernetesClient { get; set; }
 
         public Deployer(Configuration configuration)
         {
@@ -415,7 +416,8 @@ namespace CromwellOnAzureDeployer
                                 {
                                     aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName);
                                 }
-                                await kubernetesManager.DeployCoAServicesToCluster(resourceGroup, settings, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName, storageAccount);
+                                kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
+                                await kubernetesManager.DeployCoAServicesToCluster(kubernetesClient, resourceGroup, settings, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.subnetName, storageAccount);
                                 await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CoASettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
                             });
                         }
@@ -464,7 +466,11 @@ namespace CromwellOnAzureDeployer
 
                     }
 
-                    if (!configuration.UseAks)
+                    if (configuration.UseAks)
+                    {
+                        await kubernetesManager.WaitForCromwell(kubernetesClient);
+                    }
+                    else
                     {
                         await WriteCoaVersionToVmAsync(sshConnectionInfo);
                         await RebootVmAsync(sshConnectionInfo);
