@@ -34,6 +34,19 @@ namespace CromwellOnAzureDeployer
         private IAuthenticated azureClient { get; set; }
         private CancellationTokenSource cts { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
+        private ExecAsyncCallback printHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
+        {
+            using (var reader = new StreamReader(stdOut))
+            {
+                ConsoleEx.Write(reader.ReadToEnd());
+            }
+
+            using (var reader = new StreamReader(stdError))
+            {
+                ConsoleEx.Write(reader.ReadToEnd());
+            }
+        });
+
 
         public KubernetesManager(Configuration config, AzureCredentials credentials, IAuthenticated azureClient, IEnumerable<string> subscriptionIds, CancellationTokenSource cts)
         {
@@ -212,7 +225,7 @@ namespace CromwellOnAzureDeployer
             var tesDeploymentBody = await BuildTesDeployment(settings, storageAccount, resourceGroup, client);
             var triggerDeploymentBody = BuildTriggerServiceDeployment(settings);
             var cromwellDeploymentBody = BuildCromwellDeployment(settings, storageAccount.Name);
-            var mysqlDeploymentBody = BuildMysqlDeployment(settings, storageAccount.Name);
+
 
             var deploymentsWithStorageMounts = new List<V1Deployment> { tesDeploymentBody, cromwellDeploymentBody };
             var externalStorageContainers = await CreateContainerMounts(storageAccount, resourceGroup, client, deploymentsWithStorageMounts);
@@ -221,35 +234,43 @@ namespace CromwellOnAzureDeployer
             var tesDeployment = await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, configuration.AksCoANamespace);
             var tesService = await client.CreateNamespacedServiceAsync(tesServiceBody, configuration.AksCoANamespace);
             var triggerDeployment = await client.CreateNamespacedDeploymentAsync(triggerDeploymentBody, configuration.AksCoANamespace);
-            var mysqlDeployment = await client.CreateNamespacedDeploymentAsync(mysqlDeploymentBody, configuration.AksCoANamespace);
-            var mysqlService = await client.CreateNamespacedServiceAsync(mysqlServiceBody, configuration.AksCoANamespace);
+
             var cromwellDeployment = await client.CreateNamespacedDeploymentAsync(cromwellDeploymentBody, configuration.AksCoANamespace);
             var cromwellService = await client.CreateNamespacedServiceAsync(cromwellServiceBody, configuration.AksCoANamespace);
 
-            var pods = await client.ListNamespacedPodAsync(configuration.AksCoANamespace);
-            var mysqlPod = pods.Items.Where(x => x.Metadata.Name.Contains("mysql")).FirstOrDefault(); //.Metadata.Name;
-
-            if (!await WaitForWorkloadWithTimeout(client, "mysqldb", TimeSpan.FromMinutes(3), cts.Token))
+            if (!configuration.ProvisionMySqlOnAzure.HasValue || !configuration.ProvisionMySqlOnAzure.Value)
             {
-                throw new Exception("Timed out waiting for MySQL to start.");
+                var mysqlDeploymentBody = BuildMysqlDeployment(settings, storageAccount.Name);
+                var mysqlDeployment = await client.CreateNamespacedDeploymentAsync(mysqlDeploymentBody, configuration.AksCoANamespace);
+                var mysqlService = await client.CreateNamespacedServiceAsync(mysqlServiceBody, configuration.AksCoANamespace);
+                var commands = new List<string[]>
+                {
+                    new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" },
+                    new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }
+                };
+                await ExecuteCommandsOnPod(client, "mysqldb", commands);
             }
-            await Task.Delay(TimeSpan.FromSeconds(30));
+        }
 
-            var printHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
+        public async Task ExecuteCommandsOnPod(IKubernetes client, string podName, IEnumerable<string[]> commands)
+        {
+            var pods = await client.ListNamespacedPodAsync(configuration.AksCoANamespace);
+            var mysqlPod = pods.Items.Where(x => x.Metadata.Name.Contains(podName)).FirstOrDefault(); //.Metadata.Name;
+
+            if (!configuration.ProvisionMySqlOnAzure.HasValue || !configuration.ProvisionMySqlOnAzure.Value)
             {
-                using (var reader = new StreamReader(stdOut))
+                if (!await WaitForWorkloadWithTimeout(client, podName, TimeSpan.FromMinutes(5), cts.Token))
                 {
-                    ConsoleEx.Write(reader.ReadToEnd());
+                    throw new Exception($"Timed out waiting for {podName} to start.");
                 }
+                // For some reason even if a pod says it ready, call made immediately will fail. Wait for 10 seconds for safety. 
+                await Task.Delay(TimeSpan.FromSeconds(10));
 
-                using (var reader = new StreamReader(stdError))
+                foreach (var command in commands)
                 {
-                    ConsoleEx.Write(reader.ReadToEnd());
+                    await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, configuration.AksCoANamespace, podName, command, true, printHandler, CancellationToken.None);
                 }
-            });
-
-            await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, configuration.AksCoANamespace, "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" }, true, printHandler, CancellationToken.None);
-            await client.NamespacedPodExecAsync(mysqlPod.Metadata.Name, configuration.AksCoANamespace, "mysqldb", new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }, true, printHandler, CancellationToken.None);
+            }
         }
 
         public async Task WaitForCromwell(IKubernetes client)
