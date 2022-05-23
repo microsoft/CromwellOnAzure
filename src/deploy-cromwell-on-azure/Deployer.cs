@@ -418,7 +418,7 @@ namespace CromwellOnAzureDeployer
                                 var settings = GetSettingsDict(managedIdentity);
                                 if (aksCluster == null)
                                 {
-                                    aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name);
+                                    aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
                                 kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
                                 await kubernetesManager.DeployCoAServicesToCluster(kubernetesClient, resourceGroup, settings, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, storageAccount);
@@ -619,7 +619,7 @@ namespace CromwellOnAzureDeployer
 
         }
 
-        private async Task<ManagedCluster> ProvisionManagedCluster(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName)
+        private async Task<ManagedCluster> ProvisionManagedCluster(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, bool privateNetworking)
         {
             string resourceGroup = resourceGroupObject.Name;
             string nodePoolName = "nodepool1";
@@ -657,6 +657,15 @@ namespace CromwellOnAzureDeployer
                 Mode = "System",
                 VnetSubnetID = virtualNetwork.Subnets[subnetName].Inner.Id
             });
+
+            if (privateNetworking)
+            {
+                cluster.ApiServerAccessProfile = new ManagedClusterAPIServerAccessProfile()
+                {
+                    EnablePrivateCluster = true,
+                    EnablePrivateClusterPublicFQDN = true
+                };
+            }
 
             return await Execute(
                 $"Creating AKS Cluster: {configuration.AksClusterName}...",
