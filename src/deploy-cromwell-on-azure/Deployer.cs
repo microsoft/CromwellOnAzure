@@ -460,7 +460,7 @@ namespace CromwellOnAzureDeployer
                                 if(configuration.ProvisionMySqlOnAzure == true) 
                                 { 
                                     mySQLServer = await CreateMySqlServerAndDatabaseAsync(mySQLManagementClient, vnetAndSubnet.Value.mySqlSubnet);
-                                    //await ExecuteQueriesOnMySqlDb();
+
                                     if (configuration.UseAks)
                                     {
                                         // If using AKS, wait on compute task.
@@ -1532,32 +1532,36 @@ namespace CromwellOnAzureDeployer
                 () => networkInterface.Update().WithExistingNetworkSecurityGroup(networkSecurityGroup).ApplyAsync()
             );
 
+        private string GetInitSqlString()
+        {
+            return Utility.PersonalizeContent(new[]
+            {
+                new Utility.ConfigReplaceRegExItemText("^CREATE USER 'cromwell'@'%'.*$", String.Empty, RegexOptions.Multiline),
+            }, "scripts", "mysql", "init-user.sql");
+        }
+
         private Task ExecuteQueriesOnAzureMySqlDb(ConnectionInfo sshConnectionInfo, Server mySQLServer)
         => Execute(
             $"Executing scripts on cromwell_db.",
             async () => {
                 await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y mysql-client");
-                var initScript = Utility.PersonalizeContent(new[]
-                {
-                    new Utility.ConfigReplaceRegExItemText("^CREATE USER 'cromwell'@'%'.*$", String.Empty, RegexOptions.Multiline),
-                }, "scripts", "mysql", "init-user.sql");
+                var initScript = GetInitSqlString();
                 return await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"mysql -u cromwell -p'{configuration.MySqlServerPassword}' -h {mySQLServer.FullyQualifiedDomainName} -P 3306 -D cromwell_db -e \"{initScript}\"");
             });
 
         private Task ExecuteQueriesOnAzureMySqlDbFromK8(Server mySQLServer)
             => Execute(
                 $"Executing scripts on cromwell_db.",
-                async () => {
-                    var initScript = Utility.PersonalizeContent(new[]
-                    {
-                                new Utility.ConfigReplaceRegExItemText("^CREATE USER 'cromwell'@'%'.*$", String.Empty, RegexOptions.Multiline),
-                    }, "scripts", "mysql", "init-user.sql");
+                async () => 
+                {
+                    var initScript = GetInitSqlString();
 
-                    var commands = new List<string[]>() {
+                    var commands = new List<string[]>() 
+                    {
                         new string[] { "sudo apt install -y mysql-client" } ,
                         new string[] { $"mysql -u cromwell -p'{configuration.MySqlServerPassword}' -h {mySQLServer.FullyQualifiedDomainName} -P 3306 -D cromwell_db -e \"{initScript}\"" }
                     };
-                    return kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "cromwell", commands);
+                    await kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "cromwell", commands, System.TimeSpan.FromMinutes(5));
                 });
 
         private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
