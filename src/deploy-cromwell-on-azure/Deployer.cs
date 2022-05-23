@@ -645,14 +645,13 @@ namespace CromwellOnAzureDeployer
             cluster.AgentPoolProfiles.Add(new ManagedClusterAgentPoolProfile()
             {
                 Name = nodePoolName,
-                Count = 2,
-                VmSize = "Standard_DS2_v2",
+                Count = 1,
+                VmSize = configuration.VmSize,
                 OsDiskSizeGB = 128,
                 OsDiskType = OSDiskType.Managed,
-                MaxPods = 110,
                 Type = "VirtualMachineScaleSets",
                 EnableAutoScaling = false,
-                EnableNodePublicIP = true,
+                EnableNodePublicIP = false,
                 OsType = "Linux",
                 Mode = "System",
                 VnetSubnetID = virtualNetwork.Subnets[subnetName].Inner.Id

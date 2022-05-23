@@ -263,8 +263,8 @@ namespace CromwellOnAzureDeployer
                 {
                     throw new Exception($"Timed out waiting for {podName} to start.");
                 }
-                // For some reason even if a pod says it ready, call made immediately will fail. Wait for 10 seconds for safety. 
-                await Task.Delay(TimeSpan.FromSeconds(10));
+                // For some reason even if a pod says it ready, calls made immediately will fail. Wait for 20 seconds for safety. 
+                await Task.Delay(TimeSpan.FromSeconds(20));
 
                 foreach (var command in commands)
                 {
