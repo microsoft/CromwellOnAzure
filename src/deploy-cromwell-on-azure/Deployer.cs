@@ -69,7 +69,8 @@ namespace CromwellOnAzureDeployer
         public const string ConfigurationContainerName = "configuration";
         public const string CromwellConfigurationFileName = "cromwell-application.conf";
         public const string ContainersToMountFileName = "containers-to-mount";
-        public const string CoASettingsFileName = "settings";
+        public const string PersonalizedSettingsFileName = "settings-user";
+        public const string NonpersonalizedSettingsFileName = "settings-system";
         public const string AllowedVmSizesFileName = "allowed-vm-sizes";
         public const string InputsContainerName = "inputs";
         public const string CromwellAzureRootDir = "/data/cromwellazure";
@@ -183,10 +184,9 @@ namespace CromwellOnAzureDeployer
                                     throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple storage accounts. {nameof(configuration.StorageAccountName)} must be provided.");
                                 }
                                 storageAccount = storageAccounts.First();
-
                             }
 
-                            accountNames = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CoASettingsFileName, cts), SettingsDelimiter);
+                            accountNames = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, cts), SettingsDelimiter);
                         }   
                         else
                         {
@@ -415,15 +415,19 @@ namespace CromwellOnAzureDeployer
                         {
                             compute = Task.Run(async () =>
                             {
-                                var settings = GetSettingsDict(managedIdentity);
+                                var personalizedSettings = GetPersonalizedSettings(managedIdentity);
+                                var systemSettings = GetSystemSettings(managedIdentity);
+                                var settings = new Dictionary<string, string>(personalizedSettings);
+                                systemSettings.ToList().ForEach(x => settings.Add(x.Key, x.Value));
 
                                 if (aksCluster == null)
                                 {
                                     aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
                                 kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
-                                await kubernetesManager.DeployCoAServicesToCluster(kubernetesClient, resourceGroup, settings, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, storageAccount);
-                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CoASettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
+                                await kubernetesManager.DeployCoAServicesToCluster(kubernetesClient, resourceGroup, settings, storageAccount);
+                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
+                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
                             });
                         }
                         else
@@ -454,9 +458,21 @@ namespace CromwellOnAzureDeployer
 
                         await Task.WhenAll(new Task[]
                         {
-                            Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync(storageAccount.Id)),
-                            Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
-                            Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
+                            Task.Run(async () => 
+                            {
+                                batchAccount ??= await CreateBatchAccountAsync(storageAccount.Id);
+                                await AssignVmAsContributorToBatchAccountAsync(managedIdentity, batchAccount);
+                            }),
+                            Task.Run(async () =>
+                            {
+                                appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId);
+                                await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
+                            }),
+                            Task.Run(async () => 
+                            {
+                                cosmosDb = await CreateCosmosDbAsync();
+                                await AssignVmAsContributorToCosmosDb(managedIdentity, cosmosDb);
+                            }),
                             Task.Run(async () => { 
                                 if(configuration.ProvisionMySqlOnAzure == true) 
                                 { 
@@ -477,10 +493,6 @@ namespace CromwellOnAzureDeployer
                             }),
                             Task.Run(async () => await compute)
                         });
-
-                        await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
-                        await AssignVmAsContributorToCosmosDb(managedIdentity, cosmosDb);
-                        await AssignVmAsContributorToBatchAccountAsync(managedIdentity, batchAccount);
 
                         if (!SkipBillingReaderRoleAssignment)
                         {
@@ -656,7 +668,7 @@ namespace CromwellOnAzureDeployer
                 EnableNodePublicIP = false,
                 OsType = "Linux",
                 Mode = "System",
-                VnetSubnetID = virtualNetwork.Subnets[subnetName].Inner.Id
+                VnetSubnetID = virtualNetwork.Subnets[subnetName].Inner.Id,
             });
 
             if (privateNetworking)
@@ -754,25 +766,9 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private Dictionary<string, string> GetSettingsDict(IIdentity managedIdentity)
+        private Dictionary<string, string> GetSystemSettings(IIdentity managedIdentity)
         {
-            var files = new string[] { "env-00-coa-version.txt", "env-01-account-names.txt", "env-02-internal-images.txt", "env-03-external-images.txt", "env-04-settings.txt" };
             var settings = new Dictionary<string, string>();
-            foreach (var file in files)
-            {
-                var fileContents = Utility.GetFileContent("scripts", file);
-                foreach (var line in fileContents.Split("\n"))
-                {
-                    var parts = line.Split("=");
-                    if (parts.Length == 2)
-                    {
-                        settings.Add(parts[0], parts[1]);
-                    }
-                }
-            }
-
-            // env 05-12
-            UpdateSettingsFromConfiguration(settings, configuration);
             settings["BatchNodesSubnetId"] = configuration.BatchNodesSubnetId;
             settings["DockerInDockerImageName"] = configuration.DockerInDockerImageName;
             settings["BlobxferImageName"] = configuration.BlobxferImageName;
@@ -787,6 +783,30 @@ namespace CromwellOnAzureDeployer
                 settings["KeepSshPortOpen"] = configuration.KeepSshPortOpen.Value.ToString();
             }
 
+            return settings;
+        }
+
+        private Dictionary<string, string> GetPersonalizedSettings(IIdentity managedIdentity)
+        {
+            var files = new string[] { "env-00-coa-version.txt", "env-01-account-names.txt", "env-02-internal-images.txt", "env-03-external-images.txt", "env-04-settings.txt" };
+            var settings = new Dictionary<string, string>();
+
+            foreach (var file in files)
+            {
+                var fileContents = Utility.GetFileContent("scripts", file);
+                foreach (var line in fileContents.Split("\n"))
+                {
+                    var parts = line.Split("=");
+                    if (parts.Length == 2)
+                    {
+                        settings.Add(parts[0], parts[1]);
+                    }
+                }
+            }
+
+            // env 05-12
+            OverrideSettingsFromConfiguration(settings, configuration);
+
             settings["DefaultStorageAccountName"] = configuration.StorageAccountName;
             settings["CosmosDbAccountName"] = configuration.CosmosDbAccountName;
             settings["BatchAccountName"] = configuration.BatchAccountName;
@@ -797,7 +817,7 @@ namespace CromwellOnAzureDeployer
             return settings;
         }
 
-        public static void UpdateSettingsFromConfiguration(Dictionary<string, string> settings, Configuration configuration)
+        public static void OverrideSettingsFromConfiguration(Dictionary<string, string> settings, Configuration configuration)
         {
             if (!string.IsNullOrWhiteSpace(configuration.CromwellVersion))
             {

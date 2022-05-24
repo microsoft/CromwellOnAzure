@@ -156,7 +156,7 @@ namespace CromwellOnAzureDeployer
             return new Kubernetes(k8sConfig);
         }
 
-        public async Task DeployCoAServicesToCluster(IKubernetes client, IResource resourceGroupObject, Dictionary<string, string> settings, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, IStorageAccount storageAccount)
+        public async Task DeployCoAServicesToCluster(IKubernetes client, IResource resourceGroupObject, Dictionary<string, string> settings, IStorageAccount storageAccount)
         {
             var resourceGroup = resourceGroupObject.Name;
             await InstallCSIBlobDriver(client);
@@ -642,7 +642,7 @@ namespace CromwellOnAzureDeployer
         public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount)
         {
             // Override any configuration that is used by the update.
-            Deployer.UpdateSettingsFromConfiguration(settings, configuration);
+            Deployer.OverrideSettingsFromConfiguration(settings, configuration);
 
             var containerServiceClient = new ContainerServiceClient(azureCredentials);
             containerServiceClient.SubscriptionId = configuration.SubscriptionId;
