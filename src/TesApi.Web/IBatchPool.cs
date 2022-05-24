@@ -10,7 +10,7 @@ namespace TesApi.Web
     /// <summary>
     /// Represents a pool in an Azure Batch Account.
     /// </summary>
-    public interface IBatchPool : IHasRepositoryItem<BatchPool.PoolData>
+    public interface IBatchPool
     {
         /// <summary>
         /// Indicates that the pool is available for new jobs/tasks.
@@ -108,12 +108,6 @@ namespace TesApi.Web
             /// Removes <see cref="CloudPool"/> if it's retired and empty.
             /// </summary>
             RemovePoolIfEmpty,
-
-            /// <summary>
-            /// Remove pool metadata.
-            /// </summary>
-            /// <remarks>Used when batch account reports pool is missing or being deleted.</remarks>
-            ForceRemove,
         }
     }
 }

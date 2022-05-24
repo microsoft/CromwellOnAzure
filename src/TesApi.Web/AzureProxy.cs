@@ -19,6 +19,7 @@ using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
@@ -27,6 +28,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Tes.Models;
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
+using Extensions = Microsoft.Azure.Management.ResourceManager.Fluent.Core.Extensions;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TesApi.Web
@@ -453,6 +455,20 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
+        public async Task<IEnumerable<string>> GetActivePoolIdsAsync(string hostName, CancellationToken cancellationToken = default)
+        {
+            var activePoolsFilter = new ODATADetailLevel
+            {
+                FilterClause = $"state eq 'active'",
+                SelectClause = "id,metadata"
+            };
+
+            return (await batchClient.PoolOperations.ListPools(activePoolsFilter).ToListAsync(cancellationToken))
+                .Where(p => hostName.Equals(p.Metadata?.FirstOrDefault(m => BatchScheduler.PoolHostName.Equals(m.Name, StringComparison.Ordinal))?.Value, StringComparison.OrdinalIgnoreCase))
+                .Select(p => p.Id);
+        }
+
+        /// <inheritdoc/>
         public async Task<IEnumerable<string>> GetPoolIdsReferencedByJobsAsync(CancellationToken cancellationToken = default)
             => (await batchClient.JobOperations.ListJobs(new ODATADetailLevel(selectClause: "executionInfo")).ToListAsync(cancellationToken))
                 .Where(j => !string.IsNullOrEmpty(j.ExecutionInformation?.PoolId))
@@ -465,6 +481,14 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default)
             => batchClient.PoolOperations.DeletePoolAsync(poolId, cancellationToken: cancellationToken);
+
+        /// <inheritdoc/>
+        public Task<CloudPool> GetBatchPoolAsync(string poolId, DetailLevel detailLevel = default, CancellationToken cancellationToken = default)
+            => batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: detailLevel, cancellationToken: cancellationToken);
+
+        /// <inheritdoc/>
+        public Task CommitBatchPoolChangesAsync(CloudPool pool, CancellationToken cancellationToken = default)
+            => pool.CommitChangesAsync(cancellationToken: cancellationToken);
 
         /// <inheritdoc/>
         public async Task<AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)

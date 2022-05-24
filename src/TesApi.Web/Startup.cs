@@ -79,12 +79,6 @@ namespace TesApi.Web
                 return (IRepository<TesTask>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<TesTask>>(sp, new CosmosDbRepository<TesTask>(cosmos.CosmosDbEndpoint, cosmos.CosmosDbKey, Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId, Constants.CosmosDbPartitionId));
             })
 
-            .AddSingleton(sp =>
-            {
-                var cosmos = sp.GetService<CosmosCredentials>();
-                return (IRepository<BatchPool.PoolData>)ActivatorUtilities.CreateInstance<CachingWithRetriesRepository<BatchPool.PoolData>>(sp, new CosmosDbRepository<BatchPool.PoolData>(cosmos.CosmosDbEndpoint, cosmos.CosmosDbKey, Constants.CosmosDbDatabaseId, BatchScheduler.CosmosDbContainerId, Constants.CosmosDbPartitionId));
-            })
-
             .AddSingleton<IBatchScheduler, BatchScheduler>()
             .AddSingleton<IStorageAccessProvider, StorageAccessProvider>()
 

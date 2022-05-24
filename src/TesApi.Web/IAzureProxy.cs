@@ -168,6 +168,14 @@ namespace TesApi.Web
         Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken);
 
         /// <summary>
+        /// Gets the list of active pool ids matching the hostname in the metadata
+        /// </summary>
+        /// <param name="hostName"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        Task<IEnumerable<string>> GetActivePoolIdsAsync(string hostName, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Gets the list of pool ids referenced by the jobs
         /// </summary>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
@@ -180,6 +188,23 @@ namespace TesApi.Web
         /// <param name="poolId">The id of the pool.</param>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="poolId"></param>
+        /// <param name="detailLevel"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        Task<CloudPool> GetBatchPoolAsync(string poolId, DetailLevel detailLevel = default, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="pool"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        Task CommitBatchPoolChangesAsync(CloudPool pool, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Lists compute nodes in batch pool <paramref name="poolId"/>

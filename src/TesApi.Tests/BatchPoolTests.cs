@@ -36,9 +36,9 @@ namespace TesApi.Tests
             catch (AzureBatchQuotaMaxedOutException) { }
 
             Assert.IsNull(info);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetLowPriority);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetDedicated);
+            Assert.AreEqual(1, ((BatchPool)pool).TestPendingReservationsCount);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
             {
@@ -71,9 +71,9 @@ namespace TesApi.Tests
             }
 
             Assert.IsNull(info);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetLowPriority);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetDedicated);
+            Assert.AreEqual(1, ((BatchPool)pool).TestPendingReservationsCount);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
             {
@@ -106,9 +106,9 @@ namespace TesApi.Tests
             }
 
             Assert.IsNull(info);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
-            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetLowPriority);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetDedicated);
+            Assert.AreEqual(2, ((BatchPool)pool).TestPendingReservationsCount);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
             {
@@ -145,7 +145,7 @@ namespace TesApi.Tests
 
             Assert.IsNotNull(info);
             Assert.IsTrue(setTargetsCalled);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.AreEqual(1, ((BatchPool)pool).TestNodeReservationCount);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
             {
@@ -194,8 +194,8 @@ namespace TesApi.Tests
 
             Assert.IsNotNull(info);
             Assert.IsTrue(setTargetsCalled);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
-            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.AreEqual(0, ((BatchPool)pool).TestPendingReservationsCount);
+            Assert.AreEqual(2, ((BatchPool)pool).TestNodeReservationCount);
             Assert.AreEqual(AffinityPrefix + "ComputeNode1", info.AffinityId);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
@@ -237,9 +237,9 @@ namespace TesApi.Tests
 
             Assert.IsNotNull(info);
             Assert.IsTrue(setTargetsCalled);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetDedicated);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
+            Assert.AreEqual(1, ((BatchPool)pool).TestNodeReservationCount);
+            Assert.AreEqual(1, ((BatchPool)pool).TestTargetDedicated);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetLowPriority);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
             {
@@ -278,9 +278,9 @@ namespace TesApi.Tests
             _ = await pool.PrepareNodeAsync("JobId1", true);
             _ = await pool.PrepareNodeAsync("JobId2", true);
 
-            Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeTwoLoPriIdle"));
-            Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneLoPriIdle"));
-            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.IsTrue(((BatchPool)pool).TestIsNodeReserved(AffinityPrefix + "NodeTwoLoPriIdle"));
+            Assert.IsTrue(((BatchPool)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneLoPriIdle"));
+            Assert.AreEqual(2, ((BatchPool)pool).TestNodeReservationCount);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
@@ -315,13 +315,13 @@ namespace TesApi.Tests
             _ = await pool.PrepareNodeAsync("JobId1", true);
             _ = await pool.PrepareNodeAsync("JobId2", false);
 
-            Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneDedicatedIdle"));
+            Assert.IsTrue(((BatchPool)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneDedicatedIdle"));
 
             pool.ReleaseNode(new AffinityInformation(AffinityPrefix + "NodeOneDedicatedIdle"));
 
-            Assert.IsFalse(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneDedicatedIdle"));
-            Assert.IsTrue(((IBatchPoolImpl)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneLoPriIdle"));
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.IsFalse(((BatchPool)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneDedicatedIdle"));
+            Assert.IsTrue(((BatchPool)pool).TestIsNodeReserved(AffinityPrefix + "NodeOneLoPriIdle"));
+            Assert.AreEqual(1, ((BatchPool)pool).TestNodeReservationCount);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
@@ -356,11 +356,11 @@ namespace TesApi.Tests
             _ = await pool.PrepareNodeAsync("JobId1", true);
             _ = await pool.PrepareNodeAsync("JobId2", false);
 
-            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.AreEqual(2, ((BatchPool)pool).TestNodeReservationCount);
 
             pool.ReleaseNode(new AffinityInformation(AffinityPrefix + "NodeTwoLoPriRunning"));
 
-            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.AreEqual(2, ((BatchPool)pool).TestNodeReservationCount);
 
             IAsyncEnumerable<ComputeNode> ListComputeNodes(string id, ODATADetailLevel detail)
                 => ListComputeNodesAsync(nodes, id, detail, ValidateLCN, c => c.State == ComputeNodeState.Idle);
@@ -384,8 +384,8 @@ namespace TesApi.Tests
             azureProxy.AzureProxyGetComputeNodeTargets = ValidateComputeNodeTargets;
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize);
 
-            Assert.AreEqual(3, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(3, ((BatchPool)pool).TestTargetLowPriority);
+            Assert.AreEqual(2, ((BatchPool)pool).TestTargetDedicated);
 
             void ValidateComputeNodeTargets(string id)
                 => Assert.AreEqual(pool.Pool.PoolId, id);
@@ -404,9 +404,9 @@ namespace TesApi.Tests
             azureProxy.AzureProxyGetAllocationState = GetState;
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
 
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(0, ((BatchPool)pool).TestNodeReservationCount);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetLowPriority);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetDedicated);
 
             Microsoft.Azure.Batch.Common.AllocationState GetState(string id)
             {
@@ -430,9 +430,9 @@ namespace TesApi.Tests
             try { _ = await pool.PrepareNodeAsync("JobId1", false); } catch (AzureBatchQuotaMaxedOutException) { }
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
 
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(0, ((BatchPool)pool).TestNodeReservationCount);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetLowPriority);
+            Assert.AreEqual(1, ((BatchPool)pool).TestTargetDedicated);
 
             Microsoft.Azure.Batch.Common.AllocationState GetState(string id)
             {
@@ -459,9 +459,9 @@ namespace TesApi.Tests
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
 
             Assert.AreEqual(1, setTargetsCalled);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestPendingReservationsCount);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(1, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(1, ((BatchPool)pool).TestPendingReservationsCount);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetLowPriority);
+            Assert.AreEqual(1, ((BatchPool)pool).TestTargetDedicated);
 
             Microsoft.Azure.Batch.Common.AllocationState GetState(string id)
             {
@@ -511,27 +511,27 @@ namespace TesApi.Tests
             azureProxy.AzureProxyListComputeNodesAsync = ListComputeNodesRemoveNode;
             azureProxy.AzureProxyDeleteBatchComputeNodes = DeleteComputeNodes;
 
-            Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-            Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(4, ((BatchPool)pool).TestNodeReservationCount);
+            Assert.AreEqual(4, ((BatchPool)pool).TestTargetLowPriority);
+            Assert.AreEqual(4, ((BatchPool)pool).TestTargetDedicated);
             pool.ReleaseNode(new AffinityInformation(AffinityPrefix + "NodeOneDedicatedIdle"));
-            Assert.AreEqual(3, ((IBatchPoolImpl)pool).TestNodeReservationCount);
+            Assert.AreEqual(3, ((BatchPool)pool).TestNodeReservationCount);
 
             // Ensure nodes are not deleted prematurely
-            expiryTime = DateTime.UtcNow - ((IBatchPoolImpl)pool).TestIdleNodeTime;
+            expiryTime = DateTime.UtcNow - ((BatchPool)pool).TestIdleNodeTime;
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle);
-            Assert.AreEqual(3, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-            Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(4, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(3, ((BatchPool)pool).TestNodeReservationCount);
+            Assert.AreEqual(4, ((BatchPool)pool).TestTargetLowPriority);
+            Assert.AreEqual(4, ((BatchPool)pool).TestTargetDedicated);
 
-            nodes = TimeShift(((IBatchPoolImpl)pool).TestIdleNodeTime, pool, nodes).ToArray();
-            expiryTime = DateTime.UtcNow - ((IBatchPoolImpl)pool).TestIdleNodeTime;
+            nodes = TimeShift(((BatchPool)pool).TestIdleNodeTime, pool, nodes).ToArray();
+            expiryTime = DateTime.UtcNow - ((BatchPool)pool).TestIdleNodeTime;
 
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle);
 
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestNodeReservationCount);
-            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestTargetLowPriority);
-            Assert.AreEqual(2, ((IBatchPoolImpl)pool).TestTargetDedicated);
+            Assert.AreEqual(0, ((BatchPool)pool).TestNodeReservationCount);
+            Assert.AreEqual(2, ((BatchPool)pool).TestTargetLowPriority);
+            Assert.AreEqual(2, ((BatchPool)pool).TestTargetDedicated);
 
 
             Microsoft.Azure.Batch.Common.AllocationState GetState(string id)
@@ -586,7 +586,7 @@ namespace TesApi.Tests
         {
             var services = GetServiceProvider();
             var pool = await AddPool(services.GetT());
-            ((IBatchPoolImpl)pool).TestSetAvailable(false);
+            ((BatchPool)pool).TestSetAvailable(false);
 
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Rotate);
 
@@ -599,11 +599,11 @@ namespace TesApi.Tests
             var services = GetServiceProvider();
             var pool = await AddPool(services.GetT());
 
-            TimeShift(((IBatchPoolImpl)pool).TestIdlePoolTime, pool);
+            TimeShift(((BatchPool)pool).TestIdlePoolTime, pool);
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Rotate);
 
             Assert.IsFalse(pool.IsAvailable);
-            Assert.AreEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated + ((IBatchPoolImpl)pool).TestTargetLowPriority);
+            Assert.AreEqual(0, ((BatchPool)pool).TestTargetDedicated + ((BatchPool)pool).TestTargetLowPriority);
         }
 
         [TestMethod]
@@ -625,11 +625,11 @@ namespace TesApi.Tests
                 await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
             }
 
-            TimeShift(((IBatchPoolImpl)pool).TestRotatePoolTime, pool);
+            TimeShift(((BatchPool)pool).TestRotatePoolTime, pool);
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Rotate);
 
             Assert.IsFalse(pool.IsAvailable);
-            Assert.AreNotEqual(0, ((IBatchPoolImpl)pool).TestTargetDedicated + ((IBatchPoolImpl)pool).TestTargetLowPriority);
+            Assert.AreNotEqual(0, ((BatchPool)pool).TestTargetDedicated + ((BatchPool)pool).TestTargetLowPriority);
         }
 
         [TestMethod]
@@ -652,7 +652,7 @@ namespace TesApi.Tests
             azureProxy.AzureProxyDeleteBatchPool = (poolId, cancellationToken) => Assert.Fail();
             var services = GetServiceProvider(azureProxy);
             pool = await AddPool(services.GetT());
-            ((IBatchPoolImpl)pool).TestSetAvailable(false);
+            ((BatchPool)pool).TestSetAvailable(false);
 
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
         }
@@ -665,7 +665,7 @@ namespace TesApi.Tests
             azureProxy.AzureProxyDeleteBatchPool = DeletePool;
             var services = GetServiceProvider(azureProxy);
             pool = await AddPool(services.GetT());
-            ((IBatchPoolImpl)pool).TestSetAvailable(false);
+            ((BatchPool)pool).TestSetAvailable(false);
             var isDeleted = false;
 
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty);
@@ -683,11 +683,11 @@ namespace TesApi.Tests
         private static TestServices.TestServiceProvider<BatchScheduler> GetServiceProvider(AzureProxyReturnValues azureProxyReturn = default)
             => new(wrapAzureProxy: true, configuration: GetMockConfig(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Get()), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
-        private static async Task<IBatchPool> AddPool(IBatchPoolsImpl batchPools)
+        private static async Task<IBatchPool> AddPool(BatchScheduler batchPools)
             => await batchPools.GetOrAddAsync("key1", id => ValueTask.FromResult(new Pool(name: id, displayName: "display1", vmSize: "vmSize1")));
 
         private static void TimeShift(TimeSpan shift, IBatchPool pool)
-            => ((IBatchPoolImpl)pool).TimeShift(shift);
+            => ((BatchPool)pool).TimeShift(shift);
 
         private static IEnumerable<ComputeNode> TimeShift(TimeSpan shift, IBatchPool pool, IEnumerable<ComputeNode> nodes)
         {
@@ -720,16 +720,17 @@ namespace TesApi.Tests
         private static Action<Mock<IAzureProxy>> PrepareMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
             => azureProxy =>
             {
-               azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
-               azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
-               azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>())).Returns((Pool p) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
-               azureProxy.Setup(a => a.ListComputeNodesAsync(It.IsAny<string>(), It.IsAny<DetailLevel>())).Returns<string, ODATADetailLevel>((poolId, detailLevel) => azureProxyReturnValues.AzureProxyListComputeNodesAsync(poolId, detailLevel));
-               azureProxy.Setup(a => a.DeleteBatchComputeNodesAsync(It.IsAny<string>(), It.IsAny<IEnumerable<ComputeNode>>(), It.IsAny<CancellationToken>())).Callback<string, IEnumerable<ComputeNode>, CancellationToken>((poolId, computeNodes, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchComputeNodes(poolId, computeNodes, cancellationToken)).Returns(Task.CompletedTask);
-               azureProxy.Setup(a => a.GetComputeNodeTargets(It.IsAny<string>())).Callback<string>(id => azureProxyReturnValues.AzureProxyGetComputeNodeTargets?.Invoke(id)).Returns(() => azureProxyReturnValues.AzureProxyReturnComputeNodeTargets());
-               azureProxy.Setup(a => a.GetCurrentComputeNodesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(() => Task.FromResult<(int? lowPriorityNodes, int? dedicatedNodes)>(azureProxyReturnValues.AzureProxyGetCurrentComputeNodes?.Invoke() ?? (null, null)));
-               azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPool?.Invoke(poolId, cancellationToken)).Returns(Task.CompletedTask);
-               azureProxy.Setup(a => a.GetAllocationStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns((string id, CancellationToken token) => Task.FromResult(azureProxyReturnValues.AzureProxyGetAllocationState?.Invoke(id)));
-               azureProxy.Setup(a => a.SetComputeNodeTargetsAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).Callback<string, int?, int?, CancellationToken>((id, loPri, dedic, cancel) => azureProxyReturnValues.AzureProxySetComputeNodeTargets?.Invoke(id, loPri, dedic)).Returns(Task.CompletedTask);
+                azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
+                azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
+                azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>())).Returns((Pool p) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
+                azureProxy.Setup(a => a.ListComputeNodesAsync(It.IsAny<string>(), It.IsAny<DetailLevel>())).Returns<string, ODATADetailLevel>((poolId, detailLevel) => azureProxyReturnValues.AzureProxyListComputeNodesAsync(poolId, detailLevel));
+                azureProxy.Setup(a => a.DeleteBatchComputeNodesAsync(It.IsAny<string>(), It.IsAny<IEnumerable<ComputeNode>>(), It.IsAny<CancellationToken>())).Callback<string, IEnumerable<ComputeNode>, CancellationToken>((poolId, computeNodes, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchComputeNodes(poolId, computeNodes, cancellationToken)).Returns(Task.CompletedTask);
+                azureProxy.Setup(a => a.GetBatchPoolAsync(It.IsAny<string>(), It.IsAny<DetailLevel>(), It.IsAny<CancellationToken>())).Returns((string id, DetailLevel detailLevel, CancellationToken cancellationToken) => Task.FromResult(GeneratePool(id)));
+                azureProxy.Setup(a => a.GetComputeNodeTargets(It.IsAny<string>())).Callback<string>(id => azureProxyReturnValues.AzureProxyGetComputeNodeTargets?.Invoke(id)).Returns(() => azureProxyReturnValues.AzureProxyReturnComputeNodeTargets());
+                azureProxy.Setup(a => a.GetCurrentComputeNodesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(() => Task.FromResult<(int? lowPriorityNodes, int? dedicatedNodes)>(azureProxyReturnValues.AzureProxyGetCurrentComputeNodes?.Invoke() ?? (null, null)));
+                azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPool?.Invoke(poolId, cancellationToken)).Returns(Task.CompletedTask);
+                azureProxy.Setup(a => a.GetAllocationStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns((string id, CancellationToken token) => Task.FromResult(azureProxyReturnValues.AzureProxyGetAllocationState?.Invoke(id)));
+                azureProxy.Setup(a => a.SetComputeNodeTargetsAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).Callback<string, int?, int?, CancellationToken>((id, loPri, dedic, cancel) => azureProxyReturnValues.AzureProxySetComputeNodeTargets?.Invoke(id, loPri, dedic)).Returns(Task.CompletedTask);
             };
 
 
@@ -765,7 +766,30 @@ namespace TesApi.Tests
             public override Microsoft.Azure.Batch.Protocol.IComputeNodeOperations ComputeNode => computeNode;
         }
 
-        // Below this line the code using reflection and internal details of the Azure libraries in order to generate Mocks of ComputeNode. A newer version of the library is supposed to enable this scenario, so hopefully we can ditch this code.
+        // Below this line we use reflection and internal details of the Azure libraries in order to generate Mocks of CloudPool and ComputeNode. A newer version of the library is supposed to enable this scenario, so hopefully we can soon drop this code.
+        internal static CloudPool GeneratePool(string id, int currentDedicatedNodes = default, int currentLowPriorityNodes = default, int targetDedicatedNodes = default, int targetLowPriorityNodes = default, Microsoft.Azure.Batch.Common.AllocationState allocationState = Microsoft.Azure.Batch.Common.AllocationState.Steady, IList<Microsoft.Azure.Batch.MetadataItem> metadata = default, DateTime creationTime = default)
+        {
+            if (default == creationTime)
+            {
+                creationTime = DateTime.UtcNow;
+            }
+
+            metadata ??= new List<Microsoft.Azure.Batch.MetadataItem>();
+
+            var computeNodeOperations = new Mock<Microsoft.Azure.Batch.Protocol.IComputeNodeOperations>();
+            var batchServiceClient = new MockServiceClient(computeNodeOperations.Object);
+            var protocolLayer = typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient).Assembly.GetType("Microsoft.Azure.Batch.ProtocolLayer").GetConstructor(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient) }, null)
+                .Invoke(new object[] { batchServiceClient });
+            var parentClient = (BatchClient)typeof(BatchClient).GetConstructor(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient).Assembly.GetType("Microsoft.Azure.Batch.IProtocolLayer") }, null)
+                .Invoke(new object[] { protocolLayer });
+            var modelPool = new Microsoft.Azure.Batch.Protocol.Models.CloudPool(id: id, currentDedicatedNodes: currentDedicatedNodes, currentLowPriorityNodes: currentLowPriorityNodes, targetDedicatedNodes: targetDedicatedNodes, targetLowPriorityNodes: targetLowPriorityNodes, allocationState: (Microsoft.Azure.Batch.Protocol.Models.AllocationState)allocationState, metadata: metadata.Select(ConvertMetadata).ToList(), creationTime: creationTime);
+            var pool = (CloudPool)typeof(CloudPool).GetConstructor(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, default, new Type[] { typeof(BatchClient), typeof(Microsoft.Azure.Batch.Protocol.Models.CloudPool), typeof(IEnumerable<BatchClientBehavior>) }, default)
+                .Invoke(new object[] { parentClient, modelPool, null });
+            return pool;
+
+            static Microsoft.Azure.Batch.Protocol.Models.MetadataItem ConvertMetadata(Microsoft.Azure.Batch.MetadataItem item)
+                => item is null ? default : new(item.Name, item.Value);
+        }
 
         internal static ComputeNode GenerateNode(string poolId, string id, bool isDedicated, bool isIdle, DateTime stateTransitionTime = default)
         {

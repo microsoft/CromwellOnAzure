@@ -54,14 +54,22 @@ namespace TesApi.Web
         public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchPoolAsync(poolId, cancellationToken));
 
         /// <inheritdoc/>
-        public Task DeleteBatchComputeNodesAsync(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken = default)
-            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchComputeNodesAsync(poolId, computeNodes, cancellationToken));
+        public Task<CloudPool> GetBatchPoolAsync(string poolId, DetailLevel detailLevel = default, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetBatchPoolAsync(poolId, detailLevel, cancellationToken));
+
+        /// <inheritdoc/>
+        public Task CommitBatchPoolChangesAsync(CloudPool pool, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.CommitBatchPoolChangesAsync(pool, cancellationToken));
+
+        /// <inheritdoc/>
+        public Task DeleteBatchComputeNodesAsync(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DeleteBatchComputeNodesAsync(poolId, computeNodes, cancellationToken));
 
         /// <inheritdoc/>
         public Task<string> DownloadBlobAsync(Uri blobAbsoluteUri) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DownloadBlobAsync(blobAbsoluteUri));
 
         /// <inheritdoc/>
         public Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetActivePoolIdsAsync(prefix, minAge, cancellationToken));
+
+        /// <inheritdoc/>
+        public Task<IEnumerable<string>> GetActivePoolIdsAsync(string hostName, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetActivePoolIdsAsync(hostName, cancellationToken));
 
         /// <inheritdoc/>
         public Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
@@ -128,8 +136,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync()
-            => cache.GetOrAddAsync("vmSizesAndPrices", () => azureProxy.GetVmSizesAndPricesAsync(), DateTimeOffset.MaxValue);
+        public Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync() => cache.GetOrAddAsync("vmSizesAndPrices", () => azureProxy.GetVmSizesAndPricesAsync(), DateTimeOffset.MaxValue);
 
         /// <inheritdoc/>
         public Task<IEnumerable<string>> ListBlobsAsync(Uri directoryUri) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListBlobsAsync(directoryUri));
@@ -156,31 +163,24 @@ namespace TesApi.Web
         public bool TryReadCwlFile(string workflowId, out string content) => azureProxy.TryReadCwlFile(workflowId, out content);
 
         /// <inheritdoc/>
-        public Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo)
-            => azureProxy.CreateBatchPoolAsync(poolInfo);
+        public Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo) => azureProxy.CreateBatchPoolAsync(poolInfo);
 
         /// <inheritdoc/>
-        public Task<Microsoft.Azure.Batch.Common.AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
-            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetAllocationStateAsync(poolId, cancellationToken));
+        public Task<Microsoft.Azure.Batch.Common.AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetAllocationStateAsync(poolId, cancellationToken));
 
         /// <inheritdoc/>
-        public Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default)
-            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetCurrentComputeNodesAsync(poolId, cancellationToken));
+        public Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetCurrentComputeNodesAsync(poolId, cancellationToken));
 
         /// <inheritdoc/>
-        public (int TargetLowPriority, int TargetDedicated) GetComputeNodeTargets(string poolId)
-            => azureProxy.GetComputeNodeTargets(poolId);
+        public (int TargetLowPriority, int TargetDedicated) GetComputeNodeTargets(string poolId) => azureProxy.GetComputeNodeTargets(poolId);
 
         /// <inheritdoc/>
-        public Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default)
-            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.SetComputeNodeTargetsAsync(poolId, targetLowPriorityComputeNodes, targetDedicatedComputeNodes, cancellationToken));
+        public Task SetComputeNodeTargetsAsync(string poolId, int? targetLowPriorityComputeNodes, int? targetDedicatedComputeNodes, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.SetComputeNodeTargetsAsync(poolId, targetLowPriorityComputeNodes, targetDedicatedComputeNodes, cancellationToken));
 
         /// <inheritdoc/>
-        public IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null)
-            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListComputeNodesAsync(poolId, detailLevel), retryPolicy);
+        public IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ListComputeNodesAsync(poolId, detailLevel), retryPolicy);
 
         /// <inheritdoc/>
-        public Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, Microsoft.Azure.Batch.Common.ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default)
-            => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ReimageComputeNodeAsync(poolId, computeNodeId, reimageOption, cancellationToken));
+        public Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, Microsoft.Azure.Batch.Common.ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.ReimageComputeNodeAsync(poolId, computeNodeId, reimageOption, cancellationToken));
     }
 }

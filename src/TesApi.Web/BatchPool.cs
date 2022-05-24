@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
@@ -18,74 +19,14 @@ using Tes.Repository;
 
 namespace TesApi.Web
 {
-    // Used for unit/module testing
-    internal interface IBatchPoolImpl
-    {
-        int TestTargetDedicated { get; set; }
-        int TestTargetLowPriority { get; set; }
-        void TestSetAvailable(bool available);
-        TimeSpan TestIdleNodeTime { get; }
-        TimeSpan TestIdlePoolTime { get; }
-        TimeSpan TestRotatePoolTime { get; }
-        bool TestIsNodeReserved(string affinityId);
-        int TestNodeReservationCount { get; }
-        int TestPendingReservationsCount { get; }
-        void TimeShift(TimeSpan shift);
-    }
-
     /// <summary>
     /// Represents a pool in an Azure Batch Account.
     /// </summary>
-    public sealed class BatchPool : IBatchPool, IBatchPoolImpl
+    public sealed class BatchPool : IBatchPool
     {
+        internal const string PoolDataName = "CoA-TES-PoolData";
+
         #region IBatchPool
-        /// <inheritdoc/>
-        public PoolData RepositoryItem { get; private set; }
-
-        IHasChangesRepositoryItem<PoolData> IHasRepositoryItem<PoolData>.ChangesRepositoryItem
-            => _hasChangesRepository;
-
-        void IHasRepositoryItem<PoolData>.ReplaceRepositoryItem(PoolData replacementItem)
-        {
-            SetPoolData(this, replacementItem);
-            RepositoryItem = replacementItem;
-        }
-
-        private static void SetPoolData(BatchPool pool, PoolData data)
-        {
-            if (data.Changed != pool.Changed)
-            {
-                data.Changed = pool.Changed;
-            }
-
-            if (data.IsAvailable != pool.IsAvailable)
-            {
-                data.IsAvailable = pool.IsAvailable;
-            }
-
-            if (data.RequestedDedicatedNodes != pool.TargetDedicated)
-            {
-                data.RequestedDedicatedNodes = pool.TargetDedicated;
-            }
-
-            if (data.RequestedLowPriorityNodes != pool.TargetLowPriority)
-            {
-                data.RequestedLowPriorityNodes = pool.TargetLowPriority;
-            }
-
-            var reservations = pool.ReservedComputeNodes.Select(a => a.Affinity.AffinityId).ToList();
-            if (!data.Reservations.SequenceEqual(reservations))
-            {
-                data.Reservations = reservations;
-            }
-
-            var pendingReservations = pool.PendingReservations.Select(p => new PendingReservationItem { JobId = p.Key, Created = p.Value.QueuedTime, IsDedicated = !p.Value.IsLowPriority, IsRequested = p.Value.IsRequested }).ToList();
-            if (!data.PendingReservations.SequenceEqual(pendingReservations))
-            {
-                data.PendingReservations = pendingReservations;
-            }
-        }
-
         /// <inheritdoc/>
         public bool IsAvailable { get; private set; } = true;
 
@@ -220,7 +161,7 @@ namespace TesApi.Web
             if (ReservedComputeNodes.Remove(ReservedComputeNodes.FirstOrDefault(n => n.Equals(affinityInformation))))
             {
                 logger.LogDebug("Removing reservation for {AffinityId}", affinityInformation.AffinityId);
-                ServicePoolUpdateAsync().AsTask().Wait();
+                ServicePoolUpdateAsync(default).AsTask().Wait();
             }
         }
 
@@ -241,7 +182,7 @@ namespace TesApi.Web
                             break;
                     }
                 }
-                ServicePoolUpdateAsync().AsTask().Wait();
+                ServicePoolUpdateAsync(default).AsTask().Wait();
             }
         }
 
@@ -309,7 +250,6 @@ namespace TesApi.Web
                 IBatchPool.ServiceKind.RemoveNodeIfIdle => ServicePoolRemoveNodeIfIdleAsync(cancellationToken),
                 IBatchPool.ServiceKind.Rotate => ServicePoolRotateAsync(cancellationToken),
                 IBatchPool.ServiceKind.RemovePoolIfEmpty => ServicePoolRemovePoolIfEmptyAsync(cancellationToken),
-                IBatchPool.ServiceKind.ForceRemove => ServicePoolForceRemoveAsync(cancellationToken),
                 _ => throw new InvalidOperationException(),
             };
 
@@ -326,7 +266,7 @@ namespace TesApi.Web
         #endregion
 
         #region ServicePool~Async implementations
-        private ValueTask ServicePoolSyncSizeAsync(CancellationToken _1 = default)
+        private ValueTask ServicePoolSyncSizeAsync(CancellationToken _1)
         {
             var (targetLowPriority, targetDedicated) = azureProxy.GetComputeNodeTargets(Pool.PoolId);
             TargetLowPriority = targetLowPriority;
@@ -335,7 +275,7 @@ namespace TesApi.Web
             return ValueTask.CompletedTask;
         }
 
-        private async ValueTask ServicePoolResizeAsync(CancellationToken cancellationToken = default)
+        private async ValueTask ServicePoolResizeAsync(CancellationToken cancellationToken)
         {
             foreach (var key in PendingReservations.Keys)
             {
@@ -414,22 +354,7 @@ namespace TesApi.Web
                     }
                 }
 
-                // It's documented that a max of 100 nodes can be removed at a time. Group the nodes to remove in batches up to 100 in quantity.
-                var removeNodesTasks = Enumerable.Empty<Task>();
-                foreach (var nodes in nodesToRemove.Select((n, i) => (i, n)).GroupBy(t => t.i / 100).OrderBy(t => t.Key))
-                {
-                    removeNodesTasks = removeNodesTasks.Append(azureProxy.DeleteBatchComputeNodesAsync(Pool.PoolId, nodes.Select(t => t.n), cancellationToken));
-                }
-
-                // Call each group serially. Start the first group.
-                var tasks = Task.Run(async () =>
-                {
-                    foreach (var task in removeNodesTasks)
-                    {
-                        logger.LogDebug("Removing nodes from {PoolId}", Pool.PoolId);
-                        await task;
-                    }
-                }, cancellationToken);
+                var tasks = RemoveNodes(nodesToRemove, cancellationToken);
 
                 // Mark the new target values. Removing the nodes will reduce the targets in the Azure CloudPool for us, so when this is done, the "resize" will be a no-op, and we won't accidentally remove a node we are expecting to use for a different task.
                 TargetDedicated -= dedicatedDecrementTarget;
@@ -444,7 +369,7 @@ namespace TesApi.Web
             }
         }
 
-        private ValueTask ServicePoolRotateAsync(CancellationToken _1 = default)
+        private ValueTask ServicePoolRotateAsync(CancellationToken _1)
         {
             if (IsAvailable)
             {
@@ -455,7 +380,7 @@ namespace TesApi.Web
             return ValueTask.CompletedTask;
         }
 
-        private async ValueTask ServicePoolRemovePoolIfEmptyAsync(CancellationToken cancellationToken = default)
+        private async ValueTask ServicePoolRemovePoolIfEmptyAsync(CancellationToken cancellationToken)
         {
             if (!IsAvailable)
             {
@@ -464,27 +389,21 @@ namespace TesApi.Web
                 {
                     _isRemoved = true;
                     await azureProxy.DeleteBatchPoolAsync(Pool.PoolId, cancellationToken);
-                    _ = await _batchPools.RemovePoolFromListAsync(this);
+                    _ = _batchPools.RemovePoolFromList(this);
                 }
             }
         }
 
-        private async ValueTask ServicePoolForceRemoveAsync(CancellationToken _1)
-        {
-            IsAvailable = false;
-            _isRemoved = true;
-            _ = await _batchPools.RemovePoolFromListAsync(this);
-        }
-
-        private ValueTask ServicePoolUpdateAsync(CancellationToken _1 = default)
+        private async ValueTask ServicePoolUpdateAsync(CancellationToken cancellationToken)
         {
             if (_isRemoved)
             {
-                return ValueTask.CompletedTask;
+                return;
             }
 
-            SetPoolData(this, RepositoryItem);
-            return ValueTask.CompletedTask;
+            var cloudPool = await azureProxy.GetBatchPoolAsync(Pool.PoolId, new ODATADetailLevel { SelectClause = "id,metadata" }, cancellationToken);
+            cloudPool.Metadata = SetPoolData(this, _poolData, cloudPool.Metadata).ToList();
+            await azureProxy.CommitBatchPoolChangesAsync(cloudPool, cancellationToken);
         }
         #endregion
 
@@ -493,23 +412,21 @@ namespace TesApi.Web
         /// Constructor of <see cref="BatchPool"/>
         /// </summary>
         /// <param name="poolInformation"></param>
-        /// <param name="batchPools"></param>
+        /// <param name="batchScheduler"></param>
         /// <param name="configuration"></param>
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
         /// <exception cref="ArgumentException"></exception>
-        public BatchPool(PoolInformation poolInformation, IBatchScheduler batchPools, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+        public BatchPool(PoolInformation poolInformation, IBatchScheduler batchScheduler, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
             : this(new()
                 {
-                    PoolId = poolInformation.PoolId,
-                    Created = DateTime.UtcNow,
                     IsAvailable = true,
-                    Reservations = new(),
-                    PendingReservations = new(),
+                    Reservations = Enumerable.Empty<string>(),
+                    PendingReservations = Enumerable.Empty<IPendingReservation>(),
                     Changed = DateTime.UtcNow // Please keep this at the bottom of this initialization list
                 },
                 poolInformation,
-                batchPools,
+                batchScheduler,
                 configuration,
                 azureProxy,
                 logger)
@@ -518,24 +435,25 @@ namespace TesApi.Web
         /// <summary>
         /// Constructor of <see cref="BatchPool"/>
         /// </summary>
+        /// <param name="poolId"></param>
         /// <param name="poolData"></param>
-        /// <param name="batchPools"></param>
+        /// <param name="batchScheduler"></param>
         /// <param name="configuration"></param>
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
-        public BatchPool(PoolData poolData, IBatchScheduler batchPools, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+        public BatchPool(string poolId, PoolData poolData, IBatchScheduler batchScheduler, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
             : this(poolData,
-                new PoolInformation { PoolId = poolData.PoolId },
-                batchPools,
+                new PoolInformation { PoolId = poolId },
+                batchScheduler,
                 configuration,
                 azureProxy,
                 logger)
         { }
 
-        private BatchPool(PoolData data, PoolInformation poolId, IBatchScheduler batchPools, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+        private BatchPool(PoolData data, PoolInformation poolInfo, IBatchScheduler batchScheduler, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
         {
-            RepositoryItem = data ?? throw new ArgumentNullException(nameof(data));
-            Pool = poolId ?? throw new ArgumentNullException(nameof(poolId));
+            _poolData = data ?? throw new ArgumentNullException(nameof(data));
+            Pool = poolInfo ?? throw new ArgumentNullException(nameof(poolInfo));
 
             _idleNodeCheck = TimeSpan.FromMinutes(GetConfigurationValue(configuration, "BatchPoolIdleNodeMinutes", 0.125));
             _idlePoolCheck = TimeSpan.FromMinutes(GetConfigurationValue(configuration, "BatchPoolIdlePoolMinutes", 0.125));
@@ -543,16 +461,19 @@ namespace TesApi.Web
 
             this.azureProxy = azureProxy;
             this.logger = logger;
-            _batchPools = batchPools as IBatchPoolsImpl ?? throw new ArgumentException("batchPools must be of type IBatchPoolsImpl", nameof(batchPools));
-            _hasChangesRepository = new(this);
+            _batchPools = batchScheduler as BatchScheduler ?? throw new ArgumentException("batchScheduler must be of type BatchScheduler", nameof(batchScheduler));
+            var cloudPool = azureProxy.GetBatchPoolAsync(Pool.PoolId, new ODATADetailLevel { SelectClause = "id,creationTime,metadata" }).Result;
 
-            Changed = RepositoryItem.Changed;
-            IsAvailable = RepositoryItem.IsAvailable;
-            TargetDedicated = RepositoryItem.RequestedDedicatedNodes;
-            TargetLowPriority = RepositoryItem.RequestedLowPriorityNodes;
-            ReservedComputeNodes = RepositoryItem.Reservations.Select<string, EquatableAffinityInformation>(r => new(new(r))).ToList();
-            PendingReservations = RepositoryItem.PendingReservations.ToDictionary(p => p.JobId, p => new PendingReservation(p));
+            Creation = cloudPool.CreationTime.Value;
+            Changed = _poolData.Changed;
+            IsAvailable = _poolData.IsAvailable;
+            TargetDedicated = FindTarget(_poolData.RequestedDedicatedNodes, cloudPool.TargetDedicatedComputeNodes);
+            TargetLowPriority = FindTarget(_poolData.RequestedLowPriorityNodes, cloudPool.TargetLowPriorityComputeNodes);
+            ReservedComputeNodes = _poolData.Reservations.Select<string, EquatableAffinityInformation>(r => new(new(r))).ToList();
+            PendingReservations = _poolData.PendingReservations.ToDictionary(p => p.JobId);
             ResizeDirty = false;
+            cloudPool.Metadata = SetPoolData(this, _poolData, cloudPool.Metadata).ToList();
+            azureProxy.CommitBatchPoolChangesAsync(cloudPool).Wait();
 
             // IConfiguration.GetValue<double>(string key, double defaultValue) throws an exception if the value is defined as blank
             static double GetConfigurationValue(IConfiguration configuration, string key, double defaultValue)
@@ -560,15 +481,133 @@ namespace TesApi.Web
                 var value = configuration.GetValue(key, string.Empty);
                 return string.IsNullOrWhiteSpace(value) ? defaultValue : double.Parse(value);
             }
+
+            static int FindTarget(int poolDataTarget, int? cloudPoolTarget)
+                => default == poolDataTarget ? cloudPoolTarget.GetValueOrDefault(poolDataTarget) : poolDataTarget;
+        }
+        #endregion
+
+        #region Implementation methods
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="pool"></param>
+        /// <returns></returns>
+        public static PoolData GetPoolData(CloudPool pool)
+        {
+            var metadata = pool.Metadata.FirstOrDefault(t => PoolDataName.Equals(t.Name, StringComparison.Ordinal));
+            using var reader = metadata is null ? default : new StringReader(metadata.Value);
+            return BatchUtils.ReadJson<PoolData>(reader, () => default);
+        }
+
+        internal static IEnumerable<MetadataItem> SetPoolData(BatchPool pool, PoolData data, IEnumerable<MetadataItem> metadataItems)
+        {
+            if (data.Changed != pool.Changed)
+            {
+                data.Changed = pool.Changed;
+            }
+
+            if (data.IsAvailable != pool.IsAvailable)
+            {
+                data.IsAvailable = pool.IsAvailable;
+            }
+
+            if (data.RequestedDedicatedNodes != pool.TargetDedicated)
+            {
+                data.RequestedDedicatedNodes = pool.TargetDedicated;
+            }
+
+            if (data.RequestedLowPriorityNodes != pool.TargetLowPriority)
+            {
+                data.RequestedLowPriorityNodes = pool.TargetLowPriority;
+            }
+
+            var reservations = pool.ReservedComputeNodes.Select(a => a.Affinity.AffinityId).ToList();
+            if (!data.Reservations.SequenceEqual(reservations))
+            {
+                data.Reservations = reservations;
+            }
+
+            var pendingReservations = pool.PendingReservations.Values;
+            if (!data.PendingReservations.SequenceEqual(pendingReservations))
+            {
+                data.PendingReservations = pendingReservations;
+            }
+
+            return Enumerable.Empty<MetadataItem>()
+                .Append(new(PoolDataName, BatchUtils.WriteJson(data)))
+                .Concat(metadataItems?.Where(t => !PoolDataName.Equals(t.Name, StringComparison.Ordinal)) ?? Enumerable.Empty<MetadataItem>());
+        }
+
+        internal bool IsJobQueued(string jobId, out IPendingReservation queuedRecord)
+            => PendingReservations.TryGetValue(jobId, out queuedRecord);
+
+        internal async ValueTask<IEnumerable<(string AffinityId, bool IsPreemptible, TaskFailureInformation FailureInfo, IBatchPool Pool)>> ServicePoolRemoveNodeIfStartTaskFailedAsync(CancellationToken cancellationToken = default)
+        {
+            var affinitiesToRemove = Enumerable.Empty<(string, bool, TaskFailureInformation, IBatchPool)>();
+            var nodesToRemove = Enumerable.Empty<ComputeNode>();
+
+            if ((await azureProxy.GetAllocationStateAsync(Pool.PoolId, cancellationToken)) == AllocationState.Steady)
+            {
+                await foreach (var node in azureProxy
+                .ListComputeNodesAsync(
+                    Pool.PoolId,
+                    new ODATADetailLevel(filterClause: $"state eq 'starttaskfailed'", selectClause: "id,affinityId,isDedicated,startTaskInfo"))
+                .WithCancellation(cancellationToken))
+                {
+                    logger.LogDebug("Found starttaskfailed node {NodeId}", node.Id);
+                    nodesToRemove = nodesToRemove.Append(node);
+                    DecrementTarget(node.IsDedicated == false);
+                    affinitiesToRemove = affinitiesToRemove.Append((node.AffinityId, node.IsDedicated == false, node.StartTaskInformation.FailureInformation, this));
+                    _ = ReservedComputeNodes.Remove(new AffinityInformation(node.AffinityId));
+                }
+            }
+
+            await RemoveNodes(nodesToRemove, cancellationToken);
+            return affinitiesToRemove;
+        }
+
+        internal void DecrementTarget(bool? isLowPriority)
+        {
+            switch (isLowPriority)
+            {
+                case true:
+                    --TargetLowPriority;
+                    break;
+                case false:
+                    --TargetDedicated;
+                    break;
+            }
+        }
+
+        private Task RemoveNodes(IEnumerable<ComputeNode> nodesToRemove, CancellationToken cancellationToken = default)
+        {
+            // It's documented that a max of 100 nodes can be removed at a time. Group the nodes to remove in batches up to 100 in quantity.
+            var removeNodesTasks = Enumerable.Empty<Task>();
+            foreach (var nodes in nodesToRemove.Select((n, i) => (n, i)).GroupBy(t => t.i / 100).OrderBy(t => t.Key))
+            {
+                removeNodesTasks = removeNodesTasks.Append(azureProxy.DeleteBatchComputeNodesAsync(Pool.PoolId, nodes.Select(t => t.n), cancellationToken));
+            }
+
+            // Call each group serially. Start the first group.
+            var tasks = Task.Run(async () =>
+            {
+                foreach (var task in removeNodesTasks)
+                {
+                    logger.LogDebug("Removing nodes from {PoolId}", Pool.PoolId);
+                    await task;
+                }
+            }, cancellationToken);
+
+            return tasks;
         }
         #endregion
 
         #region Implementation state
-        private readonly HasChangesRepositoryItem<PoolData> _hasChangesRepository;
+        private readonly PoolData _poolData;
 
         private readonly ILogger logger;
-        private DateTime Creation
-            => RepositoryItem.Created;
+        private DateTime Creation { get; set; }
         private DateTime Changed { get; set; }
 
         private bool _isRemoved;
@@ -586,40 +625,93 @@ namespace TesApi.Web
         private int TargetDedicated { get => _targetDedicated; set { ResizeDirty |= value != _targetDedicated; _targetDedicated = value; } }
         private volatile int _targetDedicated = 0;
 
-        private readonly IBatchPoolsImpl _batchPools;
+        private readonly BatchScheduler _batchPools;
         private readonly IAzureProxy azureProxy;
 
-        private IDictionary<string, PendingReservation> PendingReservations { get; }
+        private IDictionary<string, IPendingReservation> PendingReservations { get; }
         private List<EquatableAffinityInformation> ReservedComputeNodes { get; }
         #endregion
 
         #region Nested private classes
-        private interface IPendingReservation
+        /// <summary>
+        /// TODO
+        /// </summary>
+        public class PoolData
+        {
+            [Newtonsoft.Json.JsonProperty("changed")]
+            internal DateTime Changed { get; set; }
+
+            [Newtonsoft.Json.JsonProperty("isAvailable")]
+            internal bool IsAvailable { get; set; }
+
+            [Newtonsoft.Json.JsonProperty("requestedDedicated")]
+            internal int RequestedDedicatedNodes { get; set; }
+
+            [Newtonsoft.Json.JsonProperty("requestedLowPriority")]
+            internal int RequestedLowPriorityNodes { get; set; }
+
+            [Newtonsoft.Json.JsonProperty("reservations")]
+            internal IEnumerable<string> Reservations { get; set; } = Enumerable.Empty<string>();
+
+            [Newtonsoft.Json.JsonConverter(typeof(PendingReservationConverter))]
+            [Newtonsoft.Json.JsonProperty("pendingReservations")]
+            internal IEnumerable<IPendingReservation> PendingReservations { get; set; } = Enumerable.Empty<IPendingReservation>();
+        }
+
+        private class PendingReservationConverter : Newtonsoft.Json.JsonConverter
+        {
+            public override bool CanConvert(Type objectType)
+                => objectType switch
+                {
+                    var x when x == typeof(IEnumerable<IPendingReservation>) => true,
+                    _ => false,
+                };
+
+            public override object ReadJson(Newtonsoft.Json.JsonReader reader, Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer)
+                => serializer.Deserialize<IEnumerable<PendingReservation>>(reader);
+
+            public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer)
+                => serializer.Serialize(writer, value);
+        }
+
+        internal interface IPendingReservation
         {
             string JobId { get; }
             bool IsLowPriority { get; }
             DateTime QueuedTime { get; }
             bool IsRequested { get; set; }
+
+            void TimeShift(TimeSpan shift);
         }
 
+        [Newtonsoft.Json.JsonObject]
         private class PendingReservation : IPendingReservation
         {
-            private PendingReservation(string jobId, bool isLowPriority, DateTime queued, bool requested)
-                => Source = new() { JobId = jobId ?? throw new ArgumentNullException(nameof(jobId)), IsDedicated = !isLowPriority, Created = queued, IsRequested = requested };
+            internal PendingReservation(string jobId, bool isLowPriority, DateTime queued, bool requested)
+            {
+                JobId = jobId ?? throw new ArgumentNullException(nameof(jobId));
+                IsLowPriority = isLowPriority;
+                QueuedTime = queued;
+                IsRequested = requested;
+            }
 
             public PendingReservation(string jobId, bool isLowPriority) : this(jobId, isLowPriority, DateTime.UtcNow, false) { }
 
-            internal PendingReservation(PendingReservationItem item) => Source = item;
+            [DataMember(Name = "isLowPriority")]
+            public bool IsLowPriority { get; }
 
-            internal PendingReservationItem Source { get; }
-            public bool IsLowPriority => !Source.IsDedicated;
-            public DateTime QueuedTime => Source.Created;
-            public bool IsRequested { get => Source.IsRequested; set => Source.IsRequested = value; }
-            string IPendingReservation.JobId => Source.JobId;
+            [DataMember(Name = "created")]
+            public DateTime QueuedTime { get; private set; }
+
+            [DataMember(Name = "isRequested")]
+            public bool IsRequested { get; set; }
+
+            [DataMember(Name = "jobId")]
+            public string JobId { get; }
 
             // For testing
-            internal void TimeShift(TimeSpan shift)
-                => Source.Created -= shift;
+            void IPendingReservation.TimeShift(TimeSpan shift)
+                => QueuedTime -= shift;
         }
 
         private class EquatableAffinityInformation : IEquatable<EquatableAffinityInformation>
@@ -650,35 +742,32 @@ namespace TesApi.Web
         }
         #endregion
 
-        #region IBatchPoolImpl
-        int IBatchPoolImpl.TestNodeReservationCount => ReservedComputeNodes.Count;
-        int IBatchPoolImpl.TestPendingReservationsCount => PendingReservations.Count;
+        #region Used for unit/module testing
+        internal int TestNodeReservationCount => ReservedComputeNodes.Count;
+        internal int TestPendingReservationsCount => PendingReservations.Count;
 
 
-        int IBatchPoolImpl.TestTargetDedicated { get => TargetDedicated; set => TargetDedicated = value; }
-        int IBatchPoolImpl.TestTargetLowPriority { get => TargetLowPriority; set => TargetLowPriority = value; }
+        internal int TestTargetDedicated { get => TargetDedicated; set => TargetDedicated = value; }
+        internal int TestTargetLowPriority { get => TargetLowPriority; set => TargetLowPriority = value; }
 
-        TimeSpan IBatchPoolImpl.TestIdleNodeTime
+        internal TimeSpan TestIdleNodeTime
             => _idleNodeCheck;
 
-        TimeSpan IBatchPoolImpl.TestIdlePoolTime
+        internal TimeSpan TestIdlePoolTime
             => _idlePoolCheck;
 
-        TimeSpan IBatchPoolImpl.TestRotatePoolTime
+        internal TimeSpan TestRotatePoolTime
             => _forcePoolRotationAge;
 
-        //PoolData IHasRepositoryItem<PoolData>.RepositoryItem
-        //    => RepositoryItem;
-
-        void IBatchPoolImpl.TestSetAvailable(bool available)
+        internal void TestSetAvailable(bool available)
             => IsAvailable = available;
 
-        bool IBatchPoolImpl.TestIsNodeReserved(string affinityId)
+        internal bool TestIsNodeReserved(string affinityId)
             => ReservedComputeNodes.Contains(new AffinityInformation(affinityId));
 
-        void IBatchPoolImpl.TimeShift(TimeSpan shift)
+        internal void TimeShift(TimeSpan shift)
         {
-            RepositoryItem.Created -= shift;
+            Creation -= shift;
             Changed -= shift;
 
             foreach (var reservation in PendingReservations)
@@ -686,165 +775,7 @@ namespace TesApi.Web
                 reservation.Value.TimeShift(shift);
             }
 
-            ServicePoolUpdateAsync().AsTask().Wait();
-        }
-        #endregion
-
-        #region Repository classes
-        /// <summary>
-        /// Relevant <see cref="CloudPool"/> metadata.
-        /// </summary>
-        public sealed class PoolData : RepositoryItem<PoolData>, IEquatable<PoolData>
-        {
-            /// <summary>
-            /// Batch pool id.
-            /// </summary>
-            [DataMember(Name = "id")]
-            public string PoolId { get; set; }
-
-            /// <summary>
-            /// Pool availability for scheduling (false means pool will be deleted once drained).
-            /// </summary>
-            [DataMember(Name = "is_available")]
-            public bool IsAvailable { get; set; }
-
-            /// <summary>
-            /// Time of pool creation.
-            /// </summary>
-            [DataMember(Name = "created")]
-            public DateTime Created { get; set; }
-
-            /// <summary>
-            /// Time of pool creation.
-            /// </summary>
-            [DataMember(Name = "changed")]
-            public DateTime Changed { get; set; }
-
-            /// <summary>
-            /// Number of dedicated <see cref="ComputeNode"/> required.
-            /// </summary>
-            [DataMember(Name = "dedicated")]
-            public int RequestedDedicatedNodes { get; set; }
-
-            /// <summary>
-            /// Number of low priority <see cref="ComputeNode"/> required.
-            /// </summary>
-            [DataMember(Name = "low_priority")]
-            public int RequestedLowPriorityNodes { get; set; }
-
-            /// <summary>
-            /// List of <see cref="ComputeNode.AffinityId"/> of reserved nodes.
-            /// </summary>
-            [DataMember(Name = "reservations")]
-            public List<string> Reservations { get; set; }
-
-            /// <summary>
-            /// List of <see cref="PendingReservationItem"/>.
-            /// </summary>
-            [DataMember(Name = "pending_reservations")]
-            public List<PendingReservationItem> PendingReservations { get; set; }
-
-            /// <inheritdoc/>
-            public bool Equals(PoolData data)
-                => data is not null
-                && PoolId == data.PoolId
-                && IsAvailable == data.IsAvailable
-                && Created == data.Created
-                && Changed == data.Changed
-                && RequestedDedicatedNodes == data.RequestedDedicatedNodes
-                && RequestedLowPriorityNodes == data.RequestedLowPriorityNodes
-                && (Reservations?.SequenceEqual(data.Reservations) ?? data.Reservations is null)
-                && (PendingReservations?.SequenceEqual(data.PendingReservations) ?? data.PendingReservations is null);
-
-            /// <inheritdoc/>
-            public override bool Equals(object obj)
-                => obj switch
-                {
-                    null => false,
-                    PoolData item => Equals(item),
-                    _ => false,
-                };
-
-            /// <inheritdoc/>
-            public override int GetHashCode()
-                => GetHashCodeFromData(PoolId, IsAvailable, Created, Changed, RequestedDedicatedNodes, RequestedLowPriorityNodes, Reservations, PendingReservations);
-
-            /// <summary>
-            /// Generates hashcode for a <see cref="PoolData"/> with the relevant data.
-            /// </summary>
-            /// <param name="poolId"></param>
-            /// <param name="isAvailable"></param>
-            /// <param name="created"></param>
-            /// <param name="changed"></param>
-            /// <param name="requestedDedicatedNodes"></param>
-            /// <param name="requestedLowPriorityNodes"></param>
-            /// <param name="reservations"></param>
-            /// <param name="pendingReservations"></param>
-            /// <returns></returns>
-            public static int GetHashCodeFromData(string poolId, bool isAvailable, DateTime created, DateTime changed, int requestedDedicatedNodes, int requestedLowPriorityNodes, List<string> reservations, List<PendingReservationItem> pendingReservations)
-                => Tuple.Create(poolId, isAvailable, created, changed, requestedDedicatedNodes, requestedLowPriorityNodes, reservations, pendingReservations).GetHashCode();
-        }
-
-        /// <summary>
-        /// Pending reservation for a needed <see cref="ComputeNode"/>.
-        /// </summary>
-        public class PendingReservationItem : /*RepositoryItem<PendingReservationItem>,*/ IEquatable<PendingReservationItem>
-        {
-            /// <summary>
-            /// TES job id.
-            /// </summary>
-            [DataMember(Name = "id")]
-            public string JobId { get; set; }
-
-            /// <summary>
-            /// Queued time.
-            /// </summary>
-            [DataMember(Name = "created")]
-            public DateTime Created { get; set; }
-
-            /// <summary>
-            /// Dedicated <see cref="ComputeNode"/> requested.
-            /// </summary>
-            [DataMember(Name = "dedicated")]
-            public bool IsDedicated { get; set; }
-
-            /// <summary>
-            /// <see cref="CloudPool"/>'s "Targeted~" resize values include this reservation.
-            /// </summary>
-            [DataMember(Name = "requested")]
-            public bool IsRequested { get; set; }
-
-            /// <inheritdoc/>
-            public bool Equals(PendingReservationItem other)
-                => other is not null
-                && JobId == other.JobId
-                && Created == other.Created
-                && IsDedicated == other.IsDedicated
-                && IsRequested == other.IsRequested;
-
-            /// <inheritdoc/>
-            public override bool Equals(object obj)
-                => obj switch
-                {
-                    null => false,
-                    PendingReservationItem item => Equals(item),
-                    _ => false,
-                };
-
-            /// <inheritdoc/>
-            public override int GetHashCode()
-                => GetHashCodeFromData(JobId, Created, IsDedicated, IsRequested);
-
-            /// <summary>
-            /// Generates hashcode for a <see cref="PendingReservationItem"/> with the relevant data.
-            /// </summary>
-            /// <param name="jobId"></param>
-            /// <param name="created"></param>
-            /// <param name="isDedicated"></param>
-            /// <param name="isRequested"></param>
-            /// <returns></returns>
-            public static int GetHashCodeFromData(string jobId, DateTime created, bool isDedicated, bool isRequested)
-                => Tuple.Create(jobId, created, isDedicated, isRequested).GetHashCode();
+            ServicePoolUpdateAsync(default).AsTask().Wait();
         }
         #endregion
     }

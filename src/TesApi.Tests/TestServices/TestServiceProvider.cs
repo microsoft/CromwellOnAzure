@@ -77,7 +77,6 @@ namespace TesApi.Tests.TestServices
         internal IConfiguration Configuration { get; private set; }
         internal Mock<IAzureProxy> AzureProxy { get; private set; }
         internal Mock<IRepository<TesTask>> TesTaskRepository { get; private set; }
-        internal Mock<IRepository<BatchPool.PoolData>> PoolDataRepository { get; private set; }
         internal Mock<IStorageAccessProvider> StorageAccessProvider { get; private set; }
 
 
@@ -94,7 +93,6 @@ namespace TesApi.Tests.TestServices
                 .AddSingleton(s => wrapAzureProxy ? ActivatorUtilities.CreateInstance<CachingWithRetriesAzureProxy>(s, GetAzureProxy(azureProxy).Object) : GetAzureProxy(azureProxy).Object)
                 .AddSingleton(_ => GetTesTaskRepository(tesTaskRepository).Object)
                 .AddSingleton(_ => new CosmosCredentials(batchPoolRepositoryArgs.endpoint ?? "endpoint", batchPoolRepositoryArgs.key ?? "key"))
-                .AddSingleton(s => GetRepository<BatchPool.PoolData>(s, s.GetService<CosmosCredentials>(), ParseRepositoryArgs(batchPoolRepositoryArgs)))
                 .AddSingleton(s => mockStorageAccessProvider ? GetStorageAccessProvider(storageAccessProvider).Object : ActivatorUtilities.CreateInstance<StorageAccessProvider>(s))
                 .AddSingleton<IAppCache>(_ => new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()))))
                 .AddTransient<ILogger<T>>(_ => NullLogger<T>.Instance)

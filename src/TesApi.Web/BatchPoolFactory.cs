@@ -13,7 +13,7 @@ namespace TesApi.Web
     public sealed class BatchPoolFactory
     {
         private readonly Func<PoolInformation, IBatchScheduler, IBatchPool> _batchPoolCreator;
-        private readonly Func<BatchPool.PoolData, IBatchScheduler, IBatchPool> _batchPoolRequester;
+        private readonly Func<string, BatchPool.PoolData, IBatchScheduler, IBatchPool> _batchPoolRequester;
 
         /// <summary>
         /// Constructor for <see cref="BatchPoolFactory"/>.
@@ -22,7 +22,7 @@ namespace TesApi.Web
         public BatchPoolFactory(IServiceProvider serviceProvider)
         {
             _batchPoolCreator = (pool, batchScheduler) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(PoolInformation), typeof(IBatchScheduler) })(serviceProvider, new object[] { pool, batchScheduler });
-            _batchPoolRequester = (pool, batchScheduler) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(BatchPool.PoolData), typeof(IBatchScheduler) })(serviceProvider, new object[] { pool, batchScheduler });
+            _batchPoolRequester = (id, pool, batchScheduler) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(string), typeof(BatchPool.PoolData), typeof(IBatchScheduler) })(serviceProvider, new object[] { id, pool, batchScheduler });
         }
 
         /// <summary>
@@ -37,10 +37,11 @@ namespace TesApi.Web
         /// <summary>
         /// Retrieves <see cref="BatchPool"/> instances.
         /// </summary>
+        /// <param name="poolId"></param>
         /// <param name="poolData"></param>
         /// <param name="batchScheduler"></param>
         /// <returns></returns>
-        public IBatchPool Retrieve(BatchPool.PoolData poolData, IBatchScheduler batchScheduler)
-            => _batchPoolRequester(poolData, batchScheduler);
+        public IBatchPool Retrieve(string poolId, BatchPool.PoolData poolData, IBatchScheduler batchScheduler)
+            => _batchPoolRequester(poolId, poolData, batchScheduler);
     }
 }

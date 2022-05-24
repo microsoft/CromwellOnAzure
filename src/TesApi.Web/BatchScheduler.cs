@@ -33,8 +33,10 @@ namespace TesApi.Web
     /// <summary>
     /// Orchestrates <see cref="TesTask"/>s on Azure Batch
     /// </summary>
-    public class BatchScheduler : IBatchScheduler, IBatchPoolsImpl
+    public class BatchScheduler : IBatchScheduler
     {
+        internal const string PoolHostName = "CoA-TES-HostName";
+
         /// <summary>
         /// CosmosDB container id for storing pool metadata that needs to survive reboots/etc.
         /// </summary>
@@ -51,8 +53,7 @@ namespace TesApi.Web
         private const string BatchScriptFileName = "batch_script";
         private const string UploadFilesScriptFileName = "upload_files_script";
         private const string DownloadFilesScriptFileName = "download_files_script";
-        private const string startTaskScriptFilename = "start-task.sh";
-        private static readonly string batchStartTaskLocalPathOnBatchNode = $"/mnt/batch/tasks/startup/wd/{startTaskScriptFilename}";
+        //private const string startTaskScriptFilename = "start-task.sh";
         private static readonly Regex queryStringRegex = new(@"[^\?.]*(\?.*)");
         private readonly string dockerInDockerImageName;
         private readonly string blobxferImageName;
@@ -73,7 +74,6 @@ namespace TesApi.Web
         //private readonly string defaultStorageAccountName;
         private readonly string hostname;
         private readonly BatchPoolFactory _poolFactory;
-        private readonly IRepository<BatchPool.PoolData> _poolDataRepository;
         private readonly Random random = new();
 
         /// <summary>
@@ -83,9 +83,8 @@ namespace TesApi.Web
         /// <param name="configuration">Configuration <see cref="IConfiguration"/></param>
         /// <param name="azureProxy">Azure proxy <see cref="IAzureProxy"/></param>
         /// <param name="storageAccessProvider">Storage access provider <see cref="IStorageAccessProvider"/></param>
-        /// <param name="poolDataRepository"></param>
         /// <param name="poolFactory"></param>
-        public BatchScheduler(ILogger<BatchScheduler> logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, IRepository<BatchPool.PoolData> poolDataRepository, BatchPoolFactory poolFactory)
+        public BatchScheduler(ILogger<BatchScheduler> logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, BatchPoolFactory poolFactory)
         {
             this.logger = logger;
             this.azureProxy = azureProxy;
@@ -110,7 +109,6 @@ namespace TesApi.Web
             if (!this.enableBatchAutopool)
             {
                 batchPools = new(this, this.logger);
-                _poolDataRepository = poolDataRepository;
                 _poolFactory = poolFactory;
                 hostname = GetStringValue(configuration, "HOSTNAME");
                 logger.LogInformation($"hostname: {hostname}");
@@ -248,7 +246,7 @@ namespace TesApi.Web
             => await HandleTesTaskTransitionAsync(tesTask, await GetBatchTaskStateAsync(tesTask));
 
         private static string GetCromwellExecutionDirectoryPath(TesTask task)
-            => GetParentPath(task.Inputs?.FirstOrDefault(IsCromwellCommandScript)?.Path);
+            => GetParentPath(task.Inputs?.FirstOrDefault(IsCromwellCommandScript)?.Path.TrimStart('/'));
 
         private static string GetBatchExecutionDirectoryPath(TesTask task)
             => $"{GetCromwellExecutionDirectoryPath(task)}/{BatchExecutionDirectoryName}";
@@ -292,6 +290,13 @@ namespace TesApi.Web
             return localPath is not null;
         }
 
+        private string GetPoolName(TesTask tesTask, string vmSize)
+        {
+            var identityResourceId = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : string.Empty;
+
+            return $"CoA-TES-{PoolNameNamespace.GenerateGuid($"{hostname}-{vmSize}-{identityResourceId}")}-pool";
+        }
+
         /// <summary>
         /// Adds a new Azure Batch pool/job/task for the given <see cref="TesTask"/>
         /// </summary>
@@ -305,45 +310,92 @@ namespace TesApi.Web
             {
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
-
-                var identityResourceId = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
-
-                var poolName = GeneratePoolName($"{virtualMachineInfo.VmSize}-{identityResourceId}");
-
+                var poolName = GetPoolName(tesTask, virtualMachineInfo.VmSize);
                 await CheckBatchAccountQuotas(virtualMachineInfo, poolName);
 
-                var tesTaskLog = tesTask.AddTesTaskLog();
-                tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
-                // TODO?: Support for multiple executors. Cromwell has single executor per task.
-                var dockerImage = tesTask.Executors.First().Image;
+                TesTaskLog tesTaskLog = default;
+                (AffinityInformation Affinity, Action<AffinityInformation> ReleaseAffinity) affinityInfo = default;
+                var suppressTesTaskLog = false;
+                Lazy<ValueTask<ContainerConfiguration>> containerConfiguration = default;
 
-                var containerConfiguration = new Lazy<ValueTask<ContainerConfiguration>>(async () => await ContainerConfigurationIfNeeded(dockerImage));
-                var startTask = new Lazy<ValueTask<StartTask>>(async () => await StartTaskIfNeeded(tesTask));
+                try
+                {
+                    // TODO?: Support for multiple executors. Cromwell has single executor per task.
+                    containerConfiguration = new Lazy<ValueTask<ContainerConfiguration>>(async () => await GetContainerConfigurationIfNeeded(tesTask.Executors.First().Image));
 
-                Func<ValueTask<AffinityInformation>> getAffinity = () => default;
-                if (this.enableBatchAutopool)
-                {
-                    poolInformation = await CreateAutoPoolModePoolInformation(
-                        virtualMachineInfo.VmSize,
-                        virtualMachineInfo.LowPriority,
-                        await containerConfiguration.Value,
-                        await startTask.Value,
-                        jobId,
-                        identityResourceId);
-                }
-                else
-                {
-                    poolInformation = (await GetOrAddAsync(poolName, async id => ConvertPoolSpecificationToModelsPool(
+                    (Func<ValueTask<AffinityInformation>> GetAffinity, Action<AffinityInformation> ReleaseAffinity) getAffinityFuncs = (() => default, a => { });
+                    if (this.enableBatchAutopool)
+                    {
+                        poolInformation = await CreateAutoPoolModePoolInformation(
+                            GetPoolSpecification(
+                                virtualMachineInfo.VmSize,
+                                virtualMachineInfo.LowPriority,
+                                batchNodeInfo,
+                                await containerConfiguration.Value),
+                            jobId,
+                            tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default);
+                    }
+                    else
+                    {
+                        poolInformation = (await GetOrAddAsync(poolName, async id =>
+                        {
+                            return ConvertPoolSpecificationToModelsPool(
                             name: id,
                             displayName: poolName,
-                            GetBatchPoolIdentity(identityResourceId),
-                            GetPoolSpecification(virtualMachineInfo.VmSize, null, await containerConfiguration.Value, await startTask.Value))))
-                        .Pool;
+                            GetBatchPoolIdentity(tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default),
+                            GetPoolSpecification(
+                                virtualMachineInfo.VmSize,
+                                null,
+                                batchNodeInfo,
+                                await containerConfiguration.Value));
+                        })).Pool;
 
-                    getAffinity = () => TryGet(poolInformation.PoolId, out var pool) ? pool.PrepareNodeAsync(jobId, virtualMachineInfo.LowPriority) : ValueTask.FromResult<AffinityInformation>(default);
+                        getAffinityFuncs = (
+                            () => TryGet(poolInformation.PoolId, out var pool) ? pool.PrepareNodeAsync(jobId, virtualMachineInfo.LowPriority) : ValueTask.FromResult<AffinityInformation>(default),
+                            a =>
+                            {
+                                if (TryGet(poolInformation.PoolId, out var pool))
+                                {
+                                    pool.ReleaseNode(a);
+                                }
+                            }
+                        );
+                    }
+
+                    affinityInfo = (await new Func<ValueTask<AffinityInformation>>(async () =>
+                    {
+                        try
+                        {
+                            return await getAffinityFuncs.GetAffinity();
+                        }
+                        catch (AggregateException ex) when (ex.InnerException is AzureBatchQuotaMaxedOutException)
+                        {
+                            suppressTesTaskLog = true;
+                            throw ex.InnerException;
+                        }
+                        catch (AzureBatchQuotaMaxedOutException)
+                        {
+                            suppressTesTaskLog = true;
+                            throw;
+                        }
+                        catch (Exception)
+                        {
+                            throw;
+                        }
+
+                    })(),
+                    getAffinityFuncs.ReleaseAffinity);
+                }
+                finally
+                {
+                    if (!suppressTesTaskLog)
+                    {
+                        tesTaskLog = tesTask.AddTesTaskLog();
+                        tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
+                    }
                 }
 
-                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, getAffinity, (await containerConfiguration.Value) is not null);
+                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, affinityInfo, (await containerConfiguration.Value) is not null);
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
                 await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, TryGet);
 
@@ -351,10 +403,10 @@ namespace TesApi.Web
                 tesTask.State = TesState.INITIALIZINGEnum;
                 poolInformation = null;
             }
-            catch (AggregateException ex) when (ex.InnerException is AzureBatchQuotaMaxedOutException)
-            {
-                logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {ex.InnerException.Message}. Task will remain in queue.");
-            }
+            //catch (AggregateException ex) when (ex.InnerException is AzureBatchQuotaMaxedOutException)
+            //{
+            //    logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {ex.InnerException.Message}. Task will remain in queue.");
+            //}
             catch (AzureBatchQuotaMaxedOutException exception)
             {
                 logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {exception.Message}. Task will remain in queue.");
@@ -398,9 +450,6 @@ namespace TesApi.Web
                 }
             }
         }
-
-        private string GeneratePoolName(string name)
-            => $"CoA-TES-{PoolNameNamespace.GenerateGuid(hostname + name)}-pool";
 
         /// <summary>
         /// Gets the current state of the Azure Batch task
@@ -455,6 +504,38 @@ namespace TesApi.Web
                     AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                     ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                 };
+            }
+
+            // Because a ComputeTask is not assigned to the compute node while the StartTask is running, IAzureProxy.GetBatchJobAndTaskStateAsync() does not see start task failures. Attempt to deal with that here.
+            if (azureBatchJobAndTaskState.NodeState is null && azureBatchJobAndTaskState.JobState == JobState.Active && azureBatchJobAndTaskState.TaskState == TaskState.Active && (_startTaskFailedNodesByAffinity?.Any() ?? false))
+            {
+                if (this.enableBatchAutopool)
+                {
+                    // TODO
+                }
+                else
+                {
+                    var nodeInfo = _startTaskFailedNodesByAffinity.FirstOrDefault(t => t.AffinityId == azureBatchJobAndTaskState.AffinityInformation?.AffinityId);
+                    //if (default == nodeInfo)
+                    //{
+                    //    nodeInfo = _startTaskFailedNodesByAffinity.FirstOrDefault(i => ((BatchPool)i.Pool).IsJobQueued(azureBatchJobAndTaskState.JobId, out var pending) && pending.IsLowPriority == i.IsPreemptible == tesTask?.Resources?.Preemptible);
+                    //}
+
+                    if (default != nodeInfo)
+                    {
+                        azureBatchJobAndTaskState.NodeState = ComputeNodeState.StartTaskFailed;
+                        azureBatchJobAndTaskState.NodeErrorCode = nodeInfo.FailureInfo?.Code;
+                        azureBatchJobAndTaskState.NodeErrorDetails = nodeInfo.FailureInfo?.Details?.Select(d => d.Value);
+
+                        if (azureBatchJobAndTaskState.NodeErrorCode is not null)
+                        {
+                            nodeInfo.Pool.ReleaseNode(new AffinityInformation(nodeInfo.AffinityId));
+                            nodeInfo.Pool.ReleaseNode(azureBatchJobAndTaskState.JobId);
+                        }
+
+                        _startTaskFailedNodesByAffinity.Remove(nodeInfo);
+                    }
+                }
             }
 
             switch (azureBatchJobAndTaskState.JobState)
@@ -678,204 +759,237 @@ namespace TesApi.Web
         /// Returns job preparation and main Batch tasks that represents the given <see cref="TesTask"/>
         /// </summary>
         /// <param name="task">The <see cref="TesTask"/></param>
-        /// <param name="GetAffinityInfo"></param>
+        /// <param name="getAffinityFuncs"></param>
         /// <param name="poolHasContainerConfig">Indicates that <see cref="CloudTask.ContainerSettings"/> must be set.</param>
         /// <returns>Job preparation and main Batch tasks</returns>
-        private async Task<CloudTask> ConvertTesTaskToBatchTaskAsync(TesTask task, Func<ValueTask<AffinityInformation>> GetAffinityInfo, bool poolHasContainerConfig)
+        private async Task<CloudTask> ConvertTesTaskToBatchTaskAsync(TesTask task, (AffinityInformation Affinity, Action<AffinityInformation> ReleaseAffinity) getAffinityFuncs, bool poolHasContainerConfig)
         {
-            var cromwellPathPrefixWithoutEndSlash = CromwellPathPrefix.TrimEnd('/');
-            var taskId = task.Id;
+            var completed = false;
 
-            var queryStringsToRemoveFromLocalFilePaths = task.Inputs
-                .Select(i => i.Path)
-                .Concat(task.Outputs.Select(o => o.Path))
-                .Where(p => p is not null)
-                .Select(p => queryStringRegex.Match(p).Groups[1].Value)
-                .Where(qs => !string.IsNullOrEmpty(qs))
-                .ToList();
-
-            var inputFiles = task.Inputs.Distinct();
-
-            var drsInputFiles = inputFiles
-                .Where(f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) == true)
-                .ToList();
-
-            var cromwellExecutionDirectoryPath = GetCromwellExecutionDirectoryPath(task);
-
-            if (cromwellExecutionDirectoryPath is null)
+            try
             {
-                throw new TesException("NoCromwellExecutionDirectory", $"Could not identify Cromwell execution directory path for task {task.Id}. This TES instance supports Cromwell tasks only.");
-            }
+                var cromwellPathPrefixWithoutEndSlash = CromwellPathPrefix.TrimEnd('/');
+                var taskId = task.Id;
 
-            foreach (var output in task.Outputs)
-            {
-                if (!output.Path.StartsWith(CromwellPathPrefix, StringComparison.OrdinalIgnoreCase))
+                var queryStringsToRemoveFromLocalFilePaths = task.Inputs
+                    .Select(i => i.Path)
+                    .Concat(task.Outputs.Select(o => o.Path))
+                    .Where(p => p is not null)
+                    .Select(p => queryStringRegex.Match(p).Groups[1].Value)
+                    .Where(qs => !string.IsNullOrEmpty(qs))
+                    .ToList();
+
+                var inputFiles = task.Inputs.Distinct();
+
+                var drsInputFiles = inputFiles
+                    .Where(f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) == true)
+                    .ToList();
+
+                var cromwellExecutionDirectoryPath = GetCromwellExecutionDirectoryPath(task);
+
+                if (cromwellExecutionDirectoryPath is null)
                 {
-                    throw new TesException("InvalidOutputPath", $"Unsupported output path '{output.Path}' for task Id {task.Id}. Must start with {CromwellPathPrefix}");
+                    throw new TesException("NoCromwellExecutionDirectory", $"Could not identify Cromwell execution directory path for task {task.Id}. This TES instance supports Cromwell tasks only.");
                 }
-            }
 
-            var batchExecutionDirectoryPath = GetBatchExecutionDirectoryPath(task);
-            var metricsPath = $"{batchExecutionDirectoryPath}/metrics.txt";
-            var metricsUrl = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync(metricsPath, getContainerSas: true));
-
-            // TODO: Cromwell bug: Cromwell command write_tsv() generates a file in the execution directory, for example execution/write_tsv_3922310b441805fc43d52f293623efbc.tmp. These are not passed on to TES inputs.
-            // WORKAROUND: Get the list of files in the execution directory and add them to task inputs.
-            var executionDirectoryUri = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync(cromwellExecutionDirectoryPath, getContainerSas: true));
-            var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.Contains($"/{BatchExecutionDirectoryName}/"));
-            var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
-            
-            var filesToDownload = await Task.WhenAll(
-                inputFiles
-                .Where(f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) != true) // do not attempt to download DRS input files since the cromwell-drs-localizer will
-                .Union(additionalInputFiles)
-                .Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
-
-            const string exitIfDownloadedFileIsNotFound = "{ [ -f \"$path\" ] && : || { echo \"Failed to download file $url\" 1>&2 && exit 1; } }";
-            const string incrementTotalBytesTransferred = "total_bytes=$(( $total_bytes + `stat -c %s \"$path\"` ))";
-
-            // Using --include and not using --no-recursive as a workaround for https://github.com/Azure/blobxfer/issues/123
-            var downloadFilesScriptContent = "total_bytes=0 && "
-                + string.Join(" && ", filesToDownload.Select(f => {
-                    var setVariables = $"path='{f.Path}' && url='{f.Url}'";
-
-                    var downloadSingleFile = f.Url.Contains(".blob.core.")
-                        ? $"blobxfer download --storage-url \"$url\" --local-path \"$path\" --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
-                        : "mkdir -p $(dirname \"$path\") && wget -O \"$path\" \"$url\"";
-
-                    return $"{setVariables} && {downloadSingleFile} && {exitIfDownloadedFileIsNotFound} && {incrementTotalBytesTransferred}"; }))
-                + $" && echo FileDownloadSizeInBytes=$total_bytes >> {metricsPath}";
-
-            var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
-            var downloadFilesScriptUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(downloadFilesScriptPath);
-            await this.storageAccessProvider.UploadBlobAsync(downloadFilesScriptPath, downloadFilesScriptContent);
-
-            var filesToUpload = await Task.WhenAll(
-                task.Outputs.Select(async f =>
-                    new TesOutput { Path = f.Path, Url = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(f.Path, getContainerSas: true), Name = f.Name, Type = f.Type }));
-
-            // Ignore missing stdout/stderr files. CWL workflows have an issue where if the stdout/stderr are redirected, they are still listed in the TES outputs
-            // Ignore any other missing files and directories. WDL tasks can have optional output files.
-            // Syntax is: If file or directory doesn't exist, run a noop (":") operator, otherwise run the upload command:
-            // { if not exists do nothing else upload; } && { ... }
-            var uploadFilesScriptContent = "total_bytes=0 && "
-                + string.Join(" && ", filesToUpload.Select(f => {
-                    var setVariables = $"path='{f.Path}' && url='{f.Url}'";
-                    var blobxferCommand = $"blobxfer upload --storage-url \"$url\" --local-path \"$path\" --one-shot-bytes 104857600 {(f.Type == TesFileType.FILEEnum ? "--rename --no-recursive" : string.Empty)}";
-
-                    return $"{{ {setVariables} && [ ! -e \"$path\" ] && : || {{ {blobxferCommand} && {incrementTotalBytesTransferred}; }} }}";
-                }))
-                + $" && echo FileUploadSizeInBytes=$total_bytes >> {metricsPath}";
-
-            var uploadFilesScriptPath = $"{batchExecutionDirectoryPath}/{UploadFilesScriptFileName}";
-            var uploadFilesScriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(uploadFilesScriptPath);
-            await this.storageAccessProvider.UploadBlobAsync(uploadFilesScriptPath, uploadFilesScriptContent);
-
-            var executor = task.Executors.First();
-
-            var volumeMountsOption = $"-v /mnt{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash}";
-
-            var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) is null;
-            var dockerInDockerImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName)) is null;
-            var blobXferImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(blobxferImageName)) is null;
-
-            var sb = new StringBuilder();
-
-            sb.AppendLine($"write_kv() {{ echo \"$1=$2\" >> /mnt{metricsPath}; }} && \\");  // Function that appends key=value pair to metrics.txt file
-            sb.AppendLine($"write_ts() {{ write_kv $1 $(date -Iseconds); }} && \\");    // Function that appends key=<current datetime> to metrics.txt file
-            sb.AppendLine($"mkdir -p /mnt{batchExecutionDirectoryPath} && \\");
-
-            if (dockerInDockerImageIsPublic)
-            {
-                sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");  // Install bash if running on alpine (will be the case if running inside "docker" image)
-            }
-
-            var vmSize = task.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size);
-
-            if (drsInputFiles.Count > 0 && task.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
-            {
-                sb.AppendLine($"write_ts CromwellDrsLocalizerPullStart && \\");
-                sb.AppendLine($"docker pull --quiet {cromwellDrsLocalizerImageName} && \\");
-                sb.AppendLine($"write_ts CromwellDrsLocalizerPullEnd && \\");
-            }
-
-            if (blobXferImageIsPublic)
-            {
-                sb.AppendLine($"write_ts BlobXferPullStart && \\");
-                sb.AppendLine($"docker pull --quiet {blobxferImageName} && \\");
-                sb.AppendLine($"write_ts BlobXferPullEnd && \\");
-            }
-
-            if (executorImageIsPublic)
-            {
-                // Private executor images are pulled via pool ContainerConfiguration
-                sb.AppendLine($"write_ts ExecutorPullStart && docker pull --quiet {executor.Image} && write_ts ExecutorPullEnd && \\");
-            }
-
-            // The remainder of the script downloads the inputs, runs the main executor container, and uploads the outputs, including the metrics.txt file
-            // After task completion, metrics file is downloaded and used to populate the BatchNodeMetrics object
-            sb.AppendLine($"write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \\\"Size\\\" | grep -Po '(?i)\\\"Size\\\":\\K([^,]*)') && \\");
-
-            if (drsInputFiles.Count > 0)
-            {
-                // resolve DRS input files with Cromwell DRS Localizer Docker image
-                sb.AppendLine($"write_ts DrsLocalizationStart && \\");
-
-                foreach (var drsInputFile in drsInputFiles)
+                foreach (var output in task.Outputs)
                 {
-                    var drsUrl = drsInputFile.Url;
-                    var localizedFilePath = drsInputFile.Path;
-                    var drsLocalizationCommand = $"docker run --rm {volumeMountsOption} -e MARTHA_URL=\"{marthaUrl}\" {cromwellDrsLocalizerImageName} {drsUrl} {localizedFilePath} --access-token-strategy azure{(!string.IsNullOrWhiteSpace(marthaKeyVaultName) ? " --vault-name " + marthaKeyVaultName : string.Empty)}{(!string.IsNullOrWhiteSpace(marthaSecretName) ? " --secret-name " + marthaSecretName : string.Empty)} && \\";
-                    sb.AppendLine(drsLocalizationCommand);
+                    if (!output.Path.StartsWith(CromwellPathPrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new TesException("InvalidOutputPath", $"Unsupported output path '{output.Path}' for task Id {task.Id}. Must start with {CromwellPathPrefix}");
+                    }
                 }
 
-                sb.AppendLine($"write_ts DrsLocalizationEnd && \\");
-            }
+                var batchExecutionDirectoryPath = GetBatchExecutionDirectoryPath(task);
+                var metricsPath = $"/{batchExecutionDirectoryPath}/metrics.txt";
+                var metricsUrl = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync(metricsPath, getContainerSas: true));
 
-            sb.AppendLine($"write_ts DownloadStart && \\");
-            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} {downloadFilesScriptPath} && \\");
-            sb.AppendLine($"write_ts DownloadEnd && \\");
-            sb.AppendLine($"chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \\");
-            sb.AppendLine($"write_ts ExecutorStart && \\");
-            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{ string.Join(" && ", executor.Command.Skip(1))}\" && \\");
-            sb.AppendLine($"write_ts ExecutorEnd && \\");
-            sb.AppendLine($"write_ts UploadStart && \\");
-            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} {uploadFilesScriptPath} && \\");
-            sb.AppendLine($"write_ts UploadEnd && \\");
-            sb.AppendLine($"/bin/bash -c 'disk=( `df -k /mnt | tail -1` ) && echo DiskSizeInKiB=${{disk[1]}} >> /mnt{metricsPath} && echo DiskUsedInKiB=${{disk[2]}} >> /mnt{metricsPath}' && \\");
-            sb.AppendLine($"write_kv VmCpuModelName \"$(cat /proc/cpuinfo | grep -m1 name | cut -f 2 -d ':' | xargs)\" && \\");
-            sb.AppendLine($"docker run --rm {volumeMountsOption} {blobxferImageName} upload --storage-url \"{metricsUrl}\" --local-path \"{metricsPath}\" --rename --no-recursive");
+                    // TODO: Cromwell bug: Cromwell command write_tsv() generates a file in the execution directory, for example execution/write_tsv_3922310b441805fc43d52f293623efbc.tmp. These are not passed on to TES inputs.
+                    // WORKAROUND: Get the list of files in the execution directory and add them to task inputs.
+                var executionDirectoryUri = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{cromwellExecutionDirectoryPath}", getContainerSas: true));
+                var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.Contains($"/{BatchExecutionDirectoryName}/"));
+                var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
 
-            var batchScriptPath = $"{batchExecutionDirectoryPath}/{BatchScriptFileName}";
-            await this.storageAccessProvider.UploadBlobAsync(batchScriptPath, sb.ToString());
+                var filesToDownload = await Task.WhenAll(
+                    inputFiles
+                    .Where(f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) != true) // do not attempt to download DRS input files since the cromwell-drs-localizer will
+                    .Union(additionalInputFiles)
+                    .Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
 
-            var batchScriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(batchScriptPath);
-            var batchExecutionDirectorySasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"{batchExecutionDirectoryPath}", getContainerSas: true);
+                const string exitIfDownloadedFileIsNotFound = "{ [ -f \"$path\" ] && : || { echo \"Failed to download file $url\" 1>&2 && exit 1; } }";
+                const string incrementTotalBytesTransferred = "total_bytes=$(( $total_bytes + `stat -c %s \"$path\"` ))";
 
-            var cloudTask = new CloudTask(taskId, $"/bin/sh /mnt{batchScriptPath}")
-            {
-                UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-                ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(batchScriptSasUrl, $"/mnt{batchScriptPath}"), ResourceFile.FromUrl(downloadFilesScriptUrl, $"/mnt{downloadFilesScriptPath}"), ResourceFile.FromUrl(uploadFilesScriptSasUrl, $"/mnt{uploadFilesScriptPath}") },
-                OutputFiles = new List<OutputFile> {
-                    new OutputFile(
-                        "../std*.txt",
-                        new OutputFileDestination(new OutputFileBlobContainerDestination(batchExecutionDirectorySasUrl)),
-                        new OutputFileUploadOptions(OutputFileUploadCondition.TaskFailure))
+                // Using --include and not using --no-recursive as a workaround for https://github.com/Azure/blobxfer/issues/123
+                var downloadFilesScriptContent = "total_bytes=0 && "
+                    + string.Join(" && ", filesToDownload.Select(f =>
+                    {
+                        var setVariables = $"path='{f.Path}' && url='{f.Url}'";
+
+                        var downloadSingleFile = f.Url.Contains(".blob.core.")
+                                                 && UrlContainsSas(f.Url) // Workaround for https://github.com/Azure/blobxfer/issues/132
+                            ? $"blobxfer download --storage-url \"$url\" --local-path \"$path\" --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
+                            : "mkdir -p $(dirname \"$path\") && wget -O \"$path\" \"$url\"";
+
+                        return $"{setVariables} && {downloadSingleFile} && {exitIfDownloadedFileIsNotFound} && {incrementTotalBytesTransferred}";
+                    }))
+                    + $" && echo FileDownloadSizeInBytes=$total_bytes >> {metricsPath}";
+
+                var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
+                var downloadFilesScriptUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{downloadFilesScriptPath}");
+                await this.storageAccessProvider.UploadBlobAsync($"/{downloadFilesScriptPath}", downloadFilesScriptContent);
+
+                var filesToUpload = await Task.WhenAll(
+                    task.Outputs.Select(async f =>
+                        new TesOutput { Path = f.Path, Url = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(f.Path, getContainerSas: true), Name = f.Name, Type = f.Type }));
+
+                // Ignore missing stdout/stderr files. CWL workflows have an issue where if the stdout/stderr are redirected, they are still listed in the TES outputs
+                // Ignore any other missing files and directories. WDL tasks can have optional output files.
+                // Syntax is: If file or directory doesn't exist, run a noop (":") operator, otherwise run the upload command:
+                // { if not exists do nothing else upload; } && { ... }
+                var uploadFilesScriptContent = "total_bytes=0 && "
+                    + string.Join(" && ", filesToUpload.Select(f =>
+                    {
+                        var setVariables = $"path='{f.Path}' && url='{f.Url}'";
+                        var blobxferCommand = $"blobxfer upload --storage-url \"$url\" --local-path \"$path\" --one-shot-bytes 104857600 {(f.Type == TesFileType.FILEEnum ? "--rename --no-recursive" : string.Empty)}";
+
+                        return $"{{ {setVariables} && [ ! -e \"$path\" ] && : || {{ {blobxferCommand} && {incrementTotalBytesTransferred}; }} }}";
+                    }))
+                    + $" && echo FileUploadSizeInBytes=$total_bytes >> {metricsPath}";
+
+                var uploadFilesScriptPath = $"{batchExecutionDirectoryPath}/{UploadFilesScriptFileName}";
+                var uploadFilesScriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{uploadFilesScriptPath}");
+                await this.storageAccessProvider.UploadBlobAsync($"/{uploadFilesScriptPath}", uploadFilesScriptContent);
+
+                var executor = task.Executors.First();
+
+                var volumeMountsOption = $"-v $AZ_BATCH_TASK_WORKING_DIR{cromwellPathPrefixWithoutEndSlash}:{cromwellPathPrefixWithoutEndSlash}";
+
+                var executorImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(executor.Image)) is null;
+                var dockerInDockerImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName)) is null;
+                var blobXferImageIsPublic = (await azureProxy.GetContainerRegistryInfoAsync(blobxferImageName)) is null;
+
+                var sb = new StringBuilder();
+
+                sb.AppendLine($"write_kv() {{ echo \"$1=$2\" >> $AZ_BATCH_TASK_WORKING_DIR{metricsPath}; }} && \\");  // Function that appends key=value pair to metrics.txt file
+                sb.AppendLine($"write_ts() {{ write_kv $1 $(date -Iseconds); }} && \\");    // Function that appends key=<current datetime> to metrics.txt file
+                sb.AppendLine($"mkdir -p $AZ_BATCH_TASK_WORKING_DIR{batchExecutionDirectoryPath} && \\");
+
+                if (dockerInDockerImageIsPublic)
+                {
+                    sb.AppendLine($"(grep -q alpine /etc/os-release && apk add bash || :) && \\");  // Install bash if running on alpine (will be the case if running inside "docker" image)
                 }
-            };
 
-            if (poolHasContainerConfig)
-            {
-                // If the executor image is private, and in order to run multiple containers in the main task, the image has to be downloaded via pool ContainerConfiguration.
-                // This also requires that the main task runs inside a container. So we run the "docker" container that in turn runs other containers.
-                // If the executor image is public, there is no need for pool ContainerConfiguration and task can run normally, without being wrapped in a docker container.
-                // Volume mapping for docker.sock below allows the docker client in the container to access host's docker daemon.
-                var containerRunOptions = $"--rm -v /var/run/docker.sock:/var/run/docker.sock -v /mnt:/mnt ";
-                cloudTask.ContainerSettings = new TaskContainerSettings(dockerInDockerImageName, containerRunOptions);
+                var vmSize = task.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size);
+
+                if (drsInputFiles.Count > 0 && task.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+                {
+                    sb.AppendLine($"write_ts CromwellDrsLocalizerPullStart && \\");
+                    sb.AppendLine($"docker pull --quiet {cromwellDrsLocalizerImageName} && \\");
+                    sb.AppendLine($"write_ts CromwellDrsLocalizerPullEnd && \\");
+                }
+
+                if (blobXferImageIsPublic)
+                {
+                    sb.AppendLine($"write_ts BlobXferPullStart && \\");
+                    sb.AppendLine($"docker pull --quiet {blobxferImageName} && \\");
+                    sb.AppendLine($"write_ts BlobXferPullEnd && \\");
+                }
+
+                if (executorImageIsPublic)
+                {
+                    // Private executor images are pulled via pool ContainerConfiguration
+                    sb.AppendLine($"write_ts ExecutorPullStart && docker pull --quiet {executor.Image} && write_ts ExecutorPullEnd && \\");
+                }
+
+                // The remainder of the script downloads the inputs, runs the main executor container, and uploads the outputs, including the metrics.txt file
+                // After task completion, metrics file is downloaded and used to populate the BatchNodeMetrics object
+                sb.AppendLine($"write_kv ExecutorImageSizeInBytes $(docker inspect {executor.Image} | grep \\\"Size\\\" | grep -Po '(?i)\\\"Size\\\":\\K([^,]*)') && \\");
+
+                if (drsInputFiles.Count > 0)
+                {
+                    // resolve DRS input files with Cromwell DRS Localizer Docker image
+                    sb.AppendLine($"write_ts DrsLocalizationStart && \\");
+
+                    foreach (var drsInputFile in drsInputFiles)
+                    {
+                        var drsUrl = drsInputFile.Url;
+                        var localizedFilePath = drsInputFile.Path;
+                        var drsLocalizationCommand = $"docker run --rm {volumeMountsOption} -e MARTHA_URL=\"{marthaUrl}\" {cromwellDrsLocalizerImageName} {drsUrl} {localizedFilePath} --access-token-strategy azure{(!string.IsNullOrWhiteSpace(marthaKeyVaultName) ? " --vault-name " + marthaKeyVaultName : string.Empty)}{(!string.IsNullOrWhiteSpace(marthaSecretName) ? " --secret-name " + marthaSecretName : string.Empty)} && \\";
+                        sb.AppendLine(drsLocalizationCommand);
+                    }
+
+                    sb.AppendLine($"write_ts DrsLocalizationEnd && \\");
+                }
+
+                sb.AppendLine($"write_ts DownloadStart && \\");
+                sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} /{downloadFilesScriptPath} && \\");
+                sb.AppendLine($"write_ts DownloadEnd && \\");
+                sb.AppendLine($"chmod -R o+rwx $AZ_BATCH_TASK_WORKING_DIR{cromwellPathPrefixWithoutEndSlash} && \\");
+                sb.AppendLine($"write_ts ExecutorStart && \\");
+                sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{string.Join(" && ", executor.Command.Skip(1))}\" && \\");
+                sb.AppendLine($"write_ts ExecutorEnd && \\");
+                sb.AppendLine($"write_ts UploadStart && \\");
+                sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} /{uploadFilesScriptPath} && \\");
+                sb.AppendLine($"write_ts UploadEnd && \\");
+                sb.AppendLine($"/bin/bash -c 'disk=( `df -k $AZ_BATCH_TASK_WORKING_DIR | tail -1` ) && echo DiskSizeInKiB=${{disk[1]}} >> $AZ_BATCH_TASK_WORKING_DIR{metricsPath} && echo DiskUsedInKiB=${{disk[2]}} >> $AZ_BATCH_TASK_WORKING_DIR{metricsPath}' && \\");
+                sb.AppendLine($"write_kv VmCpuModelName \"$(cat /proc/cpuinfo | grep -m1 name | cut -f 2 -d ':' | xargs)\" && \\");
+                sb.AppendLine($"docker run --rm {volumeMountsOption} {blobxferImageName} upload --storage-url \"{metricsUrl}\" --local-path \"{metricsPath}\" --rename --no-recursive");
+
+                var batchScriptPath = $"{batchExecutionDirectoryPath}/{BatchScriptFileName}";
+                await this.storageAccessProvider.UploadBlobAsync($"/{batchScriptPath}", sb.ToString());
+
+                var batchScriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{batchScriptPath}");
+                var batchExecutionDirectorySasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{batchExecutionDirectoryPath}", getContainerSas: true);
+
+                var cloudTask = new CloudTask(taskId, $"/bin/sh {batchScriptPath}")
+                {
+                    UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                    ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(batchScriptSasUrl, batchScriptPath), ResourceFile.FromUrl(downloadFilesScriptUrl, downloadFilesScriptPath), ResourceFile.FromUrl(uploadFilesScriptSasUrl, uploadFilesScriptPath) },
+                    OutputFiles = new List<OutputFile> {
+                        new OutputFile(
+                            "../std*.txt",
+                            new OutputFileDestination(new OutputFileBlobContainerDestination(batchExecutionDirectorySasUrl)),
+                            new OutputFileUploadOptions(OutputFileUploadCondition.TaskFailure))
+                    }
+                };
+
+                if (poolHasContainerConfig)
+                {
+                    // If the executor image is private, and in order to run multiple containers in the main task, the image has to be downloaded via pool ContainerConfiguration.
+                    // This also requires that the main task runs inside a container. So we run the "docker" container that in turn runs other containers.
+                    // If the executor image is public, there is no need for pool ContainerConfiguration and task can run normally, without being wrapped in a docker container.
+                    // Volume mapping for docker.sock below allows the docker client in the container to access host's docker daemon.
+                    var containerRunOptions = $"--rm -v /var/run/docker.sock:/var/run/docker.sock -v $AZ_BATCH_TASK_WORKING_DIR:$AZ_BATCH_TASK_WORKING_DIR ";
+                    cloudTask.ContainerSettings = new TaskContainerSettings(dockerInDockerImageName, containerRunOptions);
+                }
+
+                cloudTask.AffinityInformation = getAffinityFuncs.Affinity;
+                completed = true;
+                return cloudTask;
+
+                static bool UrlContainsSas(string url)
+                {
+                    var uri = new Uri(url, UriKind.Absolute);
+                    var query = uri.Query;
+                    return query?.Length > 1 && query[1..].Split('&').Any(QueryContainsSas);
+
+                    static bool QueryContainsSas(string arg)
+                        => arg switch
+                        {
+                            var x when x.Split('=', 2)[0] == "sig" => true,
+                            var x when x.Contains('=') => false,
+                            var x when x.Contains("sas") => true, // PrivatePathsAndUrlsGetSasToken() uses this as a "sas" token
+                            _ => false,
+                        };
+                }
             }
-
-            cloudTask.AffinityInformation = await GetAffinityInfo();
-            return cloudTask;
+            finally
+            {
+                if (!completed)
+                {
+                    getAffinityFuncs.ReleaseAffinity(getAffinityFuncs.Affinity);
+                }
+            }
         }
 
         /// <summary>
@@ -999,7 +1113,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="executorImage">The image name for the current <see cref="TesTask"/></param>
         /// <returns></returns>
-        private async Task<ContainerConfiguration> ContainerConfigurationIfNeeded(string executorImage)
+        private async ValueTask<ContainerConfiguration> GetContainerConfigurationIfNeeded(string executorImage)
         {
             BatchModels.ContainerConfiguration result = default;
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
@@ -1059,21 +1173,17 @@ namespace TesApi.Web
         /// <summary>
         /// Constructs an Azure Batch PoolInformation instance
         /// </summary>
-        /// <param name="vmSize">The Azure VM sku</param>
-        /// <param name="preemptible">True if preemptible machine should be used</param>
-        /// <param name="containerConfiguration">The configuration to download private images</param>
-        /// <param name="startTask">The start task for all jobs/tasks in the pool</param>
+        /// <param name="poolSpecification"></param>
         /// <param name="jobId"></param>
         /// <param name="identityResourceId"></param>
+        /// <remarks>If <paramref name="identityResourceId"/> is provided, <paramref name="jobId"/> must also be provided.</remarks>
         /// <returns>An Azure Batch Pool specifier</returns>
-        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(string vmSize, bool preemptible, ContainerConfiguration containerConfiguration, StartTask startTask, string jobId = null, string identityResourceId = null)
+        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(PoolSpecification poolSpecification, string jobId = null, string identityResourceId = null)
         {
             if (!string.IsNullOrWhiteSpace(identityResourceId))
             {
                 _ = jobId ?? throw new ArgumentNullException(nameof(jobId));
             }
-
-            var poolSpecification = GetPoolSpecification(vmSize, preemptible, containerConfiguration, startTask);
 
             // By default, the pool will have the same name/ID as the job if the identity is provided, otherwise we return an actual autopool.
             return string.IsNullOrWhiteSpace(identityResourceId)
@@ -1108,18 +1218,18 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="vmSize"></param>
         /// <param name="preemptible"></param>
+        /// <param name="nodeInfo"></param>
         /// <param name="containerConfiguration"></param>
-        /// <param name="startTask"></param>
         /// <returns></returns>
-        private PoolSpecification GetPoolSpecification(string vmSize, bool? preemptible, ContainerConfiguration containerConfiguration, StartTask startTask)
+        private PoolSpecification GetPoolSpecification(string vmSize, bool? preemptible, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration)
         {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
-                    batchNodeInfo.BatchImageOffer,
-                    batchNodeInfo.BatchImagePublisher,
-                    batchNodeInfo.BatchImageSku,
-                    batchNodeInfo.BatchImageVersion),
-                nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId)
+                    nodeInfo.BatchImageOffer,
+                    nodeInfo.BatchImagePublisher,
+                    nodeInfo.BatchImageSku,
+                    nodeInfo.BatchImageVersion),
+                nodeAgentSkuId: nodeInfo.BatchNodeAgentSkuId)
             {
                 ContainerConfiguration = containerConfiguration
             };
@@ -1131,7 +1241,6 @@ namespace TesApi.Web
                 ResizeTimeout = TimeSpan.FromMinutes(30),
                 TargetLowPriorityComputeNodes = preemptible == true ? 1 : 0,
                 TargetDedicatedComputeNodes = preemptible == false ? 1 : 0,
-                StartTask = startTask
             };
 
             if (!string.IsNullOrEmpty(this.batchNodesSubnetId))
@@ -1173,6 +1282,7 @@ namespace TesApi.Web
                 {
                     VirtualMachineConfiguration = new(ConvertImageReference(pool.VirtualMachineConfiguration.ImageReference), pool.VirtualMachineConfiguration.NodeAgentSkuId, containerConfiguration: ConvertContainerConfiguration(pool.VirtualMachineConfiguration.ContainerConfiguration))
                 },
+                ApplicationPackages = pool.ApplicationPackageReferences is null ? default : pool.ApplicationPackageReferences.Select(ConvertApplicationPackage).ToList(),
                 NetworkConfiguration = ConvertNetworkConfiguration(pool.NetworkConfiguration),
                 StartTask = ConvertStartTask(pool.StartTask)
             };
@@ -1206,6 +1316,9 @@ namespace TesApi.Web
 
             static BatchModels.ImageReference ConvertImageReference(ImageReference imageReference)
                 => imageReference is null ? default : new(imageReference.Publisher, imageReference.Offer, imageReference.Sku, imageReference.Version);
+
+            static BatchModels.ApplicationPackageReference ConvertApplicationPackage(ApplicationPackageReference applicationPackage)
+                => applicationPackage is null ? default : new(applicationPackage.ApplicationId, applicationPackage.Version);
 
             static BatchModels.NetworkConfiguration ConvertNetworkConfiguration(NetworkConfiguration networkConfiguration)
                 => networkConfiguration is null ? default : new(subnetId: networkConfiguration.SubnetId, publicIPAddressConfiguration: ConvertPublicIPAddressConfiguration(networkConfiguration.PublicIPAddressConfiguration));
@@ -1439,14 +1552,14 @@ namespace TesApi.Web
 
             try
             {
-                var cromwellRcContent = await this.storageAccessProvider.DownloadBlobAsync($"{GetCromwellExecutionDirectoryPath(tesTask)}/rc");
+                var cromwellRcContent = await this.storageAccessProvider.DownloadBlobAsync($"/{GetCromwellExecutionDirectoryPath(tesTask)}/rc");
 
                 if (cromwellRcContent is not null && int.TryParse(cromwellRcContent, out var temp))
                 {
                     cromwellRcCode = temp;
                 }
 
-                var metricsContent = await this.storageAccessProvider.DownloadBlobAsync($"{GetBatchExecutionDirectoryPath(tesTask)}/metrics.txt");
+                var metricsContent = await this.storageAccessProvider.DownloadBlobAsync($"/{GetBatchExecutionDirectoryPath(tesTask)}/metrics.txt");
 
                 if (metricsContent is not null)
                 {
@@ -1497,16 +1610,16 @@ namespace TesApi.Web
         #region BatchPools
         private readonly BatchPools batchPools;
 
-        private bool TryGet(string poolId, out IBatchPool batchPool)
+        internal bool TryGet(string poolId, out IBatchPool batchPool)
         {
             batchPool = batchPools.FirstOrDefault(p => p.Pool.PoolId.Equals(poolId, StringComparison.Ordinal));
             return batchPool is not null;
         }
 
-        private bool IsPoolAvailable(string key)
+        internal bool IsPoolAvailable(string key)
             => batchPools.TryGetValue(key, out var pools) && pools.Any(p => p.IsAvailable);
 
-        private async Task<IBatchPool> GetOrAddAsync(string key, Func<string, ValueTask<BatchModels.Pool>> valueFactory)
+        internal async Task<IBatchPool> GetOrAddAsync(string key, Func<string, ValueTask<BatchModels.Pool>> valueFactory)
         {
             if (enableBatchAutopool)
             {
@@ -1535,28 +1648,31 @@ namespace TesApi.Web
                 var poolId = $"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"; // '-' is required by GetKeyFromPoolId()
                 try
                 {
-                    pool = _poolFactory.CreateNew(await azureProxy.CreateBatchPoolAsync(await valueFactory(poolId)), this);
+                    var modelPool = await valueFactory(poolId);
+                    if (modelPool.Metadata is null) { modelPool.Metadata = new List<BatchModels.MetadataItem>(); }
+                    modelPool.Metadata.Add(new(PoolHostName, this.hostname));
+                    pool = _poolFactory.CreateNew(await azureProxy.CreateBatchPoolAsync(modelPool), this);
                 }
                 catch (RequestFailedException ex) when (ex.Status == 0 && ex.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout)
                 {
-                    await HandleTimeout(poolId);
+                    HandleTimeout(poolId);
                 }
                 catch (Exception ex) when (IsInnermostExceptionSocketException125(ex))
                 {
-                    await HandleTimeout(poolId);
+                    HandleTimeout(poolId);
                 }
-                _ = await AddPoolAsync(pool);
+                _ = AddPool(pool);
             }
             return pool;
 
             static bool Available(IBatchPool pool)
                 => pool.IsAvailable;
 
-            async Task HandleTimeout(string poolId)
+            void HandleTimeout(string poolId)
             {
                 // When the batch management API creating the pool times out, it may or may not have created the pool. Add an inactive record to delete it if it did get created and try again later. That record will be removed later whether or not the pool was created.
-                pool = _poolFactory.Retrieve(new BatchPool.PoolData { PoolId = poolId, IsAvailable = false, PendingReservations = new(), Reservations = new() }, this);
-                _ = await AddPoolAsync(pool);
+                pool = _poolFactory.Retrieve(poolId, new BatchPool.PoolData { IsAvailable = false }, this);
+                _ = AddPool(pool);
                 throw new AzureBatchQuotaMaxedOutException($"Pool creation timed out");
             }
 
@@ -1609,122 +1725,46 @@ namespace TesApi.Web
         public async ValueTask<bool> UpdateBatchPools(CancellationToken cancellationToken)
         {
             var changes = false;
-            var activePoolsByKey = new Dictionary<string, List<string>>();
-            var localPools = new List<string>();
-            var remotePools = new List<string>();
-            var poolsToRemove = Enumerable.Empty<Task>();
 
             // Get pool metadata from both known sources
-            var remoteGroups = (await _poolDataRepository.GetItemsAsync(p => true)).GroupBy(p => GetKeyFromPoolId(p.PoolId)).ToList();
-            var localGroups = batchPools.GetGroups().ToList();
+            var remotePoolList = (await azureProxy.GetActivePoolIdsAsync(this.hostname, cancellationToken)).ToList();
+            var localPoolList = batchPools.ToList();
 
-            // Remove pools no longer active in batch account while gathering information needed by the rest of this method
-            foreach (var group in remoteGroups)
+            // Remove nonexistant pools
+            foreach (var pool in localPoolList)
             {
-                _ = await GetActivePools(group.Key);
-                foreach (var pool in group)
+                if (!remotePoolList.Contains(pool.Pool.PoolId))
                 {
-                    remotePools.Add(pool.PoolId);
-                }
-            }
-
-            foreach (var group in localGroups)
-            {
-                var activePools = await GetActivePools(group.Key);
-                foreach(var pool in group.Value)
-                {
-                    if (!activePools.Contains(pool.Pool.PoolId))
-                    {
-                        logger.LogDebug("Pool '{PoolId}' is being removed because no pool by that name is active.", pool.Pool.PoolId);
-                        poolsToRemove = poolsToRemove.Append(batchPools.RemoveAsync(pool).AsTask());
-                        _ = remotePools.Remove(pool.Pool.PoolId);
-                        changes = true;
-                    }
-                    else
-                    {
-                        localPools.Add(pool.Pool.PoolId);
-                    }
-                }
-            }
-
-            foreach (var pool in remotePools)
-            {
-                if (!activePoolsByKey.Values.SelectMany(g => g).Contains(pool))
-                {
-                    logger.LogDebug("Pool '{PoolId}' is being removed because no pool by that name is active.", pool);
-                    poolsToRemove = poolsToRemove.Append(_poolDataRepository.DeleteItemAsync(pool));
+                    _ = batchPools.Remove(pool);
                     changes = true;
                 }
             }
 
-            // Add pools found in remote repository not present in local memory
-            foreach (var poolData in remoteGroups.SelectMany(g => g).Where(p => remotePools.Contains(p.PoolId)))
+            // Add pools found in batch account
+            foreach (var poolId in remotePoolList)
             {
-                if (!batchPools.Select(p => p.Pool.PoolId).Contains(poolData.PoolId))
+                if (!batchPools.Select(p => p.Pool.PoolId).Contains(poolId))
                 {
-                    logger.LogDebug("Pool '{PoolId}' from the repository is being added to the local store.", poolData.PoolId);
-                    var pool = _poolFactory.Retrieve(poolData, this);
-                    changes = true;
-                    if (await batchPools.AddAsync(pool, true))
-                    {
-                        await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize, cancellationToken);
-                    }
-                }
-            }
-
-            // Add pools found in local memory not present in remote repository
-            foreach (var pool in localGroups.Select(t => t.Value).SelectMany(g => g).Where(p => localPools.Contains(p.Pool.PoolId)))
-            {
-                if (!remotePools.Contains(pool.Pool.PoolId))
-                {
-                    logger.LogDebug("Pool '{PoolId}' from the local store is being added to the repository.", pool.Pool.PoolId);
-                    pool.ReplaceRepositoryItem(await _poolDataRepository.CreateItemAsync(pool.RepositoryItem));
+                    using var reader = new StringReader((await azureProxy.GetBatchPoolAsync(poolId, new ODATADetailLevel { SelectClause = "metadata" }, cancellationToken))?.Metadata?.FirstOrDefault(m => BatchPool.PoolDataName.Equals(m.Name, StringComparison.Ordinal))?.Value);
+                    var pool = _poolFactory.Retrieve(poolId, BatchUtils.ReadJson<BatchPool.PoolData>(reader, () => throw new InvalidOperationException()), this);
+                    await pool.ServicePoolAsync(IBatchPool.ServiceKind.SyncSize, cancellationToken).ConfigureAwait(false);
+                    batchPools.Add(pool);
                     changes = true;
                 }
             }
 
-            // Update remote repository with all metadata updates
-            if (await UpdateBatchPoolsMetadata())
-            {
-                changes = true;
-            }
-
-            // Wait for pool metadata deletions to complete.
-            await Task.WhenAll(poolsToRemove);
-
+            _startTaskFailedNodesByAffinity = await batchPools.ToAsyncEnumerable()
+                .SelectManyAwait(async p => (await ((BatchPool)p).ServicePoolRemoveNodeIfStartTaskFailedAsync(cancellationToken)).ToAsyncEnumerable())
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
             return changes;
-
-            async Task<List<string>> GetActivePools(string key)
-            {
-                if (!activePoolsByKey.TryGetValue(key, out var pools))
-                {
-                    pools = (await azureProxy.GetActivePoolIdsAsync($"{key}-", TimeSpan.Zero, cancellationToken)).ToList();
-                    activePoolsByKey.Add(key, pools);
-                }
-                return pools;
-            }
         }
 
-        private async Task<bool> UpdateBatchPoolsMetadata()
-        {
-            if (batchPools.HasChanges)
-            {
-                await Task.WhenAll(batchPools.Where(e => e.ChangesRepositoryItem.HasChanges).Select(async pool =>
-                {
-                    logger.LogDebug("Updating pool '{PoolId}'.", pool.Pool.PoolId);
-                    pool.ReplaceRepositoryItem(await _poolDataRepository.UpdateItemAsync(pool.RepositoryItem));
-                    pool.ChangesRepositoryItem.ResetChanges();
-                }));
-                return true;
-            }
-            return false;
-        }
+        private IList<(string AffinityId, bool IsPreemptible, TaskFailureInformation FailureInfo, IBatchPool Pool)> _startTaskFailedNodesByAffinity
+            = default;
 
         /// <inheritdoc/>
         public async ValueTask<IEnumerable<Task>> GetShutdownCandidatePools(CancellationToken cancellationToken)
         {
-            _ = await UpdateBatchPoolsMetadata(); // TODO: consider moving the actions called by the method in this line to be called by IBatchPool.ServicePoolAsync()
-
             return (await batchPools
                 .ToAsyncEnumerable()
                 .WhereAwait(async p => await p.CanBeDeleted(cancellationToken))
@@ -1736,8 +1776,8 @@ namespace TesApi.Web
         public IEnumerable<IBatchPool> GetPools()
             => batchPools;
 
-        private ValueTask<bool> AddPoolAsync(IBatchPool pool)
-            => batchPools.AddAsync(pool, false);
+        private bool AddPool(IBatchPool pool)
+            => batchPools.Add(pool);
 
         private static string GetKeyFromPoolId(string poolId)
             => poolId[..poolId.LastIndexOf('-')];
@@ -1751,29 +1791,15 @@ namespace TesApi.Web
                 => obj.Pool.PoolId.GetHashCode();
         }
 
-        #region IBatchPoolsImpl
-        /// <inheritdoc/>
-        bool IBatchPoolsImpl.TryGet(string poolId, out IBatchPool batchPool)
-            => TryGet(poolId, out batchPool);
+        #region Used for unit/module testing
+        internal bool RemovePoolFromList(IBatchPool pool)
+            => batchPools.Remove(pool);
 
-        /// <inheritdoc/>
-        bool IBatchPoolsImpl.IsPoolAvailable(string key)
-            => IsPoolAvailable(key);
-
-        /// <inheritdoc/>
-        Task<IBatchPool> IBatchPoolsImpl.GetOrAddAsync(string key, Func<string, ValueTask<BatchModels.Pool>> valueFactory)
-            => GetOrAddAsync(key, valueFactory);
-
-        /// <inheritdoc/>
-        ValueTask<bool> IBatchPoolsImpl.RemovePoolFromListAsync(IBatchPool pool)
-            => batchPools.RemoveAsync(pool);
-
-        /// <inheritdoc/>
-        IEnumerable<string> IBatchPoolsImpl.GetPoolGroupKeys()
+        internal IEnumerable<string> GetPoolGroupKeys()
             => batchPools.Keys;
         #endregion
 
-        private class BatchPools : KeyedGroupWithRepositoryElements<IBatchPool, GroupableSetWithRepositoryElements<IBatchPool, BatchPool.PoolData>, BatchPool.PoolData>
+        private class BatchPools : KeyedGroup<IBatchPool, GroupableSet<IBatchPool>>
         {
             private readonly ILogger logger;
             private readonly BatchScheduler batchScheduler;
@@ -1784,46 +1810,11 @@ namespace TesApi.Web
                 this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             }
 
-            protected override Func<IEnumerable<IBatchPool>, GroupableSetWithRepositoryElements<IBatchPool, BatchPool.PoolData>> CreateSetFunc
+            protected override Func<IEnumerable<IBatchPool>, GroupableSet<IBatchPool>> CreateSetFunc
                 => e => new(e, new BatchPoolEqualityComparer());
 
             public IBatchPool GetPoolOrDefault(string poolId)
                 => TryGetValue(GetKeyFromPoolId(poolId), out var batchPools) ? batchPools.FirstOrDefault(p => p.Pool.PoolId.Equals(poolId, StringComparison.Ordinal)) : default;
-
-            public async ValueTask<bool> AddAsync(IBatchPool element, bool isFromRepsitory)
-            {
-                var result = Add(element);
-                if (!isFromRepsitory)
-                {
-                    try
-                    {
-                        element.ReplaceRepositoryItem(await batchScheduler._poolDataRepository.CreateItemAsync(element.RepositoryItem));
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Error adding pool {PoolId} repository record", element.Pool.PoolId);
-                    }
-                }
-
-                logger.LogDebug("Adding pool {PoolId} returned {Result}", element.Pool.PoolId, result);
-                return result;
-            }
-
-            public async ValueTask<bool> RemoveAsync(IBatchPool element)
-            {
-                var result = Remove(element);
-                try
-                {
-                    await batchScheduler._poolDataRepository.DeleteItemAsync(element.Pool.PoolId);
-                }
-                catch(Exception ex)
-                {
-                    logger.LogError(ex, "Error removing pool {PoolId} repository record", element.Pool.PoolId);
-                }
-
-                logger.LogDebug("Removing pool {PoolId} returned {Result}", element.Pool.PoolId, result);
-                return result;
-            }
         }
         #endregion
 
@@ -1880,39 +1871,5 @@ namespace TesApi.Web
             public AffinityInformation AffinityInformation { get; set; }
             public ComputeNodeInformation ComputeNodeInformation { get; set; }
         }
-    }
-
-    /// <summary>
-    /// Internal access to batch pool related methods for <see cref="BatchPool"/> and also unit/module tests.
-    /// </summary>
-    internal interface IBatchPoolsImpl
-    {
-        /// <summary>
-        /// Indicates that a pool for the key value is available to service tasks.
-        /// </summary>
-        /// <param name="key">The key to locate the configured pool.</param>
-        /// <returns>True if pool is available, otherwise a new pool would need to be created to service the indicated configuration.</returns>
-        bool IsPoolAvailable(string key);
-
-        /// <summary>
-        /// Retrieves a pool that manages compute nodes of the related vmSize, creating the pool if the key doesn't exist.
-        /// </summary>
-        /// <param name="key">The key to locate the configured pool. Must be between 1 and 50 chars in length.</param>
-        /// <param name="valueFactory">A delegate to create the pool. Only called (once, even if called by multiple threads) if a pool isn't available.</param>
-        /// <remarks>The argument to <paramref name="valueFactory"/> needs to be the Name argument of its construtor. It's recommended to set the <see cref="BatchModels.Pool.DisplayName"/> to the <paramref name="key"/> value.</remarks>
-        /// <returns></returns>
-        Task<IBatchPool> GetOrAddAsync(string key, Func<string, ValueTask<BatchModels.Pool>> valueFactory);
-
-        /// <summary>
-        /// Retrieves the requested batch pool.
-        /// </summary>
-        /// <param name="poolId">The <see cref="PoolInformation.PoolId"/> of the requested <paramref name="batchPool"/>.</param>
-        /// <param name="batchPool">Returns the requested <see cref="IBatchPool"/>.</param>
-        /// <returns>True if the requested <paramref name="batchPool"/> was found, False otherwise.</returns>
-        bool TryGet(string poolId, out IBatchPool batchPool);
-
-        ValueTask<bool> RemovePoolFromListAsync(IBatchPool pool);
-
-        IEnumerable<string> GetPoolGroupKeys();
     }
 }
