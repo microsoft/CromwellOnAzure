@@ -647,7 +647,7 @@ namespace CromwellOnAzureDeployer
             cluster.AgentPoolProfiles.Add(new ManagedClusterAgentPoolProfile()
             {
                 Name = nodePoolName,
-                Count = 1,
+                Count = configuration.AksPoolSize,
                 VmSize = configuration.VmSize,
                 OsDiskSizeGB = 128,
                 OsDiskType = OSDiskType.Managed,
