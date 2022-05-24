@@ -2,8 +2,11 @@
   "profiles": {
     "Setup": {
       "commandName": "Project",
-      "commandLineArgs": "--subscriptionid aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee --regionname westus2 --mainidentifierprefix coatest",
-      "sqlDebugging": true
+      "commandLineArgs": "--subscriptionid 594bef42-33f3-42df-b056-e7399d6ae7a0 --regionname japaneast --mainidentifierprefix coajsaun --useaks true"
+    },
+    "Upgrade": {
+      "commandName": "Project",
+      "commandLineArgs": "--subscriptionid 594bef42-33f3-42df-b056-e7399d6ae7a0  --resourcegroupname coajsaun-53438 --update true --aksclustername coajsaun-bce80324b4b6"
     }
   }
 }
