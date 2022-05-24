@@ -183,6 +183,7 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
+            var noncachingStorageClass = Yaml.LoadFromString<V1StorageClass>(Utility.GetFileContent("scripts", "k8s", "noncaching-azure-disk.yaml"));
             var cromwellTempClaim = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "cromwell-tmp-claim.yaml"));
             var mysqlDataClaim = Yaml.LoadFromString<V1PersistentVolumeClaim>(Utility.GetFileContent("scripts", "k8s", "mysqldb-data-claim.yaml"));
 
@@ -190,6 +191,7 @@ namespace CromwellOnAzureDeployer
             var mysqlServiceBody = Yaml.LoadFromString<V1Service>(Utility.GetFileContent("scripts", "k8s", "mysqldb-service.yaml"));
             var cromwellServiceBody = Yaml.LoadFromString<V1Service>(Utility.GetFileContent("scripts", "k8s", "cromwell-service.yaml"));
 
+            await client.CreateStorageClassAsync(noncachingStorageClass);
             await client.CreateNamespacedPersistentVolumeClaimAsync(cromwellTempClaim, configuration.AksCoANamespace);
             await client.CreateNamespacedPersistentVolumeClaimAsync(mysqlDataClaim, configuration.AksCoANamespace);
 
@@ -218,7 +220,7 @@ namespace CromwellOnAzureDeployer
                     new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" },
                     new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }
                 };
-                await ExecuteCommandsOnPod(client, "mysqldb", commands, TimeSpan.FromMinutes(3));
+                await ExecuteCommandsOnPod(client, "mysqldb", commands, TimeSpan.FromMinutes(6));
             }
         }
 

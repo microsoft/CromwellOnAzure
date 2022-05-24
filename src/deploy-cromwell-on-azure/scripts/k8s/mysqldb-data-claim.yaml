@@ -6,6 +6,7 @@ metadata:
     io.kompose.service: mysqldb-data-claim
   name: mysqldb-data-claim
 spec:
+  storageClassName: managed-standard-no-caching
   accessModes:
     - ReadWriteOnce
   resources:

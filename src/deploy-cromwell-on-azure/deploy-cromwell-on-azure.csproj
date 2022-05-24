@@ -32,6 +32,7 @@
     <None Remove="scripts\k8s\mysqldb-data-claim.yaml" />
     <None Remove="scripts\k8s\mysqldb-deployment.yaml" />
     <None Remove="scripts\k8s\mysqldb-service.yaml" />
+    <None Remove="scripts\k8s\noncaching-azure-disk.yaml" />
     <None Remove="scripts\k8s\tes-deployment.yaml" />
     <None Remove="scripts\k8s\tes-service.yaml" />
     <None Remove="scripts\k8s\triggerservice-deployment.yaml" />
@@ -105,6 +106,7 @@
     <EmbeddedResource Include="scripts\k8s\mysqldb-data-claim.yaml" />
     <EmbeddedResource Include="scripts\k8s\mysqldb-deployment.yaml" />
     <EmbeddedResource Include="scripts\k8s\mysqldb-service.yaml" />
+    <EmbeddedResource Include="scripts\k8s\noncaching-azure-disk.yaml" />
     <EmbeddedResource Include="scripts\k8s\tes-deployment.yaml" />
     <EmbeddedResource Include="scripts\k8s\tes-service.yaml" />
     <EmbeddedResource Include="scripts\k8s\triggerservice-deployment.yaml" />

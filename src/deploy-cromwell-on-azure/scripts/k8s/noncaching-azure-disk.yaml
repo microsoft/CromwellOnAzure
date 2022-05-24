@@ -1,0 +1,10 @@
+﻿kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: managed-standard-no-caching
+provisioner: disk.csi.azure.com
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+parameters:
+  storageaccounttype: StandardSSD_LRS
+  cachingMode: None
