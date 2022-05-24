@@ -10,7 +10,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.ContainerService;
-using Microsoft.Azure.Management.Network.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
@@ -218,10 +217,18 @@ namespace CromwellOnAzureDeployer
                 var commands = new List<string[]>
                 {
                     new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" },
-                    new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }
                 };
                 await ExecuteCommandsOnPod(client, "mysqldb", commands, TimeSpan.FromMinutes(6));
             }
+        }
+
+        public async Task UnlockCromwellChangeLog(IKubernetes client)
+        {
+            var commands = new List<string[]>
+            {
+                new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }
+            };
+            await ExecuteCommandsOnPod(client, "mysqldb", commands, TimeSpan.FromMinutes(3));
         }
 
         public async Task ExecuteCommandsOnPod(IKubernetes client, string podName, IEnumerable<string[]> commands, TimeSpan timeout)
@@ -656,6 +663,8 @@ namespace CromwellOnAzureDeployer
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
             var k8sConfig = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
             IKubernetes client = new Kubernetes(k8sConfig);
+
+            await UnlockCromwellChangeLog(client);
 
             var tesDeploymentBody = BuildTesDeployment(settings);
             var triggerServiceDeploymentBody = BuildTriggerServiceDeployment(settings);
