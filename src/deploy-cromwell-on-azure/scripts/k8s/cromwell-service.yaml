@@ -1,9 +1,6 @@
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: C:\workspace\src\CromwellOnAzure\src\deploy-cromwell-on-azure\scripts\kompose.exe convert
-    kompose.version: 1.26.0 (40646f47)
   creationTimestamp: null
   labels:
     io.kompose.service: cromwell

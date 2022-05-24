@@ -416,6 +416,7 @@ namespace CromwellOnAzureDeployer
                             compute = Task.Run(async () =>
                             {
                                 var settings = GetSettingsDict(managedIdentity);
+
                                 if (aksCluster == null)
                                 {
                                     aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
@@ -461,10 +462,11 @@ namespace CromwellOnAzureDeployer
                                 { 
                                     mySQLServer = await CreateMySqlServerAndDatabaseAsync(mySQLManagementClient, vnetAndSubnet.Value.mySqlSubnet);
 
+                                    // Wait for either kubernetes pod to start or ssh connection info to be set.
+                                    await compute;
+
                                     if (configuration.UseAks)
                                     {
-                                        // If using AKS, wait on compute task.
-                                        await compute;
                                         await ExecuteQueriesOnAzureMySqlDbFromK8(mySQLServer);
                                     }
                                     else
@@ -774,6 +776,7 @@ namespace CromwellOnAzureDeployer
             settings["BatchNodesSubnetId"] = configuration.BatchNodesSubnetId;
             settings["DockerInDockerImageName"] = configuration.DockerInDockerImageName;
             settings["BlobxferImageName"] = configuration.BlobxferImageName;
+
             if (configuration.DisableBatchNodesPublicIpAddress.HasValue)
             {
                 settings["DisableBatchNodesPublicIpAddress"] = configuration.DisableBatchNodesPublicIpAddress.Value.ToString();
@@ -789,7 +792,6 @@ namespace CromwellOnAzureDeployer
             settings["BatchAccountName"] = configuration.BatchAccountName;
             settings["ApplicationInsightsAccountName"] = configuration.ApplicationInsightsAccountName;
             settings["ManagedIdentityClientId"] = managedIdentity.ClientId;
-
             settings["AzureServicesAuthConnectionString"] = $"RunAs=App;AppId={managedIdentity.ClientId}";
 
             return settings;

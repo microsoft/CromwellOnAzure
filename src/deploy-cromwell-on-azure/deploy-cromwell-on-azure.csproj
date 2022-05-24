@@ -20,8 +20,7 @@
   <ItemGroup>
     <None Remove="scripts\k8s\cromwell-deployment.yaml" />
     <None Remove="scripts\k8s\cromwell-service.yaml" />
-    <None Remove="scripts\k8s\cromwell-tmp-claim2.yaml" />
-    <None Remove="scripts\k8s\cromwellazure-claim1.yaml" />
+    <None Remove="scripts\k8s\cromwell-tmp-claim.yaml" />
     <None Remove="scripts\k8s\csi\blobfuse-proxy.yaml" />
     <None Remove="scripts\k8s\csi\csi-blob-controller.yaml" />
     <None Remove="scripts\k8s\csi\csi-blob-driver.yaml" />
@@ -30,7 +29,7 @@
     <None Remove="scripts\k8s\csi\pvc-blob-csi-dataset.yaml" />
     <None Remove="scripts\k8s\csi\rbac-csi-blob-controller.yaml" />
     <None Remove="scripts\k8s\csi\rbac-csi-blob-node.yaml" />
-    <None Remove="scripts\k8s\mysqldb-data-claim3.yaml" />
+    <None Remove="scripts\k8s\mysqldb-data-claim.yaml" />
     <None Remove="scripts\k8s\mysqldb-deployment.yaml" />
     <None Remove="scripts\k8s\mysqldb-service.yaml" />
     <None Remove="scripts\k8s\tes-deployment.yaml" />
@@ -94,8 +93,7 @@
     <EmbeddedResource Include="scripts\install-cromwellazure.sh" />
     <EmbeddedResource Include="scripts\k8s\cromwell-deployment.yaml" />
     <EmbeddedResource Include="scripts\k8s\cromwell-service.yaml" />
-    <EmbeddedResource Include="scripts\k8s\cromwell-tmp-claim2.yaml" />
-    <EmbeddedResource Include="scripts\k8s\cromwellazure-claim1.yaml" />
+    <EmbeddedResource Include="scripts\k8s\cromwell-tmp-claim.yaml" />
     <EmbeddedResource Include="scripts\k8s\csi\blobfuse-proxy.yaml" />
     <EmbeddedResource Include="scripts\k8s\csi\csi-blob-controller.yaml" />
     <EmbeddedResource Include="scripts\k8s\csi\csi-blob-driver.yaml" />
@@ -104,7 +102,7 @@
     <EmbeddedResource Include="scripts\k8s\csi\pvc-blob-csi-dataset.yaml" />
     <EmbeddedResource Include="scripts\k8s\csi\rbac-csi-blob-controller.yaml" />
     <EmbeddedResource Include="scripts\k8s\csi\rbac-csi-blob-node.yaml" />
-    <EmbeddedResource Include="scripts\k8s\mysqldb-data-claim3.yaml" />
+    <EmbeddedResource Include="scripts\k8s\mysqldb-data-claim.yaml" />
     <EmbeddedResource Include="scripts\k8s\mysqldb-deployment.yaml" />
     <EmbeddedResource Include="scripts\k8s\mysqldb-service.yaml" />
     <EmbeddedResource Include="scripts\k8s\tes-deployment.yaml" />

@@ -124,7 +124,7 @@ namespace CromwellOnAzureDeployer
                     {
                         secret = await client.ReadNamespacedSecretAsync(secretName, configuration.AksCoANamespace);
                     }
-                    catch (HttpOperationException e) { }
+                    catch (HttpOperationException) { }
 
                     if (secret != null)
                     {
@@ -139,7 +139,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task<IKubernetes> GetKubernetesClient(IResource resourceGroupObject)
         {
-            string resourceGroup = resourceGroupObject.Name;
+            var resourceGroup = resourceGroupObject.Name;
             var containerServiceClient = new ContainerServiceClient(azureCredentials);
             containerServiceClient.SubscriptionId = configuration.SubscriptionId;
 
@@ -158,23 +158,24 @@ namespace CromwellOnAzureDeployer
 
         public async Task DeployCoAServicesToCluster(IKubernetes client, IResource resourceGroupObject, Dictionary<string, string> settings, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, IStorageAccount storageAccount)
         {
-            string resourceGroup = resourceGroupObject.Name;
+            var resourceGroup = resourceGroupObject.Name;
             await InstallCSIBlobDriver(client);
 
             if (!string.Equals(configuration.AksCoANamespace, "default", StringComparison.OrdinalIgnoreCase))
             {
                 V1Namespace existing = null;
+
                 try
                 {
                     existing = await client.ReadNamespaceStatusAsync(configuration.AksCoANamespace);
                 }
-                catch (HttpOperationException e) { }
+                catch (HttpOperationException) { }
 
                 if (existing is null)
                 {
-                    await client.CreateNamespaceAsync(new V1Namespace()
+                    await client.CreateNamespaceAsync(new V1Namespace
                     {
-                        Metadata = new V1ObjectMeta()
+                        Metadata = new V1ObjectMeta
                         {
                             Name = configuration.AksCoANamespace
                         }
@@ -200,18 +201,18 @@ namespace CromwellOnAzureDeployer
             var externalStorageContainers = await CreateContainerMounts(storageAccount, resourceGroup, client, deploymentsWithStorageMounts);
             tesDeploymentBody.Spec.Template.Spec.Containers.First().Env.Add(new V1EnvVar("ExternalStorageContainers", externalStorageContainers.ToString()));
 
-            var tesDeployment = await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, configuration.AksCoANamespace);
-            var tesService = await client.CreateNamespacedServiceAsync(tesServiceBody, configuration.AksCoANamespace);
-            var triggerDeployment = await client.CreateNamespacedDeploymentAsync(triggerDeploymentBody, configuration.AksCoANamespace);
+            await client.CreateNamespacedDeploymentAsync(tesDeploymentBody, configuration.AksCoANamespace);
+            await client.CreateNamespacedServiceAsync(tesServiceBody, configuration.AksCoANamespace);
+            await client.CreateNamespacedDeploymentAsync(triggerDeploymentBody, configuration.AksCoANamespace);
 
-            var cromwellDeployment = await client.CreateNamespacedDeploymentAsync(cromwellDeploymentBody, configuration.AksCoANamespace);
-            var cromwellService = await client.CreateNamespacedServiceAsync(cromwellServiceBody, configuration.AksCoANamespace);
+            await client.CreateNamespacedDeploymentAsync(cromwellDeploymentBody, configuration.AksCoANamespace);
+            await client.CreateNamespacedServiceAsync(cromwellServiceBody, configuration.AksCoANamespace);
 
             if (!configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
             {
                 var mysqlDeploymentBody = BuildMysqlDeployment(settings, storageAccount.Name);
-                var mysqlDeployment = await client.CreateNamespacedDeploymentAsync(mysqlDeploymentBody, configuration.AksCoANamespace);
-                var mysqlService = await client.CreateNamespacedServiceAsync(mysqlServiceBody, configuration.AksCoANamespace);
+                await client.CreateNamespacedDeploymentAsync(mysqlDeploymentBody, configuration.AksCoANamespace);
+                await client.CreateNamespacedServiceAsync(mysqlServiceBody, configuration.AksCoANamespace);
                 var commands = new List<string[]>
                 {
                     new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" },
@@ -252,6 +253,7 @@ namespace CromwellOnAzureDeployer
             var timer = Stopwatch.StartNew();
             var deployments = await client.ListNamespacedDeploymentAsync(configuration.AksCoANamespace);
             var deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
+            
             while (deployment is null ||
                 deployment.Status is null ||
                 deployment.Status.ReadyReplicas is null ||
@@ -324,7 +326,7 @@ namespace CromwellOnAzureDeployer
         private V1Deployment BuildTriggerServiceDeployment(Dictionary<string, string> settings)
         {
             var triggerDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "triggerservice-deployment.yaml"));
-            // Example to set Environment Variables for trigger service.
+
             var triggerEnv = new List<V1EnvVar>();
             triggerEnv.Add(new V1EnvVar("DefaultStorageAccountName", settings["DefaultStorageAccountName"]));
             triggerEnv.Add(new V1EnvVar("AzureServicesAuthConnectionString", settings["AzureServicesAuthConnectionString"]));
@@ -341,15 +343,15 @@ namespace CromwellOnAzureDeployer
 
         private static void AddStaticVolumeClaimToDeploymentBody(V1Deployment deploymentBody, string configurationMountName, string path)
         {
-            deploymentBody.Spec.Template.Spec.Volumes.Add(new V1Volume()
+            deploymentBody.Spec.Template.Spec.Volumes.Add(new V1Volume
             {
                 Name = configurationMountName,
-                PersistentVolumeClaim = new V1PersistentVolumeClaimVolumeSource()
+                PersistentVolumeClaim = new V1PersistentVolumeClaimVolumeSource
                 {
                     ClaimName = configurationMountName
                 }
             });
-            deploymentBody.Spec.Template.Spec.Containers.First().VolumeMounts.Add(new V1VolumeMount()
+            deploymentBody.Spec.Template.Spec.Containers.First().VolumeMounts.Add(new V1VolumeMount
             {
                 MountPath = path,
                 Name = configurationMountName
@@ -364,41 +366,42 @@ namespace CromwellOnAzureDeployer
 
             if (!(await KubernetesSecretExists(client, secretName)))
             {
-                await client.CreateNamespacedSecretAsync(new V1Secret()
+                await client.CreateNamespacedSecretAsync(new V1Secret
                 {
-                    Metadata = new V1ObjectMeta()
+                    Metadata = new V1ObjectMeta
                     {
                         Name = secretName
                     },
-                    StringData = new Dictionary<string, string> {
-                    {"azurestorageaccountname", container.StorageAccount},
-                    {"azurestorageaccountsastoken", container.SasToken}
-                },
+                    StringData = new Dictionary<string, string> 
+                    {
+                        {"azurestorageaccountname", container.StorageAccount},
+                        {"azurestorageaccountsastoken", container.SasToken}
+                    },
                     Type = "Opaque",
                     Kind = "Secret",
                 }, configuration.AksCoANamespace);
             }
 
-            await client.CreatePersistentVolumeAsync(new V1PersistentVolume()
+            await client.CreatePersistentVolumeAsync(new V1PersistentVolume
             {
-                Metadata = new V1ObjectMeta()
+                Metadata = new V1ObjectMeta
                 {
                     Name = volumeName
                 },
-                Spec = new V1PersistentVolumeSpec()
+                Spec = new V1PersistentVolumeSpec
                 {
                     AccessModes = new List<string>() { "ReadWriteMany" },
                     PersistentVolumeReclaimPolicy = "Retain",
-                    Capacity = new Dictionary<string, ResourceQuantity>()
+                    Capacity = new Dictionary<string, ResourceQuantity>
                     {
                         { "storage", new ResourceQuantity("10Gi") }
                     },
-                    Csi = new V1CSIPersistentVolumeSource()
+                    Csi = new V1CSIPersistentVolumeSource
                     {
                         Driver = "blob.csi.azure.com",
                         ReadOnlyProperty = false,
                         VolumeHandle = $"volume-{container.StorageAccount}-{container.ContainerName}-{new Random().Next(10000)}",
-                        VolumeAttributes = new Dictionary<string, string>()
+                        VolumeAttributes = new Dictionary<string, string>
                         {
                             { "containerName", container.ContainerName }
                         },
@@ -411,23 +414,23 @@ namespace CromwellOnAzureDeployer
                 }
             });
 
-            await client.CreateNamespacedPersistentVolumeClaimAsync(new V1PersistentVolumeClaim()
+            await client.CreateNamespacedPersistentVolumeClaimAsync(new V1PersistentVolumeClaim
             {
-                Metadata = new V1ObjectMeta()
+                Metadata = new V1ObjectMeta
                 {
                     Name = claimName
                 },
-                Spec = new V1PersistentVolumeClaimSpec()
+                Spec = new V1PersistentVolumeClaimSpec
                 {
                     AccessModes = new List<string>() { "ReadWriteMany" },
                     VolumeName = volumeName,
-                    StorageClassName = "",
-                    Resources = new V1ResourceRequirements()
+                    StorageClassName = "", // This is required, default value is not empty string, and empty string is required for PVC to work.
+                    Resources = new V1ResourceRequirements
                     {
-                        Requests = new Dictionary<string, ResourceQuantity>()
-                            {
-                                { "storage", new ResourceQuantity("10Gi") }
-                            }
+                        Requests = new Dictionary<string, ResourceQuantity>
+                        {
+                            { "storage", new ResourceQuantity("10Gi") }
+                        }
                     }
                 }
             }, configuration.AksCoANamespace);
@@ -444,6 +447,7 @@ namespace CromwellOnAzureDeployer
             var pvcName = $"{container.StorageAccount}-{container.ContainerName}-blob-claim1";
             var storageClassName = $"sc-blob-{container.StorageAccount}-{container.ContainerName}";
             var path = string.Empty;
+
             if (container.StorageAccount.Equals(coaStorageAccount, StringComparison.OrdinalIgnoreCase))
             {
                 path = $"/{container.ContainerName}";
@@ -454,26 +458,27 @@ namespace CromwellOnAzureDeployer
             }
 
             var storageAccount = await Deployer.GetExistingStorageAccountAsync(container.StorageAccount, azureClient, subscriptionIds, configuration);
+            
             if (!(await KubernetesSecretExists(client, sasSecretName)))
             {
-                await client.CreateNamespacedSecretAsync(new V1Secret()
+                await client.CreateNamespacedSecretAsync(new V1Secret
                 {
                     Metadata = new V1ObjectMeta()
                     {
                         Name = sasSecretName,
                     },
                     StringData = new Dictionary<string, string> {
-                    {"azurestorageaccountname", storageAccount.Name},
-                    {"azurestorageaccountkey", storageAccount.Key}
-                },
+                        {"azurestorageaccountname", storageAccount.Name},
+                        {"azurestorageaccountkey", storageAccount.Key}
+                    },
                     Type = "Opaque",
                     Kind = "Secret",
                 }, configuration.AksCoANamespace);
             }
 
-            var storageClassBody = new V1StorageClass()
+            var storageClassBody = new V1StorageClass
             {
-                Metadata = new V1ObjectMeta()
+                Metadata = new V1ObjectMeta
                 {
                     Name = storageClassName
                 },
@@ -481,30 +486,30 @@ namespace CromwellOnAzureDeployer
                 VolumeBindingMode = "Immediate",
                 ReclaimPolicy = "Retain",
                 Parameters = new Dictionary<string, string>()
-                    {
-                        {"resourceGroup", resouceGroup},
-                        {"storageAccount", container.StorageAccount},
-                        {"containerName", container.ContainerName}
-                    }
+                {
+                    {"resourceGroup", resouceGroup},
+                    {"storageAccount", container.StorageAccount},
+                    {"containerName", container.ContainerName}
+                }
             };
             await client.CreateStorageClassAsync(storageClassBody);
 
-            var pvc = new V1PersistentVolumeClaim()
+            var pvc = new V1PersistentVolumeClaim
             {
-                Metadata = new V1ObjectMeta()
+                Metadata = new V1ObjectMeta
                 {
                     Name = pvcName
                 },
-                Spec = new V1PersistentVolumeClaimSpec()
+                Spec = new V1PersistentVolumeClaimSpec
                 {
-                    AccessModes = new List<string>() { "ReadWriteMany" },
+                    AccessModes = new List<string> { "ReadWriteMany" },
                     StorageClassName = storageClassBody.Metadata.Name,
-                    Resources = new V1ResourceRequirements()
+                    Resources = new V1ResourceRequirements
                     {
-                        Requests = new Dictionary<string, ResourceQuantity>()
-                            {
-                                { "storage", new ResourceQuantity("10Gi") }
-                            }
+                        Requests = new Dictionary<string, ResourceQuantity>
+                        {
+                            { "storage", new ResourceQuantity("10Gi") }
+                        }
                     }
                 }
             };
@@ -519,11 +524,13 @@ namespace CromwellOnAzureDeployer
         private async Task<bool> KubernetesSecretExists(IKubernetes client, string sasSecretName)
         {
             V1Secret existing = null;
+
             try
             {
                 existing = await client.ReadNamespacedSecretAsync(sasSecretName, configuration.AksCoANamespace);
             }
-            catch (HttpOperationException e) { }
+            catch (HttpOperationException) { }
+
             return existing != null;
         }
 
@@ -533,6 +540,7 @@ namespace CromwellOnAzureDeployer
             var exclusion = new HashSet<MountableContainer>();
             var wildCardAccounts = new List<string>();
             var contents = await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, Deployer.ContainersToMountFileName, cts);
+            
             foreach (var line in contents.Split("\n", StringSplitOptions.RemoveEmptyEntries))
             {
                 if (line.StartsWith("#"))
@@ -577,6 +585,7 @@ namespace CromwellOnAzureDeployer
                     });
                 }
             }
+
             containers.ExceptWith(exclusion);
             return containers.ToList();
         }
@@ -610,20 +619,22 @@ namespace CromwellOnAzureDeployer
             var csiBlobNode = Yaml.LoadFromString<V1DaemonSet>(Utility.GetFileContent("scripts", "k8s", "csi", "csi-blob-node.yaml"));
             objects.Add(csiBlobNode);
 
-            var @switch = new Dictionary<Type, Action<object>> {
-                { typeof(V1Service), (value) => client.CreateNamespacedService((V1Service)value, "kube-system") },
-                { typeof(V1ServiceAccount), (value) => client.CreateNamespacedServiceAccount((V1ServiceAccount)value, "kube-system") },
-                { typeof(V1ClusterRole), (value) => client.CreateClusterRole((V1ClusterRole)value) },
-                { typeof(V1ClusterRoleBinding), (value) => client.CreateClusterRoleBinding((V1ClusterRoleBinding)value) },
-                { typeof(V1DaemonSet), (value) => client.CreateNamespacedDaemonSet((V1DaemonSet)value, "kube-system") },
-                { typeof(V1CSIDriver), (value) => client.CreateCSIDriver((V1CSIDriver)value) },
-                { typeof(V1Deployment), (value) => client.CreateNamespacedDeployment((V1Deployment)value, "kube-system") },
+            var @switch = new Dictionary<Type, Func<object, Task>> {
+                { typeof(V1Service), (value) => client.CreateNamespacedServiceAsync((V1Service) value, "kube-system") },
+                { typeof(V1ServiceAccount), (value) => client.CreateNamespacedServiceAccountAsync((V1ServiceAccount) value, "kube-system") },
+                { typeof(V1ClusterRole), (value) => client.CreateClusterRoleAsync((V1ClusterRole) value) },
+                { typeof(V1ClusterRoleBinding), (value) => client.CreateClusterRoleBindingAsync((V1ClusterRoleBinding) value) },
+                { typeof(V1DaemonSet), (value) => client.CreateNamespacedDaemonSetAsync((V1DaemonSet) value, "kube-system") },
+                { typeof(V1CSIDriver), (value) => client.CreateCSIDriverAsync((V1CSIDriver) value) },
+                { typeof(V1Deployment), (value) => client.CreateNamespacedDeploymentAsync((V1Deployment) value, "kube-system") },
             };
 
+            var tasks = new List<Task>();
             foreach (var value in objects)
             {
-                @switch[value.GetType()](value);
+                tasks.Add(@switch[value.GetType()](value));
             }
+            await Task.WhenAll(tasks);
         }
 
         public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount)
@@ -641,7 +652,6 @@ namespace CromwellOnAzureDeployer
             writer.Close();
 
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
-
             var k8sConfig = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
             IKubernetes client = new Kubernetes(k8sConfig);
 
@@ -654,10 +664,14 @@ namespace CromwellOnAzureDeployer
             var externalStorageContainers = await CreateContainerMounts(storageAccount, resourceGroup.Name, client, deploymentsWithStorageMounts);
             tesDeploymentBody.Spec.Template.Spec.Containers.First().Env.Add(new V1EnvVar("ExternalStorageContainers", externalStorageContainers.ToString()));
 
-            var tesDeployment = await client.ReplaceNamespacedDeploymentAsync(tesDeploymentBody, "tes", configuration.AksCoANamespace);
-            var triggerServiceDeployment = await client.ReplaceNamespacedDeploymentAsync(triggerServiceDeploymentBody, "triggerservice", configuration.AksCoANamespace);
-            var cromwellDeployment = await client.ReplaceNamespacedDeploymentAsync(cromwellDeploymentBody, "cromwell", configuration.AksCoANamespace);
-            var mysqlDeployment = await client.ReplaceNamespacedDeploymentAsync(mysqlDeploymentBody, "mysqldb", configuration.AksCoANamespace);
+            await client.ReplaceNamespacedDeploymentAsync(tesDeploymentBody, "tes", configuration.AksCoANamespace);
+            await client.ReplaceNamespacedDeploymentAsync(triggerServiceDeploymentBody, "triggerservice", configuration.AksCoANamespace);
+            await client.ReplaceNamespacedDeploymentAsync(cromwellDeploymentBody, "cromwell", configuration.AksCoANamespace);
+            
+            if (string.IsNullOrEmpty(configuration.MySqlServerName))
+            {
+                await client.ReplaceNamespacedDeploymentAsync(mysqlDeploymentBody, "mysqldb", configuration.AksCoANamespace);
+            }
         }
 
         private class MountableContainer
