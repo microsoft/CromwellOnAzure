@@ -36,7 +36,7 @@ services:
       - MarthaKeyVaultName=$MarthaKeyVaultName
       - MarthaSecretName=$MarthaSecretName
       - BatchPoolIdleNodeMinutes=$BatchPoolIdleNodeMinutes
-      - BatchPoolIdlePoolMinutes=$BatchPoolIdlePoolMinutes
+      - BatchPoolIdlePoolDays=$BatchPoolIdlePoolDays
       - BatchPoolRotationForcedDays=$BatchPoolRotationForcedDays
       - HOSTNAME=$HOSTNAME
     expose:

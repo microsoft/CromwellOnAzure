@@ -738,7 +738,7 @@ namespace TesApi.Tests
             => Enumerable
                 .Empty<(string Key, string Value)>()
                 .Append(("BatchPoolIdleNodeMinutes", "0.3"))
-                .Append(("BatchPoolIdlePoolMinutes", "0.6"))
+                .Append(("BatchPoolIdlePoolDays", "0.000416667"))
                 .Append(("BatchPoolRotationForcedDays", "0.000694444"));
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously

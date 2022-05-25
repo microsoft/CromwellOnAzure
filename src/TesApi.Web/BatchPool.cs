@@ -456,8 +456,8 @@ namespace TesApi.Web
             Pool = poolInfo ?? throw new ArgumentNullException(nameof(poolInfo));
 
             _idleNodeCheck = TimeSpan.FromMinutes(GetConfigurationValue(configuration, "BatchPoolIdleNodeMinutes", 0.125));
-            _idlePoolCheck = TimeSpan.FromMinutes(GetConfigurationValue(configuration, "BatchPoolIdlePoolMinutes", 0.125));
-            _forcePoolRotationAge = TimeSpan.FromDays(GetConfigurationValue(configuration, "BatchPoolRotationForcedDays", 60));
+            _idlePoolCheck = TimeSpan.FromDays(GetConfigurationValue(configuration, "BatchPoolIdlePoolDays", 0.03125));
+            _forcePoolRotationAge = TimeSpan.FromDays(GetConfigurationValue(configuration, "BatchPoolRotationForcedDays", 30));
 
             this.azureProxy = azureProxy;
             this.logger = logger;
