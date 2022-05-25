@@ -39,7 +39,7 @@ namespace TesApi.Tests
             Assert.IsTrue(batchScheduler.RemovePoolFromList(pool));
             Assert.AreEqual(0, batchScheduler.GetPoolGroupKeys().Count());
 
-            pool = await batchScheduler.GetOrAddAsync(key, id => ValueTask.FromResult(new Pool(name: id)));
+            pool = await batchScheduler.GetOrAddAsync(key, id => /*ValueTask.FromResult(*/new Pool(name: id)/*)*/);
 
             Assert.AreEqual(1, batchScheduler.GetPoolGroupKeys().Count());
             Assert.IsTrue(batchScheduler.TryGet(pool.Pool.PoolId, out var pool1));
@@ -58,7 +58,7 @@ namespace TesApi.Tests
             var count = batchScheduler.GetPools().Count();
             serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>()), Times.Once);
 
-            var pool = await batchScheduler.GetOrAddAsync(key, id => ValueTask.FromResult(new Pool(name: id)));
+            var pool = await batchScheduler.GetOrAddAsync(key, id => /*ValueTask.FromResult(*/new Pool(name: id)/*)*/);
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
 
             Assert.AreEqual(batchScheduler.GetPools().Count(), count);
@@ -81,7 +81,7 @@ namespace TesApi.Tests
             var key = batchScheduler.GetPoolGroupKeys().First();
             var count = batchScheduler.GetPools().Count();
 
-            var pool = await batchScheduler.GetOrAddAsync(key, id => ValueTask.FromResult(new Pool(name: id)));
+            var pool = await batchScheduler.GetOrAddAsync(key, id => /*ValueTask.FromResult(*/new Pool(name: id)/*)*/);
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
 
             Assert.AreNotEqual(batchScheduler.GetPools().Count(), count);
@@ -320,6 +320,7 @@ namespace TesApi.Tests
             Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/download_files_script")));
         }
 
+        [TestCategory("Batch Pools")]
         [TestMethod]
         public async Task BatchJobContainsExpectedBatchPoolInformation()
         {
@@ -1165,7 +1166,7 @@ namespace TesApi.Tests
             => new(wrapAzureProxy: true, configuration: GetMockConfig()(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Defaults), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
         private static async Task<IBatchPool> AddPool(BatchScheduler batchPools)
-            => await batchPools.GetOrAddAsync("key1", id => ValueTask.FromResult(new Pool(name: id, displayName: "display1", vmSize: "vmSize1")));
+            => await batchPools.GetOrAddAsync("key1", id => /*ValueTask.FromResult(*/new Pool(name: id, displayName: "display1", vmSize: "vmSize1")/*)*/);
 
         private struct BatchJobAndTaskStates
         {

@@ -684,7 +684,7 @@ namespace TesApi.Tests
             => new(wrapAzureProxy: true, configuration: GetMockConfig(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Get()), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
         private static async Task<IBatchPool> AddPool(BatchScheduler batchPools)
-            => await batchPools.GetOrAddAsync("key1", id => ValueTask.FromResult(new Pool(name: id, displayName: "display1", vmSize: "vmSize1")));
+            => await batchPools.GetOrAddAsync("key1", id => /*ValueTask.FromResult(*/new Pool(name: id, displayName: "display1", vmSize: "vmSize1")/*)*/);
 
         private static void TimeShift(TimeSpan shift, IBatchPool pool)
             => ((BatchPool)pool).TimeShift(shift);
