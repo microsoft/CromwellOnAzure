@@ -872,7 +872,7 @@ namespace TesApi.Web
 
                 sb.AppendLine($"write_kv() {{ echo \"$1=$2\" >> $AZ_BATCH_TASK_WORKING_DIR{metricsPath}; }} && \\");  // Function that appends key=value pair to metrics.txt file
                 sb.AppendLine($"write_ts() {{ write_kv $1 $(date -Iseconds); }} && \\");    // Function that appends key=<current datetime> to metrics.txt file
-                sb.AppendLine($"mkdir -p $AZ_BATCH_TASK_WORKING_DIR{batchExecutionDirectoryPath} && \\");
+                sb.AppendLine($"mkdir -p $AZ_BATCH_TASK_WORKING_DIR/{batchExecutionDirectoryPath} && \\");
 
                 if (dockerInDockerImageIsPublic)
                 {
