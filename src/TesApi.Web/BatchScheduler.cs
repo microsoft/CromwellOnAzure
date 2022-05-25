@@ -290,11 +290,12 @@ namespace TesApi.Web
             return localPath is not null;
         }
 
-        private string GetPoolName(TesTask tesTask, string vmSize)
+        private (string PoolName, string DisplayName) GetPoolName(TesTask tesTask, string vmSize)
         {
             var identityResourceId = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : string.Empty;
 
-            return $"CoA-TES-{PoolNameNamespace.GenerateGuid($"{hostname}-{vmSize}-{identityResourceId}")}-pool";
+            var name = $"{hostname}-{vmSize}-{identityResourceId}"; // TODO: limit this to 1024
+            return ($"CoA-TES-{PoolNameNamespace.GenerateGuid(name)}-pool", name);
         }
 
         /// <summary>
@@ -310,7 +311,7 @@ namespace TesApi.Web
             {
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
-                var poolName = this.enableBatchAutopool ? default : GetPoolName(tesTask, virtualMachineInfo.VmSize);
+                var (poolName, displayName) = this.enableBatchAutopool ? default : GetPoolName(tesTask, virtualMachineInfo.VmSize);
                 await CheckBatchAccountQuotas(virtualMachineInfo, poolName);
 
                 TesTaskLog tesTaskLog = default;
@@ -337,7 +338,7 @@ namespace TesApi.Web
                     {
                         poolInformation = (await GetOrAddAsync(poolName, id => ConvertPoolSpecificationToModelsPool(
                             name: id,
-                            displayName: poolName,
+                            displayName: displayName,
                             GetBatchPoolIdentity(tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default),
                             GetPoolSpecification(
                                 virtualMachineInfo.VmSize,
@@ -1219,6 +1220,9 @@ namespace TesApi.Web
         /// <returns></returns>
         private static BatchModels.Pool ConvertPoolSpecificationToModelsPool(string name, string displayName, BatchModels.BatchPoolIdentity poolIdentity, PoolSpecification pool)
         {
+            ValidateString(name, nameof(name), 64);
+            ValidateString(displayName, nameof(displayName), 1024);
+
             return new(name: name, displayName: displayName, identity: poolIdentity)
             {
                 VmSize = pool.VirtualMachineSize,
@@ -1240,6 +1244,12 @@ namespace TesApi.Web
                 NetworkConfiguration = ConvertNetworkConfiguration(pool.NetworkConfiguration),
                 StartTask = ConvertStartTask(pool.StartTask)
             };
+
+            static void ValidateString(string value, string name, int length)
+            {
+                if (value is null) throw new ArgumentNullException(name);
+                if (value.Length > length) throw new ArgumentException($"{name} exceeds maximum length {length}", name);
+            }
 
             static BatchModels.ContainerConfiguration ConvertContainerConfiguration(ContainerConfiguration containerConfiguration)
                 => containerConfiguration is null ? default : new(containerConfiguration.ContainerImageNames, containerConfiguration.ContainerRegistries?.Select(ConvertContainerRegistry).ToList());
