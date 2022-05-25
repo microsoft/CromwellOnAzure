@@ -13,3 +13,4 @@ BatchPoolRotationForcedDays=90
 MarthaUrl=
 MarthaKeyVaultName=
 MarthaSecretName=
+MySqlServerPassword={MySqlServerPassword}
