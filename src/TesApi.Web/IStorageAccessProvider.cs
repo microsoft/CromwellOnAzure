@@ -36,7 +36,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="blobRelativePath">Path to the file in form of /storageaccountname/container/path</param>
         /// <param name="content">The new content</param>
-        /// <returns></returns>
+        /// <returns>A task to await</returns>
         public Task UploadBlobAsync(string blobRelativePath, string content);
 
         /// <summary>
@@ -44,8 +44,15 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="blobRelativePath">Path to the file in form of /storageaccountname/container/path</param>
         /// <param name="sourceLocalFilePath">Path to the local file to get the content from</param>
-        /// <returns></returns>
+        /// <returns>A task to await</returns>
         public Task UploadBlobFromFileAsync(string blobRelativePath, string sourceLocalFilePath);
+
+        /// <summary>
+        /// Removes a blob
+        /// </summary>
+        /// <param name="blobRelativePath"></param>
+        /// <returns>A task to await</returns>
+        public Task DeleteBlobAsync(string blobRelativePath);
 
         /// <summary>
         /// Checks if the specified string represents a HTTP URL that is publicly accessible

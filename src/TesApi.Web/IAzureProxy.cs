@@ -143,6 +143,13 @@ namespace TesApi.Web
         Task<IEnumerable<string>> ListBlobsAsync(Uri directoryUri);
 
         /// <summary>
+        /// Removes a blob
+        /// </summary>
+        /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
+        /// <returns>A task to await</returns>
+        Task DeleteBlobAsync(Uri blobAbsoluteUri);
+
+        /// <summary>
         /// Gets the ids of completed Batch jobs older than specified timespan
         /// </summary>
         /// <param name="oldestJobAge"></param>
@@ -265,6 +272,27 @@ namespace TesApi.Web
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Gets the application packages currently present in the Batch Account
+        /// </summary>
+        /// <returns><see cref="BatchModels.ApplicationPackage"/></returns>
+        Task<IEnumerable<BatchModels.ApplicationPackage>> ListApplicationPackages(BatchModels.Application application);
+
+        /// <summary>
+        /// Gets the applications currently present in the Batch Account
+        /// </summary>
+        /// <returns><see cref="BatchModels.Application"/></returns>
+        Task<IEnumerable<BatchModels.Application>> ListApplications();
+
+        /// <summary>
+        /// Creates, activates, and loads a versioned package into a new Batch Application
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="version"></param>
+        /// <param name="package"></param>
+        /// <returns></returns>
+        Task<string> CreateAndActivateBatchApplication(string name, string version, System.IO.Stream package);
 
         /// <summary>
         /// Checks if a local file exists

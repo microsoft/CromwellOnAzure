@@ -318,7 +318,7 @@ namespace TesApi.Web
             }
         }
 
-        private async ValueTask ServicePoolRemoveNodeIfIdleAsync(CancellationToken cancellationToken = default)
+        private async ValueTask ServicePoolRemoveNodeIfIdleAsync(CancellationToken cancellationToken)
         {
             if ((await azureProxy.GetAllocationStateAsync(Pool.PoolId, cancellationToken)) == AllocationState.Steady)
             {

@@ -1,0 +1,16 @@
+{
+  "batchImage": {
+    "imageReference": {
+      "offer": "centos-container",
+      "publisher": "microsoft-azure-batch",
+      "sku": "7-8",
+      "version": "latest"
+    },
+    "nodeAgentSKUId": "batch.node.centos 7"
+  },
+  "startTask": {},
+  "dockerRun": {
+    "parameters": "--device /dev/dri",
+    "pretaskCommand": ["/opt/edico/bin/dragen_reset"]
+  }
+}

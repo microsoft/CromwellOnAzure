@@ -7,11 +7,40 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using Common.HostConfigs;
+using Newtonsoft.Json;
 
 namespace CromwellOnAzureDeployer
 {
     public static class Utility
     {
+        public static HostConfiguration ParseConfig(TextReader textReader)
+        {
+            using var reader = new JsonTextReader(textReader);
+            return JsonSerializer.CreateDefault().Deserialize<HostConfiguration>(reader) ?? throw new ArgumentException("File is not a HostConfig configuration.", nameof(textReader));
+        }
+
+        public static T ReadJson<T>(TextReader textReader, Func<T> defaultValue)
+        {
+            return textReader is null
+                ? defaultValue()
+                : ReadFile();
+
+            T ReadFile()
+            {
+                using var reader = new JsonTextReader(textReader);
+                return JsonSerializer.CreateDefault().Deserialize<T>(reader) ?? defaultValue();
+            }
+        }
+
+        public static string WriteJson<T>(T value)
+        {
+            using var result = new StringWriter();
+            using var writer = new JsonTextWriter(result);
+            JsonSerializer.CreateDefault().Serialize(writer, value);
+            return result.ToString();
+        }
+
         public static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
             => text.Trim().Split(rowDelimiter)
                 .Select(r => r.Trim().Split(fieldDelimiter))
@@ -95,6 +124,18 @@ namespace CromwellOnAzureDeployer
 
         private static Stream GetBinaryFileContent(params string[] pathComponentsRelativeToAppBase)
             => typeof(Deployer).Assembly.GetManifestResourceStream($"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}");
+
+        public struct EmbeddedResourceName
+        {
+            public string Name { get; }
+            public string ManifestName { get; }
+
+            public EmbeddedResourceName(string manifestName, string name)
+            {
+                Name = name;
+                ManifestName = manifestName;
+            }
+        }
 
         /// <summary>
         /// Generates a secure password with one lowercase letter, one uppercase letter, and one number

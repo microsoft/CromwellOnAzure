@@ -1,0 +1,18 @@
+*		        text=auto
+*.			text eol=lf
+*.txt			text eol=lf
+*.md			-text
+*.sln			text eol=crlf
+*.sql			text eol=crlf
+*.yml			text eol=lf
+*.sh			text eol=lf
+*.service		 text eol=lf
+*.zip filter=lfs diff=lfs merge=lfs -text
+*.tar filter=lfs diff=lfs merge=lfs -text
+*.rpm filter=lfs diff=lfs merge=lfs -text
+*.deb filter=lfs diff=lfs merge=lfs -text
+CODE_OF_CONDUCT.md	-text
+LICENSE README.md	-text
+SECURITY.md		-text
+*.PNG filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text

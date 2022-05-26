@@ -320,12 +320,15 @@ namespace CromwellOnAzureDeployer
 
                         if (installedVersion is null || installedVersion < new Version(3, 1))
                         {
+                            await AttachStorageToBatchV310Async(storageAccount.Id);
                             if (!newSettingsAdded)
                             {
                                 await AddNewSettingsAsync(sshConnectionInfo);
                                 newSettingsAdded = true;
                             }
                         }
+
+                        await CreateDefaultStorageContainersAsync(storageAccount);
                     }
 
                     if (!configuration.Update)
@@ -1026,7 +1029,7 @@ namespace CromwellOnAzureDeployer
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
 
-            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
+            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName, "host-config-blobs" };
             await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
         }
 
@@ -1331,7 +1334,7 @@ namespace CromwellOnAzureDeployer
                         configuration.BatchAccountName,
                         new BatchAccountCreateParameters(
                             configuration.RegionName,
-                            autoStorage: configuration.PrivateNetworking.GetValueOrDefault() ? new AutoStorageBaseProperties { StorageAccountId = storageAccountId } : null),
+                            autoStorage: new(storageAccountId)),
                         cts.Token));
 
         private Task<IResourceGroup> CreateResourceGroupAsync()
@@ -1516,6 +1519,12 @@ namespace CromwellOnAzureDeployer
         private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
             => await Execute("Disabling auto-start of Docker service...",
                 () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
+
+        private async Task AttachStorageToBatchV310Async(string storageAccountId)
+            => await Execute("Linking storage account to batch account...",
+                () => new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
+                    .BatchAccount
+                    .UpdateAsync(configuration.ResourceGroupName, configuration.BatchAccountName, new(autoStorage: new(storageAccountId))));
 
         private Task AddNewSettingsAsync(ConnectionInfo sshConnectionInfo)
             => Execute(
@@ -2132,13 +2141,16 @@ namespace CromwellOnAzureDeployer
             return (await container.GetBlobClient(blobName).DownloadContentAsync(cts.Token)).Value.Content.ToString();
         }
 
-        private async Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
+        private Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
+            => UploadBinaryToStorageAccountAsync(storageAccount, containerName, blobName, BinaryData.FromString(content));
+
+        private async Task UploadBinaryToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, BinaryData content)
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
             await container.CreateIfNotExistsAsync();
-            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, cts.Token);
+            await container.GetBlobClient(blobName).UploadAsync(content, true, cts.Token);
         }
 
         private static string GetLinuxParentPath(string path)
@@ -2166,5 +2178,147 @@ namespace CromwellOnAzureDeployer
                 DisplayExample = displayExample;
             }
         }
+
+        /*
+        /// <summary>
+        /// Makes an acceptable batch application name out of the internal calculated name
+        /// </summary>
+        /// <param name="host"></param>
+        /// <returns></returns>
+        public static string BatchAppFromHostConfigName(string host)
+        {
+            const char dash = '-';
+            return new string(host.Normalize().Select(Mangle).ToArray());
+
+            static char Mangle(char c)
+                => char.GetUnicodeCategory(c) switch
+                {
+                    UnicodeCategory.UppercaseLetter => MangleLetter(c),
+                    UnicodeCategory.LowercaseLetter => MangleLetter(c),
+                    UnicodeCategory.TitlecaseLetter => MangleLetter(c),
+                    UnicodeCategory.DecimalDigitNumber => c,
+                    UnicodeCategory.LetterNumber => MangleNumber(c),
+                    UnicodeCategory.OtherNumber => MangleNumber(c),
+                    UnicodeCategory.PrivateUse => dash,
+                    UnicodeCategory.ConnectorPunctuation => dash,
+                    UnicodeCategory.DashPunctuation => dash,
+                    UnicodeCategory.MathSymbol => dash,
+                    UnicodeCategory.CurrencySymbol => dash,
+                    _ => '_',
+                };
+
+            static char MangleLetter(char c)
+                => char.IsLetterOrDigit(c) && *//*char.IsAscii(c)*//*
+                    (c >= 0x0000 && c <= 0x007f) ? c : dash;
+
+            static char MangleNumber(char c)
+                => char.GetNumericValue(c) switch
+                {
+                    (>= 0) and (<= 9) => (char)('0' + char.GetNumericValue(c)),
+                    _ => dash,
+                };
+        }
+
+        InitializeHostBlobs = new Task(async () =>
+        {
+            var writeStoredVersions = false;
+            var storedVersions = BatchUtils.ReadApplicationVersions();
+            try
+            {
+                var knownExtant = Enumerable.Empty<(string, string)>();
+                foreach (var hash in BatchUtils.GetApplicationPayloadHashes().Select(p => (Name: p.Key, Hash: Convert.ToHexString(p.Value))))
+                {
+                    if (storedVersions.TryGetValue(hash.Name, out var keyMetadata))
+                    {
+                        if (keyMetadata.Packages.TryGetValue(hash.Hash, out var hashMetadata))
+                        {
+                            knownExtant = knownExtant.Append((hash.Name, hash.Hash));
+                        }
+                        else
+                        {
+                            keyMetadata.Packages.Add(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name)));
+                            writeStoredVersions = true;
+                        }
+                    }
+                    else
+                    {
+                        storedVersions.Add(hash.Name, (default, BatchUtils.BatchAppFromHostConfigName(hash.Name), new Dictionary<string, (int, bool)>(Enumerable.Empty<KeyValuePair<string, (int, bool)>>().Append(new(hash.Hash, (default, DoesPayloadContainStartScript(hash.Name)))))));
+                        writeStoredVersions = true;
+                    }
+                }
+
+                var serverAppList = Enumerable.Empty<(string Name, string Version)>();
+                foreach (var appVersion in (await azureProxy.ListApplications()).Select(a => (a.Name, azureProxy.ListApplicationPackages(a).Result)).SelectMany(t => t.Result.Select(p => (t.Name, p.Name))))
+                {
+                    serverAppList = serverAppList.Append(appVersion);
+                }
+
+                var storedVersionsByServerName = new Dictionary<string, (IDictionary<string, (int, bool)> Packages, string)>(storedVersions.Select(p => new KeyValuePair<string, (IDictionary<string, (int, bool)>, string)>(p.Value.ServerAppName, (p.Value.Packages, p.Key))));
+                var appsToRemove = Enumerable.Empty<(string Name, string Version)>();
+                var storedVersionsFoundBuilder = Enumerable.Empty<(string Name, string Version)>();
+                foreach (var app in serverAppList)
+                {
+                    if (storedVersionsByServerName.TryGetValue(app.Name, out var keyMetadata))
+                    {
+                        var storedHashes = new List<string>(keyMetadata.Packages.Keys);
+
+                        foreach (var hash in keyMetadata.Packages)
+                        {
+                            if (hash.Key.Equals(app.Version, StringComparison.InvariantCulture))
+                            {
+                                storedVersionsFoundBuilder = storedVersionsFoundBuilder.Append(new(app.Name, app.Version));
+                            }
+                            else
+                            {
+                                appsToRemove = appsToRemove.Append(new(app.Name, app.Version));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Unknown app. Ignore. TODO: Warn?
+                    }
+                }
+
+                foreach (var app in appsToRemove)
+                {
+                    //TODO: Remove(app.Package)
+                }
+
+                var storedVersionsFound = storedVersionsFoundBuilder.ToList();
+                var updates = Enumerable.Empty<KeyValuePair<string, (string, string, IDictionary<string, (int, bool)>)>>();
+                foreach (var app in storedVersions)
+                {
+                    foreach (var version in app.Value.Packages)
+                    {
+                        if (!storedVersionsFound.Contains((app.Key, version.Key)))
+                        {
+                            using var payload = BatchUtils.GetApplicationPayload(app.Key);
+                            updates = updates.Append(new KeyValuePair<string, (string, string, IDictionary<string, (int, bool)>)>(app.Key,
+                                (await azureProxy.CreateAndActivateBatchApplication(app.Value.ServerAppName, version.Key, payload), app.Value.ServerAppName, app.Value.Packages)));
+                        }
+                    }
+                }
+
+                foreach (var app in updates)
+                {
+                    storedVersions[app.Key] = app.Value;
+                }
+            }
+            finally
+            {
+                if (writeStoredVersions)
+                {
+                    BatchUtils.WriteApplicationVersions(storedVersions);
+                }
+            }
+
+            bool DoesPayloadContainStartScript(string name)
+            {
+                using var zip = new ZipArchive(BatchUtils.GetApplicationPayload(name));
+                return zip.Entries.Any(e => e.Name.Equals(StartTaskScriptFilename, StringComparison.InvariantCulture));
+            }
+        });
+         */
     }
 }

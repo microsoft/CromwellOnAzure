@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Common.HostConfigs;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.Batch.Models;
@@ -39,7 +40,7 @@ namespace TesApi.Tests
             Assert.IsTrue(batchScheduler.RemovePoolFromList(pool));
             Assert.AreEqual(0, batchScheduler.GetPoolGroupKeys().Count());
 
-            pool = await batchScheduler.GetOrAddAsync(key, id => /*ValueTask.FromResult(*/new Pool(name: id)/*)*/);
+            pool = await batchScheduler.GetOrAddAsync(key, id => new(name: id));
 
             Assert.AreEqual(1, batchScheduler.GetPoolGroupKeys().Count());
             Assert.IsTrue(batchScheduler.TryGet(pool.Pool.PoolId, out var pool1));
@@ -58,7 +59,7 @@ namespace TesApi.Tests
             var count = batchScheduler.GetPools().Count();
             serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>()), Times.Once);
 
-            var pool = await batchScheduler.GetOrAddAsync(key, id => /*ValueTask.FromResult(*/new Pool(name: id)/*)*/);
+            var pool = await batchScheduler.GetOrAddAsync(key, id => new(name: id));
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
 
             Assert.AreEqual(batchScheduler.GetPools().Count(), count);
@@ -81,7 +82,7 @@ namespace TesApi.Tests
             var key = batchScheduler.GetPoolGroupKeys().First();
             var count = batchScheduler.GetPools().Count();
 
-            var pool = await batchScheduler.GetOrAddAsync(key, id => /*ValueTask.FromResult(*/new Pool(name: id)/*)*/);
+            var pool = await batchScheduler.GetOrAddAsync(key, id => new(name: id));
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
 
             Assert.AreNotEqual(batchScheduler.GetPools().Count(), count);
@@ -170,6 +171,28 @@ namespace TesApi.Tests
             Assert.IsFalse(batchScheduler.GetPools().Any());
         }
 
+        [TestCategory("HostConfig")]
+        [TestMethod]
+        public Task BatchUtils_ReadApplicationVersions()
+        {
+            try
+            {
+                BatchUtils.WriteHostConfiguration(new() { ApplicationVersions = new() { { "test1", new() { ApplicationId = "test1", Packages = new() { { "ver1", new() { ContainsTaskScript = true } } } } } } });
+
+                var result = BatchUtils.GetBatchApplicationVersions();
+                Assert.IsNotNull(result);
+                Assert.AreEqual(1, result.Count);
+                Assert.AreEqual("test1", result["test1"].ApplicationId);
+                Assert.AreEqual(1, result["test1"].Packages.Count);
+                Assert.AreEqual(true, result["test1"].Packages["ver1"].ContainsTaskScript);
+                return Task.CompletedTask;
+            }
+            finally
+            {
+                var versionsFile = new FileInfo(Path.Combine(AppContext.BaseDirectory, @"HostConfigs", @"Versions.json"));
+                if (versionsFile.Exists) { versionsFile.Delete(); }
+            }
+        }
 
         [TestCategory("TES 1.1")]
         [TestMethod]
@@ -222,6 +245,32 @@ namespace TesApi.Tests
 
             Assert.IsNull(poolInformation.AutoPoolSpecification);
             Assert.IsFalse(string.IsNullOrWhiteSpace(poolInformation.PoolId));
+        }
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task BackendParametersHostConfiguration()
+        {
+            var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
+            azureProxyReturnValues.BatchJobAndTaskState = new AzureBatchJobAndTaskState { JobState = null };
+            azureProxyReturnValues.DownloadedBlobContent = BatchUtils.WriteJson<HostConfig>(
+                new() { HostConfigurations = new() { { "sample_host", new() { BatchImage = new() { NodeAgentSkuId = "batch.node.specific", ImageReference = new() { Offer = "specific-offer", Publisher = "microsoft-azure-batch", Sku = "specific-sku", Version = "latest" } } } } } });
+
+            var backendParameters = new Dictionary<string, string>
+            {
+                { "docker_host_configuration", "sample_host" }
+            };
+
+            var task = GetTesTask();
+            task.Resources.BackendParameters = backendParameters;
+            var configuration = GetMockConfig(true)();
+            configuration = configuration.Append(("BatchNodeAgentSkuId",  "batch.node.default"));
+
+            (_, _, var poolInformation, _) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(task, configuration, GetMockAzureProxy(azureProxyReturnValues));
+
+            Assert.IsNotNull(poolInformation.AutoPoolSpecification);
+            Assert.AreNotEqual(poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.NodeAgentSkuId, configuration.ToLookup(t => t.Key, t => t.Value)["BatchNodeAgentSkuId"]);
+            Assert.AreEqual(poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.NodeAgentSkuId, "batch.node.specific");
         }
 
 
@@ -339,9 +388,9 @@ namespace TesApi.Tests
 
             Assert.IsNull(poolInformation.AutoPoolSpecification);
             Assert.IsNotNull(poolInformation.PoolId);
-            Assert.AreEqual("CoA-TES-70ec7594-36b5-52f4-a191-0f3b20e9f6d5-pool-", poolInformation.PoolId[0..^13]);
+            Assert.AreEqual("CoA-TES-11114812-9201-5a8c-ad44-7b11c4d93c3c-pool-", poolInformation.PoolId[0..^13]);
             Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
-            Assert.IsTrue(batchScheduler.TryGet(poolInformation.PoolId, out var pool1));
+            Assert.IsTrue(serviceProvider.GetT().TryGet(poolInformation.PoolId, out var pool1));
             Assert.IsTrue(((BatchPool)pool1).TestIsNodeReserved(cloudTask.AffinityInformation.AffinityId));
             Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
         }
@@ -357,6 +406,27 @@ namespace TesApi.Tests
             Assert.AreEqual("VmSizeDedicated1", poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineSize);
             Assert.AreEqual(1, poolInformation.AutoPoolSpecification.PoolSpecification.TargetDedicatedComputeNodes);
             Assert.AreEqual(1, poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
+        }
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task BatchJobContainsExpectedManualPoolInformation()
+        {
+            var backendParameters = new Dictionary<string, string>
+            {
+                { "workflow_execution_identity", "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/coa/providers/Microsoft.ManagedIdentity/userAssignedIdentities/coa-test-uami" }
+            };
+
+            var task = GetTesTask();
+            task.Resources.BackendParameters = backendParameters;
+            (_, _, var poolInformation, var pool) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(task, GetMockConfig(true)(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+
+            Assert.IsNotNull(poolInformation.PoolId);
+            Assert.IsNull(poolInformation.AutoPoolSpecification);
+            Assert.AreEqual("JobId-1", poolInformation.PoolId);
+            Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
+            Assert.AreEqual(1, pool.ScaleSettings.FixedScale.TargetDedicatedNodes);
+            Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
         }
 
         [TestMethod]
@@ -1166,7 +1236,7 @@ namespace TesApi.Tests
             => new(wrapAzureProxy: true, configuration: GetMockConfig()(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Defaults), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
         private static async Task<IBatchPool> AddPool(BatchScheduler batchPools)
-            => await batchPools.GetOrAddAsync("key1", id => /*ValueTask.FromResult(*/new Pool(name: id, displayName: "display1", vmSize: "vmSize1")/*)*/);
+            => await batchPools.GetOrAddAsync("key1", id => new(name: id, displayName: "display1", vmSize: "vmSize1"));
 
         private struct BatchJobAndTaskStates
         {

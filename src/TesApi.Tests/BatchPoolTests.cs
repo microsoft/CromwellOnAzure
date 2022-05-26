@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,6 +20,9 @@ namespace TesApi.Tests
     public class BatchPoolTests
     {
         private const string AffinityPrefix = "AP-";
+
+        //[TestCategory("Batch Pools")]
+
 
         [TestMethod]
         public async Task PrepareNodeMakesReservationWhenPoolIsEmpty()
@@ -684,7 +688,7 @@ namespace TesApi.Tests
             => new(wrapAzureProxy: true, configuration: GetMockConfig(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Get()), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
         private static async Task<IBatchPool> AddPool(BatchScheduler batchPools)
-            => await batchPools.GetOrAddAsync("key1", id => /*ValueTask.FromResult(*/new Pool(name: id, displayName: "display1", vmSize: "vmSize1")/*)*/);
+            => await batchPools.GetOrAddAsync("key1", id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
 
         private static void TimeShift(TimeSpan shift, IBatchPool pool)
             => ((BatchPool)pool).TimeShift(shift);
@@ -709,6 +713,10 @@ namespace TesApi.Tests
 
             internal Func<string, ODATADetailLevel, IAsyncEnumerable<ComputeNode>> AzureProxyListComputeNodesAsync { get; set; } = (poolId, detailLevel) => AsyncEnumerable.Empty<ComputeNode>();
             internal Action<string> AzureProxyGetComputeNodeTargets { get; set; } = poolId => { };
+            internal Dictionary<string, StorageAccountInfo> StorageAccountInfos { get; set; }
+                = new Dictionary<string, StorageAccountInfo> { { "defaultstorageaccount", new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount.blob.core.windows.net/", SubscriptionId = "SubId" } } };
+            internal string StorageAccountKey { get; set; } = "Key1";
+            internal string DownloadedBlobContent { get; set; } = string.Empty;
             internal Action<string, IEnumerable<ComputeNode>, CancellationToken> AzureProxyDeleteBatchComputeNodes { get; set; } = (poolId, computeNodes, cancellationToken) => { };
             internal Func<string, Microsoft.Azure.Batch.Common.AllocationState> AzureProxyGetAllocationState { get; set; } = /*(poolId, cancellationToken)*/ poolId => Microsoft.Azure.Batch.Common.AllocationState.Steady;
             internal Func<(int, int)> AzureProxyReturnComputeNodeTargets { get; set; } = () => /*(int TargetLowPriority, int TargetDedicated)*/ (0, 0);
@@ -722,6 +730,9 @@ namespace TesApi.Tests
             {
                 azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
                 azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
+                azureProxy.Setup(a => a.GetStorageAccountInfoAsync("defaultstorageaccount")).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["defaultstorageaccount"]));
+                azureProxy.Setup(a => a.GetStorageAccountKeyAsync(It.IsAny<StorageAccountInfo>())).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountKey));
+                azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>())).Returns(Task.FromResult(azureProxyReturnValues.DownloadedBlobContent));
                 azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>())).Returns((Pool p) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
                 azureProxy.Setup(a => a.ListComputeNodesAsync(It.IsAny<string>(), It.IsAny<DetailLevel>())).Returns<string, ODATADetailLevel>((poolId, detailLevel) => azureProxyReturnValues.AzureProxyListComputeNodesAsync(poolId, detailLevel));
                 azureProxy.Setup(a => a.DeleteBatchComputeNodesAsync(It.IsAny<string>(), It.IsAny<IEnumerable<ComputeNode>>(), It.IsAny<CancellationToken>())).Callback<string, IEnumerable<ComputeNode>, CancellationToken>((poolId, computeNodes, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchComputeNodes(poolId, computeNodes, cancellationToken)).Returns(Task.CompletedTask);
@@ -737,6 +748,7 @@ namespace TesApi.Tests
         private static IEnumerable<(string Key, string Value)> GetMockConfig()
             => Enumerable
                 .Empty<(string Key, string Value)>()
+                .Append(("DefaultStorageAccountName", "defaultstorageaccount"))
                 .Append(("BatchPoolIdleNodeMinutes", "0.3"))
                 .Append(("BatchPoolIdlePoolDays", "0.000416667"))
                 .Append(("BatchPoolRotationForcedDays", "0.000694444"));

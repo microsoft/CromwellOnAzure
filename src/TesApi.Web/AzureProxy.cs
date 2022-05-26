@@ -52,6 +52,7 @@ namespace TesApi.Web
         private readonly string azureOfferDurableId;
         private readonly string batchResourceGroupName;
         private readonly string batchAccountName;
+        private readonly string batchAccountId;
 
 
         /// <summary>
@@ -64,10 +65,11 @@ namespace TesApi.Web
         {
             this.logger = logger;
             this.batchAccountName = batchAccountName;
-            var (SubscriptionId, ResourceGroupName, Location, BatchAccountEndpoint) = FindBatchAccountAsync(batchAccountName).Result;
+            var (SubscriptionId, ResourceGroupName, Location, BatchAccountEndpoint, BatchAccountId) = FindBatchAccountAsync(batchAccountName).Result;
             batchResourceGroupName = ResourceGroupName;
             subscriptionId = SubscriptionId;
             location = Location;
+            batchAccountId = BatchAccountId;
             batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{BatchAccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
 
             getBatchAccountFunc = async () => 
@@ -635,6 +637,10 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
+        public Task DeleteBlobAsync(Uri blobAbsoluteUri)
+            => new CloudBlockBlob(blobAbsoluteUri).DeleteIfExistsAsync();
+
+        /// <inheritdoc/>
         public async Task<List<VirtualMachineInformation>> GetVmSizesAndPricesAsync()
             => (await GetVmSizesAndPricesRawAsync()).ToList();
 
@@ -798,6 +804,14 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public async Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo)
         {
+            if (poolInfo?.ApplicationPackages is not null)
+            {
+                foreach (var package in poolInfo.ApplicationPackages)
+                {
+                    package.Id = $"{this.batchAccountId}/applications/{package.Id}";
+                }
+            }
+
             try
             {
                 var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
@@ -815,7 +829,7 @@ namespace TesApi.Web
             }
         }
 
-        private static async Task<(string SubscriptionId, string ResourceGroupName, string Location, string BatchAccountEndpoint)> FindBatchAccountAsync(string batchAccountName)
+        private static async Task<(string SubscriptionId, string ResourceGroupName, string Location, string BatchAccountEndpoint, string BatchAccountId)> FindBatchAccountAsync(string batchAccountName)
         {
             var resourceGroupRegex = new Regex("/*/resourceGroups/([^/]*)/*");
 
@@ -833,7 +847,7 @@ namespace TesApi.Web
                 {
                     var resourceGroupName = resourceGroupRegex.Match(batchAccount.Id).Groups[1].Value;
 
-                    return (subId, resourceGroupName, batchAccount.Location, batchAccount.AccountEndpoint);
+                    return (subId, resourceGroupName, batchAccount.Location, batchAccount.AccountEndpoint, batchAccount.Id);
                 }
             }
 
@@ -853,6 +867,39 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null)
             => batchClient.PoolOperations.ListComputeNodes(poolId, detailLevel: detailLevel).ToAsyncEnumerable();
+
+        /// <inheritdoc/>
+        public async Task<IEnumerable<BatchModels.Application>> ListApplications()
+        {
+            var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
+
+            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
+            return (await batchManagementClient.Application.ListAsync(batchResourceGroupName, batchAccountName))
+                .AsContinuousCollection(link => Extensions.Synchronize(() => batchManagementClient.Application.ListNextAsync(link)));
+        }
+
+        /// <inheritdoc/>
+        public async Task<IEnumerable<BatchModels.ApplicationPackage>> ListApplicationPackages(BatchModels.Application application)
+        {
+            var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
+
+            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
+            return (await batchManagementClient.ApplicationPackage.ListAsync(batchResourceGroupName, batchAccountName, application.Name))
+                .AsContinuousCollection(link => Extensions.Synchronize(() => batchManagementClient.ApplicationPackage.ListNextAsync(link)));
+        }
+
+        /// <inheritdoc/>
+        public async Task<string> CreateAndActivateBatchApplication(string name, string version, Stream package)
+        {
+            var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
+
+            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
+            _ = await batchManagementClient.Application.CreateAsync(batchResourceGroupName, batchAccountName, name);
+            var applicationPackage = await batchManagementClient.ApplicationPackage.CreateAsync(batchResourceGroupName, batchAccountName, name, version);
+            await new CloudBlockBlob(new Uri(applicationPackage.StorageUrl, UriKind.Absolute)).UploadFromStreamAsync(package);
+            _ = await batchManagementClient.ApplicationPackage.ActivateAsync(batchResourceGroupName, batchAccountName, name, version, "zip");
+            return (await batchManagementClient.Application.UpdateAsync(batchResourceGroupName, batchAccountName, name, new BatchModels.Application(allowUpdates: false))).Id;
+        }
 
         private class VmPrice
         {
