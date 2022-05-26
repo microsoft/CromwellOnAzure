@@ -6,6 +6,7 @@ BatchImagePublisher=microsoft-azure-batch
 BatchImageSku=20-04-lts
 BatchImageVersion=latest
 BatchNodeAgentSkuId=batch.node.ubuntu 20.04
+CosmosDbDatabaseId=
 MarthaUrl=
 MarthaKeyVaultName=
 MarthaSecretName=

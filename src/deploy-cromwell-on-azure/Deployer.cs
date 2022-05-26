@@ -251,11 +251,6 @@ namespace CromwellOnAzureDeployer
                             throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
                         }
 
-                        if (accountNames.TryGetValue("CosmosDbDatabaseId", out var cosmosDbDatabaseId))
-                        {
-                            configuration.CosmosDbDatabaseId = cosmosDbDatabaseId;
-                        }
-
                         cosmosDb = (await azureSubscriptionClient.CosmosDBAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName))
                             .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase))
                                 ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
@@ -817,7 +812,10 @@ namespace CromwellOnAzureDeployer
                     }, "scripts", "env-01-account-names.txt"),
                     $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
-                    (Utility.GetFileContent("scripts", "env-04-settings.txt"),
+                    (Utility.PersonalizeContent(new []
+                    {
+                        new Utility.ConfigReplaceTextItem("{CosmosDbDatabaseId}", configuration.CosmosDbDatabaseId),
+                    },"scripts", "env-04-settings.txt"),
                     $"{CromwellAzureRootDir}/env-04-settings.txt", false)
                 });
 
