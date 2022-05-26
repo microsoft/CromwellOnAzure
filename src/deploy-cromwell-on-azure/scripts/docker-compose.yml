@@ -8,7 +8,7 @@ services:
     environment:
       - DefaultStorageAccountName=$DefaultStorageAccountName
       - CosmosDbAccountName=$CosmosDbAccountName
-      - CosmosDbAccountId=$CosmosDbAccountId
+      - CosmosDbDatabaseId=CosmosDbDatabaseId
       - BatchAccountName=$BatchAccountName
       - ApplicationInsightsAccountName=$ApplicationInsightsAccountName
       - AzureServicesAuthConnectionString=RunAs=App;AppId=$ManagedIdentityClientId
@@ -87,7 +87,7 @@ services:
     image: "$TriggerServiceImageName"
     environment:
       - DefaultStorageAccountName=$DefaultStorageAccountName
-      - CosmosDbAccountId=$CosmosDbAccountId
+      - CosmosDbDatabaseId=CosmosDbDatabaseId
       - CosmosDbAccountName=$CosmosDbAccountName
       - ApplicationInsightsAccountName=$ApplicationInsightsAccountName
       - AzureServicesAuthConnectionString=RunAs=App;AppId=$ManagedIdentityClientId
