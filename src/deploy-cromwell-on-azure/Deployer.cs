@@ -176,18 +176,23 @@ namespace CromwellOnAzureDeployer
 
                         networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(g => g.NetworkInterfaceIds.Contains(linuxVm.GetPrimaryNetworkInterface().Id));
 
-                        if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup is null)
+                        if (!configuration.PrivateNetworking.GetValueOrDefault())
                         {
-                            if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
+                            if (networkSecurityGroup is null)
                             {
-                                configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                                if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
+                                {
+                                    configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                                }
+
+                                networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
+                                await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
                             }
 
-                            networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
-                            await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
+                            await EnableSsh(networkSecurityGroup);
                         }
 
-                        await EnableSsh(networkSecurityGroup);
+
 
                         sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
 
@@ -389,7 +394,7 @@ namespace CromwellOnAzureDeployer
 
                         if (vnetAndSubnet is not null)
                         {
-                            ConsoleEx.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.vmSubnet}");
+                            ConsoleEx.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.vmSubnet.Name}");
                         }
 
                         if (storageAccount is not null)
@@ -1670,7 +1675,6 @@ namespace CromwellOnAzureDeployer
 
         private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet mySqlSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
         {
-            return null;
             static bool AllOrNoneSet(params string[] values) => values.All(v => !string.IsNullOrEmpty(v)) || values.All(v => string.IsNullOrEmpty(v));
             static bool NoneSet(params string[] values) => values.All(v => string.IsNullOrEmpty(v));
 
