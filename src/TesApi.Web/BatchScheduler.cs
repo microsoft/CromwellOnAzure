@@ -300,12 +300,15 @@ namespace TesApi.Web
             return localPath is not null;
         }
 
-        private (string PoolName, string DisplayName) GetPoolName(TesTask tesTask, string vmSize)
+        private async Task<(string PoolName, string DisplayName)> GetPoolName(TesTask tesTask, string vmSize)
         {
-            var identityResourceId = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
             var hostConfigName = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) == true ? tesTask.Resources.GetBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) : default;
+            var identityResourceId = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
+            var image = tesTask.Executors.FirstOrDefault()?.Image;
+            var containerInfo = await azureProxy.GetContainerRegistryInfoAsync(image);
+            var registryServer = containerInfo is null ? default : containerInfo.RegistryServer;
 
-            var name = $"{hostname ?? "<none>"}-{hostConfigName ?? "<none>"}-{vmSize ?? "<none>"}-{identityResourceId ?? "<none>"}"; // TODO: limit this to 1024
+            var name = $"{hostname ?? "<none>"}-{hostConfigName ?? "<none>"}-{vmSize ?? "<none>"}-{registryServer ?? "<none>"}-{identityResourceId ?? "<none>"}"; // TODO: limit a version of this to 1024 for DisplayName
             return ($"CoA-TES-{PoolNameNamespace.GenerateGuid(name)}-pool", name);
         }
 
@@ -322,7 +325,7 @@ namespace TesApi.Web
             {
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
-                var (poolName, displayName) = this.enableBatchAutopool ? default : GetPoolName(tesTask, virtualMachineInfo.VmSize);
+                var (poolName, displayName) = this.enableBatchAutopool ? default : await GetPoolName(tesTask, virtualMachineInfo.VmSize);
                 await CheckBatchAccountQuotas(virtualMachineInfo, poolName);
 
                 TesTaskLog tesTaskLog = default;
@@ -1748,6 +1751,10 @@ namespace TesApi.Web
                     if (modelPool.Metadata is null) { modelPool.Metadata = new List<BatchModels.MetadataItem>(); }
                     modelPool.Metadata.Add(new(PoolHostName, this.hostname));
                     pool = _poolFactory.CreateNew(await azureProxy.CreateBatchPoolAsync(modelPool), this);
+                }
+                catch (OperationCanceledException)
+                {
+                    HandleTimeout(poolId);
                 }
                 catch (RequestFailedException ex) when (ex.Status == 0 && ex.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout)
                 {
