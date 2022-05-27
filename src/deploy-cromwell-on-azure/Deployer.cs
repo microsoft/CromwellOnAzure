@@ -429,6 +429,7 @@ namespace CromwellOnAzureDeployer
                             Task.Run(async () =>
                             {
                                 storageAccount ??= await CreateStorageAccountAsync();
+
                                 await Task.WhenAll(new Task[]
                                 {
                                     Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync(storageAccount.Id)),
@@ -854,17 +855,17 @@ namespace CromwellOnAzureDeployer
 
                     (Utility.PersonalizeContent(new []
                     {
-                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName ?? String.Empty),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin ?? String.Empty),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword ?? String.Empty),
+                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword),
                     }, "scripts", "env-13-my-sql-db.txt"),
                     $"{CromwellAzureRootDir}/env-13-my-sql-db.txt", false),
 
                     (Utility.PersonalizeContent(new []
                     {
-                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName ?? String.Empty),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin ?? String.Empty),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword ?? String.Empty),
+                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword),
                     }, "scripts", "mysql", "init-user.sql"),
                     $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
                 });
@@ -1052,9 +1053,9 @@ namespace CromwellOnAzureDeployer
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
                         new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? $"{configuration.MySqlServerName}.mysql.database.azure.com" : "mysqldb"),
-                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName ?? String.Empty),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin ?? String.Empty),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword ?? String.Empty),
+                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword),
                         new Utility.ConfigReplaceTextItem("{MySqlUseSSL}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? "true" : "false"),
                     }, "scripts", CromwellConfigurationFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
