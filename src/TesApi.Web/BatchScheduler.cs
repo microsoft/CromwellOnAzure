@@ -302,10 +302,10 @@ namespace TesApi.Web
 
         private (string PoolName, string DisplayName) GetPoolName(TesTask tesTask, string vmSize)
         {
-            var identityResourceId = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : string.Empty;
-            var hostConfigName = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) == true ? tesTask.Resources.GetBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) : string.Empty;
+            var identityResourceId = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
+            var hostConfigName = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) == true ? tesTask.Resources.GetBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) : default;
 
-            var name = $"{hostname}-{hostConfigName}-{vmSize}-{identityResourceId}"; // TODO: limit this to 1024
+            var name = $"{hostname ?? "<none>"}-{hostConfigName ?? "<none>"}-{vmSize ?? "<none>"}-{identityResourceId ?? "<none>"}"; // TODO: limit this to 1024
             return ($"CoA-TES-{PoolNameNamespace.GenerateGuid(name)}-pool", name);
         }
 
@@ -926,7 +926,7 @@ namespace TesApi.Web
             //    }
             //    sb.AppendLine(" && \\");
             //}
-            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{string.Join(" && ", executor.Command.Skip(1))}\" && \\");
+            sb.AppendLine($"docker run {dockerRunParams} --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{string.Join(" && ", executor.Command.Skip(1))}\" && \\");
             sb.AppendLine($"write_ts ExecutorEnd && \\");
             sb.AppendLine($"write_ts UploadStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} /{uploadFilesScriptPath} && \\");

@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29102.190
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32519.379
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{EF518D6D-FA52-4B12-AF47-0C46C0BC434D}"
 	ProjectSection(SolutionItems) = preProject
@@ -30,6 +30,14 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "src\Common\Common.csproj", "{1D5F3C4A-5A69-4A86-BF80-D075DBDD0307}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tests", "src\Common.Tests\Common.Tests.csproj", "{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "HostConfigs", "HostConfigs", "{107966C0-1F15-4CC3-B9A8-9CBB0B1BB668}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dragen_v1.0.0", "dragen_v1.0.0", "{DC47F3B7-A1E5-4619-80EF-372F1B7FB1BB}"
+	ProjectSection(SolutionItems) = preProject
+		HostConfigs\dragen_v1.0.0\config.json = HostConfigs\dragen_v1.0.0\config.json
+		HostConfigs\dragen_v1.0.0\start.zip = HostConfigs\dragen_v1.0.0\start.zip
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -80,6 +88,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{DC47F3B7-A1E5-4619-80EF-372F1B7FB1BB} = {107966C0-1F15-4CC3-B9A8-9CBB0B1BB668}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {67AD4797-6B55-4CF7-A9BB-A83921479EA7}
