@@ -224,6 +224,8 @@ string   VmPassword | Y | N | Y | Required for update
 string   VnetResourceGroupName | Y | Y | N | Available starting version 2.1. The resource group name of the specified virtual network to use - Not required, generated automatically if not provided. If specified, VnetName and SubnetName must be provided.
 string   VnetName | Y | Y | N | Available starting version 2.1. The name of the specified virtual network to use - Not required, generated automatically if not provided. If specified, VnetResourceGroupName and SubnetName must be provided.
 string   SubnetName | Y | Y | N | Available starting version 2.1. The subnet name of the specified virtual network to use - Not required, generated automatically if not provided. If specified, VnetResourceGroupName and VnetName must be provided.
+string   VmSubnetName | Y | Y | N | Available starting version 3.1. The subnet name of the specified virtual network to use for the VM - Not required, generated automatically if not provided and ProvisionMySQLOnAzure is true. If specified, VnetResourceGroupName, VnetName, and MySqlSubnetName  must be provided.
+string   MySqlSubnetName  | Y | Y | N | Available starting version 3.1. The subnet name of the specified virtual network to use for the Azure MySQL database- Not required, generated automatically if not provided and ProvisionMySQLOnAzure is true. If specified, VnetResourceGroupName, VnetName, and VmSubnetName must be provided.
 string   ResourceGroupName | Y | Y | Y | Required for update.   If provided for new Cromwell on Azure deployment, it must already exist.
 string   BatchAccountName | Y | N | N | The name of the Azure Batch Account to use ; must be in the SubscriptionId and RegionName provided - Not required, generated automatically if not provided
 string   StorageAccountName | Y | N | N | The name of the Azure Storage Account to use ; must be in the SubscriptionId provided - Not required, generated automatically if not provided
@@ -237,6 +239,7 @@ bool     Update =   false; | Y | Y | Y | Set to true if you want to update your 
 bool     PrivateNetworking = false; | Y | Y | N | Available starting version 2.2. Set to true to create the host VM without public IP address. If set, VnetResourceGroupName, VnetName and SubnetName must be provided (and already exist). The deployment must be initiated from a machine that has access to that subnet.
 bool     KeepSshPortOpen =   false; | Y | Y | Y | Available starting version 3.0. Set to true if you need to keep the SSH port accessible on the host VM while deployer is not running (not recommended). 
 string   LogAnalyticsArmId | Y | N | N | Arm resource id for an exising Log Analytics workspace, workspace is used for App Insights - Not required, a workspace will be generated automatically if not provided.
+bool     ProvisionMySQLOnAzure =   false; | Y | N | N | Available starting version 3.1. Triggers whether to use Docker MySQL or Azure MySQL when provisioning the database.
 
 ### Use a specific Cromwell version
 #### Before deploying Cromwell on Azure
@@ -292,7 +295,7 @@ This is applicable if the VM and storage account are in different Azure tenants,
 
 1. Add a [SAS url for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file. The SAS token can be at the account or container level and may be read-only or read-write depending on the usage.
     ```
-    https://<yourstorageaccountname>.blob.core.windows.net:443/<yourcontainername>?<sastoken>
+    https://<yourstorageaccountname>.blob.core.windows.net/<yourcontainername>?<sastoken>
     ```
 
 2. Save the changes and restart the VM

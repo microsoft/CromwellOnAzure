@@ -1,5 +1,5 @@
-CREATE USER 'cromwell'@'localhost' IDENTIFIED BY 'cromwell';
-GRANT ALL PRIVILEGES ON cromwell_db.* TO 'cromwell'@'localhost' WITH GRANT OPTION;
-CREATE USER 'cromwell'@'%' IDENTIFIED BY 'cromwell'; 
-GRANT ALL PRIVILEGES ON cromwell_db.* TO 'cromwell'@'%' WITH GRANT OPTION;
+CREATE USER '{MySqlUserLogin}'@'localhost' IDENTIFIED BY '{MySqlUserPassword}';
+GRANT ALL PRIVILEGES ON {MySqlDatabaseName}.* TO '{MySqlUserLogin}'@'localhost' WITH GRANT OPTION;
+CREATE USER '{MySqlUserLogin}'@'%' IDENTIFIED BY '{MySqlUserPassword}';
+GRANT ALL PRIVILEGES ON {MySqlDatabaseName}.* TO '{MySqlUserLogin}'@'%' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
