@@ -36,7 +36,11 @@ write_log
 
 storage_account_name=${kv["DefaultStorageAccountName"]}
 managed_identity_client_id=${kv["ManagedIdentityClientId"]}
-mysql_server_name=${kv["MySqlServerName"]}
+
+mysql_server_name=""
+if [[ -v "kv['MySqlServerName']" ]] ; then
+    mysql_server_name=${kv["MySqlServerName"]}
+fi
 
 write_log "Checking account access (this could take awhile due to role assignment propagation delay)..."
 
