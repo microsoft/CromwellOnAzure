@@ -29,7 +29,7 @@ namespace CromwellOnAzureDeployer
 
             if (sshCommand.ExitStatus != 0)
             {
-                throw new Exception($"ExecuteCommandAsync failed: ExitStatus = {sshCommand.ExitStatus}, Error = '{sshCommand.Error}'");
+                throw new Exception($"ExecuteCommandAsync failed: Command: = {commandText} ExitStatus = {sshCommand.ExitStatus}, Error = '{sshCommand.Error}'");
             }
 
             return (sshCommand.Result.Trim(), sshCommand.Error, sshCommand.ExitStatus);
