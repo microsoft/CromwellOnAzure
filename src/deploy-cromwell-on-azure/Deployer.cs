@@ -420,12 +420,12 @@ namespace CromwellOnAzureDeployer
                             vnetAndSubnet = await CreateVnetAndSubnetsAsync(resourceGroup);
                         }
 
-                        //if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
-                        //{
-                        //    var workspaceName = SdkContext.RandomResourceName(configuration.MainIdentifierPrefix, 15);
-                        //    logAnalyticsWorkspace = await CreateLogAnalyticsWorkspaceResourceAsync(workspaceName);
-                        //    configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
-                        //}
+                        if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
+                        {
+                            var workspaceName = SdkContext.RandomResourceName(configuration.MainIdentifierPrefix, 15);
+                            logAnalyticsWorkspace = await CreateLogAnalyticsWorkspaceResourceAsync(workspaceName);
+                            configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
+                        }
 
 
                         // TODO: put this into a func
@@ -1141,6 +1141,7 @@ namespace CromwellOnAzureDeployer
                            location: configuration.RegionName,
                            version: configuration.PostgreSqlVersion,
                            sku: new Sku(configuration.PostgreSqlSkuName, configuration.PostgreSqlTier),
+                           storage: new Storage(128),
                            administratorLogin: configuration.PostgreSqlAdministratorLogin,
                            administratorLoginPassword: configuration.PostgreSqlAdministratorPassword,
                            network: new Network(publicNetworkAccess: "Disabled", delegatedSubnetResourceId: subnet.Inner.Id, privateDnsZoneArmResourceId: postgreSqlDnsZone.Id)
