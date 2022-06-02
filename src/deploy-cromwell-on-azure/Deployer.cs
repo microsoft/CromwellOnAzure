@@ -48,8 +48,6 @@ using Common;
 using System.Net;
 
 using Sku = Microsoft.Azure.Management.PostgreSQL.FlexibleServers.Models.Sku;
-using Microsoft.Rest.Azure.Authentication;
-
 
 namespace CromwellOnAzureDeployer
 {
@@ -427,22 +425,10 @@ namespace CromwellOnAzureDeployer
                             configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
                         }
 
-
-                        // TODO: put this into a func
-                        //Microsoft.Rest.ServiceClientCredentials serviceCreds = await ApplicationTokenProvider.LoginSilentAsync(tokenCredentials.TenantId, tokenCredentials.CallerId, secret);
-                        //var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions { ManagedIdentityClientId = managedIdentity });
-                        ConsoleEx.WriteLine($"DNS make");
-
-                        var dnsClient = new PrivateDnsManagementClient(tokenCredentials)
+                        if (configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
                         {
-                            SubscriptionId = configuration.SubscriptionId
-                        };
-                        var dnsZoneParams = new PrivateZone(etag: "global", location: "global");
-                        postgreSqlDnsZone = await dnsClient.PrivateZones.CreateOrUpdateAsync(configuration.ResourceGroupName, "privatelink.postgres.database.azure.com", dnsZoneParams, null, "*");
-                        var vnet = new Microsoft.Azure.Management.PrivateDns.Models.SubResource(vnetAndSubnet.Value.virtualNetwork.Id);
-                        var thing = await dnsClient.VirtualNetworkLinks.CreateOrUpdateAsync(configuration.ResourceGroupName, postgreSqlDnsZone.Name, vnetAndSubnet.Value.virtualNetwork.Name, 
-                            new VirtualNetworkLink(name: "PrivateVnetLink", location: "global", virtualNetwork: vnet, registrationEnabled: false));
-                        ConsoleEx.WriteLine($"DNS made");
+                            postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork);
+                        }
 
                         await Task.WhenAll(new Task[]
                         {
@@ -1301,9 +1287,26 @@ namespace CromwellOnAzureDeployer
 
         private Task CreateMySqlDatabaseUser(ConnectionInfo sshConnectionInfo, Server mySqlServer)
             => Execute(
-                $"Creating MySQL database user...",
+                $"Creating PostgreSQL database user...",
                 () => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo -u postgres psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} < {CromwellAzureRootDir}/mysql-init/init-user.sql")
             );
+
+        private Task<PrivateZone> CreatePrivateDnsZoneAsync(INetwork virtualNetwork)
+            => Execute(
+                "Creating private DNS Zone for PostgreSQL Server",
+                async () =>
+                {
+                    var dnsClient = new PrivateDnsManagementClient(tokenCredentials)
+                    {
+                        SubscriptionId = configuration.SubscriptionId
+                    };
+                    var dnsZoneParams = new PrivateZone(etag: "global", location: "global");
+                    var postgreSqlDnsZone = await dnsClient.PrivateZones.CreateOrUpdateAsync(configuration.ResourceGroupName, "privatelink.postgres.database.azure.com", dnsZoneParams, null, "*");
+                    var vnet = new Microsoft.Azure.Management.PrivateDns.Models.SubResource(virtualNetwork.Id);
+                    await dnsClient.VirtualNetworkLinks.CreateOrUpdateAsync(configuration.ResourceGroupName, postgreSqlDnsZone.Name, virtualNetwork.Name,
+                        new VirtualNetworkLink(name: "PrivateVnetLink", location: "global", virtualNetwork: vnet, registrationEnabled: false));
+                    return postgreSqlDnsZone;
+                });
 
         private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
             => Execute(
