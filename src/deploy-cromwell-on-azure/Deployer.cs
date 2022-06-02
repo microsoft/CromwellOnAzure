@@ -858,7 +858,7 @@ namespace CromwellOnAzureDeployer
 
                     if(configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
                     {
-                        await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y mysql-client");
+                        await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y postgresql");
                     }
                 });
 
@@ -873,7 +873,7 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{BatchAccountName}", configuration.BatchAccountName),
                         new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
                         new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
-                        new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? configuration.PostgreSqlServerName : String.Empty),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? configuration.PostgreSqlServerName : String.Empty),
                     }, "scripts", "env-01-account-names.txt"),
                     $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
@@ -881,17 +881,17 @@ namespace CromwellOnAzureDeployer
 
                     (Utility.PersonalizeContent(new []
                     {
-                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.PostgreSqlDatabaseName),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.PostgreSqlUserLogin),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.PostgreSqlUserPassword),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
                     }, "scripts", "env-13-my-sql-db.txt"),
                     $"{CromwellAzureRootDir}/env-13-my-sql-db.txt", false),
 
                     (Utility.PersonalizeContent(new []
                     {
-                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.PostgreSqlDatabaseName),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.PostgreSqlUserLogin),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.PostgreSqlUserPassword),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
                     }, "scripts", "mysql", "init-user.sql"),
                     $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
                 });
@@ -1078,11 +1078,11 @@ namespace CromwellOnAzureDeployer
                     }, "scripts", ContainersToMountFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
-                        new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? $"{configuration.PostgreSqlServerName}.mysql.database.azure.com" : "mysqldb"),
-                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.PostgreSqlDatabaseName),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.PostgreSqlUserLogin),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.PostgreSqlUserPassword),
-                        new Utility.ConfigReplaceTextItem("{MySqlUseSSL}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? "true" : "false"),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? $"{configuration.PostgreSqlServerName}.postgres.database.azure.com" : "mysqldb"),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
+                        new Utility.ConfigReplaceTextItem("{PostgreSqlUseSSL}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? "true" : "false"),
                     }, "scripts", CromwellConfigurationFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
@@ -1141,7 +1141,7 @@ namespace CromwellOnAzureDeployer
                            location: configuration.RegionName,
                            version: configuration.PostgreSqlVersion,
                            sku: new Sku(configuration.PostgreSqlSkuName, configuration.PostgreSqlTier),
-                           storage: new Storage(128),
+                           storage: new Storage(configuration.PostgreSqlStorageSize),
                            administratorLogin: configuration.PostgreSqlAdministratorLogin,
                            administratorLoginPassword: configuration.PostgreSqlAdministratorPassword,
                            network: new Network(publicNetworkAccess: "Disabled", delegatedSubnetResourceId: subnet.Inner.Id, privateDnsZoneArmResourceId: postgreSqlDnsZone.Id)
@@ -1302,7 +1302,7 @@ namespace CromwellOnAzureDeployer
         private Task CreateMySqlDatabaseUser(ConnectionInfo sshConnectionInfo, Server mySqlServer)
             => Execute(
                 $"Creating MySQL database user...",
-                () => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"mysql -u {configuration.PostgreSqlAdministratorLogin} -p'{configuration.PostgreSqlAdministratorPassword}' -h {mySqlServer.FullyQualifiedDomainName} -P 3306 < {CromwellAzureRootDir}/mysql-init/init-user.sql")
+                () => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo -u postgres psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} < {CromwellAzureRootDir}/mysql-init/init-user.sql")
             );
 
         private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)

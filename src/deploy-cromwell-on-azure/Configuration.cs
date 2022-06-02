@@ -22,6 +22,7 @@ namespace CromwellOnAzureDeployer
         public string DefaultVmSubnetName { get; set; } = "vmsubnet";
         public string DefaultPostgreSqlSubnetName { get; set; } = "mysqlsubnet";
         public string PostgreSqlVersion { get; set; } = "11";
+        public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
     }
     public abstract class UserAccessibleConfiguration
     {
