@@ -73,6 +73,7 @@
     <EmbeddedResource Include="scripts\mount-data-disk.sh" />
     <EmbeddedResource Include="scripts\mount.blobfuse" />
     <EmbeddedResource Include="scripts\mount_containers.sh" />
+    <EmbeddedResource Include="scripts\mysql\init-user-postgre.sql" />
     <EmbeddedResource Include="scripts\mysql\init-user.sql" />
     <EmbeddedResource Include="scripts\mysql\unlock-change-log.sql" />
     <EmbeddedResource Include="scripts\startup.sh" />

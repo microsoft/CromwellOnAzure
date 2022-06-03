@@ -114,7 +114,7 @@ kv["TriggerServiceImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 
 if [ -n "$mysql_server_name" ]; then
-    fully_qualified_server_name="$mysql_server_name.mysql.database.azure.com"
+    fully_qualified_server_name="$mysql_server_name.postgres.database.azure.com"
     mysql_db_name=${kv["PostgreSqlDatabaseName"]}
     mysql_user_login=${kv["PostgreSqlUserLogin"]}
     mysql_user_password=${kv["PostgreSqlUserPassword"]}
