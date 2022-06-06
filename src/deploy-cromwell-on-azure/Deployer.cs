@@ -844,7 +844,7 @@ namespace CromwellOnAzureDeployer
 
                     if(configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                     {
-                        await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y postgresql");
+                        await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y postgresql-client");
                     }
                 });
 

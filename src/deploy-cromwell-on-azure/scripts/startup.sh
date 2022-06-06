@@ -118,10 +118,10 @@ if [ -n "$mysql_server_name" ]; then
     mysql_db_name=${kv["PostgreSqlDatabaseName"]}
     mysql_user_login=${kv["PostgreSqlUserLogin"]}
     mysql_user_password=${kv["PostgreSqlUserPassword"]}
-#    write_log "Checking if database $mysql_db_name is locked"
-#    lockTableExists=$(mysql -u "$mysql_user_login" -p"$mysql_user_password" -h "$fully_qualified_server_name" -P 3306 -e "SELECT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = '$mysql_db_name' AND table_name = 'DATABASECHANGELOGLOCK') AS '' ")
-#    [[ "$lockTableExists" -eq "1" ]] && isLocked=$(mysql -u "$mysql_user_login" -p"$mysql_user_password" -h "$fully_qualified_server_name" -P 3306 -e "SELECT CONV(LOCKED, 2, 2) AS '' FROM $mysql_db_name.DATABASECHANGELOGLOCK WHERE ID = 1") || isLocked=0
-#    [[ "$isLocked" -eq "1" ]] && write_log "Removing lock from $mysql_db_name" && mysql -u "$mysql_user_login" -p"$mysql_user_password" -h "$fully_qualified_server_name" -P 3306 -e "UPDATE $mysql_db_name.DATABASECHANGELOGLOCK SET LOCKED = 0, LOCKGRANTED = null, LOCKEDBY = null WHERE ID = 1" || write_log "$mysql_db_name was not locked"
+    write_log "Checking if database $mysql_db_name is locked"
+    lockTableExists=$(psql -t -d "host="$fully_qualified_server_name" dbname=$mysql_db_name user=$mysql_user_login password=$mysql_user_password" -c "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'databasechangeloglock'")
+    [[ "$lockTableExists" -eq "1" ]] && isLocked=$(psql -t -d "host="$fully_qualified_server_name" dbname=$mysql_db_name user=$mysql_user_login password=$mysql_user_password" -c "SELECT locked::int FROM databasechangeloglock WHERE ID = 1") || isLocked=0
+    [[ "$isLocked" -eq "1" ]] && write_log "Removing lock from $mysql_db_name" && psql -t -d "host="$fully_qualified_server_name" dbname=$mysql_db_name user=$mysql_user_login password=$mysql_user_password" -c "UPDATE databasechangeloglock SET locked = FALSE, lockgranted = null, lockedby = null WHERE ID = 1" || write_log "$mysql_db_name was not locked"
 fi
 
 write_log "Running docker-compose up"
