@@ -36,7 +36,7 @@ write_log
 
 storage_account_name=${kv["DefaultStorageAccountName"]}
 managed_identity_client_id=${kv["ManagedIdentityClientId"]}
-mysql_server_name=${kv["PostgreSqlServerName"]}
+db_server_name=${kv["PostgreSqlServerName"]}
 
 write_log "Checking account access (this could take awhile due to role assignment propagation delay)..."
 
@@ -113,15 +113,15 @@ kv["TesImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}
 kv["TriggerServiceImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TriggerServiceImageName"]})
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 
-if [ -n "$mysql_server_name" ]; then
-    fully_qualified_server_name="$mysql_server_name.postgres.database.azure.com"
-    mysql_db_name=${kv["PostgreSqlDatabaseName"]}
-    mysql_user_login=${kv["PostgreSqlUserLogin"]}
-    mysql_user_password=${kv["PostgreSqlUserPassword"]}
-    write_log "Checking if database $mysql_db_name is locked"
-    lockTableExists=$(psql -t -d "host="$fully_qualified_server_name" dbname=$mysql_db_name user=$mysql_user_login password=$mysql_user_password" -c "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'databasechangeloglock'")
-    [[ "$lockTableExists" -eq "1" ]] && isLocked=$(psql -t -d "host="$fully_qualified_server_name" dbname=$mysql_db_name user=$mysql_user_login password=$mysql_user_password" -c "SELECT locked::int FROM databasechangeloglock WHERE ID = 1") || isLocked=0
-    [[ "$isLocked" -eq "1" ]] && write_log "Removing lock from $mysql_db_name" && psql -t -d "host="$fully_qualified_server_name" dbname=$mysql_db_name user=$mysql_user_login password=$mysql_user_password" -c "UPDATE databasechangeloglock SET locked = FALSE, lockgranted = null, lockedby = null WHERE ID = 1" || write_log "$mysql_db_name was not locked"
+if [ -n "$db_server_name" ]; then
+    fully_qualified_server_name="$db_server_name.postgres.database.azure.com"
+    db_name=${kv["PostgreSqlDatabaseName"]}
+    db_user=${kv["PostgreSqlUserLogin"]}
+    db_user_password=${kv["PostgreSqlUserPassword"]}
+    write_log "Checking if database $db_name is locked"
+    lockTableExists=$(psql -t -d "host="$fully_qualified_server_name" dbname=$db_name user=$db_user password=$db_user_password" -c "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'databasechangeloglock'")
+    [[ "$lockTableExists" -eq "1" ]] && isLocked=$(psql -t -d "host="$fully_qualified_server_name" dbname=$db_name user=$db_user password=$db_user_password" -c "SELECT CAST(locked AS INTEGER) FROM databasechangeloglock WHERE ID = 1") || isLocked=0
+    [[ "$isLocked" -eq "1" ]] && write_log "Removing lock from $db_name" && psql -t -d "host="$fully_qualified_server_name" dbname=$db_name user=$db_user password=$db_user_password" -c "UPDATE databasechangeloglock SET locked = FALSE, lockgranted = null, lockedby = null WHERE ID = 1" || write_log "$db_name was not locked"
 fi
 
 write_log "Running docker-compose up"
