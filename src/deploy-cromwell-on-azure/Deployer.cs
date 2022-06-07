@@ -316,6 +316,11 @@ namespace CromwellOnAzureDeployer
                             ConsoleEx.WriteLine($"To do that, navigate to the storage account in the Azure Portal,", ConsoleColor.Yellow);
                             ConsoleEx.WriteLine($"Configuration tab, and click 'Upgrade.'", ConsoleColor.Yellow);
                         }
+
+                        if (installedVersion is null || installedVersion < new Version(3, 1))
+                        {
+                            await PatchCromwellConfigurationFileV310Async(storageAccount);
+                        }
                     }
 
                     if (!configuration.Update)
@@ -771,7 +776,7 @@ namespace CromwellOnAzureDeployer
 
             if (configuration.Update)
             {
-                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose down");
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down");
             }
 
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
@@ -1545,6 +1550,18 @@ namespace CromwellOnAzureDeployer
                     {
                         cromwellConfigText = tesBackendParametersRegex.Replace(cromwellConfigText, match => $"{match.Groups[1].Value}\n        use_tes_11_preview_backend_parameters = true{match.Groups[2].Value}");
                     }
+
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
+                });
+
+        private Task PatchCromwellConfigurationFileV310Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName);
+                    var akkaHttpRegex = new Regex(@"(\s*akka\.http\.host-connection-pool\.pool-implementation.*$)", RegexOptions.Multiline);
+                    cromwellConfigText = akkaHttpRegex.Replace(cromwellConfigText, match => string.Empty);
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
                 });
