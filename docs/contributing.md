@@ -37,6 +37,8 @@ This includes things like
 We also ask contributors to plaese update the docs if you add a flag to Configuration.cs.
 
 #### Setting up a Private VNet
+TODO: REPLACE THIS SECTION WITH LINK TO PRIVATE VNET DOC ONCE JONATHON PUSHES IT.
+
 Deploying Cromwell on Azure in a Private Virtual Network ensures a secure self contained deployment with no public endpoints. This deployment expects you to have already created a number of your own resources hooked up to the VNet. 
 
 Azure resources to manually set up (must all be deployed in same region): 
