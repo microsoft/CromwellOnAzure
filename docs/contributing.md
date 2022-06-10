@@ -11,8 +11,10 @@ This project follows the [Microsoft Open Source Code of Conduct](https://github.
 
 ## Issues and Pull Requests
 - Open issues can be found [here](https://github.com/microsoft/CromwellOnAzure/issues). We also keep a project board of issues to solve by certain releases which can be found [here](https://github.com/microsoft/CromwellOnAzure/projects). Please tag new issues appropriately and loop in maintainers for discussion if you're not sure. 
-- If you're working on a large issue, please use the issue templates to break it down into smaller sub tasks. We're looking to balance avoiding massive functionality changing PRs, while not including half baked features.
+- If you're working on a large issue, please use the issue templates to break it down into smaller sub tasks. We're looking to balance avoiding massive functionality changing PRs, while not including half-baked features.
+- Please include a "risk assessment" in your PR descriptions describing what areas your PR could possibly affect. This helps reviewers less familiar with your code give a better review and anticipate problems.
 - While we have a number of contributors to the project, some folks are more frequent contributors and will be more appropriate to code review. Please look through recent PRs to get a sense of who might be most appropriate to review.
+- If you're ready for a PR review make sure the PR is not marked as Draft.
 - Make sure all Azure changes work with a [Private VNet deployment](#setting-up-a-private-vnet). We're currently working on including this in integration testing so all verification must happen manually.
 
 ## Developer Environment
@@ -34,16 +36,16 @@ This includes things like
 - Making full use of modern C# conventions such as omitting type name or using object initalizer for the [`new` keyword](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/operators/new-operator#constructor-invocation) and using modern operators such as [is](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/operators/is) (ex: `vnetAndSubnet is not null` instead of `vnetAndSubnet != null`)
 - Using [Asynchronous Programming](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/async/) to effectively allocate resources and block as little as possible.
 
-We also ask contributors to plaese update the docs if you add a flag to Configuration.cs.
+We also ask contributors to please update the docs if you add a flag to Configuration.cs.
 
 #### Setting up a Private VNet
 TODO: REPLACE THIS SECTION WITH LINK TO PRIVATE VNET DOC ONCE JONATHON PUSHES IT.
 
-Deploying Cromwell on Azure in a Private Virtual Network ensures a secure self contained deployment with no public endpoints. This deployment expects you to have already created a number of your own resources hooked up to the VNet. 
+Deploying Cromwell on Azure in a Private Virtual Network ensures a secure self-contained deployment with no public endpoints. This deployment expects you to have already created a number of your own resources hooked up to the VNet. 
 
 Azure resources to manually set up (must all be deployed in same region): 
 - Virtual Network (with Managed PostgreSQL subnet if applicable) and Network Security Group
-- A VM in the virtual network to use at a bridge machine. (You won't be able to run Cromwell on Azure from your local machine with the Private VNet.)
+- A VM in the virtual network to use as a bridge machine. (You won't be able to run Cromwell on Azure from your local machine with the Private VNet.)
 - Azure Batch account with private endpoint
 - CosmosDB with private endpoint
 - Azure Storage account with private endpoint
