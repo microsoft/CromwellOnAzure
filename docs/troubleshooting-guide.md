@@ -239,7 +239,7 @@ bool     Update =   false; | Y | Y | Y | Set to true if you want to update your 
 bool     PrivateNetworking = false; | Y | Y | N | Available starting version 2.2. Set to true to create the host VM without public IP address. If set, VnetResourceGroupName, VnetName and SubnetName must be provided (and already exist). The deployment must be initiated from a machine that has access to that subnet.
 bool     KeepSshPortOpen =   false; | Y | Y | Y | Available starting version 3.0. Set to true if you need to keep the SSH port accessible on the host VM while deployer is not running (not recommended). 
 string   LogAnalyticsArmId | Y | N | N | Arm resource id for an exising Log Analytics workspace, workspace is used for App Insights - Not required, a workspace will be generated automatically if not provided.
-bool     ProvisionPostgreSqlOnAzure =   false; | Y | N | N | Available starting version 3.1. Triggers whether to use Docker MySQL or Azure PostgreSQL when provisioning the database.
+bool     ProvisionPostgreSqlOnAzure =   false; | Y | N | N | COMING SOON in version 4.0. Triggers whether to use Docker MySQL or Azure PostgreSQL when provisioning the database.
 
 ### Use a specific Cromwell version
 #### Before deploying Cromwell on Azure
