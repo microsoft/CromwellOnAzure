@@ -15,6 +15,7 @@ This project follows the [Microsoft Open Source Code of Conduct](https://github.
 - Please include a "risk assessment" in your PR descriptions describing what areas your PR could possibly affect. This helps reviewers less familiar with your code give a better review and anticipate problems.
 - While we have a number of contributors to the project, some folks are more frequent contributors and will be more appropriate to code review. Please look through recent PRs to get a sense of who might be most appropriate to review.
 - If you're ready for a PR review make sure the PR is not marked as Draft.
+- To make sure you're on top of linting, please run Code Cleanup (Ctrl+K, Ctrl+E) on your files in Visual Studio to make use of our `.editorconfig`. To configure this to run automatically on save in Visual Studio, go to Options > Text Editor > Code Cleanup and select Run Code Cleanup profile on save.
 - Make sure all Azure changes work with a [Private VNet deployment](#setting-up-a-private-vnet). We're currently working on including this in integration testing so all verification must happen manually.
 
 ## Developer Environment
@@ -31,7 +32,7 @@ Cromwell on Azure currently does not have enforced linting, so we do ask all con
 This includes things like 
 - Keeping one newline between end braces `}` 
 - Using `var` instead of explicitly typed variables
-- Keeping our `using` statements in alphabetical order
+- Keeping our `using` statements in alphabetical order (can be fixed by running Code Cleanup in Visual Studio)
 - Cleaning up unused variables
 - Making full use of modern C# conventions such as omitting type name or using object initalizer for the [`new` keyword](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/operators/new-operator#constructor-invocation) and using modern operators such as [is](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/operators/is) (ex: `vnetAndSubnet is not null` instead of `vnetAndSubnet != null`)
 - Using [Asynchronous Programming](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/async/) to effectively allocate resources and block as little as possible.
