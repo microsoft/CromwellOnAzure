@@ -408,7 +408,7 @@ namespace CromwellOnAzureDeployer
                         {
                             ConsoleEx.WriteLine($"Using existing Storage Account {storageAccount.Name}");
                         }
-                        
+
                         if (batchAccount is not null)
                         {
                             ConsoleEx.WriteLine($"Using existing Batch Account {batchAccount.Name}");
@@ -438,7 +438,7 @@ namespace CromwellOnAzureDeployer
                         {
                             Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
                             Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
-                            Task.Run(async () => { 
+                            Task.Run(async () => {
                                 if(configuration.ProvisionPostgreSqlOnAzure== true) { postgreSqlServer = await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone); }
                             }),
 
@@ -847,7 +847,7 @@ namespace CromwellOnAzureDeployer
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo {CromwellAzureRootDir}/install-cromwellazure.sh");
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod -aG docker {configuration.VmUsername}");
 
-                    if(configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                    if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                     {
                         await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y postgresql-client");
                     }
@@ -1074,14 +1074,15 @@ namespace CromwellOnAzureDeployer
 
                     // Configure Cromwell config file for Docker Mysql or PostgreSQL on Azure.
                     var databaseConfig = new List<String>();
-                    if(configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                    if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                     {
                         databaseConfig.Add($"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName}?sslmode=require\"");
                         databaseConfig.Add($"\"{configuration.PostgreSqlUserLogin}\"");
                         databaseConfig.Add($"\"{configuration.PostgreSqlUserPassword}\"");
                         databaseConfig.Add($"\"org.postgresql.Driver\"");
                         databaseConfig.Add("\"slick.jdbc.PostgresProfile$\"");
-                    } else
+                    }
+                    else
                     {
                         databaseConfig.Add($"\"jdbc:mysql://mysqldb/cromwell_db?useSSL=false&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true\"");
                         databaseConfig.Add($"\"cromwell\"");
@@ -1166,7 +1167,7 @@ namespace CromwellOnAzureDeployer
                 () => postgresManagementClient.Databases.CreateAsync(
                     configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlDatabaseName,
                     new Database()));
- 
+
             return server;
         }
 
@@ -1364,7 +1365,7 @@ namespace CromwellOnAzureDeployer
                     .WithoutPlan()
                     .WithApiVersion("2020-02-02")
                     .WithParentResource(string.Empty)
-                    .WithProperties(new Dictionary<string, string>() { 
+                    .WithProperties(new Dictionary<string, string>() {
                         { "Application_Type", "other" } ,
                         { "WorkspaceResourceId", logAnalyticsArmId }
                     })
@@ -1786,7 +1787,7 @@ namespace CromwellOnAzureDeployer
             var resourceGraphClient = new ResourceGraphClient(tokenCredentials);
             var postgreSqlSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
 
-            if (configuration.ProvisionPostgreSqlOnAzure== true)
+            if (configuration.ProvisionPostgreSqlOnAzure == true)
             {
                 if (postgreSqlSubnet == null)
                 {
