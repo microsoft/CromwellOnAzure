@@ -26,6 +26,8 @@ using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Polly;
+using Polly.Retry;
 using Tes.Models;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
@@ -50,7 +52,7 @@ namespace TesApi.Web
         private readonly string azureOfferDurableId;
         private readonly string batchResourceGroupName;
         private readonly string batchAccountName;
-
+        private readonly AsyncRetryPolicy batchRetryPolicy;
 
         /// <summary>
         /// The constructor
@@ -80,6 +82,19 @@ namespace TesApi.Web
                 logger.LogWarning($"Azure ARM location '{location}' does not have a corresponding Azure Billing Region.  Prices from the fallback billing region '{DefaultAzureBillingRegionName}' will be used instead.");
                 billingRegionName = DefaultAzureBillingRegionName;
             }
+
+            batchRetryPolicy = Polly.Policy
+                .Handle<Exception>()
+                .WaitAndRetryAsync(new[]
+                {
+                    TimeSpan.FromSeconds(1),
+                    TimeSpan.FromSeconds(1),
+                    TimeSpan.FromSeconds(2),
+                    TimeSpan.FromSeconds(2),
+                    TimeSpan.FromSeconds(4),
+                }, (exception, timeSpan, retryCount, context) => {
+                    logger.LogWarning(exception, $"Azure Batch Job exception during {context.OperationKey} for Job ID: {context["jobId"]} (potentially transient due to Batch cache race condition), waiting {timeSpan.TotalSeconds:n0}s...");
+                });
         }
 
         // TODO: Static method because the instrumentation key is needed in both Program.cs and Startup.cs and we wanted to avoid intializing the batch client twice.
@@ -246,23 +261,26 @@ namespace TesApi.Web
         /// <returns></returns>
         public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
         {
+            var contextDictionary = new Dictionary<string, object>();
+            contextDictionary.Add("jobId", jobId);
+
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
-            await job.CommitAsync();
+            await batchRetryPolicy.ExecuteAsync(async (context) => await job.CommitAsync(), new Context("CreateBatchJobAsync-CommitAsync-1", contextDictionary));
 
             try
             {
-                job = await batchClient.JobOperations.GetJobAsync(job.Id); // Retrieve the "bound" version of the job
+                await batchRetryPolicy.ExecuteAsync(async (context) => job = await batchClient.JobOperations.GetJobAsync(job.Id), new Context("CreateBatchJobAsync-GetJobAsync", contextDictionary));
                 job.PoolInformation = poolInformation;  // Redoing this since the container registry password is not retrieved by GetJobAsync()
                 job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
-                await job.AddTaskAsync(cloudTask);
-                await job.CommitAsync();
+                await batchRetryPolicy.ExecuteAsync(async (context) => await job.AddTaskAsync(cloudTask), new Context("CreateBatchJobAsync-AddTaskAsync", contextDictionary));
+                await batchRetryPolicy.ExecuteAsync(async (context) => await job.CommitAsync(), new Context("CreateBatchJobAsync-CommitAsync-2", contextDictionary));
             }
             catch (Exception ex)
             {
                 var batchError = JsonConvert.SerializeObject((ex as BatchException)?.RequestInformation?.BatchError);
                 logger.LogError(ex, $"Deleting {job.Id} because adding task to it failed. Batch error: {batchError}");
 
-                await batchClient.JobOperations.DeleteJobAsync(job.Id);
+                await batchRetryPolicy.ExecuteAsync(async (context) => await batchClient.JobOperations.DeleteJobAsync(job.Id), new Context("CreateBatchJobAsync-DeleteJobAsync", contextDictionary));
 
                 if (!string.IsNullOrWhiteSpace(poolInformation?.PoolId))
                 {
