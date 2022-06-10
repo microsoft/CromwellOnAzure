@@ -12,10 +12,10 @@ This project follows the [Microsoft Open Source Code of Conduct](https://github.
 ## Issues and Pull Requests
 - Open issues can be found [here](https://github.com/microsoft/CromwellOnAzure/issues). We also keep a project board of issues to solve by certain releases which can be found [here](https://github.com/microsoft/CromwellOnAzure/projects). Please tag new issues appropriately and loop in maintainers for discussion if you're not sure. 
 - If you're working on a large issue, please use the issue templates to break it down into smaller sub tasks. We're looking to balance avoiding massive functionality changing PRs, while not including half-baked features.
-- Please include a "risk assessment" in your PR descriptions describing what areas your PR could possibly affect. This helps reviewers less familiar with your code give a better review and anticipate problems.
-- While we have a number of contributors to the project, some folks are more frequent contributors and will be more appropriate to code review. Please look through recent PRs to get a sense of who might be most appropriate to review.
-- If you're ready for a PR review make sure the PR is not marked as Draft.
 - To make sure you're on top of linting, please run Code Cleanup (Ctrl+K, Ctrl+E) on your files in Visual Studio to make use of our `.editorconfig`. To configure this to run automatically on save in Visual Studio, go to Options > Text Editor > Code Cleanup and select Run Code Cleanup profile on save.
+- Please include a "risk assessment" in your PR descriptions describing what areas your PR could possibly affect. This helps reviewers less familiar with your code give a better review and anticipate problems.
+- Please CC the group Genomics-devs on your PRs, or the appropriate individual(s) from said group.  
+- If you're ready for a PR review make sure the PR is not marked as Draft.
 - Make sure all Azure changes work with a [Private VNet deployment](#setting-up-a-private-vnet). We're currently working on including this in integration testing so all verification must happen manually.
 
 ## Developer Environment
