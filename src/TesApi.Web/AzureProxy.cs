@@ -265,14 +265,15 @@ namespace TesApi.Web
             contextDictionary.Add("jobId", jobId);
 
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
+            job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
             await batchRetryPolicy.ExecuteAsync(async (context) => await job.CommitAsync(), new Context("CreateBatchJobAsync-CommitAsync-1", contextDictionary));
 
             try
             {
                 await batchRetryPolicy.ExecuteAsync(async (context) => job = await batchClient.JobOperations.GetJobAsync(job.Id), new Context("CreateBatchJobAsync-GetJobAsync", contextDictionary));
                 job.PoolInformation = poolInformation;  // Redoing this since the container registry password is not retrieved by GetJobAsync()
-                job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
-                await batchRetryPolicy.ExecuteAsync(async (context) => await job.AddTaskAsync(cloudTask), new Context("CreateBatchJobAsync-AddTaskAsync", contextDictionary));
+
+                await job.AddTaskAsync(cloudTask);
                 await batchRetryPolicy.ExecuteAsync(async (context) => await job.CommitAsync(), new Context("CreateBatchJobAsync-CommitAsync-2", contextDictionary));
             }
             catch (Exception ex)
