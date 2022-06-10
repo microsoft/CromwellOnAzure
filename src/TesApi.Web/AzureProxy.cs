@@ -269,6 +269,7 @@ namespace TesApi.Web
 
             try
             {
+                // Retrieve the "bound" version of the job
                 await batchRetryPolicy.ExecuteAsync(async (context) => job = await batchClient.JobOperations.GetJobAsync(job.Id), new Context("CreateBatchJobAsync-GetJobAsync", contextDictionary));
                 await job.AddTaskAsync(cloudTask);
             }
