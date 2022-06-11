@@ -63,16 +63,14 @@ namespace Tes.Models
                 .Append("  Name: ").Append(Name).Append('\n')
                 .Append("  Doc: ").Append(Doc).Append('\n')
                 .Append("  Storage: ")
-                .IfThenElse(
-                    Storage?.Count > 0,
-                    s => s.Append(string.Join(",", Storage)),
-                    s => s)
+                .Append(
+                    Storage?.Count > 0 ?
+                    string.Join(",", Storage) : null)
                 .Append('\n')
                 .Append("  TesResourcesSupportedBackendParameters: ")
-                .IfThenElse(
-                    TesResourcesSupportedBackendParameters?.Count > 0,
-                    s => s.Append(string.Join(",", Enum.GetNames(typeof(TesResources.SupportedBackendParameters)))),
-                    s => s)
+                .Append(
+                    TesResourcesSupportedBackendParameters?.Count > 0 ?
+                    string.Join(",", Enum.GetNames(typeof(TesResources.SupportedBackendParameters))) : null)
                 .Append('\n')
                 .Append("}\n")
                 .ToString();
