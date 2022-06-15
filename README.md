@@ -226,6 +226,10 @@ Run Broad Institute of MIT and Harvard's Best Practices Pipelines on Cromwell on
 
 [Sequence data format conversion](https://github.com/microsoft/seq-format-conversion-azure)<br/>
 
+Other WDL examples on Cromwell on Azure:
+
+[Cromwell Output Re-Organization](https://github.com/microsoft/cromwell-output-reorganization)<br/>
+
 ## Related Projects
 
 [Genomics Data Analysis with Jupyter Notebooks on Azure](https://github.com/microsoft/genomicsnotebook)<br/>

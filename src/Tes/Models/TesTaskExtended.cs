@@ -41,6 +41,12 @@ namespace Tes.Models
         public string WorkflowId { get; set; }
 
         /// <summary>
+        /// Top-most parent workflow ID from the workflow engine
+        /// </summary>
+        [DataMember(Name = "pool_id")]
+        public string PoolId { get; set; }
+
+        /// <summary>
         /// Overall reason of the task failure, populated when task execution ends in EXECUTOR_ERROR or SYSTEM_ERROR, for example "DiskFull".
         /// </summary>
         [IgnoreDataMember]

@@ -142,7 +142,7 @@ namespace TesApi.Web
                     {
                         enumerator?.Dispose();
                         enumerator = null;
-                        source = await source.GetNextPageAsync(cancellationToken).ConfigureAwait(false);
+                        source = await source.GetNextPageAsync(cancellationToken);
                         if (source is null)
                         {
                             return false;
@@ -176,7 +176,7 @@ namespace TesApi.Web
             public async ValueTask<bool> MoveNextAsync()
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return await source.MoveNextAsync(cancellationToken).ConfigureAwait(false);
+                return await source.MoveNextAsync(cancellationToken);
             }
         }
         #endregion

@@ -89,26 +89,14 @@ namespace Tes.Models
                 .Append("  RamGb: ").Append(RamGb).Append('\n')
                 .Append("  DiskGb: ").Append(DiskGb).Append('\n')
                 .Append("  Zones: ")
-                .IfThenElse(
-                    Zones?.Count > 0,
-                    s => s.Append(string.Join(",", Zones)),
-                    s => s)
+                .Append(
+                    Zones?.Count > 0 ?
+                    string.Join(",", Zones) : null)
                 .Append('\n')
                 .Append("  BackendParameters: ")
-                .IfThenElse(
-                    BackendParameters?.Keys.Count > 0,
-                    s =>
-                    {
-                        var keyValues = new List<string>();
-
-                        foreach (var key in BackendParameters.Keys)
-                        {
-                            keyValues.Add($"({key},{BackendParameters[key]})");
-                        }
-
-                        return s.Append(string.Join(",", keyValues));
-                    },
-                    s => s)
+                .Append(
+                    BackendParameters?.Keys.Count > 0 ?
+                    string.Join(",", BackendParameters.Select(kv => $"({kv.Key},{kv.Value})")) : null)
                 .Append('\n')
                 .Append("  BackendParametersStrict: ").Append(BackendParametersStrict).Append('\n')
                 .Append("}\n")
@@ -240,11 +228,5 @@ namespace Tes.Models
 
 #pragma warning restore 1591
         #endregion Operators
-    }
-
-    internal static class StringBuilderSelectorExtensions
-    {
-        public static StringBuilder IfThenElse(this StringBuilder builder, bool @if, Func<StringBuilder, StringBuilder> then, Func<StringBuilder, StringBuilder> @else)
-            => @if ? then(builder) : @else(builder);
     }
 }

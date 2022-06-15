@@ -40,7 +40,7 @@ namespace TesApi.Tests
             Assert.IsTrue(batchScheduler.RemovePoolFromList(pool));
             Assert.AreEqual(0, batchScheduler.GetPoolGroupKeys().Count());
 
-            pool = await batchScheduler.GetOrAddAsync(key, id => new(name: id));
+            pool = await batchScheduler.GetOrAddAsync(key, false, id => new Pool(name: id));
 
             Assert.AreEqual(1, batchScheduler.GetPoolGroupKeys().Count());
             Assert.IsTrue(batchScheduler.TryGet(pool.Pool.PoolId, out var pool1));
@@ -57,16 +57,16 @@ namespace TesApi.Tests
             var keyCount = batchScheduler.GetPoolGroupKeys().Count();
             var key = batchScheduler.GetPoolGroupKeys().First();
             var count = batchScheduler.GetPools().Count();
-            serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>()), Times.Once);
+            serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>(), It.IsAny<bool>()), Times.Once);
 
-            var pool = await batchScheduler.GetOrAddAsync(key, id => new(name: id));
+            var pool = await batchScheduler.GetOrAddAsync(key, false, id => new Pool(name: id));
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
 
             Assert.AreEqual(batchScheduler.GetPools().Count(), count);
             Assert.AreEqual(batchScheduler.GetPoolGroupKeys().Count(), keyCount);
             //Assert.AreSame(info, pool);
             Assert.AreEqual(info.Pool.PoolId, pool.Pool.PoolId);
-            serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>()), Times.Once);
+            serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>(), It.IsAny<bool>()), Times.Once);
         }
 
         [TestCategory("Batch Pools")]
@@ -82,7 +82,7 @@ namespace TesApi.Tests
             var key = batchScheduler.GetPoolGroupKeys().First();
             var count = batchScheduler.GetPools().Count();
 
-            var pool = await batchScheduler.GetOrAddAsync(key, id => new(name: id));
+            var pool = await batchScheduler.GetOrAddAsync(key, false, id => new Pool(name: id));
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
 
             Assert.AreNotEqual(batchScheduler.GetPools().Count(), count);
@@ -388,10 +388,9 @@ namespace TesApi.Tests
 
             Assert.IsNull(poolInformation.AutoPoolSpecification);
             Assert.IsNotNull(poolInformation.PoolId);
-            Assert.AreEqual("CoA-TES-38b138d2-f16c-5a24-a301-5f44b1137bbb-pool-", poolInformation.PoolId[0..^13]);
+            Assert.AreEqual("hostname-dicated1-TL2B5EUTHTFDE3AUBPMKDRS5YRUEIFIY-", poolInformation.PoolId[0..^13]);
             Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
-            Assert.IsTrue(batchScheduler.TryGet(poolInformation.PoolId, out var pool1));
-            Assert.IsTrue(((BatchPool)pool1).TestIsNodeReserved(cloudTask.AffinityInformation.AffinityId));
+            Assert.IsTrue(batchScheduler.TryGet(poolInformation.PoolId, out _));
             Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
         }
 
@@ -1166,25 +1165,65 @@ namespace TesApi.Tests
         private static Action<Mock<IAzureProxy>> GetMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
             => azureProxy =>
             {
-                azureProxy.Setup(a => a.GetBatchJobAndTaskStateAsync(It.IsAny<string>())).Returns(Task.FromResult(azureProxyReturnValues.BatchJobAndTaskState));
-                azureProxy.Setup(a => a.GetNextBatchJobIdAsync(It.IsAny<string>())).Returns(Task.FromResult(azureProxyReturnValues.NextBatchJobId));
-                azureProxy.Setup(a => a.GetStorageAccountInfoAsync("defaultstorageaccount")).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["defaultstorageaccount"]));
-                azureProxy.Setup(a => a.GetStorageAccountInfoAsync("storageaccount1")).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["storageaccount1"]));
-                azureProxy.Setup(a => a.GetContainerRegistryInfoAsync("registryServer1/imageName1:tag1")).Returns(Task.FromResult(azureProxyReturnValues.ContainerRegistryInfo));
-                azureProxy.Setup(a => a.GetStorageAccountKeyAsync(It.IsAny<StorageAccountInfo>())).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountKey));
-                azureProxy.Setup(a => a.GetVmSizesAndPricesAsync()).Returns(Task.FromResult(azureProxyReturnValues.VmSizesAndPrices));
-                azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
-                azureProxy.Setup(a => a.GetBatchActiveNodeCountByVmSize()).Returns(azureProxyReturnValues.ActiveNodeCountByVmSize);
-                azureProxy.Setup(a => a.GetBatchActiveJobCount()).Returns(azureProxyReturnValues.ActiveJobCount);
-                azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
-                azureProxy.Setup(a => a.GetBatchPoolAsync(It.IsAny<string>(), It.IsAny<DetailLevel>(), It.IsAny<CancellationToken>())).Returns((string id, DetailLevel detailLevel, CancellationToken cancellationToken) => Task.FromResult(BatchPoolTests.GeneratePool(id)));
-                azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>())).Returns(Task.FromResult(azureProxyReturnValues.DownloadedBlobContent));
-                azureProxy.Setup(a => a.LocalFileExists(It.IsAny<string>())).Returns(azureProxyReturnValues.LocalFileExists);
-                azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>())).Returns((Pool p) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
+                azureProxy.Setup(a => a.GetBatchJobAndTaskStateAsync(It.IsAny<string>()))
+                    .Returns(Task.FromResult(azureProxyReturnValues.BatchJobAndTaskState));
+
+                azureProxy.Setup(a => a.GetNextBatchJobIdAsync(It.IsAny<string>()))
+                    .Returns(Task.FromResult(azureProxyReturnValues.NextBatchJobId));
+
+                azureProxy.Setup(a => a.GetStorageAccountInfoAsync("defaultstorageaccount"))
+                    .Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["defaultstorageaccount"]));
+
+                azureProxy.Setup(a => a.GetStorageAccountInfoAsync("storageaccount1"))
+                    .Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["storageaccount1"]));
+
+                azureProxy.Setup(a => a.GetContainerRegistryInfoAsync("registryServer1/imageName1:tag1"))
+                    .Returns(Task.FromResult(azureProxyReturnValues.ContainerRegistryInfo));
+
+                azureProxy.Setup(a => a.GetStorageAccountKeyAsync(It.IsAny<StorageAccountInfo>()))
+                    .Returns(Task.FromResult(azureProxyReturnValues.StorageAccountKey));
+
+                azureProxy.Setup(a => a.GetVmSizesAndPricesAsync())
+                    .Returns(Task.FromResult(azureProxyReturnValues.VmSizesAndPrices));
+
+                azureProxy.Setup(a => a.GetBatchAccountQuotasAsync())
+                    .Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
+
+                azureProxy.Setup(a => a.GetBatchActiveNodeCountByVmSize())
+                    .Returns(azureProxyReturnValues.ActiveNodeCountByVmSize);
+
+                azureProxy.Setup(a => a.GetBatchActiveJobCount())
+                    .Returns(azureProxyReturnValues.ActiveJobCount);
+
+                azureProxy.Setup(a => a.GetBatchActivePoolCount())
+                    .Returns(azureProxyReturnValues.ActivePoolCount);
+
+                azureProxy.Setup(a => a.GetBatchPoolAsync(It.IsAny<string>(), It.IsAny<DetailLevel>(), It.IsAny<CancellationToken>()))
+                    .Returns((string id, DetailLevel detailLevel, CancellationToken cancellationToken) => Task.FromResult(BatchPoolTests.GeneratePool(id)));
+
+                azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>()))
+                    .Returns(Task.FromResult(azureProxyReturnValues.DownloadedBlobContent));
+
+                azureProxy.Setup(a => a.LocalFileExists(It.IsAny<string>()))
+                    .Returns(azureProxyReturnValues.LocalFileExists);
+
+                azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>(), It.IsAny<bool>()))
+                    .Returns((Pool p, bool _1) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
+
+                azureProxy.Setup(a => a.GetCurrentComputeNodesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .Returns(() => Task.FromResult(azureProxyReturnValues.AzureProxyGetCurrentComputeNodes?.Invoke() ?? (null, null)));
+
                 azureProxy.Setup(a => a.ListComputeNodesAsync(It.IsAny<string>(), It.IsAny<DetailLevel>()))
                     .Returns(new Func<string, DetailLevel, IAsyncEnumerable<ComputeNode>>((string poolId, DetailLevel detailLevel)
                         => AsyncEnumerable.Empty<ComputeNode>()
                             .Append(BatchPoolTests.GenerateNode(poolId, "ComputeNodeDedicated1", true, true))));
+
+                azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPool?.Invoke(poolId, cancellationToken))
+                    .Returns(Task.CompletedTask);
+
+                azureProxy.Setup(a => a.ListJobsAsync(It.IsAny<DetailLevel>()))
+                    .Returns(azureProxyReturnValues.AzureProxyListJobs);
             };
 
         private static Func<IEnumerable<(string Key, string Value)>> GetMockConfig(bool autopool = false)
@@ -1221,22 +1260,11 @@ namespace TesApi.Tests
             return blobxferFilesToDownload.Union(wgetFilesToDownload);
         }
 
-        private static Action<Mock<IAzureProxy>> PrepareMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
-            => azureProxy =>
-            {
-                azureProxy.Setup(a => a.GetBatchAccountQuotasAsync()).Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
-                azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
-                azureProxy.Setup(a => a.GetBatchPoolAsync(It.IsAny<string>(), It.IsAny<DetailLevel>(), It.IsAny<CancellationToken>())).Returns((string id, DetailLevel detailLevel, CancellationToken cancellationToken) => Task.FromResult(BatchPoolTests.GeneratePool(id)));
-                azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>())).Returns((Pool p) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
-                azureProxy.Setup(a => a.GetCurrentComputeNodesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(() => Task.FromResult<(int? lowPriorityNodes, int? dedicatedNodes)>(azureProxyReturnValues.AzureProxyGetCurrentComputeNodes?.Invoke() ?? (null, null)));
-                azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPool?.Invoke(poolId, cancellationToken)).Returns(Task.CompletedTask);
-            };
-
         private static TestServices.TestServiceProvider<BatchScheduler> GetServiceProvider(AzureProxyReturnValues azureProxyReturn = default)
-            => new(wrapAzureProxy: true, configuration: GetMockConfig()(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Defaults), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
+            => new(wrapAzureProxy: true, configuration: GetMockConfig()(), azureProxy: GetMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Defaults), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
         private static async Task<IBatchPool> AddPool(BatchScheduler batchPools)
-            => await batchPools.GetOrAddAsync("key1", id => new(name: id, displayName: "display1", vmSize: "vmSize1"));
+            => await batchPools.GetOrAddAsync("key1", false, id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
 
         private struct BatchJobAndTaskStates
         {
@@ -1257,8 +1285,9 @@ namespace TesApi.Tests
 
         private class AzureProxyReturnValues
         {
-            internal Func<(int?, int?)> /*(int? lowPriorityNodes, int? dedicatedNodes)*/ AzureProxyGetCurrentComputeNodes { get; set; }
+            internal Func<(int? lowPriorityNodes, int? dedicatedNodes)> AzureProxyGetCurrentComputeNodes { get; set; }
             internal Action<string, CancellationToken> AzureProxyDeleteBatchPool { get; set; }
+            internal Func<ODATADetailLevel, IAsyncEnumerable<CloudJob>> AzureProxyListJobs { get; set; } = detail => AsyncEnumerable.Empty<CloudJob>();
             public Dictionary<string, StorageAccountInfo> StorageAccountInfos { get; set; }
             public ContainerRegistryInfo ContainerRegistryInfo { get; set; }
             public List<VirtualMachineInformation> VmSizesAndPrices { get; set; }

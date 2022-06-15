@@ -35,7 +35,7 @@ namespace CromwellOnAzureDeployer
             this.resource = resource;
             this.tenantId = tenantId;
 
-            this.tokenProvider = new AzureServiceTokenProvider(azureAdInstance: azureAdInstance);
+            this.tokenProvider = new AzureServiceTokenProvider("RunAs=Developer; DeveloperTool=AzureCli", azureAdInstance: azureAdInstance);
         }
 
         /// <summary>
@@ -47,7 +47,7 @@ namespace CromwellOnAzureDeployer
         {
             // AzureServiceTokenProvider caches tokens internally and refreshes them before expiry.
             // This method usually gets called on every request to set the authentication header. This ensures that we cache tokens, and also that we always get a valid one.
-            var token = await tokenProvider.GetAccessTokenAsync(resource, tenantId, cancellationToken).ConfigureAwait(false);
+            var token = await tokenProvider.GetAccessTokenAsync(resource, tenantId, cancellationToken);
             return new AuthenticationHeaderValue("Bearer", token);
         }
     }

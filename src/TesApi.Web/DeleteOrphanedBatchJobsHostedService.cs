@@ -24,7 +24,6 @@ namespace TesApi.Web
         private readonly IRepository<TesTask> repository;
         private readonly IAzureProxy azureProxy;
         private readonly ILogger<DeleteOrphanedBatchJobsHostedService> logger;
-        private readonly bool isDisabled;
 
         /// <summary>
         /// Default constructor
@@ -38,18 +37,6 @@ namespace TesApi.Web
             this.repository = repository;
             this.azureProxy = azureProxy;
             this.logger = logger;
-            this.isDisabled = !configuration.GetValue("BatchAutopool", false);
-        }
-
-        /// <inheritdoc />
-        public override Task StartAsync(CancellationToken cancellationToken)
-        {
-            if (isDisabled)
-            {
-                return Task.CompletedTask;
-            }
-
-            return base.StartAsync(cancellationToken);
         }
 
         /// <inheritdoc />

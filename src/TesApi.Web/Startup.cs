@@ -107,6 +107,7 @@ namespace TesApi.Web
             })
 
             .AddHostedService<Scheduler>()
+            .AddHostedService<BatchPoolService>()
             .AddHostedService<DeleteCompletedBatchJobsHostedService>()
             .AddHostedService<DeleteOrphanedBatchJobsHostedService>()
             .AddHostedService<DeleteOrphanedAutoPoolsHostedService>()

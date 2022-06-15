@@ -37,8 +37,7 @@ namespace TesApi.Web
         /// <param name="jobId"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
-        /// <param name="getBatchPool">Method to retrieve the <see cref="IBatchPool"/> corresponding to <paramref name="poolInformation"/>.</param>
-        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, IBatchScheduler.TryGetBatchPool getBatchPool);
+        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation);
 
         /// <summary>
         /// Gets the <see cref="ContainerRegistryInfo"/> for the given image name
@@ -58,7 +57,8 @@ namespace TesApi.Web
         /// Creates an Azure Batch pool who's lifecycle must be manually managed
         /// </summary>
         /// <param name="poolInfo">Contains information about a pool. <see cref="BatchModels.ProxyResource.Name"/> becomes the <see cref="CloudPool.Id"/></param>
-        Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo);
+        /// <param name="isPreemptable">True if nodes in this pool will all be preemptable. False if nodes will all be dedicated.</param>
+        Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo, bool isPreemptable);
 
         /// <summary>
         /// Gets the combined state of Azure Batch job, task and pool that corresponds to the given TES task
@@ -175,12 +175,12 @@ namespace TesApi.Web
         Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken);
 
         /// <summary>
-        /// Gets the list of active pool ids matching the hostname in the metadata
+        /// Gets the list of active pools matching the hostname in the metadata
         /// </summary>
         /// <param name="hostName"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        Task<IEnumerable<string>> GetActivePoolIdsAsync(string hostName, CancellationToken cancellationToken = default);
+        Task<IEnumerable<CloudPool>> GetActivePoolsAsync(string hostName, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Gets the list of pool ids referenced by the jobs
@@ -222,6 +222,13 @@ namespace TesApi.Web
         IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null);
 
         /// <summary>
+        /// Lists jobs in the batch account
+        /// </summary>
+        /// <param name="detailLevel">A Microsoft.Azure.Batch.DetailLevel used for filtering the list and for controlling which properties are retrieved from the service.</param>
+        /// <returns></returns>
+        IAsyncEnumerable<CloudJob> ListJobsAsync(DetailLevel detailLevel = null);
+
+        /// <summary>
         /// Deletes the specified ComputeNodes
         /// </summary>
         /// <param name="poolId">The id of the pool.</param>
@@ -231,12 +238,12 @@ namespace TesApi.Web
         Task DeleteBatchComputeNodesAsync(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Gets the <see cref="AllocationState"/> which indicates what node allocation activity is occurring on the pool
+        /// Gets the allocation state and numbers of targeted compute nodes
         /// </summary>
         /// <param name="poolId">The id of the pool.</param>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
-        Task<AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
+        Task<(AllocationState? AllocationState, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Reinstalls the operating system on the specified compute node
@@ -247,13 +254,6 @@ namespace TesApi.Web
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Gets the configured numbers of compute nodes in the pool
-        /// </summary>
-        /// <param name="poolId">The id of the pool.</param>
-        /// <returns></returns>
-        (int TargetLowPriority, int TargetDedicated) GetComputeNodeTargets(string poolId);
 
         /// <summary>
         /// Resizes the specified pool

@@ -12,8 +12,9 @@ namespace TesApi.Web
     /// </summary>
     public sealed class BatchPoolFactory
     {
-        private readonly Func<PoolInformation, IBatchScheduler, IBatchPool> _batchPoolCreator;
-        private readonly Func<string, BatchPool.PoolData, IBatchScheduler, IBatchPool> _batchPoolRequester;
+        private readonly Func<string, IBatchScheduler, IBatchPool> _batchPoolAltCreator;
+        private readonly Func<PoolInformation, bool, IBatchScheduler, IBatchPool> _batchPoolCreator;
+        private readonly Func<CloudPool, DateTime, IBatchScheduler, IBatchPool> _batchPoolRequester;
 
         /// <summary>
         /// Constructor for <see cref="BatchPoolFactory"/>.
@@ -21,27 +22,38 @@ namespace TesApi.Web
         /// <param name="serviceProvider"></param>
         public BatchPoolFactory(IServiceProvider serviceProvider)
         {
-            _batchPoolCreator = (pool, batchScheduler) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(PoolInformation), typeof(IBatchScheduler) })(serviceProvider, new object[] { pool, batchScheduler });
-            _batchPoolRequester = (id, pool, batchScheduler) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(string), typeof(BatchPool.PoolData), typeof(IBatchScheduler) })(serviceProvider, new object[] { id, pool, batchScheduler });
+            _batchPoolAltCreator = (poolId, batchScheduler) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(string), typeof(IBatchScheduler) })(serviceProvider, new object[] { poolId, batchScheduler });
+            _batchPoolCreator = (pool, isPreemptable, batchScheduler) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(PoolInformation), typeof(bool), typeof(IBatchScheduler) })(serviceProvider, new object[] { pool, isPreemptable, batchScheduler });
+            _batchPoolRequester = (pool, changed, batchScheduler) => (IBatchPool)ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(CloudPool), typeof(DateTime), typeof(IBatchScheduler) })(serviceProvider, new object[] { pool, changed, batchScheduler });
         }
 
         /// <summary>
         /// Creates <see cref="BatchPool"/> instances.
         /// </summary>
-        /// <param name="poolInformation"></param>
+        /// <param name="poolId"></param>
         /// <param name="batchScheduler"></param>
         /// <returns></returns>
-        public IBatchPool CreateNew(PoolInformation poolInformation, IBatchScheduler batchScheduler)
-            => _batchPoolCreator(poolInformation, batchScheduler);
+        public IBatchPool CreateNew(string poolId, IBatchScheduler batchScheduler)
+            => _batchPoolAltCreator(poolId, batchScheduler);
+
+        /// <summary>
+        /// Creates <see cref="BatchPool"/> instances.
+        /// </summary>
+        /// <param name="poolInformation"></param>
+        /// <param name="isPreemptable"></param>
+        /// <param name="batchScheduler"></param>
+        /// <returns></returns>
+        public IBatchPool CreateNew(PoolInformation poolInformation, bool isPreemptable, IBatchScheduler batchScheduler)
+            => _batchPoolCreator(poolInformation, isPreemptable, batchScheduler);
 
         /// <summary>
         /// Retrieves <see cref="BatchPool"/> instances.
         /// </summary>
-        /// <param name="poolId"></param>
-        /// <param name="poolData"></param>
+        /// <param name="pool"></param>
+        /// <param name="changed"></param>
         /// <param name="batchScheduler"></param>
         /// <returns></returns>
-        public IBatchPool Retrieve(string poolId, BatchPool.PoolData poolData, IBatchScheduler batchScheduler)
-            => _batchPoolRequester(poolId, poolData, batchScheduler);
+        public IBatchPool Retrieve(CloudPool pool, DateTime changed, IBatchScheduler batchScheduler)
+            => _batchPoolRequester(pool, changed, batchScheduler);
     }
 }
