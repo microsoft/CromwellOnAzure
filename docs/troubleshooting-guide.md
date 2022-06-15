@@ -208,7 +208,7 @@ Before deploying, you can choose to customize some input parameters to use exist
 .\deploy-cromwell-on-azure.exe --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> --VmSize "Standard_D2_v2"
 ```
 
-Here is the summary of all configuration parameters:
+Here is the summary of common configuration parameters:
 
 Configuration   parameter | Has default | Validated | Used by update | Comment
 -- | -- | -- | -- | --
@@ -238,6 +238,19 @@ bool     PrivateNetworking = false; | Y | Y | N | Available starting version 2.2
 bool     KeepSshPortOpen =   false; | Y | Y | Y | Available starting version 3.0. Set to true if you need to keep the SSH port accessible on the host VM while deployer is not running (not recommended). 
 string   LogAnalyticsArmId | Y | N | N | Arm resource id for an exising Log Analytics workspace, workspace is used for App Insights - Not required, a workspace will be generated automatically if not provided.
 bool     ProvisionMySQLOnAzure =   false; | Y | N | N | Triggers whether to use Docker MySQL or Azure MySQL when provisioning the database.
+bool     UseAks =   false; | Y | N | N | Uses Azure Kubernetes Service rather than a VM to run the CoA system services Cromwell/TES/TriggerService.
+string   AksClusterName | Y | Y | N | Cluster name of existing Azure Kubernetes Service cluster to use rather than provisioning a new one.
+
+The following are more advanced configuration parameters:
+
+Configuration   parameter | Has default | Validated | Used by update | Comment
+-- | -- | -- | -- | --
+string   VnetAddressSpace = "10.1.0.0/16" | Y | N | N | Total address space for CoA vnet.
+string   VmSubnetAddressSpace = "10.1.0.0/24" | Y | N | N | Address space for compute, VM or AKS. 
+string   MySqlSubnetAddressSpace  = "10.1.1.0/24" | Y | N | N | Address space for database.
+string   KubernetesServiceCidr = "10.1.4.0/22" | Y | N | N | Address space for kubernetes system services, must not overlap with any subnets.
+string   KubernetesDnsServiceIP = "10.1.4.10" | Y | N | N | Kubernetes DNS service IP Address.
+string   KubernetesDockerBridgeCidr = "172.17.0.1/16" | Y | N | N | Kubernetes dock bridge Cidr.
 
 ### Use a specific Cromwell version
 #### Before deploying Cromwell on Azure
