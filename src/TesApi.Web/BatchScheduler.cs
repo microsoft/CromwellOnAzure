@@ -395,7 +395,7 @@ namespace TesApi.Web
                             virtualMachineInfo.VmSize,
                             virtualMachineInfo.LowPriority,
                             nodeInfo ?? batchNodeInfo,
-                            containerConfiguration
+                            containerConfiguration,
                             applicationPackages,
                             startTask),
                         jobId,
@@ -1293,7 +1293,7 @@ namespace TesApi.Web
         /// <param name="applicationPackages"></param>
         /// <param name="startTask"></param>
         /// <returns></returns>
-        private PoolSpecification GetPoolSpecification(string vmSize, bool? preemptible, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration, IEnumerable<ApplicationPackageReference> applicationPackages, StartTask startTask)
+        private PoolSpecification GetPoolSpecification(string vmSize, bool? preemptable, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration, IEnumerable<ApplicationPackageReference> applicationPackages, StartTask startTask)
         {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
@@ -1311,8 +1311,8 @@ namespace TesApi.Web
                 VirtualMachineConfiguration = vmConfig,
                 VirtualMachineSize = vmSize,
                 ResizeTimeout = TimeSpan.FromMinutes(30),
-                TargetLowPriorityComputeNodes = preemptible == true ? 1 : 0,
-                TargetDedicatedComputeNodes = preemptible == false ? 1 : 0,
+                TargetLowPriorityComputeNodes = preemptable == true ? 1 : 0,
+                TargetDedicatedComputeNodes = preemptable == false ? 1 : 0,
                 StartTask = startTask
             };
 
