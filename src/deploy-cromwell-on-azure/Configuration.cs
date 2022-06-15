@@ -12,10 +12,11 @@ namespace CromwellOnAzureDeployer
     public class Configuration : UserAccessibleConfiguration
     {
         public string MySqlServerName { get; set; }
-        public string MySqlServerPassword { get; set; }
         public string MySqlDatabaseName { get; set; } = "cromwell_db";
-        public string MySqlAdministratorLogin { get; set; } = "cromwell";
-        public string MySqlAdministratorLoginPassword { get; set; }
+        public string MySqlAdministratorLogin { get; set; } = "coa_admin";
+        public string MySqlAdministratorPassword { get; set; }
+        public string MySqlUserLogin { get; set; } = "cromwell";
+        public string MySqlUserPassword { get; set; }
         public string MySqlSkuName { get; set; } = "Standard_B1s";
         public string MySqlTier { get; set; } = "Burstable";
         public string DefaultVmSubnetName { get; set; } = "vmsubnet";

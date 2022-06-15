@@ -272,7 +272,6 @@ namespace CromwellOnAzureDeployer
                         // Note: Current behavior is to block switching from Docker MySQL to Azure MySQL on Update.
                         // However we do ancitipate including this change, this code is here to facilitate this future behavior.
                         configuration.MySqlServerName = accountNames.GetValueOrDefault("MySqlServerName");
-                        //configuration.ProvisionMySqlOnAzure = !string.IsNullOrEmpty(MySqlServerName);
 
                         var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
 
@@ -325,6 +324,7 @@ namespace CromwellOnAzureDeployer
                                 await AddNewSettingsAsync(sshConnectionInfo);
                                 newSettingsAdded = true;
                             }
+                            await PatchCromwellConfigurationFileV310Async(storageAccount);
                         }
                     }
 
@@ -337,7 +337,8 @@ namespace CromwellOnAzureDeployer
 
                         // Configuration preferences not currently settable by user.
                         configuration.MySqlServerName = configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15) : String.Empty;
-                        configuration.MySqlServerPassword = Utility.GeneratePassword();
+                        configuration.MySqlAdministratorPassword = Utility.GeneratePassword();
+                        configuration.MySqlUserPassword = Utility.GeneratePassword();
 
                         if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
                         {
@@ -445,6 +446,7 @@ namespace CromwellOnAzureDeployer
                             Task.Run(async () =>
                             {
                                 storageAccount ??= await CreateStorageAccountAsync();
+
                                 await Task.WhenAll(new Task[]
                                 {
                                     Task.Run(async () => batchAccount ??= await CreateBatchAccountAsync(storageAccount.Id)),
@@ -489,7 +491,7 @@ namespace CromwellOnAzureDeployer
 
                         if (configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
                         {
-                            await ExecuteQueriesOnAzureMySqlDb(sshConnectionInfo, mySQLServer);
+                            await CreateMySqlDatabaseUser(sshConnectionInfo, mySQLServer);
                         }
                     }
 
@@ -775,7 +777,7 @@ namespace CromwellOnAzureDeployer
 
             if (configuration.Update)
             {
-                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose down");
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down");
             }
 
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
@@ -826,7 +828,6 @@ namespace CromwellOnAzureDeployer
                         ? new[] {
                         (Utility.GetFileContent("scripts", "env-12-local-my-sql-db.txt"), $"{CromwellAzureRootDir}/env-12-local-my-sql-db.txt", false),
                         (Utility.GetFileContent("scripts", "docker-compose.mysql.yml"), $"{CromwellAzureRootDir}/docker-compose.mysql.yml", false),
-                        (Utility.GetFileContent("scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
                         (Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
                         }
                         : Array.Empty<(string, string, bool)>())
@@ -845,6 +846,11 @@ namespace CromwellOnAzureDeployer
                 {
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo {CromwellAzureRootDir}/install-cromwellazure.sh");
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod -aG docker {configuration.VmUsername}");
+
+                    if(configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
+                    {
+                        await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y mysql-client");
+                    }
                 });
 
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
@@ -862,11 +868,23 @@ namespace CromwellOnAzureDeployer
                     }, "scripts", "env-01-account-names.txt"),
                     $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
+                    (Utility.GetFileContent("scripts", "env-04-settings.txt"), $"{CromwellAzureRootDir}/env-04-settings.txt", false),
+
                     (Utility.PersonalizeContent(new []
                     {
-                        new Utility.ConfigReplaceTextItem("{MySqlServerPassword}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? configuration.MySqlServerPassword : String.Empty),
-                    }, "scripts", "env-04-settings.txt"),
-                    $"{CromwellAzureRootDir}/env-04-settings.txt", false),
+                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword),
+                    }, "scripts", "env-13-my-sql-db.txt"),
+                    $"{CromwellAzureRootDir}/env-13-my-sql-db.txt", false),
+
+                    (Utility.PersonalizeContent(new []
+                    {
+                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword),
+                    }, "scripts", "mysql", "init-user.sql"),
+                    $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
                 });
 
         private async Task HandleCustomImagesAsync(ConnectionInfo sshConnectionInfo)
@@ -1052,7 +1070,9 @@ namespace CromwellOnAzureDeployer
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
                         new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? $"{configuration.MySqlServerName}.mysql.database.azure.com" : "mysqldb"),
-                        new Utility.ConfigReplaceTextItem("{MySqlServerPassword}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? configuration.MySqlServerPassword : "cromwell"),
+                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin),
+                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword),
                         new Utility.ConfigReplaceTextItem("{MySqlUseSSL}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? "true" : "false"),
                     }, "scripts", CromwellConfigurationFileName));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
@@ -1094,17 +1114,16 @@ namespace CromwellOnAzureDeployer
 
         private async Task<Server> CreateMySqlServerAndDatabaseAsync(IMySQLManagementClient mySqlManagementClient, ISubnet subnet)
         {
-            // Confirm subnet has MySQL delegation.
             if (!subnet.Inner.Delegations.Any())
             {
                 subnet.Parent.Update().UpdateSubnet(subnet.Name).WithDelegation("Microsoft.DBforMySQL/flexibleServers");
                 await subnet.Parent.Update().ApplyAsync();
             }
 
-            // Create Server.
             Server server = null;
+
             await Execute(
-                $"Creating MySQL On Azure Server Instance: {configuration.MySqlServerName} With Password: {configuration.MySqlServerPassword}...",
+                $"Creating Azure Database for MySQL: {configuration.MySqlServerName} ...",
                 async () =>
                 {
                     server = await mySqlManagementClient.Servers.CreateAsync(
@@ -1113,18 +1132,17 @@ namespace CromwellOnAzureDeployer
                            location: configuration.RegionName,
                            version: configuration.MySqlVersion,
                            sku: new Sku(configuration.MySqlSkuName, configuration.MySqlTier),
-                           administratorLogin: "cromwell",
-                           administratorLoginPassword: configuration.MySqlServerPassword,
+                           administratorLogin: configuration.MySqlAdministratorLogin,
+                           administratorLoginPassword: configuration.MySqlAdministratorPassword,
                            network: new Network(publicNetworkAccess: "Disabled", delegatedSubnetResourceId: subnet.Inner.Id)
                         ));
                 });
 
-            // Create Database.
             await Execute(
-                $"Creating MySQL On Azure Server Database: cromwell_db...",
+                $"Creating MySQL database: {configuration.MySqlDatabaseName}...",
                 () => mySqlManagementClient.Databases.CreateOrUpdateAsync(
-               configuration.ResourceGroupName, configuration.MySqlServerName, configuration.MySqlDatabaseName,
-               new Database()));
+                    configuration.ResourceGroupName, configuration.MySqlServerName, configuration.MySqlDatabaseName,
+                    new Database()));
  
             return server;
         }
@@ -1271,17 +1289,11 @@ namespace CromwellOnAzureDeployer
                 () => networkInterface.Update().WithExistingNetworkSecurityGroup(networkSecurityGroup).ApplyAsync()
             );
 
-        private Task ExecuteQueriesOnAzureMySqlDb(ConnectionInfo sshConnectionInfo, Server mySQLServer)
-        => Execute(
-            $"Executing scripts on cromwell_db.",
-            async () => {
-                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y mysql-client");
-                var initScript = Utility.PersonalizeContent(new[]
-                {
-                    new Utility.ConfigReplaceRegExItemText("^CREATE USER 'cromwell'@'%'.*$", String.Empty, RegexOptions.Multiline),
-                }, "scripts", "mysql", "init-user.sql");
-                return await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"mysql -u cromwell -p'{configuration.MySqlServerPassword}' -h {mySQLServer.FullyQualifiedDomainName} -P 3306 -D cromwell_db -e \"{initScript}\"");
-            });
+        private Task CreateMySqlDatabaseUser(ConnectionInfo sshConnectionInfo, Server mySqlServer)
+            => Execute(
+                $"Creating MySQL database user...",
+                () => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"mysql -u {configuration.MySqlAdministratorLogin} -p'{configuration.MySqlAdministratorPassword}' -h {mySqlServer.FullyQualifiedDomainName} -P 3306 < {CromwellAzureRootDir}/mysql-init/init-user.sql")
+            );
 
         private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
             => Execute(
@@ -1516,6 +1528,18 @@ namespace CromwellOnAzureDeployer
         private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
             => await Execute("Disabling auto-start of Docker service...",
                 () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
+
+        private Task PatchCromwellConfigurationFileV310Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName);
+                    var akkaHttpRegex = new Regex(@"(\s*akka\.http\.host-connection-pool\.pool-implementation.*$)", RegexOptions.Multiline);
+                    cromwellConfigText = akkaHttpRegex.Replace(cromwellConfigText, match => string.Empty);
+
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
+                });
 
         private Task AddNewSettingsAsync(ConnectionInfo sshConnectionInfo)
             => Execute(
@@ -1792,7 +1816,7 @@ namespace CromwellOnAzureDeployer
         {
             try
             {
-                await Execute("Retrieving Azure management token...", () => new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/"));
+                await Execute("Retrieving Azure management token...", () => new AzureServiceTokenProvider("RunAs=Developer; DeveloperTool=AzureCli").GetAccessTokenAsync("https://management.azure.com/"));
             }
             catch (AzureServiceTokenProviderException ex)
             {

@@ -1,0 +1,3 @@
+﻿MySqlDatabaseName={MySqlDatabaseName}
+MySqlUserLogin={MySqlUserLogin}
+MySqlUserPassword={MySqlUserPassword}
