@@ -36,7 +36,7 @@ namespace TesApi.Web
             this.repository = repository;
             this.azureProxy = azureProxy;
             this.logger = logger;
-            this.isDisabled = configuration.GetValue("DisableBatchJobCleanup", false) || !configuration.GetValue("BatchAutopool", false);
+            this.isDisabled = configuration.GetValue("DisableBatchJobCleanup", false);
         }
 
         /// <inheritdoc />

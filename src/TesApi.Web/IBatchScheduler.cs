@@ -28,13 +28,6 @@ namespace TesApi.Web
         IEnumerable<IBatchPool> GetPools();
 
         /// <summary>
-        /// Synchronizes the CosmosDB storage of batch pool metadata
-        /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        ValueTask<bool> UpdateBatchPools(CancellationToken cancellationToken);
-
-        /// <summary>
         /// Provides a list of pools that can safely be disposed of.
         /// </summary>
         /// <param name="cancellationToken"></param>

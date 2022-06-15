@@ -218,7 +218,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, IBatchScheduler.TryGetBatchPool getBatchPool)
+        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
             await job.CommitAsync();
@@ -237,17 +237,6 @@ namespace TesApi.Web
                 logger.LogError(ex, $"Deleting {job.Id} because adding task to it failed. Batch error: {batchError}");
 
                 await batchClient.JobOperations.DeleteJobAsync(job.Id);
-
-                if (!string.IsNullOrWhiteSpace(poolInformation?.PoolId))
-                {
-                    // With manual pools, the PoolId property is set
-                    if (getBatchPool(poolInformation.PoolId, out var batchPool))
-                    {
-                        batchPool.ReleaseNode(jobId);
-                        batchPool.ReleaseNode(cloudTask.AffinityInformation);
-                    }
-                }
-
                 throw;
             }
         }
@@ -294,7 +283,7 @@ namespace TesApi.Web
                 var attemptNumber = lastJobInfo.AttemptNumber;
                 poolId = job.ExecutionInformation?.PoolId;
 
-                if (poolId is not null)
+                if (job.State == JobState.Active && poolId is not null)
                 {
                     var poolFilter = new ODATADetailLevel
                     {
@@ -304,28 +293,25 @@ namespace TesApi.Web
 
                     var pool = await batchClient.PoolOperations.ListPools(poolFilter).ToAsyncEnumerable().FirstOrDefaultAsync();
 
-                    if (job.State == JobState.Active)
+                    if (pool is not null)
                     {
-                        if (pool is not null)
+                        nodeAllocationFailed = pool.ResizeErrors?.Count > 0;
+
+                        var node = await pool.ListComputeNodes().ToAsyncEnumerable().FirstOrDefaultAsync(n => (n.RecentTasks?.Select(t => t.JobId) ?? Enumerable.Empty<string>()).Contains(job.Id));
+
+                        if (node is not null)
                         {
-                            nodeAllocationFailed = pool.ResizeErrors?.Count > 0;
-
-                            var node = await pool.ListComputeNodes().ToAsyncEnumerable().FirstOrDefaultAsync(n => (n.RecentTasks?.Select(t => t.JobId) ?? Enumerable.Empty<string>()).Contains(job.Id));
-
-                            if (node is not null)
-                            {
-                                nodeState = node.State;
-                                var nodeError = node.Errors?.FirstOrDefault();
-                                nodeErrorCode = nodeError?.Code;
-                                nodeErrorDetails = nodeError?.ErrorDetails?.Select(e => e.Value);
-                            }
+                            nodeState = node.State;
+                            var nodeError = node.Errors?.FirstOrDefault();
+                            nodeErrorCode = nodeError?.Code;
+                            nodeErrorDetails = nodeError?.ErrorDetails?.Select(e => e.Value);
                         }
-                        else
+                    }
+                    else
+                    {
+                        if (job.CreationTime.HasValue && DateTime.UtcNow.Subtract(job.CreationTime.Value) > TimeSpan.FromMinutes(30))
                         {
-                            if (job.CreationTime.HasValue && DateTime.UtcNow.Subtract(job.CreationTime.Value) > TimeSpan.FromMinutes(30))
-                            {
-                                activeJobWithMissingAutoPool = true;
-                            }
+                            activeJobWithMissingAutoPool = true;
                         }
                     }
                 }
@@ -397,19 +383,6 @@ namespace TesApi.Web
             {
                 logger.LogInformation($"Deleting job {job.Id}");
                 await batchClient.JobOperations.DeleteJobAsync(job.Id, cancellationToken: cancellationToken);
-
-                if (!string.IsNullOrWhiteSpace(job.PoolInformation?.PoolId))
-                {
-                    // With manual pools, the PoolId property is set
-                    if (getBatchPool(job.PoolInformation.PoolId, out var batchPool))
-                    {
-                        batchPool.ReleaseNode(job.Id);
-                        foreach (var task in await job.ListTasks(detailLevel: new ODATADetailLevel { SelectClause = "affinityId" }).ToListAsync(cancellationToken: cancellationToken))
-                        {
-                            batchPool.ReleaseNode(task.AffinityInformation);
-                        }
-                    }
-                }
             }
         }
 
@@ -455,17 +428,16 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task<IEnumerable<string>> GetActivePoolIdsAsync(string hostName, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<CloudPool>> GetActivePoolsAsync(string hostName, CancellationToken cancellationToken = default)
         {
             var activePoolsFilter = new ODATADetailLevel
             {
                 FilterClause = $"state eq 'active'",
-                SelectClause = "id,metadata"
+                SelectClause = BatchPool.CloudPoolSelectClause
             };
 
             return (await batchClient.PoolOperations.ListPools(activePoolsFilter).ToListAsync(cancellationToken))
-                .Where(p => hostName.Equals(p.Metadata?.FirstOrDefault(m => BatchScheduler.PoolHostName.Equals(m.Name, StringComparison.Ordinal))?.Value, StringComparison.OrdinalIgnoreCase))
-                .Select(p => p.Id);
+                .Where(p => hostName.Equals(p.Metadata?.FirstOrDefault(m => BatchScheduler.PoolHostName.Equals(m.Name, StringComparison.Ordinal))?.Value, StringComparison.OrdinalIgnoreCase));
         }
 
         /// <inheritdoc/>
@@ -491,10 +463,6 @@ namespace TesApi.Web
             => pool.CommitChangesAsync(cancellationToken: cancellationToken);
 
         /// <inheritdoc/>
-        public async Task<AllocationState?> GetAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
-            => (await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState"), cancellationToken: cancellationToken)).AllocationState;
-
-        /// <inheritdoc/>
         public async Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default)
         {
             var computeNode = await batchClient.PoolOperations.GetComputeNodeAsync(poolId, computeNodeId, detailLevel: new ODATADetailLevel(selectClause: "id,state"), cancellationToken: cancellationToken);
@@ -518,10 +486,10 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public (int TargetLowPriority, int TargetDedicated) GetComputeNodeTargets(string poolId)
+        public async Task<(AllocationState? AllocationState, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
         {
-            var pool = batchClient.PoolOperations.GetPool(poolId, detailLevel: new ODATADetailLevel(selectClause: "targetLowPriorityNodes,targetDedicatedNodes"));
-            return (pool.TargetLowPriorityComputeNodes ?? 0, pool.TargetDedicatedComputeNodes ?? 0);
+            var pool = await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState,targetLowPriorityNodes,targetDedicatedNodes"), cancellationToken: cancellationToken);
+            return (pool.AllocationState, pool.TargetLowPriorityComputeNodes, pool.TargetDedicatedComputeNodes);
         }
 
         /// <inheritdoc/>
@@ -796,21 +764,21 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo)
+        public async Task<PoolInformation> CreateBatchPoolAsync(BatchModels.Pool poolInfo, bool isPreemptable)
         {
             try
             {
                 var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
 
                 var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
-                logger.LogInformation($"Creating manual batch pool named {poolInfo.Name} with vmSize {poolInfo.VmSize}");
+                logger.LogInformation($"Creating manual batch pool named {poolInfo.Name} with vmSize {poolInfo.VmSize} and low priority {isPreemptable}");
                 var pool = await batchManagementClient.Pool.CreateAsync(batchResourceGroupName, batchAccountName, poolInfo.Name, poolInfo);
-                logger.LogInformation($"Successfully created manual batch pool named {poolInfo.Name} with vmSize {poolInfo.VmSize}");
+                logger.LogInformation($"Successfully created manual batch pool named {poolInfo.Name} with vmSize {poolInfo.VmSize} and low priority {isPreemptable}");
                 return new() { PoolId = pool.Name };
             }
             catch (Exception exc)
             {
-                logger.LogError(exc, $"Error trying to create manual batch pool named {poolInfo.Name} with vmSize {poolInfo.VmSize}");
+                logger.LogError(exc, $"Error trying to create manual batch pool named {poolInfo.Name} with vmSize {poolInfo.VmSize} and low priority {isPreemptable}");
                 throw;
             }
         }
@@ -853,6 +821,10 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public IAsyncEnumerable<ComputeNode> ListComputeNodesAsync(string poolId, DetailLevel detailLevel = null)
             => batchClient.PoolOperations.ListComputeNodes(poolId, detailLevel: detailLevel).ToAsyncEnumerable();
+
+        /// <inheritdoc/>
+        public IAsyncEnumerable<CloudJob> ListJobsAsync(DetailLevel detailLevel = null)
+            => batchClient.JobOperations.ListJobs(detailLevel: detailLevel).ToAsyncEnumerable();
 
         private class VmPrice
         {

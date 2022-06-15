@@ -186,7 +186,7 @@ namespace TriggerService
                     blobListingDetails: BlobListingDetails.None,
                     maxResults: null,
                     options: null,
-                    operationContext: null).ConfigureAwait(false);
+                    operationContext: null);
 
                 continuationToken = partialResult.ContinuationToken;
 
