@@ -439,7 +439,7 @@ namespace CromwellOnAzureDeployer
                             Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
                             Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
                             Task.Run(async () => {
-                                if(configuration.ProvisionPostgreSqlOnAzure== true) { postgreSqlServer = await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone); }
+                                if (configuration.ProvisionPostgreSqlOnAzure == true) { postgreSqlServer = await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone); }
                             }),
 
                             Task.Run(async () =>
@@ -854,42 +854,46 @@ namespace CromwellOnAzureDeployer
                 });
 
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
-            => await UploadFilesToVirtualMachineAsync(
-                sshConnectionInfo,
-                new[] {
-                    (Utility.PersonalizeContent(new []
-                    {
-                        new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
-                        new Utility.ConfigReplaceTextItem("{CosmosDbAccountName}", configuration.CosmosDbAccountName),
-                        new Utility.ConfigReplaceTextItem("{BatchAccountName}", configuration.BatchAccountName),
-                        new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
-                        new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
-                        new Utility.ConfigReplaceTextItem("{PostgreSqlServerName}", configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? configuration.PostgreSqlServerName : String.Empty),
-                    }, "scripts", "env-01-account-names.txt"),
-                    $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
+        {
+            var uploadList = new List<(string, string, bool)>
+            {
+                (Utility.PersonalizeContent(new []
+                {
+                    new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
+                    new Utility.ConfigReplaceTextItem("{CosmosDbAccountName}", configuration.CosmosDbAccountName),
+                    new Utility.ConfigReplaceTextItem("{BatchAccountName}", configuration.BatchAccountName),
+                    new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
+                    new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlServerName}", configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? configuration.PostgreSqlServerName : String.Empty),
+                }, "scripts", "env-01-account-names.txt"),
+                $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
-                    (Utility.GetFileContent("scripts", "env-04-settings.txt"), $"{CromwellAzureRootDir}/env-04-settings.txt", false),
+                (Utility.GetFileContent("scripts", "env-04-settings.txt"), $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+            };
 
-                    (Utility.PersonalizeContent(new []
-                    {
-                        new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
-                        new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
-                        new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
-                    }, "scripts", "env-13-my-sql-db.txt"),
-                    $"{CromwellAzureRootDir}/env-13-my-sql-db.txt", false),
-                }.Concat(configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault()
-                    ? new[] {
-                        (Utility.PersonalizeContent(new []
-                        {
-                            new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
-                            new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
-                            new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
-                        }, "scripts", "mysql", "init-user-postgre.sql"),
-                        $"{CromwellAzureRootDir}/mysql-init/init-user-postgre.sql", false)
-                    }
-                    : Array.Empty<(string, string, bool)>())
-                    .ToArray()
-                );
+            if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+            {
+                uploadList.Add((Utility.PersonalizeContent(new[]
+                {
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
+                }, "scripts", "env-13-my-sql-db.txt"),
+                $"{CromwellAzureRootDir}/env-13-my-sql-db.txt", false));
+
+                uploadList.Add((Utility.PersonalizeContent(new[]
+                {
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
+                }, "scripts", "mysql", "init-user-postgre.sql"),
+                $"{CromwellAzureRootDir}/mysql-init/init-user-postgre.sql", false));
+            }
+
+            await UploadFilesToVirtualMachineAsync(
+               sshConnectionInfo,
+               uploadList.ToArray());
+        }
 
         private async Task HandleCustomImagesAsync(ConnectionInfo sshConnectionInfo)
         {
@@ -1073,31 +1077,29 @@ namespace CromwellOnAzureDeployer
                     }, "scripts", ContainersToMountFileName));
 
                     // Configure Cromwell config file for Docker Mysql or PostgreSQL on Azure.
-                    var databaseConfig = new List<String>();
                     if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                     {
-                        databaseConfig.Add($"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName}?sslmode=require\"");
-                        databaseConfig.Add($"\"{configuration.PostgreSqlUserLogin}\"");
-                        databaseConfig.Add($"\"{configuration.PostgreSqlUserPassword}\"");
-                        databaseConfig.Add($"\"org.postgresql.Driver\"");
-                        databaseConfig.Add("\"slick.jdbc.PostgresProfile$\"");
+                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
+                        {
+                            new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName}?sslmode=require\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", $"\"{configuration.PostgreSqlUserLogin}\""),
+                            new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlUserPassword}\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
+                        }, "scripts", CromwellConfigurationFileName));
                     }
                     else
                     {
-                        databaseConfig.Add($"\"jdbc:mysql://mysqldb/cromwell_db?useSSL=false&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true\"");
-                        databaseConfig.Add($"\"cromwell\"");
-                        databaseConfig.Add($"\"cromwell\"");
-                        databaseConfig.Add($"\"com.mysql.cj.jdbc.Driver\"");
-                        databaseConfig.Add("\"slick.jdbc.MySQLProfile$\"");
+                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
+                        {
+                            new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:mysql://mysqldb/cromwell_db?useSSL=false&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", $"\"cromwell\""),
+                            new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"cromwell\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"com.mysql.cj.jdbc.Driver\""),
+                        new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.MySQLProfile$\""),
+                        }, "scripts", CromwellConfigurationFileName));
                     }
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
-                    {
-                        new Utility.ConfigReplaceTextItem("{DatabaseUrl}", databaseConfig[0]),
-                        new Utility.ConfigReplaceTextItem("{DatabaseUser}", databaseConfig[1]),
-                        new Utility.ConfigReplaceTextItem("{DatabasePassword}", databaseConfig[2]),
-                        new Utility.ConfigReplaceTextItem("{DatabaseDriver}", databaseConfig[3]),
-                        new Utility.ConfigReplaceTextItem("{DatabaseProfile}", databaseConfig[4]),
-                    }, "scripts", CromwellConfigurationFileName));
+
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
 
@@ -1324,11 +1326,15 @@ namespace CromwellOnAzureDeployer
                 "Creating private DNS Zone for PostgreSQL Server",
                 async () =>
                 {
-                    // Note: upon refactoring out of fluent see commit cbffa28 in #392. 
+                    // Note: for a potential future implementation of this method without Fluent,
+                    // please see commit cbffa28 in #392
                     var postgreSqlDnsZone = await azureSubscriptionClient.PrivateDnsZones
                         .Define($"{configuration.PostgreSqlServerName}.private.postgres.database.azure.com")
                         .WithExistingResourceGroup(configuration.ResourceGroupName)
-                        .DefineVirtualNetworkLink($"{virtualNetwork.Name}-link").WithReferencedVirtualNetworkId(virtualNetwork.Id).DisableAutoRegistration().Attach()
+                        .DefineVirtualNetworkLink($"{virtualNetwork.Name}-link")
+                        .WithReferencedVirtualNetworkId(virtualNetwork.Id)
+                        .DisableAutoRegistration()
+                        .Attach()
                         .CreateAsync();
                     return postgreSqlDnsZone;
                 });
