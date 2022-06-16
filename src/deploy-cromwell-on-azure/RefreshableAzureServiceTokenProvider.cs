@@ -35,7 +35,7 @@ namespace CromwellOnAzureDeployer
             this.resource = resource;
             this.tenantId = tenantId;
 
-            this.tokenProvider = new AzureServiceTokenProvider(azureAdInstance: azureAdInstance);
+            this.tokenProvider = new AzureServiceTokenProvider("RunAs=Developer; DeveloperTool=AzureCli", azureAdInstance: azureAdInstance);
         }
 
         /// <summary>
