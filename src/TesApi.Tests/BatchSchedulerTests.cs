@@ -339,7 +339,7 @@ namespace TesApi.Tests
 
             Assert.IsNull(poolInformation.AutoPoolSpecification);
             Assert.IsNotNull(poolInformation.PoolId);
-            Assert.AreEqual("hostname-dicated1-TL2B5EUTHTFDE3AUBPMKDRS5YRUEIFIY-", poolInformation.PoolId[0..^13]);
+            Assert.AreEqual("hostname-dicated1-5UKI2CE2WNCZ567CYZFB4JYMXBRY7IWF-", poolInformation.PoolId[0..^13]);
             Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
             Assert.IsTrue(batchScheduler.TryGet(poolInformation.PoolId, out _));
             Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
@@ -356,6 +356,27 @@ namespace TesApi.Tests
             Assert.AreEqual("VmSizeDedicated1", poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineSize);
             Assert.AreEqual(1, poolInformation.AutoPoolSpecification.PoolSpecification.TargetDedicatedComputeNodes);
             Assert.AreEqual(1, poolInformation.AutoPoolSpecification.PoolSpecification.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
+        }
+
+        [TestCategory("TES 1.1")]
+        [TestMethod]
+        public async Task BatchJobContainsExpectedManualPoolInformation()
+        {
+            var backendParameters = new Dictionary<string, string>
+            {
+                { "workflow_execution_identity", "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/coa/providers/Microsoft.ManagedIdentity/userAssignedIdentities/coa-test-uami" }
+            };
+
+            var task = GetTesTask();
+            task.Resources.BackendParameters = backendParameters;
+            (_, _, var poolInformation, var pool) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(task, GetMockConfig(true)(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
+
+            Assert.IsNotNull(poolInformation.PoolId);
+            Assert.IsNull(poolInformation.AutoPoolSpecification);
+            Assert.AreEqual("TES_JobId-1", poolInformation.PoolId);
+            Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
+            Assert.AreEqual(1, pool.ScaleSettings.FixedScale.TargetDedicatedNodes);
+            Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
         }
 
         [TestMethod]

@@ -305,16 +305,24 @@ namespace TesApi.Web
             registryServer ??= "<none>";
             identityResourceId ??= "<none>";
 
-
-            var hash = ConvertToBase32(SHA1.HashData(Encoding.UTF8.GetBytes($"{vmName}-{vmSize}-{isPreemptable}-{registryServer}-{identityResourceId}"))).TrimEnd('='); // 32 chars
-            // vmame-vmsku-HostConfig(not in this branch)-Identity
-            var displayName = $"{vmName}:{vmSize}:{isPreemptable}:{registryServer}:{identityResourceId}"; // TODO: limit this to 1024
+            // Generate hash of everything that differentiates this group of pools
+            var displayName = $"{vmName}:{vmSize}:{isPreemptable}:{registryServer}:{identityResourceId}";
+            var hash = ConvertToBase32(SHA1.HashData(Encoding.UTF8.GetBytes(displayName))).TrimEnd('='); // 32 chars
 
             // Note that the hash covers all necessary parts to make name unique, so limiting the size of the other parts is not expected to appreciably change the risk of collisions. Those other parts are for convenience
             var remainingLength = PoolKeyLength - hash.Length - 2; // 50 is max name length, 2 is number of inserted chars. This will always be 16 if we use an entire SHA1
             var dVmSize = LimitVmSize(vmSize, Math.Max(remainingLength - vmName.Length, 6));
             var dVmName = vmName[0..Math.Min(vmName.Length, remainingLength - dVmSize.Length)];
             var name = LimitChars($"{dVmName}-{dVmSize}-{hash}");
+
+            if (displayName.Length > 1024)
+            {
+                displayName = displayName[..^identityResourceId.Length] + identityResourceId[(identityResourceId.LastIndexOf('/') + 1)..];
+                if (displayName.Length > 1024)
+                {
+                    displayName = displayName[..1021] + "...";
+                }
+            }
 
             return (name, displayName);
 
