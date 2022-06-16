@@ -64,18 +64,20 @@ namespace TesApi.Web
             }
 
             IAsyncEnumerator<T> IAsyncEnumerable<T>.GetAsyncEnumerator(CancellationToken cancellationToken)
-                => new PollyAsyncEnumerator<T>(_source.GetAsyncEnumerator(cancellationToken), _retryPolicy);
+                => new PollyAsyncEnumerator<T>(_source.GetAsyncEnumerator(cancellationToken), _retryPolicy, cancellationToken);
         }
 
         private sealed class PollyAsyncEnumerator<T> : IAsyncEnumerator<T>
         {
             private readonly IAsyncEnumerator<T> _source;
             private readonly AsyncRetryPolicy _retryPolicy;
+            private readonly CancellationToken _cancellationToken;
 
-            public PollyAsyncEnumerator(IAsyncEnumerator<T> source, AsyncRetryPolicy retryPolicy)
+            public PollyAsyncEnumerator(IAsyncEnumerator<T> source, AsyncRetryPolicy retryPolicy, CancellationToken cancellationToken)
             {
                 _source = source ?? throw new ArgumentNullException(nameof(source));
                 _retryPolicy = retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
+                _cancellationToken = cancellationToken;
             }
 
             T IAsyncEnumerator<T>.Current
@@ -85,7 +87,7 @@ namespace TesApi.Web
                 => _source.DisposeAsync();
 
             ValueTask<bool> IAsyncEnumerator<T>.MoveNextAsync()
-                => new(_retryPolicy.ExecuteAsync(() => _source.MoveNextAsync().AsTask()));
+                => new(_retryPolicy.ExecuteAsync(ct => _source.MoveNextAsync(ct).AsTask(), _cancellationToken));
         }
 
         private struct AsyncEnumerable<T> : IAsyncEnumerable<T>

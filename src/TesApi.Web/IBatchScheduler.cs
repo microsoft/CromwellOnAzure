@@ -33,13 +33,5 @@ namespace TesApi.Web
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         ValueTask<IEnumerable<Task>> GetShutdownCandidatePools(CancellationToken cancellationToken);
-
-        /// <summary>
-        /// Retrieves the requested batch pool.
-        /// </summary>
-        /// <param name="poolId">The <see cref="Microsoft.Azure.Batch.PoolInformation.PoolId"/> of the requested <paramref name="batchPool"/>.</param>
-        /// <param name="batchPool">Returns the requested <see cref="IBatchPool"/>.</param>
-        /// <returns>True if the requested <paramref name="batchPool"/> was found, False otherwise.</returns>
-        delegate bool TryGetBatchPool(string poolId, out IBatchPool batchPool);
     }
 }

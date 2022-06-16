@@ -1758,7 +1758,7 @@ namespace CromwellOnAzureDeployer
 
                 var delegatedServices = mySqlSubnet.Inner.Delegations.Select(d => d.ServiceName);
                 var hasOtherDelegations = delegatedServices.Any(s => s != "Microsoft.DBforMySQL/flexibleServers");
-                var hasNoDelegations = delegatedServices.Count() == 0;
+                var hasNoDelegations = delegatedServices.Any();
 
                 if (hasOtherDelegations)
                 {

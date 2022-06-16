@@ -39,7 +39,7 @@ namespace TesApi.Web
         public bool IsPreemptable { get; }
 
         /// <inheritdoc/>
-        public async Task<bool> CanBeDeleted(CancellationToken cancellationToken = default)
+        public async ValueTask<bool> CanBeDeleted(CancellationToken cancellationToken = default)
         {
             if (await GetJobsAsync().AnyAsync(cancellationToken))
             {
@@ -71,7 +71,7 @@ namespace TesApi.Web
             => StartTaskFailures.TryDequeue(out var failure) ? failure : default;
 
         /// <inheritdoc/>
-        public Task ServicePoolAsync(IBatchPool.ServiceKind serviceKind, CancellationToken cancellationToken = default)
+        public ValueTask ServicePoolAsync(IBatchPool.ServiceKind serviceKind, CancellationToken cancellationToken = default)
         {
             lock (this) // TODO: make lock object
             {
@@ -91,12 +91,13 @@ namespace TesApi.Web
         public async ValueTask<bool> ServicePoolAsync(CancellationToken cancellationToken = default)
         {
             var exceptions = new List<Exception>();
-
+            var retVal = _isDirty || _isChanged;
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty, cancellationToken));
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Rotate, cancellationToken));
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Resize, cancellationToken));
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle, cancellationToken));
-            var retVal = await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Update, cancellationToken));
+            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Update, cancellationToken));
+            _isChanged = false;
 
             return exceptions.Count switch
             {
@@ -112,31 +113,22 @@ namespace TesApi.Web
                     _ => Enumerable.Empty<Exception>().Append(ex),
                 };
 
-            async Task<bool> PerformTask(Task serviceAction)
+            async ValueTask PerformTask(ValueTask serviceAction)
             {
                 try
                 {
-                    switch (serviceAction)
-                    {
-                        case Task<bool> serviceActionWithReturn:
-                            return await serviceActionWithReturn;
-
-                        default:
-                            await serviceAction;
-                            return false;
-                    }
+                    await serviceAction;
                 }
                 catch (Exception ex)
                 {
                     exceptions.Add(ex);
-                    return false;
                 }
             }
         }
         #endregion
 
         #region ServicePool~Async implementations
-        private async Task ServicePoolResizeAsync(CancellationToken cancellationToken)
+        private async ValueTask ServicePoolResizeAsync(CancellationToken cancellationToken)
         {
             //DateTime cutoff;
             //try
@@ -159,12 +151,13 @@ namespace TesApi.Web
                 if (lowPri != (targetLowPri ?? 0) || dedicated != (targetDedicated ?? 0))
                 {
                     _logger.LogDebug("Resizing {PoolId}", Pool.PoolId);
+                    _isChanged = true;
                     await _azureProxy.SetComputeNodeTargetsAsync(Pool.PoolId, lowPri, dedicated, cancellationToken);
                 }
             }
         }
 
-        private async Task ServicePoolRemoveNodeIfIdleAsync(CancellationToken cancellationToken)
+        private async ValueTask ServicePoolRemoveNodeIfIdleAsync(CancellationToken cancellationToken)
         {
             if ((await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken)).AllocationState == AllocationState.Steady)
             {
@@ -194,6 +187,7 @@ namespace TesApi.Web
                 var removeNodesTasks = Enumerable.Empty<Task>();
                 foreach (var nodes in nodesToRemove.Select((n, i) => (n, i)).GroupBy(t => t.i / 100).OrderBy(t => t.Key))
                 {
+                    _isChanged = true;
                     removeNodesTasks = removeNodesTasks.Append(_azureProxy.DeleteBatchComputeNodesAsync(Pool.PoolId, nodes.Select(t => t.n), cancellationToken));
                 }
 
@@ -212,22 +206,24 @@ namespace TesApi.Web
             }
         }
 
-        private async Task ServicePoolRotateAsync(CancellationToken cancellationToken)
+        private async ValueTask ServicePoolRotateAsync(CancellationToken cancellationToken)
         {
             if (IsAvailable)
             {
                 var now = DateTime.UtcNow;
                 IsAvailable = Creation + _forcePoolRotationAge > now && (Changed + _idlePoolCheck > now || await GetJobsAsync().AnyAsync(cancellationToken));
+                _isChanged |= !IsAvailable;
             }
         }
 
-        private async Task ServicePoolRemovePoolIfEmptyAsync(CancellationToken cancellationToken)
+        private async ValueTask ServicePoolRemovePoolIfEmptyAsync(CancellationToken cancellationToken)
         {
             if (!IsAvailable)
             {
                 var (lowPriorityNodes, dedicatedNodes) = await _azureProxy.GetCurrentComputeNodesAsync(Pool.PoolId, cancellationToken);
                 if ((lowPriorityNodes is null || lowPriorityNodes == 0) && (dedicatedNodes is null || dedicatedNodes == 0) && !await GetJobsAsync().AnyAsync(cancellationToken))
                 {
+                    _isChanged = true;
                     _isRemoved = true;
                     await _azureProxy.DeleteBatchPoolAsync(Pool.PoolId, cancellationToken);
                     _ = _batchPools.RemovePoolFromList(this);
@@ -235,11 +231,11 @@ namespace TesApi.Web
             }
         }
 
-        private async Task<bool> ServicePoolUpdateAsync(CancellationToken cancellationToken)
+        private async ValueTask ServicePoolUpdateAsync(CancellationToken cancellationToken)
         {
             if (_isRemoved)
             {
-                return false;
+                return;
             }
 
             try
@@ -249,25 +245,18 @@ namespace TesApi.Web
                 cloudPool.Metadata = SetPoolData(this, _poolData, cloudPool.Metadata).ToList();
                 _isDirty |= _poolData.GetHashCode() != hash;
 
-                try
+                if (_isDirty)
                 {
-                    if (_isDirty)
-                    {
-                        await _azureProxy.CommitBatchPoolChangesAsync(cloudPool, cancellationToken);
-                        return true;
-                    }
+                    _isChanged = true;
+                    await _azureProxy.CommitBatchPoolChangesAsync(cloudPool, cancellationToken);
                 }
-                finally
-                {
-                    _isDirty = false;
-                }
+
+                _isDirty = false;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, ex.Message);
             }
-
-            return false;
         }
         #endregion
 
@@ -414,6 +403,7 @@ namespace TesApi.Web
 
         private Queue<TaskFailureInformation> StartTaskFailures { get; } = new();
 
+        private bool _isChanged;
         private bool _isRemoved;
         private bool _isDirty;
 
@@ -460,8 +450,6 @@ namespace TesApi.Web
         {
             Creation -= shift;
             Changed -= shift;
-
-            ServicePoolUpdateAsync(default).Wait();
         }
         #endregion
     }

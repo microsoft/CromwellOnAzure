@@ -100,24 +100,6 @@ namespace Tes.Repository
         }
 
         /// <inheritdoc/>
-        async IAsyncEnumerable<T> IRepository<T>.GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, [EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            string continuationToken = null;
-            do
-            {
-                IEnumerable<T> repositoryItems;
-                (continuationToken, repositoryItems) = await GetItemsAsync(predicate, pageSize, continuationToken, cancellationToken);
-                foreach (var item in repositoryItems)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    yield return item;
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
-            }
-            while (continuationToken is not null);
-        }
-
-        /// <inheritdoc/>
         public Task<(string, IEnumerable<T>)> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, string continuationToken)
             => GetItemsAsync(predicate, pageSize, continuationToken, default);
 

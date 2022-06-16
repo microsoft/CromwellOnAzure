@@ -364,7 +364,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task DeleteBatchJobAsync(string tesTaskId, IBatchScheduler.TryGetBatchPool getBatchPool, CancellationToken cancellationToken = default)
+        public async Task DeleteBatchJobAsync(string tesTaskId, CancellationToken cancellationToken = default)
         {
             var jobFilter = new ODATADetailLevel
             {
@@ -461,22 +461,6 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public Task CommitBatchPoolChangesAsync(CloudPool pool, CancellationToken cancellationToken = default)
             => pool.CommitChangesAsync(cancellationToken: cancellationToken);
-
-        /// <inheritdoc/>
-        public async Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default)
-        {
-            var computeNode = await batchClient.PoolOperations.GetComputeNodeAsync(poolId, computeNodeId, detailLevel: new ODATADetailLevel(selectClause: "id,state"), cancellationToken: cancellationToken);
-            switch (computeNode.State)
-            {
-                case ComputeNodeState.Idle:
-                case ComputeNodeState.Running:
-                    // Currently, `Reimage` "can be invoked only on Pools created with the cloud service configuration property." [third line of content](https://docs.microsoft.com/en-us/rest/api/batchservice/compute-node/reimage).
-                    //await computeNode.ReimageAsync(reimageOption: reimageOption, cancellationToken: cancellationToken);
-                    return true;
-                default:
-                    return false;
-            }
-        }
 
         /// <inheritdoc/>
         public async Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default)

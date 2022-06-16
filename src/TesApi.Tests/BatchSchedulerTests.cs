@@ -592,7 +592,7 @@ namespace TesApi.Tests
 
             Assert.AreEqual(TesState.CANCELEDEnum, tesTask.State);
             Assert.IsFalse(tesTask.IsCancelRequested);
-            azureProxy.Verify(i => i.DeleteBatchJobAsync(tesTask.Id, It.IsAny<IBatchScheduler.TryGetBatchPool>(), It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchJobAsync(tesTask.Id, It.IsAny<CancellationToken>()));
         }
 
         [TestMethod]
