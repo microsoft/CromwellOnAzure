@@ -137,9 +137,6 @@ namespace TesApi.Tests.TestServices
         Task<IEnumerable<T>> IRepository<T>.GetItemsAsync(Expression<Func<T, bool>> predicate)
             => ThrowIfDisposed<Task<IEnumerable<T>>>() ?? Task.FromResult(Items<T>().Values.Where(predicate.Compile().Invoke).Select(Clone));
 
-        IAsyncEnumerable<T> IRepository<T>.GetItemsAsync(Expression<Func<T, bool>> predicate, int size, CancellationToken token)
-            => ThrowIfDisposed<IAsyncEnumerable<T>>() ?? Items<T>().Values.Where(predicate.Compile().Invoke).Select(Clone).ToAsyncEnumerable();
-
         Task<(string, IEnumerable<T>)> IRepository<T>.GetItemsAsync(Expression<Func<T, bool>> predicate, int size, string token)
         {
             ThrowIfDisposed();

@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Tes.Extensions;
 using Tes.Models;
 using Tes.Repository;
 
@@ -116,7 +115,7 @@ namespace TesApi.Web
                         tesTask.State == TesState.CANCELEDEnum ||
                         tesTask.State == TesState.UNKNOWNEnum)
                     {
-                        await azureProxy.DeleteBatchJobAsync(tesTaskId, default, cancellationToken);
+                        await azureProxy.DeleteBatchJobAsync(tesTaskId, cancellationToken);
                     }
                 }
             }

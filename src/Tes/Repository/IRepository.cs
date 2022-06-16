@@ -53,15 +53,6 @@ namespace Tes.Repository
         /// <summary>
         /// Reads a collection of items from the repository
         /// </summary>
-        /// <param name="predicate"></param>
-        /// <param name="pageSize">Suggested default: 256</param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        IAsyncEnumerable<T> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, CancellationToken cancellationToken);
-
-        /// <summary>
-        /// Reads a collection of items from the repository
-        /// </summary>
         /// <param name="predicate">The 'where' clause</param>
         /// <param name="pageSize">The max number of items to retrieve</param>
         /// <param name="continuationToken">A token to continue retrieving items if the max is returned</param>

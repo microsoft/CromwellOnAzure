@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Azure.Batch.Protocol.Models;
 using Microsoft.Extensions.Caching.Memory;
 using Polly;
 using Polly.Retry;
@@ -24,16 +25,17 @@ namespace TesApi.Web
         private readonly IMemoryCache cache = new MemoryCache(new MemoryCacheOptions());
         private readonly IList<object> itemsPredicateCachedKeys = new List<object>();
 
+        private static readonly int RetryCount = 3;
         private static TimeSpan SleepDurationProvider(int attempt)
             => TimeSpan.FromSeconds(Math.Pow(2, attempt));
 
         private readonly RetryPolicy retryPolicy = Policy
                 .Handle<Exception>()
-                .WaitAndRetry(3, SleepDurationProvider);
+                .WaitAndRetry(RetryCount, SleepDurationProvider);
 
         private readonly AsyncRetryPolicy asyncRetryPolicy = Policy
                 .Handle<Exception>()
-                .WaitAndRetryAsync(3, SleepDurationProvider);
+                .WaitAndRetryAsync(RetryCount, SleepDurationProvider);
 
         /// <summary>
         /// Constructor to create a cache and retry wrapper for <see cref="IRepository{T}"/>
@@ -100,14 +102,9 @@ namespace TesApi.Web
             return repositoryItem;
         }
 
-
         /// <inheritdoc/>
         public Task<(string, IEnumerable<T>)> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, string continuationToken)
             => asyncRetryPolicy.ExecuteAsync(() => repository.GetItemsAsync(predicate, pageSize, continuationToken));
-
-        /// <inheritdoc/>
-        public IAsyncEnumerable<T> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, CancellationToken cancellationToken)
-            => asyncRetryPolicy.ExecuteAsync(() => repository.GetItemsAsync(predicate, pageSize, cancellationToken), retryPolicy);
 
         /// <inheritdoc/>
         public async Task<IEnumerable<T>> GetItemsAsync(Expression<Func<T, bool>> predicate)

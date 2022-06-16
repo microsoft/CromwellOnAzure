@@ -71,9 +71,8 @@ namespace TesApi.Web
         /// Deletes an Azure Batch job
         /// </summary>
         /// <param name="taskId">The unique TES task ID</param>
-        /// <param name="getBatchPool">Method to retrieve the <see cref="IBatchPool"/> corresponding to the pool that last ran <paramref name="taskId"/>.</param>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
-        Task DeleteBatchJobAsync(string taskId, IBatchScheduler.TryGetBatchPool getBatchPool, CancellationToken cancellationToken = default);
+        Task DeleteBatchJobAsync(string taskId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Gets the batch quotas
@@ -244,16 +243,6 @@ namespace TesApi.Web
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         Task<(AllocationState? AllocationState, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Reinstalls the operating system on the specified compute node
-        /// </summary>
-        /// <param name="poolId">The id of the pool.</param>
-        /// <param name="computeNodeId"></param>
-        /// <param name="reimageOption"></param>
-        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
-        /// <returns></returns>
-        Task<bool> ReimageComputeNodeAsync(string poolId, string computeNodeId, ComputeNodeReimageOption? reimageOption, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Resizes the specified pool

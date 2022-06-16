@@ -45,6 +45,7 @@ namespace TesApi.Web
         public const string CosmosDbContainerId = "Pools";
 
         private const string AzureSupportUrl = "https://portal.azure.com/#blade/Microsoft_Azure_Support/HelpAndSupportBlade/newsupportrequest";
+        private const int PoolKeyLength = 50; // 64 max pool name length - 16 chars generating unique pool names
         private const int DefaultCoreCount = 1;
         private const int DefaultMemoryGb = 2;
         private const int DefaultDiskGb = 10;
@@ -75,7 +76,6 @@ namespace TesApi.Web
         private readonly string marthaSecretName;
         private readonly string hostname;
         private readonly BatchPoolFactory _batchPoolFactory;
-        private readonly Random random = new();
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -171,28 +171,28 @@ namespace TesApi.Web
             async Task SetTaskCompleted(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
                 await RemovePool(batchInfo);
-                await azureProxy.DeleteBatchJobAsync(tesTask.Id, TryGet);
+                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, TesState.COMPLETEEnum, batchInfo);
             }
 
             async Task SetTaskExecutorError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
                 await RemovePool(batchInfo);
-                await azureProxy.DeleteBatchJobAsync(tesTask.Id, TryGet);
+                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             }
 
             async Task SetTaskSystemError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
                 await RemovePool(batchInfo);
-                await azureProxy.DeleteBatchJobAsync(tesTask.Id, TryGet);
+                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, TesState.SYSTEMERROREnum, batchInfo);
             }
 
             async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
             {
                 await RemovePool(batchInfo);
-                await this.azureProxy.DeleteBatchJobAsync(tesTask.Id, TryGet);
+                await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, newTaskState, batchInfo); 
             }
 
@@ -207,7 +207,7 @@ namespace TesApi.Web
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
                 await RemovePool(batchInfo);
-                await this.azureProxy.DeleteBatchJobAsync(tesTask.Id, TryGet);
+                await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 tesTask.IsCancelRequested = false; 
             }
 
@@ -215,7 +215,7 @@ namespace TesApi.Web
             {
                 if (enableBatchAutopool)
                 {
-                    if (!string.IsNullOrWhiteSpace(batchInfo.PoolId) && !batchInfo.PoolId.StartsWith("TES"))
+                    if (!string.IsNullOrWhiteSpace(batchInfo.PoolId) && !batchInfo.PoolId.StartsWith("TES_"))
                     {
                         await azureProxy.DeleteBatchPoolAsync(batchInfo.PoolId);
                     }
@@ -323,11 +323,11 @@ namespace TesApi.Web
             // vmame-vmsku-HostConfig(not in this branch)-Identity
             var displayName = $"{vmName}:{vmSize}:{isPreemptable}:{registryServer}:{identityResourceId}"; // TODO: limit this to 1024
 
-            // Note that hash covers all necessary parts to make name unique, so limiting the size of the other parts is not expected to appreciably increase the risk of collisions
-            var remainingLength = 50 - hash.Length - 2; // 50 is max name length, 2 is number of inserted chars. This will always be 16 if we use an entire SHA1
+            // Note that the hash covers all necessary parts to make name unique, so limiting the size of the other parts is not expected to appreciably change the risk of collisions. Those other parts are for convenience
+            var remainingLength = PoolKeyLength - hash.Length - 2; // 50 is max name length, 2 is number of inserted chars. This will always be 16 if we use an entire SHA1
             var dVmSize = LimitVmSize(vmSize, Math.Max(remainingLength - vmName.Length, 6));
             var dVmName = vmName[0..Math.Min(vmName.Length, remainingLength - dVmSize.Length)];
-            var name = $"{dVmName}-{dVmSize}-{hash}"; // TODO: ^[a-zA-Z0-9_-]+$
+            var name = LimitChars($"{dVmName}-{dVmSize}-{hash}");
 
             return (name, displayName);
 
@@ -339,6 +339,22 @@ namespace TesApi.Web
                     : vmSize.StartsWith(standard, StringComparison.OrdinalIgnoreCase)
                     ? LimitVmSize(vmSize[standard.Length..], limit)
                     : vmSize[^limit..];
+            }
+
+            static string LimitChars(string text) // ^[a-zA-Z0-9_-]+$
+            {
+                return new(text.AsEnumerable().Select(Limit).ToArray());
+
+                static char Limit(char ch)
+                    => ch switch
+                    {
+                        var x when x >= '0' || x <= '9' => x,
+                        var x when x >= 'A' || x <= 'Z' => x,
+                        var x when x >= 'a' || x <= 'z' => x,
+                        '_' => ch,
+                        '-' => ch,
+                        _ => '_',
+                    };
             }
         }
 
@@ -481,7 +497,7 @@ namespace TesApi.Web
         /// <param name="tesTask"><see cref="TesTask"/></param>
         /// <returns>A higher-level abstraction of the current state of the Azure Batch task</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1826:Do not use Enumerable methods on indexable collections", Justification = "FirstOrDefault() is straightforward, the alternative is less clear.")]
-        private async Task<CombinedBatchTaskInfo> GetBatchTaskStateAsync(TesTask tesTask)
+        private async ValueTask<CombinedBatchTaskInfo> GetBatchTaskStateAsync(TesTask tesTask)
         {
             var azureBatchJobAndTaskState = await azureProxy.GetBatchJobAndTaskStateAsync(tesTask.Id);
 
@@ -732,8 +748,7 @@ namespace TesApi.Web
         /// <param name="tesTask">TES task</param>
         /// <param name="combinedBatchTaskInfo">Current Azure Batch task info</param>
         /// <returns>True if the TES task was changed.</returns>
-        private async Task<bool> HandleTesTaskTransitionAsync(TesTask tesTask, CombinedBatchTaskInfo combinedBatchTaskInfo)
-        {
+        private async ValueTask<bool> HandleTesTaskTransitionAsync(TesTask tesTask, CombinedBatchTaskInfo combinedBatchTaskInfo)
             // When task is executed the following may be touched:
             // tesTask.Log[].SystemLog
             // tesTask.Log[].FailureReason
@@ -745,11 +760,9 @@ namespace TesApi.Web
             // tesTask.Log[].Log[].StartTime
             // tesTask.Log[].Log[].EndTime
 
-            var mapItem = tesTaskStateTransitions
-                .FirstOrDefault(m => (m.Condition is null || m.Condition(tesTask)) && (m.CurrentBatchTaskState is null || m.CurrentBatchTaskState == combinedBatchTaskInfo.BatchTaskState));
-
-            return await (mapItem?.ActionAsync(tesTask, combinedBatchTaskInfo) ?? ValueTask.FromResult(false));
-        }
+            => await (tesTaskStateTransitions
+                .FirstOrDefault(m => (m.Condition is null || m.Condition(tesTask)) && (m.CurrentBatchTaskState is null || m.CurrentBatchTaskState == combinedBatchTaskInfo.BatchTaskState))
+                ?.ActionAsync(tesTask, combinedBatchTaskInfo) ?? ValueTask.FromResult(false));
 
         /// <summary>
         /// Returns job preparation and main Batch tasks that represents the given <see cref="TesTask"/>
@@ -1260,7 +1273,7 @@ namespace TesApi.Web
                 }
                 : await azureProxy.CreateBatchPoolAsync(
                     ConvertPoolSpecificationToModelsPool(
-                        jobId ?? throw new ArgumentNullException(nameof(jobId)),
+                        $"TES_{jobId ?? throw new ArgumentNullException(nameof(jobId))}",
                         jobId,
                         GetBatchPoolIdentity(identityResourceId),
                         poolSpecification),
@@ -1337,11 +1350,12 @@ namespace TesApi.Web
         /// <summary>
         /// Convert PoolSpecification to Models.Pool, including any BatchPoolIdentity
         /// </summary>
+        /// <remarks>Note: this is not a complete conversion. It only converts properties we are currently using (including on referenced objects). TODO: add new properties we set in the future on <see cref="PoolSpecification"/> and/or its contained objects.</remarks>
         /// <param name="name"></param>
         /// <param name="displayName"></param>
         /// <param name="poolIdentity"></param>
         /// <param name="pool"></param>
-        /// <returns></returns>
+        /// <returns>A <see cref="BatchModels.Pool"/>.</returns>
         private static BatchModels.Pool ConvertPoolSpecificationToModelsPool(string name, string displayName, BatchModels.BatchPoolIdentity poolIdentity, PoolSpecification pool)
         {
             ValidateString(name, nameof(name), 64);
@@ -1716,7 +1730,7 @@ namespace TesApi.Web
 
             _ = modelPoolFactory ?? throw new ArgumentNullException(nameof(modelPoolFactory));
             var keyLength = key?.Length ?? 0;
-            if (keyLength > 50 || keyLength < 1)
+            if (keyLength > PoolKeyLength || keyLength < 1)
             {
                 throw new ArgumentException("Key must be between 1-50 chars in length", nameof(key));
             }
@@ -1733,7 +1747,7 @@ namespace TesApi.Web
                 }
 
                 var uniquifier = new byte[8]; // This always becomes 13 chars when converted to base32 after removing the three '='s at the end. We won't ever decode this, so we don't need the '='s
-                random.NextBytes(uniquifier);
+                RandomNumberGenerator.Fill(uniquifier);
                 var poolId = $"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"; // embedded '-' is required by GetKeyFromPoolId()
 
                 try
@@ -1856,11 +1870,17 @@ namespace TesApi.Web
                 Action = action;
             }
 
-            public Func<TesTask, bool> Condition { get; set; }
-            public BatchTaskState? CurrentBatchTaskState { get; set; }
-            public Func<TesTask, CombinedBatchTaskInfo, Task> AsyncAction { get; set; }
-            public Action<TesTask, CombinedBatchTaskInfo> Action { get; set; }
+            public Func<TesTask, bool> Condition { get; }
+            public BatchTaskState? CurrentBatchTaskState { get; }
+            public Func<TesTask, CombinedBatchTaskInfo, Task> AsyncAction { get; }
+            public Action<TesTask, CombinedBatchTaskInfo> Action { get; }
 
+            /// <summary>
+            /// Calls <see cref="Action"/> and/or <see cref="AsyncAction"/>.
+            /// </summary>
+            /// <param name="tesTask"></param>
+            /// <param name="combinedBatchTaskInfo"></param>
+            /// <returns>True an action was called, otherwise False.</returns>
             public async ValueTask<bool> ActionAsync(TesTask tesTask, CombinedBatchTaskInfo combinedBatchTaskInfo)
             {
                 var tesTaskChanged = false;

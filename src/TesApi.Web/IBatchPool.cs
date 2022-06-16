@@ -32,7 +32,7 @@ namespace TesApi.Web
         /// Indicates that the pool is not scheduled to run tasks nor running tasks.
         /// </summary>
         /// <param name="cancellationToken"></param>
-        Task<bool> CanBeDeleted(CancellationToken cancellationToken = default);
+        ValueTask<bool> CanBeDeleted(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Removes and returns the next available start task failure.
@@ -53,7 +53,7 @@ namespace TesApi.Web
         /// <param name="serviceKind">The type of <see cref="ServiceKind"/> service call.</param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        Task ServicePoolAsync(ServiceKind serviceKind, CancellationToken cancellationToken = default);
+        ValueTask ServicePoolAsync(ServiceKind serviceKind, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Types of maintenance calls offered by the <see cref="IBatchPool.ServicePoolAsync(ServiceKind, CancellationToken)"/> service method.
