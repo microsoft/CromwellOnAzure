@@ -97,6 +97,7 @@ namespace TesApi.Web
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Resize, cancellationToken));
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle, cancellationToken));
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Update, cancellationToken));
+            retVal |= _isDirty || _isChanged;
             _isChanged = false;
 
             return exceptions.Count switch
