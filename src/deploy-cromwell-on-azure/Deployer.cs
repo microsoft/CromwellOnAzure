@@ -878,8 +878,8 @@ namespace CromwellOnAzureDeployer
                     new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
                     new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
                     new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
-                }, "scripts", "env-13-postgres-sql-db.txt"),
-                $"{CromwellAzureRootDir}/env-13-postgres-sql-db.txt", false));
+                }, "scripts", "env-13-postgre-sql-db.txt"),
+                $"{CromwellAzureRootDir}/env-13-postgre-sql-db.txt", false));
             }
 
             await UploadFilesToVirtualMachineAsync(
