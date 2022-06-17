@@ -536,7 +536,6 @@ namespace TesApi.Web
                     FailureReason = BatchTaskState.ActiveJobWithMissingAutoPool.ToString(),
                     PoolId = azureBatchJobAndTaskState.PoolId,
                     JobId = azureBatchJobAndTaskState.JobId,
-                    AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                     ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                 };
             }
@@ -549,7 +548,6 @@ namespace TesApi.Web
                     FailureReason = BatchTaskState.MoreThanOneActiveJobFound.ToString(),
                     PoolId = azureBatchJobAndTaskState.PoolId,
                     JobId = azureBatchJobAndTaskState.JobId,
-                    AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                     ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                 };
             }
@@ -590,7 +588,6 @@ namespace TesApi.Web
                         FailureReason = BatchTaskState.JobNotFound.ToString(),
                         PoolId = azureBatchJobAndTaskState.PoolId,
                         JobId = azureBatchJobAndTaskState.JobId,
-                        AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                         ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                     };
                 case JobState.Active:
@@ -604,7 +601,6 @@ namespace TesApi.Web
                                 SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
                                 PoolId = azureBatchJobAndTaskState.PoolId,
                                 JobId = azureBatchJobAndTaskState.JobId,
-                                AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                                 ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                             };
                         }
@@ -618,7 +614,6 @@ namespace TesApi.Web
                                 SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
                                 PoolId = azureBatchJobAndTaskState.PoolId,
                                 JobId = azureBatchJobAndTaskState.JobId,
-                                AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                                 ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                             };
                         }
@@ -632,7 +627,6 @@ namespace TesApi.Web
                                 SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
                                 PoolId = azureBatchJobAndTaskState.PoolId,
                                 JobId = azureBatchJobAndTaskState.JobId,
-                                AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                                 ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                             };
                         }
@@ -647,7 +641,6 @@ namespace TesApi.Web
                                     FailureReason = azureBatchJobAndTaskState.NodeErrorCode,
                                     PoolId = azureBatchJobAndTaskState.PoolId,
                                     JobId = azureBatchJobAndTaskState.JobId,
-                                    AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                                     ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                                 };
                             }
@@ -660,7 +653,6 @@ namespace TesApi.Web
                                     SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
                                     PoolId = azureBatchJobAndTaskState.PoolId,
                                     JobId = azureBatchJobAndTaskState.JobId,
-                                    AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                                     ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                                 };
                             }
@@ -684,7 +676,6 @@ namespace TesApi.Web
                         FailureReason = BatchTaskState.MissingBatchTask.ToString(),
                         PoolId = azureBatchJobAndTaskState.PoolId,
                         JobId = azureBatchJobAndTaskState.JobId,
-                        AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                         ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                     };
                 case TaskState.Active:
@@ -694,7 +685,6 @@ namespace TesApi.Web
                         BatchTaskState = BatchTaskState.Initializing,
                         PoolId = azureBatchJobAndTaskState.PoolId,
                         JobId = azureBatchJobAndTaskState.JobId,
-                        AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                         ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                     };
                 case TaskState.Running:
@@ -703,7 +693,6 @@ namespace TesApi.Web
                         BatchTaskState = BatchTaskState.Running,
                         PoolId = azureBatchJobAndTaskState.PoolId,
                         JobId = azureBatchJobAndTaskState.JobId,
-                        AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                         ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                     };
                 case TaskState.Completed:
@@ -723,7 +712,6 @@ namespace TesApi.Web
                             CromwellRcCode = metrics.CromwellRcCode,
                             PoolId = azureBatchJobAndTaskState.PoolId,
                             JobId = azureBatchJobAndTaskState.JobId,
-                            AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                             ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                         };
                     }
@@ -741,7 +729,6 @@ namespace TesApi.Web
                             SystemLogItems = new[] { azureBatchJobAndTaskState.TaskFailureInformation?.Details?.FirstOrDefault()?.Value },
                             PoolId = azureBatchJobAndTaskState.PoolId,
                             JobId = azureBatchJobAndTaskState.JobId,
-                            AffinityInformation = azureBatchJobAndTaskState.AffinityInformation,
                             ComputeNodeInformation = azureBatchJobAndTaskState.ComputeNodeInformation
                         };
                     }
@@ -1929,7 +1916,6 @@ namespace TesApi.Web
             public IEnumerable<string> SystemLogItems { get; set; }
             public string PoolId { get; set; }
             public string JobId { get; set; } // TODO: remove
-            public AffinityInformation AffinityInformation { get; set; } // TODO: remove
             public ComputeNodeInformation ComputeNodeInformation { get; set; } // TODO: remove
         }
     }
