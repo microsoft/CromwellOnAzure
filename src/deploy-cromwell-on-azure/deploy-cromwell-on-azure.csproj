@@ -26,7 +26,6 @@
     <PackageReference Include="Microsoft.Azure.Management.Batch" Version="14.0.0" />
     <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.38.0" />
     <PackageReference Include="Microsoft.Azure.Management.PostgreSQL" Version="2.0.0" />
-    <PackageReference Include="Microsoft.Azure.Management.PrivateDns" Version="1.0.0" />
     <PackageReference Include="Microsoft.Azure.Management.ResourceGraph" Version="2.1.0" />
     <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.6.2" />
     <PackageReference Include="Microsoft.Extensions.CommandLineUtils" Version="1.1.1" />
@@ -73,7 +72,6 @@
     <EmbeddedResource Include="scripts\mount-data-disk.sh" />
     <EmbeddedResource Include="scripts\mount.blobfuse" />
     <EmbeddedResource Include="scripts\mount_containers.sh" />
-    <EmbeddedResource Include="scripts\mysql\init-user-postgre.sql" />
     <EmbeddedResource Include="scripts\mysql\init-user.sql" />
     <EmbeddedResource Include="scripts\mysql\unlock-change-log.sql" />
     <EmbeddedResource Include="scripts\startup.sh" />

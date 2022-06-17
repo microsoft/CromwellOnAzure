@@ -122,9 +122,9 @@ if [ -n "$db_server_name" ]; then
     db_user=${kv["PostgreSqlUserLogin"]}
     db_user_password=${kv["PostgreSqlUserPassword"]}
     write_log "Checking if database $db_name is locked"
-    lockTableExists=$(psql -t -d "host="$fully_qualified_server_name" dbname=$db_name user=$db_user password=$db_user_password" -c "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'databasechangeloglock'")
-    [[ "$lockTableExists" -eq "1" ]] && isLocked=$(psql -t -d "host="$fully_qualified_server_name" dbname=$db_name user=$db_user password=$db_user_password" -c "SELECT CAST(locked AS INTEGER) FROM databasechangeloglock WHERE ID = 1") || isLocked=0
-    [[ "$isLocked" -eq "1" ]] && write_log "Removing lock from $db_name" && psql -t -d "host="$fully_qualified_server_name" dbname=$db_name user=$db_user password=$db_user_password" -c "UPDATE databasechangeloglock SET locked = FALSE, lockgranted = null, lockedby = null WHERE ID = 1" || write_log "$db_name was not locked"
+    lockTableExists=$(psql -t -d "host='$fully_qualified_server_name' dbname=$db_name user=$db_user password=$db_user_password" -c "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'databasechangeloglock'")
+    [[ "$lockTableExists" -eq "1" ]] && isLocked=$(psql -t -d "host='$fully_qualified_server_name' dbname=$db_name user=$db_user password=$db_user_password" -c "SELECT CAST(locked AS INTEGER) FROM databasechangeloglock WHERE ID = 1") || isLocked=0
+    [[ "$isLocked" -eq "1" ]] && write_log "Removing lock from $db_name" && psql -t -d "host='$fully_qualified_server_name' dbname=$db_name user=$db_user password=$db_user_password" -c "UPDATE databasechangeloglock SET locked = FALSE, lockgranted = null, lockedby = null WHERE ID = 1" || write_log "$db_name was not locked"
 fi
 
 write_log "Running docker-compose up"

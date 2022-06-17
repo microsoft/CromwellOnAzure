@@ -878,16 +878,8 @@ namespace CromwellOnAzureDeployer
                     new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
                     new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
                     new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
-                }, "scripts", "env-13-my-sql-db.txt"),
-                $"{CromwellAzureRootDir}/env-13-my-sql-db.txt", false));
-
-                uploadList.Add((Utility.PersonalizeContent(new[]
-                {
-                    new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
-                    new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
-                    new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
-                }, "scripts", "mysql", "init-user-postgre.sql"),
-                $"{CromwellAzureRootDir}/mysql-init/init-user-postgre.sql", false));
+                }, "scripts", "env-13-postgres-sql-db.txt"),
+                $"{CromwellAzureRootDir}/env-13-postgres-sql-db.txt", false));
             }
 
             await UploadFilesToVirtualMachineAsync(
@@ -1318,7 +1310,11 @@ namespace CromwellOnAzureDeployer
         private Task CreatePostgreSqlDatabaseUser(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Creating PostgreSQL database user...",
-                () => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} < {CromwellAzureRootDir}/mysql-init/init-user-postgre.sql")
+                () =>
+                {
+                    var sqlCommand = $"CREATE USER {configuration.PostgreSqlUserLogin} WITH PASSWORD '{configuration.PostgreSqlUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlDatabaseName} TO {configuration.PostgreSqlUserLogin};";
+                    return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} -c \"{sqlCommand}\"");
+                }
             );
 
         private Task<IPrivateDnsZone> CreatePrivateDnsZoneAsync(INetwork virtualNetwork)
