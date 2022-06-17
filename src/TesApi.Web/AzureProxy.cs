@@ -254,7 +254,6 @@ namespace TesApi.Web
                 ComputeNodeState? nodeState = null;
                 TaskState? taskState = null;
                 string poolId = null;
-                AffinityInformation affinityInformation = null;
                 TaskExecutionInformation taskExecutionInformation = null;
                 ComputeNodeInformation computeNodeInformation = null;
 
@@ -320,7 +319,6 @@ namespace TesApi.Web
                 {
                     var batchTask = await batchClient.JobOperations.GetTaskAsync(job.Id, tesTaskId);
                     taskState = batchTask.State;
-                    affinityInformation = batchTask.AffinityInformation;
                     taskExecutionInformation = batchTask.ExecutionInformation;
                     computeNodeInformation = batchTask.ComputeNodeInformation;
                 }
@@ -345,7 +343,6 @@ namespace TesApi.Web
                     TaskState = taskState,
                     PoolId = poolId,
                     JobId = job.Id,
-                    AffinityInformation = affinityInformation,
                     TaskExecutionResult = taskExecutionInformation?.Result,
                     TaskStartTime = taskExecutionInformation?.StartTime,
                     TaskEndTime = taskExecutionInformation?.EndTime,
