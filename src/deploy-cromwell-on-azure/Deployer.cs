@@ -202,7 +202,7 @@ namespace CromwellOnAzureDeployer
                             {
                                 linuxVm = existingVms.FirstOrDefault(vm => vm.Name.Equals(configuration.VmName, StringComparison.OrdinalIgnoreCase));
 
-                                if (linuxVm == null)
+                                if (linuxVm is null)
                                 {
                                     throw new ValidationException($"Virtual machine {configuration.VmName} does not exist in resource group {configuration.ResourceGroupName}.");
                                 }
@@ -214,9 +214,9 @@ namespace CromwellOnAzureDeployer
 
                             configuration.VmName = linuxVm.Name;
                             configuration.RegionName = linuxVm.RegionName;
-                            configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() == null;
+                            configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() is null;
 
-                            if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup == null)
+                            if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup is null)
                             {
                                 if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
                                 {
@@ -613,7 +613,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task<ManagedCluster> ValidateAndGetExistingAKSClusterAsync()
         {
-            if (configuration.AksClusterName == null)
+            if (string.IsNullOrWhiteSpace(configuration.AksClusterName))
             {
                 return null;
             }

@@ -1,6 +1,17 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Azure.Storage.Blobs;
+using k8s;
+using k8s.Models;
+using Microsoft.Azure.Management.ContainerService;
+using Microsoft.Azure.Management.ContainerService.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
+using static Microsoft.Azure.Management.Fluent.Azure;
+using Microsoft.Azure.Management.Storage.Fluent;
+using Microsoft.Rest;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,17 +20,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Azure.Management.ContainerService;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
-using Microsoft.Azure.Management.Storage.Fluent;
-using Microsoft.Rest;
-using k8s;
-using k8s.Models;
-using Azure.Storage.Blobs;
-using Microsoft.Azure.Management.ContainerService.Fluent;
-using static Microsoft.Azure.Management.Fluent.Azure;
 
 namespace CromwellOnAzureDeployer
 {
@@ -601,6 +601,7 @@ namespace CromwellOnAzureDeployer
 
         /// <summary>
         /// Installs the Yaml files for CSI blob driver. 
+        /// This will need to be manually updated but replacing files in the csi directory.
         /// Current Version: 1.8.0 from https://github.com/kubernetes-sigs/blob-csi-driver/tree/master/deploy/v1.8.0
         /// </summary>
         /// <param name="client"></param>
