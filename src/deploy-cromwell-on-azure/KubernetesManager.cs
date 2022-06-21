@@ -280,6 +280,19 @@ namespace CromwellOnAzureDeployer
             return true;
         }
 
+        private async Task<bool> DoesDeploymentExist(IKubernetes client, string deploymentName, string namespaceName)
+        {
+            V1Deployment deployment = null;
+
+            try
+            {
+                deployment = await client.ReadNamespacedDeploymentStatusAsync(deploymentName, namespaceName);
+            }
+            catch (HttpOperationException) { }
+
+            return deployment != null;
+        }
+
         private V1Deployment BuildTesDeployment(Dictionary<string, string> settings)
         {
             var tesDeploymentBody = Yaml.LoadFromString<V1Deployment>(Utility.GetFileContent("scripts", "k8s", "tes-deployment.yaml"));
@@ -608,7 +621,11 @@ namespace CromwellOnAzureDeployer
         /// <returns></returns>
         private async Task InstallCSIBlobDriver(IKubernetes client)
         {
-            // TODO check if CSI driver is already installed?
+            // Skip install if csi-blob-controller already exists.
+            if (await DoesDeploymentExist(client, "csi-blob-controller", "kube-system"))
+            {
+                return;
+            }
 
             var typeMap = new Dictionary<string, Type>();
             typeMap.Add("v1/Pod", typeof(V1Pod));
