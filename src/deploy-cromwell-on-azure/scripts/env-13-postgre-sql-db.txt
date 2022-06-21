@@ -1,0 +1,3 @@
+﻿PostgreSqlDatabaseName={PostgreSqlDatabaseName}
+PostgreSqlUserLogin={PostgreSqlUserLogin}
+PostgreSqlUserPassword={PostgreSqlUserPassword}
