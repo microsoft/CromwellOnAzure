@@ -46,7 +46,17 @@ namespace CromwellOnAzureDeployer
             }
         });
 
-        private ExecAsyncCallback silentHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) => {});
+        private ExecAsyncCallback silentHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) => {
+            using (var reader = new StreamReader(stdOut))
+            {
+                reader.ReadToEnd();
+            }
+
+            using (var reader = new StreamReader(stdError))
+            {
+                reader.ReadToEnd();
+            }
+        });
 
         public KubernetesManager(Configuration config, AzureCredentials credentials, IAuthenticated azureClient, IEnumerable<string> subscriptionIds, CancellationTokenSource cts)
         {
