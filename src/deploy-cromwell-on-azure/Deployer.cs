@@ -24,6 +24,7 @@ using Microsoft.Azure.Management.MySQL.FlexibleServers;
 using Microsoft.Azure.Management.MySQL.FlexibleServers.Models;
 using Sku = Microsoft.Azure.Management.MySQL.FlexibleServers.Models.Sku;
 using Microsoft.Azure.Management.Network.Fluent;
+using Microsoft.Azure.Management.Network.Fluent.Models;
 using Microsoft.Azure.Management.ResourceGraph;
 using Microsoft.Azure.Management.ResourceGraph.Models;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
