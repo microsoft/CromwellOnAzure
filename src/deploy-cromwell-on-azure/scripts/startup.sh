@@ -36,7 +36,10 @@ write_log
 
 storage_account_name=${kv["DefaultStorageAccountName"]}
 managed_identity_client_id=${kv["ManagedIdentityClientId"]}
-mysql_server_name=${kv["MySqlServerName"]}
+db_server_name=""
+if [[ -v "kv['PostgreSqlServerName']" ]] ; then
+    db_server_name=${kv["PostgreSqlServerName"]}
+fi
 
 write_log "Checking account access (this could take awhile due to role assignment propagation delay)..."
 
@@ -97,10 +100,10 @@ write_log "Mounted containers:"
 findmnt -t fuse
 write_log
 
-k=docker-compose.*.yml
-readarray -t files < <(compgen -G "$k")
-k="${files[@]}"
-kv["COMPOSE_FILE"]="docker-compose.yml:${k//${IFS:0:1}/:}"
+compose_files=(docker-compose.*.yml)
+compose_files=("docker-compose.yml" "${compose_files[@]}")
+kv["COMPOSE_FILE"]=$(IFS=:; echo "${compose_files[*]}")
+
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 
 write_log "Running docker-compose pull"
@@ -113,12 +116,15 @@ kv["TesImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}
 kv["TriggerServiceImageSha"]=$(docker inspect --format='{{range (.RepoDigests)}}{{.}}{{end}}' ${kv["TriggerServiceImageName"]})
 rm -f .env && for key in "${!kv[@]}"; do echo "$key=${kv[$key]}" >> .env; done
 
-write_log "Removing db lock if managed mysql"
-if [ -n "$mysql_server_name" ]; then
-    fully_qualified_server_name=$mysql_server_name.mysql.database.azure.com
-    mysql_server_password=${kv["MySqlServerPassword"]}
-    lockTableExists=$(mysql -u 'cromwell' -p$mysql_server_password cromwell_db -h $fully_qualified_server_name -P 3306 -e "SELECT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'cromwell_db' AND table_name = 'DATABASECHANGELOGLOCK') AS '' ")
-    [[ $lockTableExists -eq '1' ]] && mysql -u 'cromwell' -p$mysql_server_password cromwell_db -h $fully_qualified_server_name -P 3306 -e "UPDATE cromwell_db.DATABASECHANGELOGLOCK SET LOCKED = 0, LOCKGRANTED = null, LOCKEDBY = null WHERE ID = 1" || :
+if [ -n "$db_server_name" ]; then
+    fully_qualified_server_name="$db_server_name.postgres.database.azure.com"
+    db_name=${kv["PostgreSqlDatabaseName"]}
+    db_user=${kv["PostgreSqlUserLogin"]}
+    db_user_password=${kv["PostgreSqlUserPassword"]}
+    write_log "Checking if database $db_name is locked"
+    lockTableExists=$(psql -t -d "host='$fully_qualified_server_name' dbname=$db_name user=$db_user password=$db_user_password" -c "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'databasechangeloglock'")
+    [[ "$lockTableExists" -eq "1" ]] && isLocked=$(psql -t -d "host='$fully_qualified_server_name' dbname=$db_name user=$db_user password=$db_user_password" -c "SELECT CAST(locked AS INTEGER) FROM databasechangeloglock WHERE ID = 1") || isLocked=0
+    [[ "$isLocked" -eq "1" ]] && write_log "Removing lock from $db_name" && psql -t -d "host='$fully_qualified_server_name' dbname=$db_name user=$db_user password=$db_user_password" -c "UPDATE databasechangeloglock SET locked = FALSE, lockgranted = null, lockedby = null WHERE ID = 1" || write_log "$db_name was not locked"
 fi
 
 write_log "Running docker-compose up"

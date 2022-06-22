@@ -219,7 +219,7 @@ namespace CromwellOnAzureDeployer
             await client.CreateNamespacedDeploymentAsync(cromwellDeploymentBody, configuration.AksCoANamespace);
             await client.CreateNamespacedServiceAsync(cromwellServiceBody, configuration.AksCoANamespace);
 
-            if (!configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
+            if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
             {
                 var mysqlDeploymentBody = BuildMysqlDeployment(settings, storageAccount.Name);
                 await client.CreateNamespacedDeploymentAsync(mysqlDeploymentBody, configuration.AksCoANamespace);
@@ -707,7 +707,7 @@ namespace CromwellOnAzureDeployer
             await client.ReplaceNamespacedDeploymentAsync(triggerServiceDeploymentBody, "triggerservice", configuration.AksCoANamespace);
             await client.ReplaceNamespacedDeploymentAsync(cromwellDeploymentBody, "cromwell", configuration.AksCoANamespace);
             
-            if (string.IsNullOrEmpty(configuration.MySqlServerName))
+            if (string.IsNullOrEmpty(configuration.PostgreSqlServerName))
             {
                 await client.ReplaceNamespacedDeploymentAsync(mysqlDeploymentBody, "mysqldb", configuration.AksCoANamespace);
             }
