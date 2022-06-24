@@ -502,9 +502,6 @@ namespace CromwellOnAzureDeployer
 
                         await Task.WhenAll(new Task[]
                         {   
-                            Task.Run(async () => {
-                                if (configuration.ProvisionPostgreSqlOnAzure == true) { postgreSqlServer = await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone); }
-                            }),
                             Task.Run(async () => 
                             {
                                 batchAccount ??= await CreateBatchAccountAsync(storageAccount.Id);
