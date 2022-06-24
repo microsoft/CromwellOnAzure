@@ -24,10 +24,11 @@ using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
-using Microsoft.Azure.Management.MySQL.FlexibleServers;
-using Microsoft.Azure.Management.MySQL.FlexibleServers.Models;
 using Microsoft.Azure.Management.Network.Fluent;
 using Microsoft.Azure.Management.Network.Fluent.Models;
+using Microsoft.Azure.Management.PostgreSQL.FlexibleServers;
+using Microsoft.Azure.Management.PostgreSQL.FlexibleServers.Models;
+using Microsoft.Azure.Management.PrivateDns.Fluent;
 using Microsoft.Azure.Management.ResourceGraph;
 using Microsoft.Azure.Management.ResourceGraph.Models;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
@@ -45,7 +46,7 @@ using Renci.SshNet.Common;
 using Common;
 using System.Net;
 
-using Sku = Microsoft.Azure.Management.MySQL.FlexibleServers.Models.Sku;
+using Sku = Microsoft.Azure.Management.PostgreSQL.FlexibleServers.Models.Sku;
 
 namespace CromwellOnAzureDeployer
 {
@@ -90,7 +91,7 @@ namespace CromwellOnAzureDeployer
         private Microsoft.Azure.Management.Fluent.Azure.IAuthenticated azureClient { get; set; }
         private IResourceManager resourceManagerClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
-        private IMySQLManagementClient mySQLManagementClient { get; set; }
+        private IPostgreSQLManagementClient postgreSqlManagementClient { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
         private bool SkipBillingReaderRoleAssignment { get; set; }
         private bool isResourceGroupCreated { get; set; }
@@ -118,7 +119,7 @@ namespace CromwellOnAzureDeployer
                 azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                 subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
-                mySQLManagementClient = new MySQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+                postgreSqlManagementClient = new PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
@@ -127,12 +128,13 @@ namespace CromwellOnAzureDeployer
                 IGenericResource logAnalyticsWorkspace = null;
                 IGenericResource appInsights = null;
                 ICosmosDBAccount cosmosDb = null;
-                Server mySQLServer = null;
+                Server postgreSqlServer = null;
                 IStorageAccount storageAccount = null;
                 IVirtualMachine linuxVm = null;
                 INetworkSecurityGroup networkSecurityGroup = null;
                 IIdentity managedIdentity = null;
                 ConnectionInfo sshConnectionInfo = null;
+                IPrivateDnsZone postgreSqlDnsZone = null;
 
                 try
                 {
@@ -269,9 +271,9 @@ namespace CromwellOnAzureDeployer
 
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
 
-                        // Note: Current behavior is to block switching from Docker MySQL to Azure MySQL on Update.
+                        // Note: Current behavior is to block switching from Docker MySQL to Azure PostgreSql on Update.
                         // However we do ancitipate including this change, this code is here to facilitate this future behavior.
-                        configuration.MySqlServerName = accountNames.GetValueOrDefault("MySqlServerName");
+                        configuration.PostgreSqlServerName = accountNames.GetValueOrDefault("PostgreSqlServerName");
 
                         var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
 
@@ -329,9 +331,9 @@ namespace CromwellOnAzureDeployer
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
 
                         // Configuration preferences not currently settable by user.
-                        configuration.MySqlServerName = configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15) : String.Empty;
-                        configuration.MySqlAdministratorPassword = Utility.GeneratePassword();
-                        configuration.MySqlUserPassword = Utility.GeneratePassword();
+                        configuration.PostgreSqlServerName = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15) : String.Empty;
+                        configuration.PostgreSqlAdministratorPassword = Utility.GeneratePassword();
+                        configuration.PostgreSqlUserPassword = Utility.GeneratePassword();
 
                         if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
                         {
@@ -406,7 +408,7 @@ namespace CromwellOnAzureDeployer
                         {
                             ConsoleEx.WriteLine($"Using existing Storage Account {storageAccount.Name}");
                         }
-                        
+
                         if (batchAccount is not null)
                         {
                             ConsoleEx.WriteLine($"Using existing Batch Account {batchAccount.Name}");
@@ -415,7 +417,7 @@ namespace CromwellOnAzureDeployer
                         if (vnetAndSubnet is null)
                         {
                             configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                            configuration.MySqlSubnetName = String.IsNullOrEmpty(configuration.MySqlSubnetName) && configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? configuration.DefaultMySqlSubnetName : configuration.MySqlSubnetName;
+                            configuration.PostgreSqlSubnetName = String.IsNullOrEmpty(configuration.PostgreSqlSubnetName) && configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? configuration.DefaultPostgreSqlSubnetName : configuration.PostgreSqlSubnetName;
                             configuration.VmSubnetName = String.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
                             vnetAndSubnet = await CreateVnetAndSubnetsAsync(resourceGroup);
                         }
@@ -427,13 +429,17 @@ namespace CromwellOnAzureDeployer
                             configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
                         }
 
+                        if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                        {
+                            postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork);
+                        }
 
                         await Task.WhenAll(new Task[]
                         {
                             Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
                             Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
-                            Task.Run(async () => { 
-                                if(configuration.ProvisionMySqlOnAzure == true) { mySQLServer = await CreateMySqlServerAndDatabaseAsync(mySQLManagementClient, vnetAndSubnet.Value.mySqlSubnet); }
+                            Task.Run(async () => {
+                                if (configuration.ProvisionPostgreSqlOnAzure == true) { postgreSqlServer = await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone); }
                             }),
 
                             Task.Run(async () =>
@@ -482,9 +488,9 @@ namespace CromwellOnAzureDeployer
                             await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
                         }
 
-                        if (configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
+                        if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                         {
-                            await CreateMySqlDatabaseUser(sshConnectionInfo, mySQLServer);
+                            await CreatePostgreSqlDatabaseUser(sshConnectionInfo);
                         }
                     }
 
@@ -622,7 +628,7 @@ namespace CromwellOnAzureDeployer
                 {
                     while (!cts.IsCancellationRequested)
                     {
-                        var totalNumberOfRunningDockerContainers = configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? "3" : "4";
+                        var totalNumberOfRunningDockerContainers = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? "3" : "4";
                         var (numberOfRunningContainers, _, _) = await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo docker ps -a | grep -c 'Up ' || :");
 
                         if (numberOfRunningContainers == totalNumberOfRunningDockerContainers)
@@ -817,10 +823,11 @@ namespace CromwellOnAzureDeployer
                         (Utility.GetFileContent("scripts", "docker-compose.yml"), $"{CromwellAzureRootDir}/docker-compose.yml", false),
                         (Utility.GetFileContent("scripts", "cromwellazure.service"), "/lib/systemd/system/cromwellazure.service", false),
                         (Utility.GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true)
-                    }.Concat(!configuration.ProvisionMySqlOnAzure.GetValueOrDefault()
+                    }.Concat(!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault()
                         ? new[] {
                         (Utility.GetFileContent("scripts", "env-12-local-my-sql-db.txt"), $"{CromwellAzureRootDir}/env-12-local-my-sql-db.txt", false),
                         (Utility.GetFileContent("scripts", "docker-compose.mysql.yml"), $"{CromwellAzureRootDir}/docker-compose.mysql.yml", false),
+                        (Utility.GetFileContent("scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
                         (Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
                         }
                         : Array.Empty<(string, string, bool)>())
@@ -840,45 +847,45 @@ namespace CromwellOnAzureDeployer
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo {CromwellAzureRootDir}/install-cromwellazure.sh");
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod -aG docker {configuration.VmUsername}");
 
-                    if(configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
+                    if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                     {
-                        await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y mysql-client");
+                        await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y postgresql-client");
                     }
                 });
 
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
-            => await UploadFilesToVirtualMachineAsync(
-                sshConnectionInfo,
-                new[] {
-                    (Utility.PersonalizeContent(new []
-                    {
-                        new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
-                        new Utility.ConfigReplaceTextItem("{CosmosDbAccountName}", configuration.CosmosDbAccountName),
-                        new Utility.ConfigReplaceTextItem("{BatchAccountName}", configuration.BatchAccountName),
-                        new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
-                        new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
-                        new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? configuration.MySqlServerName : String.Empty),
-                    }, "scripts", "env-01-account-names.txt"),
-                    $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
+        {
+            var uploadList = new List<(string, string, bool)>
+            {
+                (Utility.PersonalizeContent(new []
+                {
+                    new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
+                    new Utility.ConfigReplaceTextItem("{CosmosDbAccountName}", configuration.CosmosDbAccountName),
+                    new Utility.ConfigReplaceTextItem("{BatchAccountName}", configuration.BatchAccountName),
+                    new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
+                    new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlServerName}", configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? configuration.PostgreSqlServerName : String.Empty),
+                }, "scripts", "env-01-account-names.txt"),
+                $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
-                    (Utility.GetFileContent("scripts", "env-04-settings.txt"), $"{CromwellAzureRootDir}/env-04-settings.txt", false),
+                (Utility.GetFileContent("scripts", "env-04-settings.txt"), $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+            };
 
-                    (Utility.PersonalizeContent(new []
-                    {
-                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword),
-                    }, "scripts", "env-13-my-sql-db.txt"),
-                    $"{CromwellAzureRootDir}/env-13-my-sql-db.txt", false),
+            if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+            {
+                uploadList.Add((Utility.PersonalizeContent(new[]
+                {
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
+                }, "scripts", "env-13-postgre-sql-db.txt"),
+                $"{CromwellAzureRootDir}/env-13-postgre-sql-db.txt", false));
+            }
 
-                    (Utility.PersonalizeContent(new []
-                    {
-                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword),
-                    }, "scripts", "mysql", "init-user.sql"),
-                    $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
-                });
+            await UploadFilesToVirtualMachineAsync(
+               sshConnectionInfo,
+               uploadList.ToArray());
+        }
 
         private async Task HandleCustomImagesAsync(ConnectionInfo sshConnectionInfo)
         {
@@ -1060,14 +1067,31 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
                         new Utility.ConfigReplaceTextItem("{ManagedIdentityName}", managedIdentityName)
                     }, "scripts", ContainersToMountFileName));
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
+
+                    // Configure Cromwell config file for Docker Mysql or PostgreSQL on Azure.
+                    if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                     {
-                        new Utility.ConfigReplaceTextItem("{MySqlServerName}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? $"{configuration.MySqlServerName}.mysql.database.azure.com" : "mysqldb"),
-                        new Utility.ConfigReplaceTextItem("{MySqlDatabaseName}", configuration.MySqlDatabaseName),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserLogin}", configuration.MySqlUserLogin),
-                        new Utility.ConfigReplaceTextItem("{MySqlUserPassword}", configuration.MySqlUserPassword),
-                        new Utility.ConfigReplaceTextItem("{MySqlUseSSL}", configuration.ProvisionMySqlOnAzure.GetValueOrDefault() ? "true" : "false"),
-                    }, "scripts", CromwellConfigurationFileName));
+                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
+                        {
+                            new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName}?sslmode=require\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", $"\"{configuration.PostgreSqlUserLogin}\""),
+                            new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlUserPassword}\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
+                        }, "scripts", CromwellConfigurationFileName));
+                    }
+                    else
+                    {
+                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
+                        {
+                            new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:mysql://mysqldb/cromwell_db?useSSL=false&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", $"\"cromwell\""),
+                            new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"cromwell\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"com.mysql.cj.jdbc.Driver\""),
+                        new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.MySQLProfile$\""),
+                        }, "scripts", CromwellConfigurationFileName));
+                    }
+
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
 
@@ -1105,38 +1129,39 @@ namespace CromwellOnAzureDeployer
                     .WithWriteReplication(Region.Create(configuration.RegionName))
                     .CreateAsync(cts.Token));
 
-        private async Task<Server> CreateMySqlServerAndDatabaseAsync(IMySQLManagementClient mySqlManagementClient, ISubnet subnet)
+        private async Task<Server> CreatePostgreSqlServerAndDatabaseAsync(IPostgreSQLManagementClient postgresManagementClient, ISubnet subnet, IPrivateDnsZone postgreSqlDnsZone)
         {
             if (!subnet.Inner.Delegations.Any())
             {
-                subnet.Parent.Update().UpdateSubnet(subnet.Name).WithDelegation("Microsoft.DBforMySQL/flexibleServers");
+                subnet.Parent.Update().UpdateSubnet(subnet.Name).WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers");
                 await subnet.Parent.Update().ApplyAsync();
             }
 
             Server server = null;
 
             await Execute(
-                $"Creating Azure Database for MySQL: {configuration.MySqlServerName} ...",
+                $"Creating Azure Server for PostgreSQL: {configuration.PostgreSqlServerName} ...",
                 async () =>
                 {
-                    server = await mySqlManagementClient.Servers.CreateAsync(
-                        configuration.ResourceGroupName, configuration.MySqlServerName,
+                    server = await postgresManagementClient.Servers.CreateAsync(
+                        configuration.ResourceGroupName, configuration.PostgreSqlServerName,
                         new Server(
                            location: configuration.RegionName,
-                           version: configuration.MySqlVersion,
-                           sku: new Sku(configuration.MySqlSkuName, configuration.MySqlTier),
-                           administratorLogin: configuration.MySqlAdministratorLogin,
-                           administratorLoginPassword: configuration.MySqlAdministratorPassword,
-                           network: new Network(publicNetworkAccess: "Disabled", delegatedSubnetResourceId: subnet.Inner.Id)
+                           version: configuration.PostgreSqlVersion,
+                           sku: new Sku(configuration.PostgreSqlSkuName, configuration.PostgreSqlTier),
+                           storage: new Storage(configuration.PostgreSqlStorageSize),
+                           administratorLogin: configuration.PostgreSqlAdministratorLogin,
+                           administratorLoginPassword: configuration.PostgreSqlAdministratorPassword,
+                           network: new Network(publicNetworkAccess: "Disabled", delegatedSubnetResourceId: subnet.Inner.Id, privateDnsZoneArmResourceId: postgreSqlDnsZone.Id)
                         ));
                 });
 
             await Execute(
-                $"Creating MySQL database: {configuration.MySqlDatabaseName}...",
-                () => mySqlManagementClient.Databases.CreateOrUpdateAsync(
-                    configuration.ResourceGroupName, configuration.MySqlServerName, configuration.MySqlDatabaseName,
+                $"Creating PostgreSQL cromwell database: {configuration.PostgreSqlDatabaseName}...",
+                () => postgresManagementClient.Databases.CreateAsync(
+                    configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlDatabaseName,
                     new Database()));
- 
+
             return server;
         }
 
@@ -1195,7 +1220,7 @@ namespace CromwellOnAzureDeployer
             return Execute($"Creating Linux VM: {configuration.VmName}...", () => vmDefinitionPart2.CreateAsync(cts.Token));
         }
 
-        private Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet mySqlSubnet)> CreateVnetAndSubnetsAsync(IResourceGroup resourceGroup)
+        private Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet)> CreateVnetAndSubnetsAsync(IResourceGroup resourceGroup)
           => Execute(
                 $"Creating virtual network and subnets: {configuration.VnetName} ...",
             async () =>
@@ -1207,13 +1232,13 @@ namespace CromwellOnAzureDeployer
                     .WithAddressSpace(configuration.VnetAddressSpace)
                     .DefineSubnet(configuration.VmSubnetName).WithAddressPrefix(configuration.VmSubnetAddressSpace).Attach();
 
-                vnetDefinition = configuration.ProvisionMySqlOnAzure.GetValueOrDefault()
-                    ? vnetDefinition.DefineSubnet(configuration.MySqlSubnetName).WithAddressPrefix(configuration.MySqlSubnetAddressSpace).WithDelegation("Microsoft.DBforMySQL/flexibleServers").Attach()
+                vnetDefinition = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault()
+                    ? vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName).WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace).WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers").Attach()
                     : vnetDefinition;
 
                 var vnet = await vnetDefinition.CreateAsync();
 
-                return (vnet, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.MySqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value);
+                return (vnet, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value);
             });
 
         private Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync(IResourceGroup resourceGroup, string networkSecurityGroupName)
@@ -1282,11 +1307,33 @@ namespace CromwellOnAzureDeployer
                 () => networkInterface.Update().WithExistingNetworkSecurityGroup(networkSecurityGroup).ApplyAsync()
             );
 
-        private Task CreateMySqlDatabaseUser(ConnectionInfo sshConnectionInfo, Server mySqlServer)
+        private Task CreatePostgreSqlDatabaseUser(ConnectionInfo sshConnectionInfo)
             => Execute(
-                $"Creating MySQL database user...",
-                () => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"mysql -u {configuration.MySqlAdministratorLogin} -p'{configuration.MySqlAdministratorPassword}' -h {mySqlServer.FullyQualifiedDomainName} -P 3306 < {CromwellAzureRootDir}/mysql-init/init-user.sql")
+                $"Creating PostgreSQL database user...",
+                () =>
+                {
+                    var sqlCommand = $"CREATE USER {configuration.PostgreSqlUserLogin} WITH PASSWORD '{configuration.PostgreSqlUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlDatabaseName} TO {configuration.PostgreSqlUserLogin};";
+                    return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} -c \"{sqlCommand}\"");
+                }
             );
+
+        private Task<IPrivateDnsZone> CreatePrivateDnsZoneAsync(INetwork virtualNetwork)
+            => Execute(
+                "Creating private DNS Zone for PostgreSQL Server",
+                async () =>
+                {
+                    // Note: for a potential future implementation of this method without Fluent,
+                    // please see commit cbffa28 in #392
+                    var postgreSqlDnsZone = await azureSubscriptionClient.PrivateDnsZones
+                        .Define($"{configuration.PostgreSqlServerName}.private.postgres.database.azure.com")
+                        .WithExistingResourceGroup(configuration.ResourceGroupName)
+                        .DefineVirtualNetworkLink($"{virtualNetwork.Name}-link")
+                        .WithReferencedVirtualNetworkId(virtualNetwork.Id)
+                        .DisableAutoRegistration()
+                        .Attach()
+                        .CreateAsync();
+                    return postgreSqlDnsZone;
+                });
 
         private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
             => Execute(
@@ -1320,7 +1367,7 @@ namespace CromwellOnAzureDeployer
                     .WithoutPlan()
                     .WithApiVersion("2020-02-02")
                     .WithParentResource(string.Empty)
-                    .WithProperties(new Dictionary<string, string>() { 
+                    .WithProperties(new Dictionary<string, string>() {
                         { "Application_Type", "other" } ,
                         { "WorkspaceResourceId", logAnalyticsArmId }
                     })
@@ -1690,7 +1737,7 @@ namespace CromwellOnAzureDeployer
                 ?? throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
         }
 
-        private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet mySqlSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
+        private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
         {
             static bool AllOrNoneSet(params string[] values) => values.All(v => !string.IsNullOrEmpty(v)) || values.All(v => string.IsNullOrEmpty(v));
             static bool NoneSet(params string[] values) => values.All(v => string.IsNullOrEmpty(v));
@@ -1705,9 +1752,9 @@ namespace CromwellOnAzureDeployer
                 return null;
             }
 
-            if (configuration.ProvisionMySqlOnAzure == true && !AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName, configuration.MySqlSubnetName))
+            if (configuration.ProvisionPostgreSqlOnAzure == true && !AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName, configuration.PostgreSqlSubnetName))
             {
-                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)}, {nameof(configuration.VmSubnetName)} and {nameof(configuration.MySqlSubnetName)} are required when using an existing virtual network and {nameof(configuration.ProvisionMySqlOnAzure)} is set.");
+                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)}, {nameof(configuration.VmSubnetName)} and {nameof(configuration.PostgreSqlSubnetName)} are required when using an existing virtual network and {nameof(configuration.ProvisionPostgreSqlOnAzure)} is set.");
             }
 
             if (!AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName))
@@ -1740,34 +1787,34 @@ namespace CromwellOnAzureDeployer
             }
 
             var resourceGraphClient = new ResourceGraphClient(tokenCredentials);
-            var mySqlSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.MySqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
+            var postgreSqlSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
 
-            if (configuration.ProvisionMySqlOnAzure == true)
+            if (configuration.ProvisionPostgreSqlOnAzure == true)
             {
-                if (mySqlSubnet == null)
+                if (postgreSqlSubnet == null)
                 {
-                    throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.MySqlSubnetName}'");
+                    throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.PostgreSqlSubnetName}'");
                 }
 
-                var delegatedServices = mySqlSubnet.Inner.Delegations.Select(d => d.ServiceName);
-                var hasOtherDelegations = delegatedServices.Any(s => s != "Microsoft.DBforMySQL/flexibleServers");
+                var delegatedServices = postgreSqlSubnet.Inner.Delegations.Select(d => d.ServiceName);
+                var hasOtherDelegations = delegatedServices.Any(s => s != "Microsoft.DBforPostgreSQL/flexibleServers");
                 var hasNoDelegations = delegatedServices.Count() == 0;
 
                 if (hasOtherDelegations)
                 {
-                    throw new ValidationException($"Subnet '{configuration.MySqlSubnetName}' can have 'Microsoft.DBforMySQL/flexibleServers' delegation only.");
+                    throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' can have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation only.");
                 }
 
-                var resourcesInMySqlSubnetQuery = $"where type =~ 'Microsoft.Network/networkInterfaces' | where properties.ipConfigurations[0].properties.subnet.id == '{mySqlSubnet.Inner.Id}'";
-                var resourcesExist = (await resourceGraphClient.ResourcesAsync(new QueryRequest(new[] { configuration.SubscriptionId }, resourcesInMySqlSubnetQuery))).TotalRecords > 0;
+                var resourcesInPostgreSqlSubnetQuery = $"where type =~ 'Microsoft.Network/networkInterfaces' | where properties.ipConfigurations[0].properties.subnet.id == '{postgreSqlSubnet.Inner.Id}'";
+                var resourcesExist = (await resourceGraphClient.ResourcesAsync(new QueryRequest(new[] { configuration.SubscriptionId }, resourcesInPostgreSqlSubnetQuery))).TotalRecords > 0;
 
                 if (hasNoDelegations && resourcesExist)
                 {
-                    throw new ValidationException($"Subnet '{configuration.MySqlSubnetName}' must be either empty or have 'Microsoft.DBforMySQL/flexibleServers' delegation.");
+                    throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' must be either empty or have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation.");
                 }
             }
 
-            return (vnet, vmSubnet, mySqlSubnet);
+            return (vnet, vmSubnet, postgreSqlSubnet);
         }
 
         private async Task ValidateBatchAccountQuotaAsync()
@@ -1809,7 +1856,7 @@ namespace CromwellOnAzureDeployer
         {
             try
             {
-                await Execute("Retrieving Azure management token...", () => new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/"));
+                await Execute("Retrieving Azure management token...", () => new AzureServiceTokenProvider("RunAs=Developer; DeveloperTool=AzureCli").GetAccessTokenAsync("https://management.azure.com/"));
             }
             catch (AzureServiceTokenProviderException ex)
             {
@@ -1882,7 +1929,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.StorageAccountName, nameof(configuration.StorageAccountName));
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
             ThrowIfProvidedForUpdate(configuration.CosmosDbAccountName, nameof(configuration.CosmosDbAccountName));
-            ThrowIfProvidedForUpdate(configuration.ProvisionMySqlOnAzure, nameof(configuration.ProvisionMySqlOnAzure));
+            ThrowIfProvidedForUpdate(configuration.ProvisionPostgreSqlOnAzure, nameof(configuration.ProvisionPostgreSqlOnAzure));
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));

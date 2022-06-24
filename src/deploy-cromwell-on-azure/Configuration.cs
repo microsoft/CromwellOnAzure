@@ -11,17 +11,19 @@ namespace CromwellOnAzureDeployer
 {
     public class Configuration : UserAccessibleConfiguration
     {
-        public string MySqlServerName { get; set; }
-        public string MySqlDatabaseName { get; set; } = "cromwell_db";
-        public string MySqlAdministratorLogin { get; set; } = "coa_admin";
-        public string MySqlAdministratorPassword { get; set; }
-        public string MySqlUserLogin { get; set; } = "cromwell";
-        public string MySqlUserPassword { get; set; }
-        public string MySqlSkuName { get; set; } = "Standard_B1s";
-        public string MySqlTier { get; set; } = "Burstable";
+        public string PostgreSqlServerName { get; set; }
+        public string PostgreSqlDatabaseName { get; set; } = "cromwell_db";
+        public string PostgreSqlAdministratorLogin { get; set; } = "coa_admin";
+        public string PostgreSqlAdministratorPassword { get; set; }
+        public string PostgreSqlUserLogin { get; set; } = "cromwell";
+        public string PostgreSqlUserPassword { get; set; }
+        public string PostgreSqlSkuName { get; set; } = "Standard_B2s";
+        public string PostgreSqlTier { get; set; } = "Burstable";
         public string DefaultVmSubnetName { get; set; } = "vmsubnet";
-        public string DefaultMySqlSubnetName { get; set; } = "mysqlsubnet";
-        public string MySqlVersion { get; set; } = "8.0.21";
+        public string DefaultPostgreSqlSubnetName { get; set; } = "mysqlsubnet";
+        public string PostgreSqlVersion { get; set; } = "11";
+        public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
+        public bool? ProvisionPostgreSqlOnAzure { get; set; } = false; // Will be accessible in 4.0 release
     }
     public abstract class UserAccessibleConfiguration
     {
@@ -34,7 +36,7 @@ namespace CromwellOnAzureDeployer
         public string VmSize { get; set; } = "Standard_D3_v2";
         public string VnetAddressSpace { get; set; } = "10.1.0.0/16";
         public string VmSubnetAddressSpace { get; set; } = "10.1.0.0/24";
-        public string MySqlSubnetAddressSpace { get; set; } = "10.1.1.0/24";
+        public string PostgreSqlSubnetAddressSpace { get; set; } = "10.1.1.0/24";
         public string VmUsername { get; set; } = "vmadmin";
         public string VmPassword { get; set; }
         public string ResourceGroupName { get; set; }
@@ -59,7 +61,7 @@ namespace CromwellOnAzureDeployer
         public string VnetName { get; set; }
         public string SubnetName { get; set; }
         public string VmSubnetName { get; set; }
-        public string MySqlSubnetName { get; set; }
+        public string PostgreSqlSubnetName { get; set; }
         public bool? PrivateNetworking { get; set; } = null;
         public string Tags { get; set; } = null;
         public string BatchNodesSubnetId { get; set; } = null;
@@ -67,7 +69,6 @@ namespace CromwellOnAzureDeployer
         public string BlobxferImageName { get; set; } = null;
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool? KeepSshPortOpen { get; set; } = null;
-        public bool? ProvisionMySqlOnAzure { get; set; } = null;
 
         public static Configuration BuildConfiguration(string[] args)
         {
