@@ -27,7 +27,7 @@ If you run into any problems or want more information and ways to customize depl
 You've read the above section on Issues and Pull Requests and you're ready to jump in! We ask that your contributions follow our coding standards and your changes work with a private vnet deployment.
 
 #### Coding Standards 
-Cromwell on Azure currently does not have enforced linting, so we do ask all contributors to help keep things neat. We generally follow the [C# Style Conventions](https://docs.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions) (though not as much on camel casing private variables). 
+Cromwell on Azure currently does not have enforced linting, so we do ask all contributors to help keep things neat. We generally follow the [C# Style Conventions](https://docs.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions). 
 
 This includes things like 
 - Keeping one newline between end braces `}` 
@@ -40,7 +40,7 @@ This includes things like
 We also ask contributors to please update the docs if you add a flag to Configuration.cs.
 
 #### Setting up a Private VNet
-TODO: REPLACE THIS SECTION WITH LINK TO PRIVATE VNET DOC ONCE JONATHON PUSHES IT.
+(TODO: Replace this section with links to issue #286 once that goes in)
 
 Deploying Cromwell on Azure in a Private Virtual Network ensures a secure self-contained deployment with no public endpoints. This deployment expects you to have already created a number of your own resources hooked up to the VNet. 
 
