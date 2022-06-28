@@ -527,11 +527,7 @@ namespace CromwellOnAzureDeployer
 
                                     if (configuration.UseAks)
                                     {
-                                        await ExecuteQueriesOnAzureMySqlDbFromK8(postgreSqlServer);
-                                    }
-                                    else
-                                    {
-                                        await ExecuteQueriesOnAzureMySqlDb(sshConnectionInfo, postgreSqlServer);
+                                        await ExecuteQueriesOnAzurePostgreSQLDbFromK8(postgreSqlServer);
                                     }
                                 }
                             }),
@@ -1648,10 +1644,7 @@ namespace CromwellOnAzureDeployer
 
         private string GetInitSqlString()
         {
-            return Utility.PersonalizeContent(new[]
-            {
-                new Utility.ConfigReplaceRegExItemText("^CREATE USER 'cromwell'@'%'.*$", String.Empty, RegexOptions.Multiline),
-            }, "scripts", "mysql", "init-user.sql");
+            return $"CREATE USER {configuration.PostgreSqlUserLogin} WITH PASSWORD '{configuration.PostgreSqlUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlDatabaseName} TO {configuration.PostgreSqlUserLogin};";
         }
 
         private Task ExecuteQueriesOnAzureMySqlDb(ConnectionInfo sshConnectionInfo, Server mySQLServer)
@@ -1691,7 +1684,7 @@ namespace CromwellOnAzureDeployer
                     return postgreSqlDnsZone;
                 });
 
-        private Task ExecuteQueriesOnAzureMySqlDbFromK8(Server mySQLServer)
+        private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8(Server postgreSQLServer)
             => Execute(
                 $"Executing scripts on cromwell_db.",
                 async () => 
@@ -1700,10 +1693,10 @@ namespace CromwellOnAzureDeployer
 
                     var commands = new List<string[]>() 
                     {
-                        new string[] { "sudo apt install -y mysql-client" } ,
-                        new string[] { $"mysql -u cromwell -pcromwell -h {mySQLServer.FullyQualifiedDomainName} -P 3306 -D cromwell_db -e \"{initScript}\"" }
+                        new string[] { "apt", "install", "-y", "postgresql-client" },
+                        new string[] { "psql", $"postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName}", "-c", $"{initScript}" }
                     };
-                    await kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "cromwell", commands, System.TimeSpan.FromMinutes(5));
+                    await kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "tes", commands, System.TimeSpan.FromMinutes(5));
                 });
 
         private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
