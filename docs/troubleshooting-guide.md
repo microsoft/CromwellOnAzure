@@ -18,13 +18,13 @@ This article answers FAQs, describes advanced features that allow customization 
    * My jobs are taking a long time in the "Preparing" task state, even with "smaller" input files and VMs being used. [Why is that](#Check-Azure-Storage-Tier)?
 
 3. Customizing your instance
-   * How can I [customize my Cromwell on Azure deployment?](#Customize-your-Cromwell-on-Azure-deployment)
-   * How can I [use a specific Cromwell image version?](#Use-a-specific-Cromwell-version)
-   * How do I [use input data files for my workflows from a different Azure Storage account](#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using) that my lab or team is currently using?
-   * Can I connect a different [batch account with previously increased quotas](#Use-a-batch-account-for-which-I-have-already-requested-or-received-increased-cores-quota-from-Azure-Support) to run my workflows?
-   * How can I [use private Docker containers for my workflows?](#Use-private-docker-containers-hosted-on-Azure)
-   * A lot of tasks for my workflows run longer than 24 hours and have been randomly stopped. How can I [run all my tasks on dedicated batch VMs?](#Configure-my-Cromwell-on-Azure-instance-to-always-use-dedicated-Batch-VMs-to-avoid-getting-preempted)
-   * Can I get [direct access to Cromwell's REST API?](#Access-the-Cromwell-REST-API-directly-from-Linux-host-VM)
+   * How can I [customize my Cromwell on Azure deployment?](#customize-your-cromwell-on-azure-deployment)
+   * How can I [use a specific Cromwell image version?](#use-a-specific-cromwell-version)
+   * How do I [use input data files for my workflows from a different Azure Storage account](#use-input-data-files-from-an-existing-azure-storage-account-that-my-lab-or-team-is-currently-using) that my lab or team is currently using?
+   * Can I connect a different [batch account with previously increased quotas](#use-a-batch-account-for-which-i-have-already-requested-or-received-increased-cores-quota-from-azure-support) to run my workflows?
+   * How can I [use private Docker containers for my workflows?](#use-private-docker-containers-hosted-on-azure)
+   * A lot of tasks for my workflows run longer than 24 hours and have been randomly stopped. How can I [run all my tasks on dedicated batch VMs?](#configure-my-cromwell-on-azure-instance-to-always-use-dedicated-batch-vms-to-avoid-getting-preempted)
+   * Can I get [direct access to Cromwell's REST API?](#access-the-cromwell-rest-api-directly-from-linux-host-vm)
 
 4. Performance & Optimization
    * How can I figure out how much Cromwell on Azure costs me?
@@ -133,7 +133,7 @@ If a workflow you start has a task that failed immediately and lead to workflow 
 > Example file path for an "inputs" container in a storage account "msgenpublicdata" will look like
 `"/msgenpublicdata/inputs/chr21.read1.fq.gz"`
 
-Another possibility is that you are trying to use a storage account that hasn't been mounted to your Cromwell on Azure instance - either by [default during setup](../README.md/#Cromwell-on-Azure-deployed-resources) or by following these steps to [mount a different storage account](#Use-input-data-files-from-an-existing-Storage-account-that-my-lab-or-team-is-currently-using). <br/>
+Another possibility is that you are trying to use a storage account that hasn't been mounted to your Cromwell on Azure instance - either by [default during setup](../README.md/#Cromwell-on-Azure-deployed-resources) or by following these steps to [mount a different storage account](#use-input-data-files-from-an-existing-azure-storage-account-that-my-lab-or-team-is-currently-using). <br/>
 
 Check out these [known issues and mitigation](#Known-Issues-And-Mitigation) for more commonly seen issues caused by bugs we are actively tracking.
 
