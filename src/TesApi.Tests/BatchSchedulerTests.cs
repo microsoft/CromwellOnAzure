@@ -264,7 +264,7 @@ namespace TesApi.Tests
             var task = GetTesTask();
             task.Resources.BackendParameters = backendParameters;
             var configuration = GetMockConfig(true)();
-            configuration = configuration.Append(("BatchNodeAgentSkuId",  "batch.node.default"));
+            configuration = configuration.Append(("BatchNodeAgentSkuId", "batch.node.default"));
 
             (_, _, var poolInformation, _) = await ProcessTesTaskAndGetBatchJobArgumentsAsync(task, configuration, GetMockAzureProxy(azureProxyReturnValues));
 

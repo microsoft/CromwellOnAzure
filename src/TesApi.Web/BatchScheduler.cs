@@ -429,18 +429,18 @@ namespace TesApi.Web
                 {
                     poolInformation = (await GetOrAddAsync(poolName, virtualMachineInfo.LowPriority, id =>
                     {
-                    	var (startTask, nodeInfo, applicationPackages) = poolSpec.Value;
-                    	return ConvertPoolSpecificationToModelsPool(
-                        name: id,
-                        displayName: displayName,
-                        GetBatchPoolIdentity(tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default),
-                        GetPoolSpecification(
-                            virtualMachineInfo.VmSize,
-                            null,
-                            nodeInfo ?? batchNodeInfo,
-                            containerConfiguration,
-                            applicationPackages,
-                            startTask));
+                        var (startTask, nodeInfo, applicationPackages) = poolSpec.Value;
+                        return ConvertPoolSpecificationToModelsPool(
+                            name: id,
+                            displayName: displayName,
+                            GetBatchPoolIdentity(tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default),
+                            GetPoolSpecification(
+                                virtualMachineInfo.VmSize,
+                                null,
+                                nodeInfo ?? batchNodeInfo,
+                                containerConfiguration,
+                                applicationPackages,
+                                startTask));
                     })).Pool;
                 }
 

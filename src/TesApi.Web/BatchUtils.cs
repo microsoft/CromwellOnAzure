@@ -2,19 +2,9 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Common.HostConfigs;
-using Microsoft.AspNetCore.Mvc.ApplicationModels;
-using Microsoft.AspNetCore.Mvc.Formatters;
-using Microsoft.Azure.Batch;
-using Microsoft.Azure.Cosmos.Core;
-using Microsoft.Azure.Management.Compute.Models;
 using Newtonsoft.Json;
 
 namespace TesApi.Web
