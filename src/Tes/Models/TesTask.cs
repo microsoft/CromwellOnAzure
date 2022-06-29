@@ -111,8 +111,7 @@ namespace Tes.Models
         /// </summary>
         /// <returns>String presentation of the object</returns>
         public override string ToString()
-
-            =>  new StringBuilder()
+            => new StringBuilder()
                 .Append("class TesTask {\n")
                 .Append("  Id: ").Append(Id).Append('\n')
                 .Append("  State: ").Append(State).Append('\n')

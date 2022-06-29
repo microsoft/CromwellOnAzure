@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,9 +19,13 @@ namespace TesApi.Web
     public class BatchPoolService : BackgroundService
     {
         private readonly IBatchScheduler _batchScheduler;
-        private readonly ILogger<Scheduler> _logger;
+        private readonly ILogger _logger;
         private readonly bool _isDisabled;
-        private readonly TimeSpan _runInterval = TimeSpan.FromSeconds(30);
+
+        /// <summary>
+        /// Interval between each call to <see cref="IBatchPool.ServicePoolAsync(CancellationToken)"/>.
+        /// </summary>
+        public static readonly TimeSpan RunInterval = TimeSpan.FromSeconds(30);
 
         /// <summary>
         /// Default constructor
@@ -31,7 +34,7 @@ namespace TesApi.Web
         /// <param name="batchScheduler"></param>
         /// <param name="logger"></param>
         /// <exception cref="ArgumentNullException"></exception>
-        public BatchPoolService(IConfiguration configuration, IBatchScheduler batchScheduler, ILogger<Scheduler> logger)
+        public BatchPoolService(IConfiguration configuration, IBatchScheduler batchScheduler, ILogger<BatchPoolService> logger)
         {
             _batchScheduler = batchScheduler ?? throw new ArgumentNullException(nameof(batchScheduler));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -66,7 +69,7 @@ namespace TesApi.Web
                 try
                 {
                     await ServiceBatchPools(stoppingToken);
-                    await Task.Delay(_runInterval, stoppingToken);
+                    await Task.Delay(RunInterval, stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -115,7 +118,7 @@ namespace TesApi.Web
 
             if (0 != count)
             {
-                _logger.LogDebug($"ServiceBatchPools for {pools.Count} pools completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
+                _logger.LogDebug($"ServiceBatchPools for {pools.Count} pools completed ({count} with changes) in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
             }
         }
     }

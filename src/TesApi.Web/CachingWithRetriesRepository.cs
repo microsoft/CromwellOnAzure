@@ -4,9 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
-using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Azure.Batch.Protocol.Models;
 using Microsoft.Extensions.Caching.Memory;
 using Polly;
 using Polly.Retry;

@@ -60,10 +60,10 @@ namespace TriggerService
                 storageAccount,
                 new CromwellApiClient.CromwellApiClient(cromwellUrl),
                 new CosmosDbRepository<TesTask>(
-                    cosmosDbEndpoint, 
-                    cosmosDbKey, 
-                    Constants.CosmosDbDatabaseId, 
-                    Constants.CosmosDbContainerId, 
+                    cosmosDbEndpoint,
+                    cosmosDbKey,
+                    Constants.CosmosDbDatabaseId,
+                    Constants.CosmosDbContainerId,
                     Constants.CosmosDbPartitionId),
                 storageAccounts);
 

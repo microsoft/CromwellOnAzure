@@ -19,7 +19,6 @@ using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
@@ -28,7 +27,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Tes.Models;
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
-using Extensions = Microsoft.Azure.Management.ResourceManager.Fluent.Core.Extensions;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TesApi.Web
@@ -70,14 +68,14 @@ namespace TesApi.Web
             location = Location;
             batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{BatchAccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
 
-            getBatchAccountFunc = async () => 
+            getBatchAccountFunc = async () =>
                 await new BatchManagementClient(new TokenCredentials(await GetAzureAccessTokenAsync())) { SubscriptionId = SubscriptionId }
                     .BatchAccount
                     .GetAsync(ResourceGroupName, batchAccountName);
 
             this.azureOfferDurableId = azureOfferDurableId;
 
-            if (! AzureRegionUtils.TryGetBillingRegionName(location, out billingRegionName))
+            if (!AzureRegionUtils.TryGetBillingRegionName(location, out billingRegionName))
             {
                 logger.LogWarning($"Azure ARM location '{location}' does not have a corresponding Azure Billing Region.  Prices from the fallback billing region '{DefaultAzureBillingRegionName}' will be used instead.");
                 billingRegionName = DefaultAzureBillingRegionName;
@@ -642,21 +640,27 @@ namespace TesApi.Web
                 .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
                 .Select(m => new { MeterName = m["MeterName"].ToString(), MeterSubCategory = m["MeterSubCategory"].ToString(), MeterRate = m["MeterRates"]["0"].ToString() })
                 .Where(m => !m.MeterSubCategory.Contains("Windows"))
-                .Select(m => new { 
+                .Select(m => new
+                {
                     MeterName = m.MeterName.Replace(" Low Priority", string.Empty, StringComparison.OrdinalIgnoreCase),
                     m.MeterSubCategory,
-                    MeterRate = decimal.Parse(m.MeterRate), 
-                    IsLowPriority = m.MeterName.Contains(" Low Priority", StringComparison.OrdinalIgnoreCase) })
+                    MeterRate = decimal.Parse(m.MeterRate),
+                    IsLowPriority = m.MeterName.Contains(" Low Priority", StringComparison.OrdinalIgnoreCase)
+                })
                 .ToList();
 
             return supportedVmSizes
-                .Select(v => new {
+                .Select(v => new
+                {
                     v.VmSize,
-                    RateCardMeters = rateCardMeters.Where(m => m.MeterName.Equals(v.MeterName, StringComparison.OrdinalIgnoreCase) && m.MeterSubCategory.Equals(v.MeterSubCategory, StringComparison.OrdinalIgnoreCase)) })
-                .Select(v => new VmPrice {
+                    RateCardMeters = rateCardMeters.Where(m => m.MeterName.Equals(v.MeterName, StringComparison.OrdinalIgnoreCase) && m.MeterSubCategory.Equals(v.MeterSubCategory, StringComparison.OrdinalIgnoreCase))
+                })
+                .Select(v => new VmPrice
+                {
                     VmSize = v.VmSize,
                     PricePerHourDedicated = v.RateCardMeters.FirstOrDefault(m => !m.IsLowPriority)?.MeterRate,
-                    PricePerHourLowPriority = v.RateCardMeters.FirstOrDefault(m => m.IsLowPriority)?.MeterRate })
+                    PricePerHourLowPriority = v.RateCardMeters.FirstOrDefault(m => m.IsLowPriority)?.MeterRate
+                })
                 .Where(v => v.PricePerHourDedicated is not null);
         }
 
@@ -707,7 +711,7 @@ namespace TesApi.Web
                         PricePerHour = vmPrice.PricePerHourDedicated
                     });
 
-                    if(vmPrice.LowPriorityAvailable)
+                    if (vmPrice.LowPriorityAvailable)
                     {
                         vmInfos.Add(new VirtualMachineInformation
                         {

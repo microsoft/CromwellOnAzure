@@ -6,8 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.Batch.Models;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Tes.Models;
@@ -70,21 +68,23 @@ namespace TesApi.Tests
 
             var dedicatedCoreQuotaPerVMFamily = new[] { new VirtualMachineFamilyCoreQuota("VmFamily1", 100), new VirtualMachineFamilyCoreQuota("VmFamily2", 0), new VirtualMachineFamilyCoreQuota("VmFamily3", 300) };
 
-            var batchQuotas = new AzureBatchAccountQuotas { 
-                ActiveJobAndJobScheduleQuota = 1, 
-                PoolQuota = 1, 
-                DedicatedCoreQuota = 5, 
-                LowPriorityCoreQuota = 10, 
-                DedicatedCoreQuotaPerVMFamilyEnforced = true, 
-                DedicatedCoreQuotaPerVMFamily = dedicatedCoreQuotaPerVMFamily };
+            var batchQuotas = new AzureBatchAccountQuotas
+            {
+                ActiveJobAndJobScheduleQuota = 1,
+                PoolQuota = 1,
+                DedicatedCoreQuota = 5,
+                LowPriorityCoreQuota = 10,
+                DedicatedCoreQuotaPerVMFamilyEnforced = true,
+                DedicatedCoreQuotaPerVMFamily = dedicatedCoreQuotaPerVMFamily
+            };
 
             var allowedVmSizesFileContent = "VmSize1\n#SomeComment\nVmSize2\nVmSizeNonExistent";
 
             var storageAccountInfos = new Dictionary<string, StorageAccountInfo> {
-                { 
-                    "defaultstorageaccount", 
+                {
+                    "defaultstorageaccount",
                     new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount.blob.core.windows.net/", SubscriptionId = "SubId" }
-                } 
+                }
              };
 
             azureProxy.Setup(a => a.GetVmSizesAndPricesAsync()).Returns(Task.FromResult(vmInfos));
