@@ -492,6 +492,7 @@ namespace CromwellOnAzureDeployer
                         if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                         {
                             await CreatePostgreSqlCromwellDatabaseUser(sshConnectionInfo);
+                            await CreatePostgreSqlTesDatabaseUser(sshConnectionInfo);
                         }
                     }
 
@@ -1324,6 +1325,16 @@ namespace CromwellOnAzureDeployer
                 {
                     var sqlCommand = $"CREATE USER {configuration.PostgreSqlCromwellUserLogin} WITH PASSWORD '{configuration.PostgreSqlCromwellUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlCromwellDatabaseName} TO {configuration.PostgreSqlCromwellUserLogin};";
                     return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlCromwellDatabaseName} -c \"{sqlCommand}\"");
+                }
+            );
+
+        private Task CreatePostgreSqlTesDatabaseUser(ConnectionInfo sshConnectionInfo)
+            => Execute(
+                $"Creating PostgreSQL database user...",
+                () =>
+                {
+                    var sqlCommand = $"CREATE USER {configuration.PostgreSqlTesUserLogin} WITH PASSWORD '{configuration.PostgreSqlTesUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlTesDatabaseName} TO {configuration.PostgreSqlTesUserLogin};";
+                    return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlTesDatabaseName} -c \"{sqlCommand}\"");
                 }
             );
 

@@ -34,6 +34,10 @@ services:
       - MarthaUrl=$MarthaUrl
       - MarthaKeyVaultName=$MarthaKeyVaultName
       - MarthaSecretName=$MarthaSecretName
+      - PostgreSqlServerName=$PostgreSqlServerName
+      - PostgreSqlTesDatabaseName=$PostgreSqlTesDatabaseName
+      - PostgreSqlTesUserLogin=$PostgreSqlTesUserLogin
+      - PostgreSqlTesUserPassword=$PostgreSqlTesUserPassword
     expose:
       - "80"
     volumes:
