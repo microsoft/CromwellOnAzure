@@ -17,7 +17,7 @@ namespace TesApi.Web
         /// Gets or sets the password to log into the registry server.
         /// </summary>
         public string Username { get; set; }
-        
+
         /// <summary>
         /// Gets or sets the user name to log into the registry server.
         /// </summary>

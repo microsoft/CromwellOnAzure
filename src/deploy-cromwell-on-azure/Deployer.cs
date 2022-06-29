@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Azure.Storage;
 using Azure.Storage.Blobs;
+using Common;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
@@ -42,9 +43,6 @@ using Polly;
 using Polly.Retry;
 using Renci.SshNet;
 using Renci.SshNet.Common;
-using Common;
-using System.Net;
-
 using Sku = Microsoft.Azure.Management.MySQL.FlexibleServers.Models.Sku;
 
 namespace CromwellOnAzureDeployer
@@ -416,7 +414,7 @@ namespace CromwellOnAzureDeployer
                         {
                             ConsoleEx.WriteLine($"Using existing Storage Account {storageAccount.Name}");
                         }
-                        
+
                         if (batchAccount is not null)
                         {
                             ConsoleEx.WriteLine($"Using existing Batch Account {batchAccount.Name}");
@@ -442,7 +440,7 @@ namespace CromwellOnAzureDeployer
                         {
                             Task.Run(async () => appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId)),
                             Task.Run(async () => cosmosDb = await CreateCosmosDbAsync()),
-                            Task.Run(async () => { 
+                            Task.Run(async () => {
                                 if(configuration.ProvisionMySqlOnAzure == true) { mySQLServer = await CreateMySqlServerAndDatabaseAsync(mySQLManagementClient, vnetAndSubnet.Value.mySqlSubnet); }
                             }),
 
@@ -850,7 +848,7 @@ namespace CromwellOnAzureDeployer
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo {CromwellAzureRootDir}/install-cromwellazure.sh");
                     await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo usermod -aG docker {configuration.VmUsername}");
 
-                    if(configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
+                    if (configuration.ProvisionMySqlOnAzure.GetValueOrDefault())
                     {
                         await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y mysql-client");
                     }
@@ -1146,7 +1144,7 @@ namespace CromwellOnAzureDeployer
                 () => mySqlManagementClient.Databases.CreateOrUpdateAsync(
                     configuration.ResourceGroupName, configuration.MySqlServerName, configuration.MySqlDatabaseName,
                     new Database()));
- 
+
             return server;
         }
 
@@ -1330,7 +1328,7 @@ namespace CromwellOnAzureDeployer
                     .WithoutPlan()
                     .WithApiVersion("2020-02-02")
                     .WithParentResource(string.Empty)
-                    .WithProperties(new Dictionary<string, string>() { 
+                    .WithProperties(new Dictionary<string, string>() {
                         { "Application_Type", "other" } ,
                         { "WorkspaceResourceId", logAnalyticsArmId }
                     })

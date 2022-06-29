@@ -193,7 +193,7 @@ namespace TesApi.Web
             {
                 await RemovePool(batchInfo);
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                SetTaskStateAndLog(tesTask, newTaskState, batchInfo); 
+                SetTaskStateAndLog(tesTask, newTaskState, batchInfo);
             }
 
             Task DeleteBatchJobAndSetTaskExecutorErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.EXECUTORERROREnum, batchInfo);
@@ -208,7 +208,7 @@ namespace TesApi.Web
             {
                 await RemovePool(batchInfo);
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                tesTask.IsCancelRequested = false; 
+                tesTask.IsCancelRequested = false;
             }
 
             async Task RemovePool(CombinedBatchTaskInfo batchInfo)
@@ -563,6 +563,7 @@ namespace TesApi.Web
                 {
                     if (TryGet(azureBatchJobAndTaskState.PoolId, out var pool))
                     {
+                        azureBatchJobAndTaskState.NodeAllocationFailed = pool.PopNextResizeError() is not null;
                         ProcessStartTaskFailure(pool.PopNextStartTaskFailure());
                     }
                 }
@@ -806,8 +807,8 @@ namespace TesApi.Web
             var metricsPath = $"/{batchExecutionDirectoryPath}/metrics.txt";
             var metricsUrl = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync(metricsPath, getContainerSas: true));
 
-                // TODO: Cromwell bug: Cromwell command write_tsv() generates a file in the execution directory, for example execution/write_tsv_3922310b441805fc43d52f293623efbc.tmp. These are not passed on to TES inputs.
-                // WORKAROUND: Get the list of files in the execution directory and add them to task inputs.
+            // TODO: Cromwell bug: Cromwell command write_tsv() generates a file in the execution directory, for example execution/write_tsv_3922310b441805fc43d52f293623efbc.tmp. These are not passed on to TES inputs.
+            // WORKAROUND: Get the list of files in the execution directory and add them to task inputs.
             var executionDirectoryUri = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{cromwellExecutionDirectoryPath}", getContainerSas: true));
             var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.Contains($"/{BatchExecutionDirectoryName}/"));
             var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
@@ -1398,7 +1399,7 @@ namespace TesApi.Web
 
             static BatchModels.TaskContainerSettings ConvertTaskContainerSettings(TaskContainerSettings containerSettings)
                 => containerSettings is null ? default : new(containerSettings.ImageName, containerSettings.ContainerRunOptions, ConvertContainerRegistry(containerSettings.Registry), (BatchModels.ContainerWorkingDirectory?)containerSettings.WorkingDirectory);
- 
+
             static BatchModels.ContainerRegistry ConvertContainerRegistry(ContainerRegistry containerRegistry)
                 => containerRegistry is null ? default : new(containerRegistry.UserName, containerRegistry.Password, containerRegistry.RegistryServer, ConvertComputeNodeIdentityReference(containerRegistry.IdentityReference));
 
@@ -1594,7 +1595,7 @@ namespace TesApi.Web
             {
                 return selectedVm;
             }
-           
+
             if (!eligibleVms.Any())
             {
                 noVmFoundMessage += $" There are no VM sizes that match the requirements. Review the task resources.";
@@ -1664,7 +1665,7 @@ namespace TesApi.Web
                     {
                         var metrics = DelimitedTextToDictionary(metricsContent.Trim());
 
-                        var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKiB", out var diskSizeInKiB)  ? diskSizeInKiB / kiBInGB : (double?)null;
+                        var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKiB", out var diskSizeInKiB) ? diskSizeInKiB / kiBInGB : (double?)null;
                         var diskUsedInGB = TryGetValueAsDouble(metrics, "DiskUsedInKiB", out var diskUsedInKiB) ? diskUsedInKiB / kiBInGB : (double?)null;
 
                         batchNodeMetrics = new BatchNodeMetrics
@@ -1678,12 +1679,12 @@ namespace TesApi.Web
                             FileUploadDurationInSeconds = GetDurationInSeconds(metrics, "UploadStart", "UploadEnd"),
                             FileUploadSizeInGB = TryGetValueAsDouble(metrics, "FileUploadSizeInBytes", out var fileUploadSizeInBytes) ? fileUploadSizeInBytes / bytesInGB : (double?)null,
                             DiskUsedInGB = diskUsedInGB,
-                            DiskUsedPercent = diskUsedInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsedInGB / diskSizeInGB * 100 ) : null,
+                            DiskUsedPercent = diskUsedInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsedInGB / diskSizeInGB * 100) : null,
                             VmCpuModelName = metrics.GetValueOrDefault("VmCpuModelName")
                         };
 
                         taskStartTime = TryGetValueAsDateTimeOffset(metrics, "BlobXferPullStart", out var startTime) ? (DateTimeOffset?)startTime : null;
-                        taskEndTime = TryGetValueAsDateTimeOffset(metrics, "UploadEnd", out var endTime) ? (DateTimeOffset?)endTime: null;
+                        taskEndTime = TryGetValueAsDateTimeOffset(metrics, "UploadEnd", out var endTime) ? (DateTimeOffset?)endTime : null;
                     }
                     catch (Exception ex)
                     {

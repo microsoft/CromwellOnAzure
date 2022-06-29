@@ -2,20 +2,16 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Tes.Repository;
 
 namespace TesApi.Web
 {
@@ -71,6 +67,10 @@ namespace TesApi.Web
             => StartTaskFailures.TryDequeue(out var failure) ? failure : default;
 
         /// <inheritdoc/>
+        public ResizeError PopNextResizeError()
+            => ResizeErrors.TryDequeue(out var resizeError) ? resizeError : default;
+
+        /// <inheritdoc/>
         public ValueTask ServicePoolAsync(IBatchPool.ServiceKind serviceKind, CancellationToken cancellationToken = default)
         {
             lock (this) // TODO: make lock object
@@ -91,14 +91,16 @@ namespace TesApi.Web
         public async ValueTask<bool> ServicePoolAsync(CancellationToken cancellationToken = default)
         {
             var exceptions = new List<Exception>();
-            var retVal = _isDirty || _isChanged;
+            var retVal = _isDirty || IsChanged;
+
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty, cancellationToken));
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Rotate, cancellationToken));
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Resize, cancellationToken));
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle, cancellationToken));
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Update, cancellationToken));
-            retVal |= _isDirty || _isChanged;
-            _isChanged = false;
+
+            retVal |= _isDirty || IsChanged;
+            IsChanged = false;
 
             return exceptions.Count switch
             {
@@ -131,30 +133,47 @@ namespace TesApi.Web
         #region ServicePool~Async implementations
         private async ValueTask ServicePoolResizeAsync(CancellationToken cancellationToken)
         {
-            //DateTime cutoff;
-            //try
-            //{
-            //    cutoff = Reservations.Min(p => p.Value.QueuedTime);
-            //}
-            //catch (InvalidOperationException)
-            //{
-            //    cutoff = Changed;
-            //}
-
             var (allocationState, targetLowPri, targetDedicated) = await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken);
 
-            if (/*cutoff < DateTime.UtcNow - TimeSpan.FromSeconds(15) &&*/ allocationState == AllocationState.Steady)
+            if (allocationState == AllocationState.Steady)
             {
-                var nodes = await GetJobsAsync().CountAsync(cancellationToken);
-                var lowPri = IsPreemptable ? Math.Max(targetLowPri ?? 0, nodes) : 0;
-                var dedicated = IsPreemptable ? 0 : Math.Max(targetDedicated ?? 0, nodes);
+                if (!_resizeErrorsRetrieved)
+                {
+                    var pool = await _azureProxy.GetBatchPoolAsync(Pool.PoolId, new ODATADetailLevel { SelectClause = "properties.resizeOperationStatus" }, cancellationToken);
+                    ResizeErrors.Clear();
+
+                    foreach (var error in pool.ResizeErrors ?? Enumerable.Empty<ResizeError>())
+                    {
+                        ResizeErrors.Enqueue(error);
+                    }
+
+                    _resizeErrorsRetrieved = true;
+                }
+
+                var jobs = await GetJobsAsync().ToListAsync(cancellationToken);
+
+                // Delay resizing by one cycle in case a burst of jobs is being added.
+                if (!jobs.Any(n => n.StateTransitionTime <= DateTime.UtcNow.Subtract(BatchPoolService.RunInterval)))
+                {
+                    return;
+                }
+
+                // This method never reduces the nodes target. ServicePoolRemoveNodeIfIdleAsync() removes nodes.
+                var jobCount = jobs.Count;
+                var lowPri = IsPreemptable ? Math.Max(targetLowPri ?? 0, jobCount) : 0;
+                var dedicated = IsPreemptable ? 0 : Math.Max(targetDedicated ?? 0, jobCount);
 
                 if (lowPri != (targetLowPri ?? 0) || dedicated != (targetDedicated ?? 0))
                 {
-                    _logger.LogDebug("Resizing {PoolId}", Pool.PoolId);
-                    _isChanged = true;
+                    _logger.LogDebug("Resizing {PoolId} to contain at least {Nodes} nodes", Pool.PoolId, jobCount);
+                    IsChanged = true;
                     await _azureProxy.SetComputeNodeTargetsAsync(Pool.PoolId, lowPri, dedicated, cancellationToken);
+                    _resizeErrorsRetrieved = false;
                 }
+            }
+            else
+            {
+                _resizeErrorsRetrieved = false;
             }
         }
 
@@ -168,7 +187,9 @@ namespace TesApi.Web
                 await foreach (var node in _azureProxy
                     .ListComputeNodesAsync(
                         Pool.PoolId,
-                        new ODATADetailLevel(filterClause: $"state eq 'starttaskfailed' or (state eq 'idle' and stateTransitionTime lt DateTime'{expiryTime.ToString("yyyy-MM-dd'T'HH:mm:ssZ", CultureInfo.InvariantCulture)}')", selectClause: "id,state,startTaskInfo"))
+                        new ODATADetailLevel(
+                            filterClause: $"state eq 'starttaskfailed' or (state eq 'idle' and stateTransitionTime le DateTime'{expiryTime.ToString("yyyy-MM-dd'T'HH:mm:ssZ", CultureInfo.InvariantCulture)}')",
+                            selectClause: "id,state,startTaskInfo"))
                     .WithCancellation(cancellationToken))
                 {
                     switch (node.State)
@@ -182,17 +203,18 @@ namespace TesApi.Web
                             break;
                     }
                     nodesToRemove = nodesToRemove.Append(node);
+                    _resizeErrorsRetrieved = false;
                 }
 
                 // It's documented that a max of 100 nodes can be removed at a time. Group the nodes to remove in batches up to 100 in quantity.
                 var removeNodesTasks = Enumerable.Empty<Task>();
                 foreach (var nodes in nodesToRemove.Select((n, i) => (n, i)).GroupBy(t => t.i / 100).OrderBy(t => t.Key))
                 {
-                    _isChanged = true;
+                    IsChanged = true;
                     removeNodesTasks = removeNodesTasks.Append(_azureProxy.DeleteBatchComputeNodesAsync(Pool.PoolId, nodes.Select(t => t.n), cancellationToken));
                 }
 
-                // Call each group serially.
+                // Call each group serially. TODO: confirm that this is parallelizable
                 var tasks = Task.Run(async () =>
                 {
                     foreach (var task in removeNodesTasks)
@@ -213,7 +235,7 @@ namespace TesApi.Web
             {
                 var now = DateTime.UtcNow;
                 IsAvailable = Creation + _forcePoolRotationAge > now && (Changed + _idlePoolCheck > now || await GetJobsAsync().AnyAsync(cancellationToken));
-                _isChanged |= !IsAvailable;
+                IsChanged |= !IsAvailable;
             }
         }
 
@@ -224,7 +246,7 @@ namespace TesApi.Web
                 var (lowPriorityNodes, dedicatedNodes) = await _azureProxy.GetCurrentComputeNodesAsync(Pool.PoolId, cancellationToken);
                 if ((lowPriorityNodes is null || lowPriorityNodes == 0) && (dedicatedNodes is null || dedicatedNodes == 0) && !await GetJobsAsync().AnyAsync(cancellationToken))
                 {
-                    _isChanged = true;
+                    IsChanged = true;
                     _isRemoved = true;
                     await _azureProxy.DeleteBatchPoolAsync(Pool.PoolId, cancellationToken);
                     _ = _batchPools.RemovePoolFromList(this);
@@ -232,6 +254,12 @@ namespace TesApi.Web
             }
         }
 
+        /// <summary>
+        /// Updates pool metadata.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns><see cref="ValueTask"/> for purposes of awaiting the task.</returns>
+        /// <remarks>This is expected to be the last method called from <see cref="BatchPoolService"/>.</remarks>
         private async ValueTask ServicePoolUpdateAsync(CancellationToken cancellationToken)
         {
             if (_isRemoved)
@@ -248,7 +276,7 @@ namespace TesApi.Web
 
                 if (_isDirty)
                 {
-                    _isChanged = true;
+                    IsChanged = true;
                     await _azureProxy.CommitBatchPoolChangesAsync(cloudPool, cancellationToken);
                 }
 
@@ -306,7 +334,7 @@ namespace TesApi.Web
         { }
 
         /// <summary>
-        /// Alternate onstructor of <see cref="BatchPool"/> for new pools
+        /// Alternate constructor of <see cref="BatchPool"/> for new pools
         /// </summary>
         /// <param name="poolId"></param>
         /// <param name="batchScheduler"></param>
@@ -392,7 +420,7 @@ namespace TesApi.Web
         }
 
         internal IAsyncEnumerable<CloudJob> GetJobsAsync()
-            => _azureProxy.ListJobsAsync(new ODATADetailLevel { FilterClause = $"state eq 'active' and executionInfo/poolId eq '{Pool.PoolId}'" });
+            => _azureProxy.ListJobsAsync(new ODATADetailLevel { SelectClause = "id,stateTransitionTime", FilterClause = $"state eq 'active' and executionInfo/poolId eq '{Pool.PoolId}''" });
         #endregion
 
         #region Implementation state
@@ -401,12 +429,15 @@ namespace TesApi.Web
         private readonly ILogger _logger;
         private DateTime Creation { get; set; }
         private DateTime Changed { get; set; }
+        private bool IsChanged { get => _isChanged; set { _isChanged = value; if (value) Changed = DateTime.UtcNow; } }
 
         private Queue<TaskFailureInformation> StartTaskFailures { get; } = new();
+        private Queue<ResizeError> ResizeErrors { get; } = new();
 
         private bool _isChanged;
         private bool _isRemoved;
         private bool _isDirty;
+        private bool _resizeErrorsRetrieved;
 
         private readonly TimeSpan _idleNodeCheck;
         private readonly TimeSpan _idlePoolCheck;

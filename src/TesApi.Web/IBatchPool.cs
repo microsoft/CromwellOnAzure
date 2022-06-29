@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
@@ -41,10 +40,17 @@ namespace TesApi.Web
         TaskFailureInformation PopNextStartTaskFailure(); // TODO: consider adding affinityId
 
         /// <summary>
+        /// Removes and returns the next available resize error.
+        /// </summary>
+        /// <returns>The first <see cref="ResizeError"/> in the list, or null if the list is empty.</returns>
+        ResizeError PopNextResizeError(); // TODO: consider adding affinityId
+
+        /// <summary>
         /// Updates this instance based on changes to its environment.
         /// </summary>
         /// <param name="cancellationToken"></param>
-        /// <returns></returns>
+        /// <returns>True if pool was updated/has pending updates.</returns>
+        /// <remarks>Calls each internal servicing method in order. Throws all exceptions from all methods.</remarks>
         ValueTask<bool> ServicePoolAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -52,7 +58,6 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="serviceKind">The type of <see cref="ServiceKind"/> service call.</param>
         /// <param name="cancellationToken"></param>
-        /// <returns></returns>
         ValueTask ServicePoolAsync(ServiceKind serviceKind, CancellationToken cancellationToken = default);
 
         /// <summary>

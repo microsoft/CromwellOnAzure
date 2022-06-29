@@ -213,7 +213,7 @@ namespace TesApi.Tests
             state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new() { { "vm_size", "VMSIZE1" } } }, azureProxyReturnValues);
             Assert.AreEqual(TesState.INITIALIZINGEnum, state);
 
-            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new() { { "vm_size", "VmSize1" } } , CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new() { { "vm_size", "VmSize1" } }, CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
             Assert.AreEqual(TesState.INITIALIZINGEnum, state);
 
             state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new(), CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);

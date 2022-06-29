@@ -23,6 +23,6 @@ namespace Tes.Models
         /// <param name="message">Message</param>
         /// <param name="innerException">Inner exception</param>
         public TesException(string failureReason, string message = null, Exception innerException = null) : base(message, innerException)
-	    => this.FailureReason = failureReason;
+            => this.FailureReason = failureReason;
     }
 }

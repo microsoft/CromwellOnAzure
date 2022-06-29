@@ -202,7 +202,7 @@ namespace TriggerService.Tests
             var workflowId = Guid.NewGuid().ToString();
 
             var tesTasks = new[] { GetTesTask(workflowId, shard: 1, attempt: 1, TesTaskLogForSuccessfulTask) };
- 
+
             var (newTriggerName, newTriggerContent) = await UpdateWorkflowStatusAsync(workflowId, tesTasks, WorkflowStatus.Aborted);
 
             var workflowFailureInfo = newTriggerContent?.WorkflowFailureInfo;
@@ -261,7 +261,7 @@ namespace TriggerService.Tests
         {
             var workflowId = Guid.NewGuid().ToString();
 
-            var tesTasks = new[] { 
+            var tesTasks = new[] {
                 GetTesTask(workflowId, shard: 1, attempt: 1, TesTaskLogForSuccessfulTaskWithWarning),
                 GetTesTask(workflowId, shard: 2, attempt: 1, TesTaskLogForBatchTaskFailure) };
 
@@ -368,9 +368,11 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) => {
+                .Callback((string content, string container, string blobName) =>
+                {
                     newTriggerName = blobName;
-                    newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null; });
+                    newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
+                });
 
             cromwellApiClientSetup(cromwellApiClient);
 

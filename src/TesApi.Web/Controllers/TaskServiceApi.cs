@@ -69,14 +69,14 @@ namespace TesApi.Controllers
         [ValidateModelState]
         [SwaggerOperation("CancelTask")]
         [SwaggerResponse(statusCode: 200, type: typeof(object), description: "")]
-        public virtual async Task<IActionResult> CancelTask([FromRoute][Required]string id)
+        public virtual async Task<IActionResult> CancelTask([FromRoute][Required] string id)
         {
             TesTask tesTask = null;
 
             if (await repository.TryGetItemAsync(id, item => tesTask = item))
             {
-                if (tesTask.State == TesState.COMPLETEEnum || 
-                    tesTask.State == TesState.EXECUTORERROREnum || 
+                if (tesTask.State == TesState.COMPLETEEnum ||
+                    tesTask.State == TesState.EXECUTORERROREnum ||
                     tesTask.State == TesState.SYSTEMERROREnum)
                 {
                     logger.LogInformation($"Task {id} cannot be canceled because it is in {tesTask.State} state.");
@@ -108,7 +108,7 @@ namespace TesApi.Controllers
         [ValidateModelState]
         [SwaggerOperation("CreateTask")]
         [SwaggerResponse(statusCode: 200, type: typeof(TesCreateTaskResponse), description: "")]
-        public virtual async Task<IActionResult> CreateTaskAsync([FromBody]TesTask tesTask)
+        public virtual async Task<IActionResult> CreateTaskAsync([FromBody] TesTask tesTask)
         {
             if (!string.IsNullOrWhiteSpace(tesTask.Id))
             {
@@ -141,7 +141,7 @@ namespace TesApi.Controllers
             if (tesTask.Name is not null
                 && tesTask.Inputs.Any(i => i.Path.Contains(".cwl/"))
                 && tesTask.WorkflowId is not null
-                && azureProxy.TryReadCwlFile(tesTask.WorkflowId, out var cwlContent) 
+                && azureProxy.TryReadCwlFile(tesTask.WorkflowId, out var cwlContent)
                 && CwlDocument.TryCreate(cwlContent, out var cwlDocument))
             {
                 tesTask.Resources ??= new TesResources();
@@ -166,7 +166,7 @@ namespace TesApi.Controllers
 
                 // Force all keys to be lowercase
                 tesTask.Resources.BackendParameters = new Dictionary<string, string>(
-                    tesTask.Resources.BackendParameters.Select(k => new KeyValuePair<string, string> (k.Key?.ToLowerInvariant(), k.Value)));
+                    tesTask.Resources.BackendParameters.Select(k => new KeyValuePair<string, string>(k.Key?.ToLowerInvariant(), k.Value)));
 
                 keys = tesTask.Resources.BackendParameters.Keys.Select(k => k).ToList();
 
@@ -179,10 +179,10 @@ namespace TesApi.Controllers
                 }
 
                 // If backend_parameters_strict equals true, backends should fail the task if any key / values are unsupported
-                if (tesTask.Resources?.BackendParametersStrict == true 
+                if (tesTask.Resources?.BackendParametersStrict == true
                     && unsupportedKeys.Count > 0)
                 {
-                    return BadRequest($"backend_parameters_strict is set to true and unsupported backend_parameters were specified: {string.Join(",", unsupportedKeys)}");                   
+                    return BadRequest($"backend_parameters_strict is set to true and unsupported backend_parameters were specified: {string.Join(",", unsupportedKeys)}");
                 }
 
                 // Backends shall not store or return unsupported keys if included in a task.
@@ -208,14 +208,15 @@ namespace TesApi.Controllers
         [SwaggerResponse(statusCode: 200, type: typeof(TesServiceInfo), description: "")]
         public virtual IActionResult GetServiceInfo()
         {
-            var serviceInfo = new TesServiceInfo {
+            var serviceInfo = new TesServiceInfo
+            {
                 Name = "Microsoft Genomics Task Execution Service",
                 Doc = string.Empty,
                 Storage = new List<string>(),
                 TesResourcesSupportedBackendParameters = Enum.GetNames(typeof(TesResources.SupportedBackendParameters)).ToList()
             };
 
-            logger.LogInformation($"Name: {serviceInfo.Name} Doc: {serviceInfo.Doc} Storage: {serviceInfo.Storage} TesResourcesSupportedBackendParameters: {string.Join(",",serviceInfo.TesResourcesSupportedBackendParameters)}");
+            logger.LogInformation($"Name: {serviceInfo.Name} Doc: {serviceInfo.Doc} Storage: {serviceInfo.Storage} TesResourcesSupportedBackendParameters: {string.Join(",", serviceInfo.TesResourcesSupportedBackendParameters)}");
             return StatusCode(200, serviceInfo);
         }
 
@@ -230,7 +231,7 @@ namespace TesApi.Controllers
         [ValidateModelState]
         [SwaggerOperation("GetTask")]
         [SwaggerResponse(statusCode: 200, type: typeof(TesTask), description: "")]
-        public virtual async Task<IActionResult> GetTaskAsync([FromRoute][Required]string id, [FromQuery]string view)
+        public virtual async Task<IActionResult> GetTaskAsync([FromRoute][Required] string id, [FromQuery] string view)
         {
             TesTask tesTask = null;
             var itemFound = await repository.TryGetItemAsync(id, item => tesTask = item);
@@ -251,7 +252,7 @@ namespace TesApi.Controllers
         [ValidateModelState]
         [SwaggerOperation("ListTasks")]
         [SwaggerResponse(statusCode: 200, type: typeof(TesListTasksResponse), description: "")]
-        public virtual async Task<IActionResult> ListTasks([FromQuery]string namePrefix, [FromQuery]long? pageSize, [FromQuery]string pageToken, [FromQuery]string view)
+        public virtual async Task<IActionResult> ListTasks([FromQuery] string namePrefix, [FromQuery] long? pageSize, [FromQuery] string pageToken, [FromQuery] string view)
         {
             var decodedPageToken =
                 pageToken is not null ? Encoding.UTF8.GetString(Base64UrlTextEncoder.Decode(pageToken)) : null;

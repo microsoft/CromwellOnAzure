@@ -75,7 +75,12 @@ namespace TesApi.Tests
             azureProxy.AzureProxyListComputeNodesAsync = (i, d) => AsyncEnumerable.Empty<ComputeNode>();
             azureProxy.AzureProxySetComputeNodeTargets = SetTargets;
             azureProxy.AzureProxyGetComputeNodeAllocationState = GetState;
-            azureProxy.AzureProxyListJobs = detail => AsyncEnumerable.Empty<CloudJob>().Append(Mock.Of<CloudJob>());
+            var jobTime = DateTime.UtcNow;
+            azureProxy.AzureProxyListJobs = detail => AsyncEnumerable.Empty<CloudJob>().Append(GenerateJob("job1", stateTransitionTime: jobTime));
+
+            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
+            Assert.AreEqual(0, setTargetsCalled);
+            azureProxy.AzureProxyListJobs = detail => AsyncEnumerable.Empty<CloudJob>().Append(GenerateJob("job1", stateTransitionTime: jobTime - BatchPoolService.RunInterval));
 
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
 
@@ -229,15 +234,13 @@ namespace TesApi.Tests
             var azureProxy = AzureProxyReturnValues.Get();
             azureProxy.AzureProxyGetComputeNodeAllocationState = id => (Microsoft.Azure.Batch.Common.AllocationState.Steady, 0, 1);
             azureProxy.AzureProxyGetCurrentComputeNodes = () => (0, 1);
-            azureProxy.AzureProxyListJobs = detailLevel => AsyncEnumerable.Empty<CloudJob>().Append(Mock.Of<CloudJob>());
+            azureProxy.AzureProxyListJobs = detailLevel => AsyncEnumerable.Empty<CloudJob>().Append(GenerateJob("job1"));
             azureProxy.AzureProxySetComputeNodeTargets = (id, loPri, dedic) => { };
             azureProxy.AzureProxyListComputeNodesAsync = (i, d) => AsyncEnumerable.Empty<ComputeNode>();
             var services = GetServiceProvider(azureProxy);
             var pool = await AddPool(services.GetT(), false);
-
-            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
-
             TimeShift(((BatchPool)pool).TestRotatePoolTime, pool);
+
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Rotate);
 
             Assert.IsFalse(pool.IsAvailable);
@@ -426,6 +429,25 @@ namespace TesApi.Tests
 
             static Microsoft.Azure.Batch.Protocol.Models.MetadataItem ConvertMetadata(Microsoft.Azure.Batch.MetadataItem item)
                 => item is null ? default : new(item.Name, item.Value);
+        }
+
+        internal static CloudJob GenerateJob(string id, DateTime stateTransitionTime = default)
+        {
+            if (default == stateTransitionTime)
+            {
+                stateTransitionTime = DateTime.UtcNow;
+            }
+
+            var computeNodeOperations = new Mock<Microsoft.Azure.Batch.Protocol.IComputeNodeOperations>();
+            var batchServiceClient = new MockServiceClient(computeNodeOperations.Object);
+            var protocolLayer = typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient).Assembly.GetType("Microsoft.Azure.Batch.ProtocolLayer").GetConstructor(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient) }, null)
+                .Invoke(new object[] { batchServiceClient });
+            var parentClient = (BatchClient)typeof(BatchClient).GetConstructor(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(Microsoft.Azure.Batch.Protocol.BatchServiceClient).Assembly.GetType("Microsoft.Azure.Batch.IProtocolLayer") }, null)
+                .Invoke(new object[] { protocolLayer });
+            var modelJob = new Microsoft.Azure.Batch.Protocol.Models.CloudJob(id: id, stateTransitionTime: stateTransitionTime, state: Microsoft.Azure.Batch.Protocol.Models.JobState.Active);
+            var job = (CloudJob)typeof(CloudJob).GetConstructor(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, default, new Type[] { typeof(BatchClient), typeof(Microsoft.Azure.Batch.Protocol.Models.CloudJob), typeof(IEnumerable<BatchClientBehavior>) }, default)
+                .Invoke(new object[] { parentClient, modelJob, Enumerable.Empty<BatchClientBehavior>() });
+            return job;
         }
 
         internal static ComputeNode GenerateNode(string poolId, string id, bool isDedicated, bool isIdle, DateTime stateTransitionTime = default)

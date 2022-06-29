@@ -61,11 +61,11 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort))
-                .Returns(Task.FromResult(new[] { 
-                    new TriggerFile { 
-                        Uri = $"http://tempuri.org/workflows/abort/{workflowId}.json", 
-                        ContainerName = "workflows", 
-                        Name = $"abort/{workflowId}.json", 
+                .Returns(Task.FromResult(new[] {
+                    new TriggerFile {
+                        Uri = $"http://tempuri.org/workflows/abort/{workflowId}.json",
+                        ContainerName = "workflows",
+                        Name = $"abort/{workflowId}.json",
                         LastModified = DateTimeOffset.UtcNow } }.AsEnumerable()));
 
             azureStorage
@@ -74,9 +74,11 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) => {
+                .Callback((string content, string container, string blobName) =>
+                {
                     newTriggerName = blobName;
-                    newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null; });
+                    newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
+                });
 
             var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
 

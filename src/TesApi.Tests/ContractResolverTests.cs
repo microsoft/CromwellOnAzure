@@ -55,7 +55,7 @@ namespace TesApi.Tests
             tesTask.Inputs[0].Content = "test content";
 
             // Act
-            var jsonResult = JsonConvert.SerializeObject(tesTask, new JsonSerializerSettings { ContractResolver = BasicTesTaskContractResolver.Instance});
+            var jsonResult = JsonConvert.SerializeObject(tesTask, new JsonSerializerSettings { ContractResolver = BasicTesTaskContractResolver.Instance });
             var jsonObjectResult = JObject.Parse(jsonResult);
 
             // Assert
