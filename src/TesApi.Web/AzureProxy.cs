@@ -18,16 +18,17 @@ using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Tes.Models;
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
+using JsonLinq = Newtonsoft.Json.Linq;
 
 namespace TesApi.Web
 {
@@ -642,7 +643,7 @@ namespace TesApi.Web
 
         private IEnumerable<VmPrice> ExtractVmPricesFromRateCardResponse(List<(string VmSize, string FamilyName, string MeterName, string MeterSubCategory)> supportedVmSizes, string pricingContent)
         {
-            var rateCardMeters = JObject.Parse(pricingContent)["Meters"]
+            var rateCardMeters = JsonLinq.JObject.Parse(pricingContent)["Meters"]
                 .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
                 .Select(m => new { MeterName = m["MeterName"].ToString(), MeterSubCategory = m["MeterSubCategory"].ToString(), MeterRate = m["MeterRates"]["0"].ToString() })
                 .Where(m => !m.MeterSubCategory.Contains("Windows"))
