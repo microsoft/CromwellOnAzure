@@ -12,11 +12,14 @@ namespace CromwellOnAzureDeployer
     public class Configuration : UserAccessibleConfiguration
     {
         public string PostgreSqlServerName { get; set; }
-        public string PostgreSqlDatabaseName { get; set; } = "cromwell_db";
+        public string PostgreSqlCromwellDatabaseName { get; set; } = "cromwell_db";
+        public string PostgreSqlTesDatabaseName { get; set; } = "tes_db";
         public string PostgreSqlAdministratorLogin { get; set; } = "coa_admin";
         public string PostgreSqlAdministratorPassword { get; set; }
-        public string PostgreSqlUserLogin { get; set; } = "cromwell";
-        public string PostgreSqlUserPassword { get; set; }
+        public string PostgreSqlCromwellUserLogin { get; set; } = "cromwell";
+        public string PostgreSqlCromwellUserPassword { get; set; }
+        public string PostgreSqlTesUserLogin { get; set; } = "tes";
+        public string PostgreSqlTesUserPassword { get; set; }
         public string PostgreSqlSkuName { get; set; } = "Standard_B2s";
         public string PostgreSqlTier { get; set; } = "Burstable";
         public string DefaultVmSubnetName { get; set; } = "vmsubnet";
