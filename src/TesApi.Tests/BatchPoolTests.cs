@@ -174,7 +174,6 @@ namespace TesApi.Tests
             {
                 Assert.AreEqual(pool.Pool.PoolId, id);
                 Assert.IsNotNull(detail);
-                Assert.AreEqual("id,state,startTaskInfo", detail.SelectClause);
             }
 
             void DeleteComputeNodes(string poolId, IEnumerable<ComputeNode> computeNodes, CancellationToken cancellationToken)

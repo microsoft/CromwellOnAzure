@@ -182,14 +182,14 @@ namespace TesApi.Web
             if ((await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken)).AllocationState == AllocationState.Steady)
             {
                 var nodesToRemove = Enumerable.Empty<ComputeNode>();
-                var expiryTime = DateTime.UtcNow - _idleNodeCheck;
+                var expiryTime = (DateTime.UtcNow - _idleNodeCheck).ToString("yyyy-MM-dd'T'HH:mm:ssZ", CultureInfo.InvariantCulture);
 
                 await foreach (var node in _azureProxy
                     .ListComputeNodesAsync(
                         Pool.PoolId,
                         new ODATADetailLevel(
-                            filterClause: $"state eq 'starttaskfailed' or (state eq 'idle' and stateTransitionTime le DateTime'{expiryTime.ToString("yyyy-MM-dd'T'HH:mm:ssZ", CultureInfo.InvariantCulture)}')",
-                            selectClause: "id,state,startTaskInfo"))
+                            filterClause: $"state eq 'starttaskfailed' or (state eq 'idle' and stateTransitionTime le DateTime'{expiryTime}')",
+                            selectClause: "id,state,stateTransitionTime,startTaskInfo"))
                     .WithCancellation(cancellationToken))
                 {
                     switch (node.State)
@@ -206,26 +206,17 @@ namespace TesApi.Web
                     _resizeErrorsRetrieved = false;
                 }
 
-                // It's documented that a max of 100 nodes can be removed at a time. Group the nodes to remove in batches up to 100 in quantity.
-                var removeNodesTasks = Enumerable.Empty<Task>();
-                foreach (var nodes in nodesToRemove.Select((n, i) => (n, i)).GroupBy(t => t.i / 100).OrderBy(t => t.Key))
+                // Prioritize removing "start task failed" nodes, followed by longest waiting nodes.
+                var orderedNodes = nodesToRemove.OrderByDescending(n => n.State).ThenBy(n => n.StateTransitionTime).ToList();
+
+                if (!orderedNodes.Any())
                 {
-                    IsChanged = true;
-                    removeNodesTasks = removeNodesTasks.Append(_azureProxy.DeleteBatchComputeNodesAsync(Pool.PoolId, nodes.Select(t => t.n), cancellationToken));
+                    return;
                 }
 
-                // Call each group serially. TODO: confirm that this is parallelizable
-                var tasks = Task.Run(async () =>
-                {
-                    foreach (var task in removeNodesTasks)
-                    {
-                        _logger.LogDebug("Removing nodes from {PoolId}", Pool.PoolId);
-                        await task;
-                    }
-                }, cancellationToken);
-
-                // Return when all the groups are done
-                await tasks;
+                // It's documented that a max of 100 nodes can be removed at a time. Excess eligible nodes will be removed in a future call.
+                _logger.LogDebug("Removing {Nodes} nodes from {PoolId}", Math.Min(orderedNodes.Count, 100), Pool.PoolId);
+                await _azureProxy.DeleteBatchComputeNodesAsync(Pool.PoolId, orderedNodes.Take(100), cancellationToken);
             }
         }
 
