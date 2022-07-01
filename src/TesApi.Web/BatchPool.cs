@@ -139,7 +139,7 @@ namespace TesApi.Web
             {
                 if (!_resizeErrorsRetrieved)
                 {
-                    var pool = await _azureProxy.GetBatchPoolAsync(Pool.PoolId, new ODATADetailLevel { SelectClause = "properties.resizeOperationStatus" }, cancellationToken);
+                    var pool = await _azureProxy.GetBatchPoolAsync(Pool.PoolId, new ODATADetailLevel { SelectClause = "resizeErrors" }, cancellationToken);
                     ResizeErrors.Clear();
 
                     foreach (var error in pool.ResizeErrors ?? Enumerable.Empty<ResizeError>())
