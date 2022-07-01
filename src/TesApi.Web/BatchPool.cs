@@ -411,7 +411,7 @@ namespace TesApi.Web
         }
 
         internal IAsyncEnumerable<CloudJob> GetJobsAsync()
-            => _azureProxy.ListJobsAsync(new ODATADetailLevel { SelectClause = "id,stateTransitionTime", FilterClause = $"state eq 'active' and executionInfo/poolId eq '{Pool.PoolId}''" });
+            => _azureProxy.ListJobsAsync(new ODATADetailLevel { SelectClause = "id,stateTransitionTime", FilterClause = $"state eq 'active' and executionInfo/poolId eq '{Pool.PoolId}'" });
         #endregion
 
         #region Implementation state
