@@ -616,6 +616,9 @@ namespace TesApi.Web
             "Standard_ND24rs",
             "Standard_ND24s",
             "Standard_ND6s",
+            "Standard_NP10s", // \
+            "Standard_NP20s", // -> Temporarily restoring NP sizes due to bug https://github.com/Azure/Batch/issues/131.
+            "Standard_NP40s", // /
             "Standard_NV12",
             "Standard_NV12s_v3",
             "Standard_NV24",
