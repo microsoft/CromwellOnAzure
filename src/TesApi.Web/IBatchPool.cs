@@ -37,13 +37,13 @@ namespace TesApi.Web
         /// Removes and returns the next available start task failure.
         /// </summary>
         /// <returns>The first <see cref="TaskFailureInformation"/> in the list, or null if the list is empty.</returns>
-        TaskFailureInformation PopNextStartTaskFailure(); // TODO: consider adding affinityId
+        TaskFailureInformation PopNextStartTaskFailure();
 
         /// <summary>
         /// Removes and returns the next available resize error.
         /// </summary>
         /// <returns>The first <see cref="ResizeError"/> in the list, or null if the list is empty.</returns>
-        ResizeError PopNextResizeError(); // TODO: consider adding affinityId
+        ResizeError PopNextResizeError();
 
         /// <summary>
         /// Updates this instance based on changes to its environment.
@@ -66,14 +66,9 @@ namespace TesApi.Web
         enum ServiceKind
         {
             /// <summary>
-            /// Save the pool as update
+            /// Queues resize errors (if available).
             /// </summary>
-            Update,
-
-            /// <summary>
-            /// Updates the targeted numbers of dedicated and low priority compute nodes in the pool.
-            /// </summary>
-            Resize,
+            GetResizeErrors,
 
             /// <summary>
             /// Removes idle compute nodes from the pool.
@@ -81,14 +76,24 @@ namespace TesApi.Web
             RemoveNodeIfIdle,
 
             /// <summary>
+            /// Removes <see cref="CloudPool"/> if it's retired and empty.
+            /// </summary>
+            RemovePoolIfEmpty,
+
+            /// <summary>
+            /// Updates the targeted numbers of dedicated and low priority compute nodes in the pool.
+            /// </summary>
+            Resize,
+
+            /// <summary>
             /// Stages rotating or retiring this <see cref="CloudPool"/> if needed.
             /// </summary>
             Rotate,
 
             /// <summary>
-            /// Removes <see cref="CloudPool"/> if it's retired and empty.
+            /// Save the pool as update
             /// </summary>
-            RemovePoolIfEmpty,
+            Update,
         }
     }
 }

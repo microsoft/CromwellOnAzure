@@ -72,10 +72,6 @@ namespace TesApi.Tests
             azureProxy.AzureProxySetComputeNodeTargets = SetTargets;
             azureProxy.AzureProxyGetComputeNodeAllocationState = GetState;
             var jobTime = DateTime.UtcNow;
-            azureProxy.AzureProxyListJobs = detail => AsyncEnumerable.Empty<CloudJob>().Append(GenerateJob("job1", stateTransitionTime: jobTime));
-
-            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
-            Assert.AreEqual(0, setTargetsCalled);
             azureProxy.AzureProxyListJobs = detail => AsyncEnumerable.Empty<CloudJob>().Append(GenerateJob("job1", stateTransitionTime: jobTime - BatchPoolService.RunInterval));
 
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.Resize);
@@ -140,6 +136,7 @@ namespace TesApi.Tests
             // Ensure nodes are not deleted prematurely
             expiryTime = DateTime.UtcNow - ((BatchPool)pool).TestIdleNodeTime;
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle);
+            await ((BatchPool)pool).TestRemoveNodes();
 
             Assert.AreEqual(4, ((BatchPool)pool).TestTargetLowPriority);
             Assert.AreEqual(4, ((BatchPool)pool).TestTargetDedicated);
@@ -159,6 +156,7 @@ namespace TesApi.Tests
             // Ensure idle nodes are deleted
             expiryTime = DateTime.UtcNow - ((BatchPool)pool).TestIdleNodeTime;
             await pool.ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle);
+            await ((BatchPool)pool).TestRemoveNodes();
 
             Assert.AreEqual(2, ((BatchPool)pool).TestTargetLowPriority);
             Assert.AreEqual(2, ((BatchPool)pool).TestTargetDedicated);
