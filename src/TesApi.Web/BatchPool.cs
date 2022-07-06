@@ -73,15 +73,16 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public ValueTask ServicePoolAsync(IBatchPool.ServiceKind serviceKind, CancellationToken cancellationToken = default)
         {
-            lock (this) // TODO: make lock object
+            lock (_lockObj)
             {
                 return serviceKind switch
                 {
-                    IBatchPool.ServiceKind.Update => ServicePoolUpdateAsync(cancellationToken),
-                    IBatchPool.ServiceKind.Resize => ServicePoolResizeAsync(cancellationToken),
+                    IBatchPool.ServiceKind.GetResizeErrors => ServicePoolGetResizeErrorsAsync(cancellationToken),
                     IBatchPool.ServiceKind.RemoveNodeIfIdle => ServicePoolRemoveNodeIfIdleAsync(cancellationToken),
-                    IBatchPool.ServiceKind.Rotate => ServicePoolRotateAsync(cancellationToken),
                     IBatchPool.ServiceKind.RemovePoolIfEmpty => ServicePoolRemovePoolIfEmptyAsync(cancellationToken),
+                    IBatchPool.ServiceKind.Resize => ServicePoolResizeAsync(cancellationToken),
+                    IBatchPool.ServiceKind.Rotate => ServicePoolRotateAsync(cancellationToken),
+                    IBatchPool.ServiceKind.Update => ServicePoolUpdateAsync(cancellationToken),
                     _ => throw new ArgumentOutOfRangeException(nameof(serviceKind)),
                 };
             }
@@ -93,11 +94,18 @@ namespace TesApi.Web
             var exceptions = new List<Exception>();
             var retVal = _isDirty || IsChanged;
 
-            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty, cancellationToken));
-            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Rotate, cancellationToken));
-            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Resize, cancellationToken));
-            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle, cancellationToken));
-            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Update, cancellationToken));
+            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.GetResizeErrors, cancellationToken), cancellationToken);
+            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty, cancellationToken), cancellationToken);
+            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Rotate, cancellationToken), cancellationToken);
+            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle, cancellationToken), cancellationToken);
+            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Resize, cancellationToken), cancellationToken);
+            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Update, cancellationToken), cancellationToken);
+
+            if (_nodesToRemove is not null)
+            {
+                await RemoveNodesAsync(_nodesToRemove, cancellationToken);
+                _nodesToRemove = default;
+            }
 
             retVal |= _isDirty || IsChanged;
             IsChanged = false;
@@ -116,15 +124,18 @@ namespace TesApi.Web
                     _ => Enumerable.Empty<Exception>().Append(ex),
                 };
 
-            async ValueTask PerformTask(ValueTask serviceAction)
+            async ValueTask PerformTask(ValueTask serviceAction, CancellationToken cancellationToken)
             {
-                try
+                if (!cancellationToken.IsCancellationRequested)
                 {
-                    await serviceAction;
-                }
-                catch (Exception ex)
-                {
-                    exceptions.Add(ex);
+                    try
+                    {
+                        await serviceAction;
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
                 }
             }
         }
@@ -134,13 +145,36 @@ namespace TesApi.Web
         private async ValueTask ServicePoolResizeAsync(CancellationToken cancellationToken)
         {
             var (allocationState, targetLowPri, targetDedicated) = await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken);
+            var currentTargetNodes = IsPreemptable ? targetLowPri ?? 0 : targetDedicated ?? 0;
 
             if (allocationState == AllocationState.Steady)
             {
+                var jobCount = (await GetJobsAsync().CountAsync(cancellationToken));
+
+                // This method never reduces the nodes target. ServicePoolRemoveNodeIfIdleAsync() removes nodes.
+                if (jobCount > currentTargetNodes)
+                {
+                    _nodesToRemove = default; // Since we are upsizing, cancel any idle node removals (they are actually needed).
+                    _logger.LogDebug("Resizing {PoolId} to contain at least {Nodes} nodes", Pool.PoolId, jobCount);
+                    IsChanged = true;
+                    _resizeErrorsRetrieved = false;
+                    await _azureProxy.SetComputeNodeTargetsAsync(
+                        Pool.PoolId,
+                        IsPreemptable ? jobCount : 0,
+                        IsPreemptable ? 0 : jobCount,
+                        cancellationToken);
+                }
+            }
+        }
+
+        private async ValueTask ServicePoolGetResizeErrorsAsync(CancellationToken cancellationToken)
+        {
+            if ((await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken)).AllocationState == AllocationState.Steady)
+            {
                 if (!_resizeErrorsRetrieved)
                 {
-                    var pool = await _azureProxy.GetBatchPoolAsync(Pool.PoolId, new ODATADetailLevel { SelectClause = "resizeErrors" }, cancellationToken);
                     ResizeErrors.Clear();
+                    var pool = await _azureProxy.GetBatchPoolAsync(Pool.PoolId, new ODATADetailLevel { SelectClause = "resizeErrors" }, cancellationToken);
 
                     foreach (var error in pool.ResizeErrors ?? Enumerable.Empty<ResizeError>())
                     {
@@ -148,27 +182,6 @@ namespace TesApi.Web
                     }
 
                     _resizeErrorsRetrieved = true;
-                }
-
-                var jobs = await GetJobsAsync().ToListAsync(cancellationToken);
-
-                // Delay resizing by one cycle in case a burst of jobs is being added.
-                if (!jobs.Any(n => n.StateTransitionTime <= DateTime.UtcNow.Subtract(BatchPoolService.RunInterval)))
-                {
-                    return;
-                }
-
-                // This method never reduces the nodes target. ServicePoolRemoveNodeIfIdleAsync() removes nodes.
-                var jobCount = jobs.Count;
-                var lowPri = IsPreemptable ? Math.Max(targetLowPri ?? 0, jobCount) : 0;
-                var dedicated = IsPreemptable ? 0 : Math.Max(targetDedicated ?? 0, jobCount);
-
-                if (lowPri != (targetLowPri ?? 0) || dedicated != (targetDedicated ?? 0))
-                {
-                    _logger.LogDebug("Resizing {PoolId} to contain at least {Nodes} nodes", Pool.PoolId, jobCount);
-                    IsChanged = true;
-                    await _azureProxy.SetComputeNodeTargetsAsync(Pool.PoolId, lowPri, dedicated, cancellationToken);
-                    _resizeErrorsRetrieved = false;
                 }
             }
             else
@@ -179,6 +192,8 @@ namespace TesApi.Web
 
         private async ValueTask ServicePoolRemoveNodeIfIdleAsync(CancellationToken cancellationToken)
         {
+            _nodesToRemove = default;
+
             if ((await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken)).AllocationState == AllocationState.Steady)
             {
                 var nodesToRemove = Enumerable.Empty<ComputeNode>();
@@ -201,22 +216,33 @@ namespace TesApi.Web
                             _logger.LogDebug("Found starttaskfailed node {NodeId}", node.Id);
                             StartTaskFailures.Enqueue(node.StartTaskInformation.FailureInformation);
                             break;
+                        default:
+                            throw new InvalidOperationException($"Unexpected compute node state found for node {node.Id}/{node.State} (should never happen).");
                     }
                     nodesToRemove = nodesToRemove.Append(node);
                     _resizeErrorsRetrieved = false;
                 }
 
+                // It's documented that a max of 100 nodes can be removed at a time. Excess eligible nodes will be removed in a future call.
                 // Prioritize removing "start task failed" nodes, followed by longest waiting nodes.
-                var orderedNodes = nodesToRemove.OrderByDescending(n => n.State).ThenBy(n => n.StateTransitionTime).ToList();
+                var orderedNodes = nodesToRemove
+                    .OrderByDescending(n => n.State)
+                    .ThenBy(n => n.StateTransitionTime)
+                    .Take(100)
+                    .ToList();
 
                 if (!orderedNodes.Any())
-                {
+                { // No work to do
                     return;
                 }
+                else if (!orderedNodes.Any(n => n.State == ComputeNodeState.StartTaskFailed))
+                { // No StartTaskFailed nodes. Defer all node removals (in case any idle nodes haven't been assigned yet)
+                    _nodesToRemove = orderedNodes;
+                    return;
+                }
+                // Even if there are both Idle nodes and StartTaskFailed nodes mixed together, remove them in one call. We can't scale the pool in either direction again anytime soon, and it's simply an egregious waste of money to defer removal of start task failed nodes.
 
-                // It's documented that a max of 100 nodes can be removed at a time. Excess eligible nodes will be removed in a future call.
-                _logger.LogDebug("Removing {Nodes} nodes from {PoolId}", Math.Min(orderedNodes.Count, 100), Pool.PoolId);
-                await _azureProxy.DeleteBatchComputeNodesAsync(Pool.PoolId, orderedNodes.Take(100), cancellationToken);
+                await RemoveNodesAsync(orderedNodes, cancellationToken);
             }
         }
 
@@ -387,7 +413,7 @@ namespace TesApi.Web
 
         #region Implementation methods
         /// <summary>
-        /// TODO
+        /// Retrieve stored metadata from pool's metadata collection
         /// </summary>
         /// <param name="pool"></param>
         /// <returns></returns>
@@ -412,10 +438,19 @@ namespace TesApi.Web
 
         internal IAsyncEnumerable<CloudJob> GetJobsAsync()
             => _azureProxy.ListJobsAsync(new ODATADetailLevel { SelectClause = "id,stateTransitionTime", FilterClause = $"state eq 'active' and executionInfo/poolId eq '{Pool.PoolId}'" });
+
+        private async ValueTask RemoveNodesAsync(IList<ComputeNode> nodesToRemove, CancellationToken cancellationToken)
+        {
+            _logger.LogDebug("Removing {Nodes} nodes from {PoolId}", nodesToRemove.Count, Pool.PoolId);
+            _resizeErrorsRetrieved = false;
+            await _azureProxy.DeleteBatchComputeNodesAsync(Pool.PoolId, nodesToRemove, cancellationToken);
+        }
         #endregion
 
         #region Implementation state
+        private readonly object _lockObj = new();
         private readonly PoolData _poolData;
+        private IList<ComputeNode> _nodesToRemove;
 
         private readonly ILogger _logger;
         private DateTime Creation { get; set; }
@@ -439,7 +474,7 @@ namespace TesApi.Web
 
         #region Nested private classes
         /// <summary>
-        /// TODO
+        /// Stateful data we need to survive reboots
         /// </summary>
         public class PoolData
         {
@@ -468,6 +503,15 @@ namespace TesApi.Web
 
         internal void TestSetAvailable(bool available)
             => IsAvailable = available;
+
+        internal async ValueTask TestRemoveNodes()
+        {
+            if (_nodesToRemove is not null)
+            {
+                await RemoveNodesAsync(_nodesToRemove, default);
+                _nodesToRemove = default;
+            }
+        }
 
         internal void TimeShift(TimeSpan shift)
         {
