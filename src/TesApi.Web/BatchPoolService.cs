@@ -99,16 +99,12 @@ namespace TesApi.Web
             }
 
             var startTime = DateTime.UtcNow;
-            var count = 0;
 
             foreach (var pool in pools)
             {
                 try
                 {
-                    if (await pool.ServicePoolAsync(cancellationToken))
-                    {
-                        ++count;
-                    }
+                    await pool.ServicePoolAsync(cancellationToken);
                 }
                 catch (Exception exc)
                 {
@@ -116,10 +112,7 @@ namespace TesApi.Web
                 }
             }
 
-            if (0 != count)
-            {
-                _logger.LogDebug($"ServiceBatchPools for {pools.Count} pools completed ({count} with changes) in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
-            }
+            _logger.LogDebug($"ServiceBatchPools for {pools.Count} pools completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
         }
     }
 }
