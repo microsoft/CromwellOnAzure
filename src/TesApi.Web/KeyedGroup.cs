@@ -38,7 +38,7 @@ namespace TesApi.Web
 
         #region Protected implementation
         /// <summary>
-        /// A method that creates new <see cref="GroupableSetWithRepositoryElements{TElement, TRepositoryItem}"/> objects.
+        /// A method that creates new TSet objects.
         /// </summary>
         protected abstract Func<IEnumerable<TElement>, TSet> CreateSetFunc { get; }
         #endregion
@@ -47,7 +47,7 @@ namespace TesApi.Web
         /// <summary>
         /// Enumerates all elements grouped by their computed keys
         /// </summary>
-        /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="KeyValuePair{TKey, TValue}"/> where <see cref="KeyValuePair{TKey, TValue}.Value"/> is an <see cref="GroupableSetWithRepositoryElements{TElement, TRepositoryItem}"/> object.</returns>
+        /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="KeyValuePair{TKey, TValue}"/> where <see cref="KeyValuePair{TKey, TValue}.Value"/> is a TSet object.</returns>
         public virtual IEnumerable<KeyValuePair<string, TSet>> GetGroups()
             => _sets.GetGroups();
 

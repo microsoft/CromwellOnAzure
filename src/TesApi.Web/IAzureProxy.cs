@@ -178,7 +178,7 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="hostName"></param>
         /// <param name="cancellationToken"></param>
-        /// <returns></returns>
+        /// <returns>List of <see cref="CloudPool"/> managed by the host.</returns>
         Task<IEnumerable<CloudPool>> GetActivePoolsAsync(string hostName, CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -196,19 +196,19 @@ namespace TesApi.Web
         Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// TODO
+        /// Retrieves the specified pool
         /// </summary>
-        /// <param name="poolId"></param>
-        /// <param name="detailLevel"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
+        /// <param name="poolId">The <see cref="CloudPool.Id"/> of the pool to retrieve.</param>
+        /// <param name="detailLevel">A Microsoft.Azure.Batch.DetailLevel used for controlling which properties are retrieved from the service.</param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
+        /// <returns><see cref="CloudPool"/></returns>
         Task<CloudPool> GetBatchPoolAsync(string poolId, DetailLevel detailLevel = default, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// TODO
+        /// Commits all pending changes to this Microsoft.Azure.Batch.CloudPool to the Azure Batch service.
         /// </summary>
-        /// <param name="pool"></param>
-        /// <param name="cancellationToken"></param>
+        /// <param name="pool">The <see cref="CloudPool"/> to change.</param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         Task CommitBatchPoolChangesAsync(CloudPool pool, CancellationToken cancellationToken = default);
 

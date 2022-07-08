@@ -51,7 +51,7 @@ namespace TesApi.Web
         /// <param name="cancellationToken"></param>
         /// <returns>True if pool was updated/has pending updates.</returns>
         /// <remarks>Calls each internal servicing method in order. Throws all exceptions from all methods.</remarks>
-        ValueTask<bool> ServicePoolAsync(CancellationToken cancellationToken = default);
+        ValueTask ServicePoolAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Service methods dispatcher.

@@ -256,7 +256,6 @@ namespace TesApi.Web
                 TaskState? taskState = null;
                 string poolId = null;
                 TaskExecutionInformation taskExecutionInformation = null;
-                ComputeNodeInformation computeNodeInformation = null;
 
                 var jobFilter = new ODATADetailLevel
                 {
@@ -321,7 +320,6 @@ namespace TesApi.Web
                     var batchTask = await batchClient.JobOperations.GetTaskAsync(job.Id, tesTaskId);
                     taskState = batchTask.State;
                     taskExecutionInformation = batchTask.ExecutionInformation;
-                    computeNodeInformation = batchTask.ComputeNodeInformation;
                 }
                 catch (Exception ex)
                 {
@@ -343,15 +341,13 @@ namespace TesApi.Web
                     JobSchedulingError = job.ExecutionInformation?.SchedulingError,
                     TaskState = taskState,
                     PoolId = poolId,
-                    JobId = job.Id,
                     TaskExecutionResult = taskExecutionInformation?.Result,
                     TaskStartTime = taskExecutionInformation?.StartTime,
                     TaskEndTime = taskExecutionInformation?.EndTime,
                     TaskExitCode = taskExecutionInformation?.ExitCode,
                     TaskFailureInformation = taskExecutionInformation?.FailureInformation,
                     TaskContainerState = taskExecutionInformation?.ContainerInformation?.State,
-                    TaskContainerError = taskExecutionInformation?.ContainerInformation?.Error,
-                    ComputeNodeInformation = computeNodeInformation
+                    TaskContainerError = taskExecutionInformation?.ContainerInformation?.Error
                 };
             }
             catch (Exception ex)
