@@ -24,6 +24,35 @@ namespace TesApi.Tests.TestServices
     {
         private readonly IServiceProvider provider;
 
+        internal TestServiceProvider(
+            bool mockStorageAccessProvider = false,
+            bool wrapAzureProxy = false,
+            IEnumerable<(string Key, string Value)> configuration = default,
+            Action<Mock<IAzureProxy>> azureProxy = default,
+            Action<Mock<IRepository<TesTask>>> tesTaskRepository = default,
+            (string endpoint, string key, string databaseId, string containerId, string partitionKeyValue) batchPoolRepositoryArgs = default,
+            Action<Mock<IStorageAccessProvider>> storageAccessProvider = default)
+            => provider = new ServiceCollection()
+                .AddSingleton(_ => GetConfiguration(configuration))
+                .AddSingleton(s => wrapAzureProxy ? ActivatorUtilities.CreateInstance<CachingWithRetriesAzureProxy>(s, GetAzureProxy(azureProxy).Object) : GetAzureProxy(azureProxy).Object)
+                .AddSingleton(_ => GetTesTaskRepository(tesTaskRepository).Object)
+                .AddSingleton(_ => new CosmosCredentials(batchPoolRepositoryArgs.endpoint ?? "endpoint", batchPoolRepositoryArgs.key ?? "key"))
+                .AddSingleton(s => mockStorageAccessProvider ? GetStorageAccessProvider(storageAccessProvider).Object : ActivatorUtilities.CreateInstance<StorageAccessProvider>(s))
+                .AddSingleton<IAppCache>(_ => new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()))))
+                .AddTransient<ILogger<T>>(_ => NullLogger<T>.Instance)
+                .IfThenElse(mockStorageAccessProvider, s => s, s => s.AddTransient<ILogger<StorageAccessProvider>>(_ => NullLogger<StorageAccessProvider>.Instance))
+                .AddTransient<ILogger<BatchScheduler>>(_ => NullLogger<BatchScheduler>.Instance)
+                .AddTransient<ILogger<BatchPool>>(_ => NullLogger<BatchPool>.Instance)
+                .AddSingleton<TestRepositoryStorage>()
+                .AddSingleton<BatchPoolFactory>()
+                .AddSingleton<IBatchScheduler, BatchScheduler>()
+            .BuildServiceProvider();
+
+        internal IConfiguration Configuration { get; private set; }
+        internal Mock<IAzureProxy> AzureProxy { get; private set; }
+        internal Mock<IRepository<TesTask>> TesTaskRepository { get; private set; }
+        internal Mock<IStorageAccessProvider> StorageAccessProvider { get; private set; }
+
         internal T GetT()
             => GetT(Array.Empty<Type>(), Array.Empty<object>());
 
@@ -65,42 +94,6 @@ namespace TesApi.Tests.TestServices
         internal TService GetService<TService>()
             => provider.GetService<TService>();
 
-        internal IConfiguration Configuration { get; private set; }
-        internal Mock<IAzureProxy> AzureProxy { get; private set; }
-        internal Mock<IRepository<TesTask>> TesTaskRepository { get; private set; }
-        internal Mock<IStorageAccessProvider> StorageAccessProvider { get; private set; }
-
-
-        internal TestServiceProvider(
-            bool mockStorageAccessProvider = false,
-            bool wrapAzureProxy = false,
-            IEnumerable<(string Key, string Value)> configuration = default,
-            Action<Mock<IAzureProxy>> azureProxy = default,
-            Action<Mock<IRepository<TesTask>>> tesTaskRepository = default,
-            (string endpoint, string key, string databaseId, string containerId, string partitionKeyValue) batchPoolRepositoryArgs = default,
-            Action<Mock<IStorageAccessProvider>> storageAccessProvider = default)
-            => provider = new ServiceCollection()
-                .AddSingleton(_ => GetConfiguration(configuration))
-                .AddSingleton(s => wrapAzureProxy ? ActivatorUtilities.CreateInstance<CachingWithRetriesAzureProxy>(s, GetAzureProxy(azureProxy).Object) : GetAzureProxy(azureProxy).Object)
-                .AddSingleton(_ => GetTesTaskRepository(tesTaskRepository).Object)
-                .AddSingleton(_ => new CosmosCredentials(batchPoolRepositoryArgs.endpoint ?? "endpoint", batchPoolRepositoryArgs.key ?? "key"))
-                .AddSingleton(s => mockStorageAccessProvider ? GetStorageAccessProvider(storageAccessProvider).Object : ActivatorUtilities.CreateInstance<StorageAccessProvider>(s))
-                .AddSingleton<IAppCache>(_ => new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions()))))
-                .AddTransient<ILogger<T>>(_ => NullLogger<T>.Instance)
-                .IfThenElse(mockStorageAccessProvider, s => s, s => s.AddTransient<ILogger<StorageAccessProvider>>(_ => NullLogger<StorageAccessProvider>.Instance))
-                .AddTransient<ILogger<BatchScheduler>>(_ => NullLogger<BatchScheduler>.Instance)
-                .AddTransient<ILogger<BatchPool>>(_ => NullLogger<BatchPool>.Instance)
-                .AddSingleton<TestRepositoryStorage>()
-                .AddSingleton<BatchPoolFactory>()
-                .AddSingleton<IBatchScheduler, BatchScheduler>()
-            .BuildServiceProvider();
-
-        private static IRepository<I> GetRepository<I>(IServiceProvider serviceProvider, CosmosCredentials credentials, object[] args) where I : RepositoryItem<I>
-        {
-            var factory = ActivatorUtilities.CreateFactory(typeof(TestRepository<I>), Enumerable.Empty<Type>().Append(typeof(string)).Append(typeof(string)).Append(typeof(string)).Append(typeof(string)).Append(typeof(string)).ToArray());
-            return (IRepository<I>)factory(serviceProvider, args.Prepend(credentials.CosmosDbKey).Prepend(credentials.CosmosDbEndpoint).ToArray());
-        }
-
         private IConfiguration GetConfiguration(IEnumerable<(string Key, string Value)> configuration)
             => Configuration = new ConfigurationBuilder().AddInMemoryCollection(configuration?.Select(t => new KeyValuePair<string, string>(t.Key, t.Value)) ?? Enumerable.Empty<KeyValuePair<string, string>>()).Build();
 
@@ -117,13 +110,6 @@ namespace TesApi.Tests.TestServices
             action?.Invoke(proxy);
             return TesTaskRepository = proxy;
         }
-
-        private static object[] ParseRepositoryArgs((string endpoint, string key, string databaseId, string containerId, string partitionKeyValue) batchPoolRepositoryArgs)
-            => Enumerable.Empty<object>()
-                .Append(batchPoolRepositoryArgs.databaseId)
-                .Append(batchPoolRepositoryArgs.containerId)
-                .Append(batchPoolRepositoryArgs.partitionKeyValue)
-                .ToArray();
 
         private Mock<IStorageAccessProvider> GetStorageAccessProvider(Action<Mock<IStorageAccessProvider>> action)
         {

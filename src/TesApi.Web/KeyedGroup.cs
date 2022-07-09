@@ -16,14 +16,8 @@ namespace TesApi.Web
     /// <typeparam name="TSet"></typeparam>
     public abstract class KeyedGroup<TElement, TSet> : IEnumerable<TElement> where TSet : GroupableSet<TElement>
     {
-        #region Private implementation
+        #region Private fields
         private readonly KeyedCollectionWrapper _sets;
-
-        private bool CreateSet(TElement element)
-        {
-            _sets.Add(CreateSetFunc(Enumerable.Empty<TElement>().Append(element)));
-            return true;
-        }
         #endregion
 
         #region Constructors
@@ -36,11 +30,27 @@ namespace TesApi.Web
             => _sets = new(getKeyForItemFunc, comparer);
         #endregion
 
-        #region Protected implementation
+        #region Protected properties
         /// <summary>
         /// A method that creates new TSet objects.
         /// </summary>
         protected abstract Func<IEnumerable<TElement>, TSet> CreateSetFunc { get; }
+        #endregion
+
+        #region Public properties
+        /// <summary>
+        /// Gets an <see cref="IEnumerable{T}"/> containing the keys of this object.
+        /// </summary>
+        public virtual IEnumerable<string> Keys
+            => _sets.Keys;
+        #endregion
+
+        #region Private methods
+        private bool CreateSet(TElement element)
+        {
+            _sets.Add(CreateSetFunc(Enumerable.Empty<TElement>().Append(element)));
+            return true;
+        }
         #endregion
 
         #region Public methods
@@ -50,7 +60,6 @@ namespace TesApi.Web
         /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="KeyValuePair{TKey, TValue}"/> where <see cref="KeyValuePair{TKey, TValue}.Value"/> is a TSet object.</returns>
         public virtual IEnumerable<KeyValuePair<string, TSet>> GetGroups()
             => _sets.GetGroups();
-
 
         /// <summary>
         /// Adds the specified element to a set.
@@ -86,12 +95,6 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Gets an <see cref="IEnumerable{T}"/> containing the keys of this object.
-        /// </summary>
-        public virtual IEnumerable<string> Keys
-            => _sets.Keys;
-
-        /// <summary>
         /// Tries to get an item from the collection using the specified key.
         /// </summary>
         /// <param name="key">The key of the item to search in the collection.</param>
@@ -100,57 +103,6 @@ namespace TesApi.Web
         /// <returns>true if an item for the specified key was found in the collection; otherwise, false.</returns>
         public virtual bool TryGetValue(string key, out TSet set)
             => _sets.TryGetValue(key, out set);
-
-        //public ISet<IBatchPool> this[string key] { get => pools.Dictionary[key]; set => DictionarySet(key, value); }
-
-        //private void DictionarySet(string key, ISet<IBatchPool> value)
-        //{
-        //    if (pools.Dictionary? .ContainsKey(key) ?? false)
-        //    {
-        //        pools.Dictionary[key] = new HashSet<IBatchPool>(value, new BatchPoolEqualityComparer());
-        //        return;
-        //    }
-
-        //    pools.Add(new HashSet<IBatchPool>(value, new BatchPoolEqualityComparer()));
-        //}
-        //public Values
-        //    => pools.Dictionary.Values ?? Enumerable.Empty<ISet<IBatchPool>>().ToList();
-
-        //public int Count
-        //    => pools.Count;
-
-        //public void Add(string key, ISet<IBatchPool> value)
-        //    => ((ICollection<KeyValuePair<string, ISet<IBatchPool>>>)this).Add(new KeyValuePair<string, ISet<IBatchPool>>(key, value));
-
-        //public void Add(KeyValuePair<string, ISet<IBatchPool>> item)
-        //{
-        //    //TODO: validate that key is correct for each element in value
-
-        //    if (!item.Key.Equals(pools.KeyForItem(item.Value)))
-        //    {
-        //        throw new InvalidOperationException("Mismatched key");
-        //    }
-
-        //    pools.Add(new HashSet<IBatchPool>(item.Value, new BatchPoolEqualityComparer()));
-        //}
-
-        //public bool Contains(KeyValuePair<string, ISet<IBatchPool>> item)
-        //    => pools.Dictionary?.Contains(item) ?? false;
-
-        //public bool ContainsKey(string key)
-        //    => pools.Dictionary?.ContainsKey(key) ?? false;
-
-        //public void CopyTo(KeyValuePair<string, ISet<IBatchPool>>[] array, int arrayIndex)
-        //    => pools.Dictionary?.CopyTo(array, arrayIndex);
-
-        //public bool Remove(KeyValuePair<string, ISet<IBatchPool>> item)
-        //    => pools.Dictionary?.Remove(item) ?? false;
-
-        //public bool Remove(string key)
-        //    => pools.TryGetValue(key, out var item) && pools.Remove(item);
-
-        //public void Clear()
-        //    => pools.Clear();
         #endregion
 
         #region IEnumerable
@@ -164,6 +116,12 @@ namespace TesApi.Web
         #region Embedded classes
         private class KeyedCollectionWrapper : KeyedCollection<string, TSet>
         {
+            private readonly Dictionary<TSet, string> keyMap = new();
+
+            public KeyedCollectionWrapper(Func<TElement, string> getKeyForItemFunc, IEqualityComparer<string> comparer = default)
+                : base(comparer ?? StringComparer.Ordinal)
+                => GetKeyForItemFunc = getKeyForItemFunc ?? throw new ArgumentNullException(nameof(getKeyForItemFunc));
+
             public Func<TElement, string> GetKeyForItemFunc { get; }
 
             public virtual IEnumerable<KeyValuePair<string, TSet>> GetGroups()
@@ -172,13 +130,7 @@ namespace TesApi.Web
             public virtual IEnumerable<string> Keys
                 => Dictionary?.Keys ?? Enumerable.Empty<string>();
 
-            public KeyedCollectionWrapper(Func<TElement, string> getKeyForItemFunc, IEqualityComparer<string> comparer = default)
-                : base(comparer ?? StringComparer.Ordinal)
-                => GetKeyForItemFunc = getKeyForItemFunc ?? throw new ArgumentNullException(nameof(getKeyForItemFunc));
-
             #region Overrides
-            private readonly Dictionary<TSet, string> keyMap = new();
-
             protected override string GetKeyForItem(TSet item)
             {
                 if (keyMap.TryGetValue(item, out var key))
