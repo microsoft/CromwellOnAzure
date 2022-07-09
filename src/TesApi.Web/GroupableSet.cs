@@ -46,7 +46,7 @@ namespace TesApi.Web
             => elements = new(collection, comparer);
         #endregion
 
-        #region Public interface or implementation object methods
+        #region Public interface properties
         /// <summary>
         /// Gets the <see cref="IEqualityComparer{T}"/> object that is used to determine equality for the values in the set.
         /// </summary>
@@ -56,7 +56,15 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public int Count
             => elements.Count;
+        #endregion
 
+        #region Explicit interface properties
+        /// <inheritdoc/>
+        bool ICollection<T>.IsReadOnly
+            => ((ICollection<T>)elements).IsReadOnly;
+        #endregion
+
+        #region Public interface methods
         /// <inheritdoc/>
         public bool Add(T item)
             => elements.Add(item);
@@ -69,36 +77,9 @@ namespace TesApi.Web
         public bool Contains(T item)
             => elements.Contains(item);
 
-        /// <summary>
-        /// Copies the elements of this object to an array.
-        /// </summary>
-        /// <param name="array">The one-dimensional array that is the destination of the elements copied from this object. The array must have zero-based indexing.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="array"/> is null.</exception>
-        public void CopyTo(T[] array)
-            => elements.CopyTo(array);
-
         /// <inheritdoc/>
         public void CopyTo(T[] array, int arrayIndex)
             => elements.CopyTo(array, arrayIndex);
-
-        /// <summary>
-        /// Copies the specified number of elements of this object to an array, starting at the specified array index.
-        /// </summary>
-        /// <param name="array">The one-dimensional array that is the destination of the elements copied from this object. The array must have zero-based indexing.</param>
-        /// <param name="arrayIndex">The zero-based index in array at which copying begins.</param>
-        /// <param name="count">The number of elements to copy to array.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="array"/> is null.</exception>
-        /// <exception cref="ArgumentOutOfRangeException"><paramref name="arrayIndex"/> is less than 0. -or- <paramref name="count"/> is less than 0.</exception>
-        /// <exception cref="ArgumentException"><paramref name="arrayIndex"/> is greater than the length of the destination array. -or- <paramref name="count"/> is greater than the available space from the index to the end of the destination array.</exception>
-        public void CopyTo(T[] array, int arrayIndex, int count)
-            => elements.CopyTo(array, arrayIndex, count);
-
-        /// <summary>
-        /// Returns an enumerator that iterates through this object.
-        /// </summary>
-        /// <returns>A <see cref="HashSet{T}.Enumerator"/> object for this object.</returns>
-        public HashSet<T>.Enumerator GetEnumerator()
-            => elements.GetEnumerator();
 
         /// <inheritdoc/>
         public void ExceptWith(IEnumerable<T> other)
@@ -143,6 +124,49 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public void UnionWith(IEnumerable<T> other)
             => elements.UnionWith(other);
+        #endregion
+
+        #region Explicit interface methods
+        /// <inheritdoc/>
+        void ICollection<T>.Add(T item)
+            => ((ICollection<T>)elements).Add(item);
+
+        /// <inheritdoc/>
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
+            => GetEnumerator();
+
+        /// <inheritdoc/>
+        IEnumerator IEnumerable.GetEnumerator()
+            => GetEnumerator();
+        #endregion
+
+        #region Public implementation methods
+        /// <summary>
+        /// Copies the elements of this object to an array.
+        /// </summary>
+        /// <param name="array">The one-dimensional array that is the destination of the elements copied from this object. The array must have zero-based indexing.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="array"/> is null.</exception>
+        public void CopyTo(T[] array)
+            => elements.CopyTo(array);
+
+        /// <summary>
+        /// Copies the specified number of elements of this object to an array, starting at the specified array index.
+        /// </summary>
+        /// <param name="array">The one-dimensional array that is the destination of the elements copied from this object. The array must have zero-based indexing.</param>
+        /// <param name="arrayIndex">The zero-based index in array at which copying begins.</param>
+        /// <param name="count">The number of elements to copy to array.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="array"/> is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="arrayIndex"/> is less than 0. -or- <paramref name="count"/> is less than 0.</exception>
+        /// <exception cref="ArgumentException"><paramref name="arrayIndex"/> is greater than the length of the destination array. -or- <paramref name="count"/> is greater than the available space from the index to the end of the destination array.</exception>
+        public void CopyTo(T[] array, int arrayIndex, int count)
+            => elements.CopyTo(array, arrayIndex, count);
+
+        /// <summary>
+        /// Returns an enumerator that iterates through this object.
+        /// </summary>
+        /// <returns>A <see cref="HashSet{T}.Enumerator"/> object for this object.</returns>
+        public HashSet<T>.Enumerator GetEnumerator()
+            => elements.GetEnumerator();
 
         /// <summary>
         /// Removes all elements that match the conditions defined by the specified predicate from the current collection.
@@ -166,24 +190,6 @@ namespace TesApi.Web
         /// <returns></returns>
         public bool TryGetValue(T equalValue, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out T actualValue)
             => elements.TryGetValue(equalValue, out actualValue);
-        #endregion
-
-        #region Explicit interface methods
-        /// <inheritdoc/>
-        bool ICollection<T>.IsReadOnly
-            => ((ICollection<T>)elements).IsReadOnly;
-
-        /// <inheritdoc/>
-        void ICollection<T>.Add(T item)
-            => ((ICollection<T>)elements).Add(item);
-
-        /// <inheritdoc/>
-        IEnumerator<T> IEnumerable<T>.GetEnumerator()
-            => GetEnumerator();
-
-        /// <inheritdoc/>
-        IEnumerator IEnumerable.GetEnumerator()
-            => GetEnumerator();
         #endregion
     }
 }

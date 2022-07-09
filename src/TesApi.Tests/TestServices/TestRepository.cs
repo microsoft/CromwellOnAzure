@@ -88,6 +88,8 @@ namespace TesApi.Tests.TestServices
 
     internal abstract class BaseRepository<T> : DefaultRepositoryBase, IRepository<T> where T : RepositoryItem<T>
     {
+        private bool isDisposed = false;
+
         protected BaseRepository(string endpoint, string key, string databaseId, string containerId, string partitionKeyValue, TestRepositoryStorage storage)
             : base(endpoint, key, databaseId, containerId, partitionKeyValue, storage) { }
 
@@ -112,7 +114,6 @@ namespace TesApi.Tests.TestServices
             return Task.CompletedTask;
         }
 
-        private bool isDisposed = false;
         public void Dispose()
             => isDisposed = true;
 

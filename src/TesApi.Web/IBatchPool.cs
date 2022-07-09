@@ -13,54 +13,6 @@ namespace TesApi.Web
     public interface IBatchPool
     {
         /// <summary>
-        /// Indicates that the pool is available for new jobs/tasks.
-        /// </summary>
-        bool IsAvailable { get; }
-
-        /// <summary>
-        /// Indicates that the pool contains only preemptable nodes. If false, indicates that the pool contains only dedicated nodes.
-        /// </summary>
-        bool IsPreemptable { get; }
-
-        /// <summary>
-        /// Provides the <see cref="PoolInformation"/> for the pool.
-        /// </summary>
-        PoolInformation Pool { get; }
-
-        /// <summary>
-        /// Indicates that the pool is not scheduled to run tasks nor running tasks.
-        /// </summary>
-        /// <param name="cancellationToken"></param>
-        ValueTask<bool> CanBeDeleted(CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Removes and returns the next available start task failure.
-        /// </summary>
-        /// <returns>The first <see cref="TaskFailureInformation"/> in the list, or null if the list is empty.</returns>
-        TaskFailureInformation PopNextStartTaskFailure();
-
-        /// <summary>
-        /// Removes and returns the next available resize error.
-        /// </summary>
-        /// <returns>The first <see cref="ResizeError"/> in the list, or null if the list is empty.</returns>
-        ResizeError PopNextResizeError();
-
-        /// <summary>
-        /// Updates this instance based on changes to its environment.
-        /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns>True if pool was updated/has pending updates.</returns>
-        /// <remarks>Calls each internal servicing method in order. Throws all exceptions from all methods.</remarks>
-        ValueTask ServicePoolAsync(CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Service methods dispatcher.
-        /// </summary>
-        /// <param name="serviceKind">The type of <see cref="ServiceKind"/> service call.</param>
-        /// <param name="cancellationToken"></param>
-        ValueTask ServicePoolAsync(ServiceKind serviceKind, CancellationToken cancellationToken = default);
-
-        /// <summary>
         /// Types of maintenance calls offered by the <see cref="IBatchPool.ServicePoolAsync(ServiceKind, CancellationToken)"/> service method.
         /// </summary>
         enum ServiceKind
@@ -95,5 +47,52 @@ namespace TesApi.Web
             /// </summary>
             Update,
         }
+
+        /// <summary>
+        /// Indicates that the pool is available for new jobs/tasks.
+        /// </summary>
+        bool IsAvailable { get; }
+
+        /// <summary>
+        /// Indicates that the pool contains only preemptable nodes. If false, indicates that the pool contains only dedicated nodes.
+        /// </summary>
+        bool IsPreemptable { get; }
+
+        /// <summary>
+        /// Provides the <see cref="PoolInformation"/> for the pool.
+        /// </summary>
+        PoolInformation Pool { get; }
+
+        /// <summary>
+        /// Indicates that the pool is not scheduled to run tasks nor running tasks.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        ValueTask<bool> CanBeDeleted(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Removes and returns the next available resize error.
+        /// </summary>
+        /// <returns>The first <see cref="ResizeError"/> in the list, or null if the list is empty.</returns>
+        ResizeError PopNextResizeError();
+
+        /// <summary>
+        /// Removes and returns the next available start task failure.
+        /// </summary>
+        /// <returns>The first <see cref="TaskFailureInformation"/> in the list, or null if the list is empty.</returns>
+        TaskFailureInformation PopNextStartTaskFailure();
+
+        /// <summary>
+        /// Updates this instance based on changes to its environment.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <remarks>Calls each internal servicing method in order. Throws all exceptions gathered from all methods.</remarks>
+        ValueTask ServicePoolAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Service methods dispatcher.
+        /// </summary>
+        /// <param name="serviceKind">The type of <see cref="ServiceKind"/> service call.</param>
+        /// <param name="cancellationToken"></param>
+        ValueTask ServicePoolAsync(ServiceKind serviceKind, CancellationToken cancellationToken = default);
     }
 }
