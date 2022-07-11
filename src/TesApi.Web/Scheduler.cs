@@ -124,6 +124,7 @@ namespace TesApi.Web
                         || t.State == TesState.INITIALIZINGEnum
                         || t.State == TesState.RUNNINGEnum
                         || (t.State == TesState.CANCELEDEnum && t.IsCancelRequested)))
+                .OrderBy(t => t.CreationTime)
                 .ToList();
 
             if (0 == tesTasks.Count)
