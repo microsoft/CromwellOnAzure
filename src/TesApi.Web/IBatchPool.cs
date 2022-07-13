@@ -41,11 +41,6 @@ namespace TesApi.Web
             /// Stages rotating or retiring this <see cref="CloudPool"/> if needed.
             /// </summary>
             Rotate,
-
-            /// <summary>
-            /// Save the pool as update
-            /// </summary>
-            Update,
         }
 
         /// <summary>

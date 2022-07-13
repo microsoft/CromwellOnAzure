@@ -64,13 +64,12 @@ namespace TesApi.Web
         /// Retrieves <see cref="BatchPool"/> instances.
         /// </summary>
         /// <param name="pool"></param>
-        /// <param name="changed"></param>
         /// <param name="batchScheduler"></param>
         /// <returns></returns>
-        public IBatchPool Retrieve(CloudPool pool, DateTime changed, IBatchScheduler batchScheduler)
-            => (IBatchPool)_batchPoolRequester(_serviceProvider, new object[] { pool, changed, batchScheduler });
+        public IBatchPool Retrieve(CloudPool pool, IBatchScheduler batchScheduler)
+            => (IBatchPool)_batchPoolRequester(_serviceProvider, new object[] { pool, batchScheduler });
 
         private static ObjectFactory BatchPoolRequesterFactory()
-            => ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(CloudPool), typeof(DateTime), typeof(IBatchScheduler) });
+            => ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(CloudPool), typeof(IBatchScheduler) });
     }
 }

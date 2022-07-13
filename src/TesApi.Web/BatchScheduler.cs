@@ -233,10 +233,9 @@ namespace TesApi.Web
 
         private async Task LoadExistingPools(CancellationToken cancellationToken = default)
         {
-            var changed = DateTime.UtcNow;
             foreach (var cloudPool in await azureProxy.GetActivePoolsAsync(this.hostname, cancellationToken))
             {
-                batchPools.Add(_batchPoolFactory.Retrieve(cloudPool, changed, this));
+                batchPools.Add(_batchPoolFactory.Retrieve(cloudPool, this));
             }
         }
 
@@ -307,19 +306,23 @@ namespace TesApi.Web
 
             // Generate hash of everything that differentiates this group of pools
             var displayName = $"{vmName}:{vmSize}:{isPreemptable}:{registryServer}:{identityResourceId}";
-            var hash = ConvertToBase32(SHA1.HashData(Encoding.UTF8.GetBytes(displayName))).TrimEnd('='); // 32 chars
+            var hash = ConvertToBase32(SHA1.HashData(Encoding.UTF8.GetBytes(displayName))).TrimEnd('='); // This becomes 32 chars
 
+            // Build a PoolName that is of legal length, while exposing the most important metadata without requiring user to find DisplayName
             // Note that the hash covers all necessary parts to make name unique, so limiting the size of the other parts is not expected to appreciably change the risk of collisions. Those other parts are for convenience
             var remainingLength = PoolKeyLength - hash.Length - 2; // 50 is max name length, 2 is number of inserted chars. This will always be 16 if we use an entire SHA1
-            var dVmSize = LimitVmSize(vmSize, Math.Max(remainingLength - vmName.Length, 6));
-            var dVmName = vmName[0..Math.Min(vmName.Length, remainingLength - dVmSize.Length)];
-            var name = LimitChars($"{dVmName}-{dVmSize}-{hash}");
+            var visibleVmSize = LimitVmSize(vmSize, Math.Max(remainingLength - vmName.Length, 6));
+            var visibleHostName = vmName[0..Math.Min(vmName.Length, remainingLength - visibleVmSize.Length)];
+            var name = LimitChars($"{visibleHostName}-{visibleVmSize}-{hash}");
 
+            // Trim DisplayName if needed
             if (displayName.Length > 1024)
             {
+                // Remove "path" of identityResourceId
                 displayName = displayName[..^identityResourceId.Length] + identityResourceId[(identityResourceId.LastIndexOf('/') + 1)..];
                 if (displayName.Length > 1024)
                 {
+                    // Trim end, leaving fake elipsys as marker
                     displayName = displayName[..1021] + "...";
                 }
             }
@@ -328,6 +331,7 @@ namespace TesApi.Web
 
             static string LimitVmSize(string vmSize, int limit)
             {
+                // First try optimizing by removing "Standard_" prefix.
                 var standard = "Standard_";
                 return vmSize.Length <= limit
                     ? vmSize
@@ -410,7 +414,7 @@ namespace TesApi.Web
                 }
                 else
                 {
-                    poolInformation = (await GetOrAddAsync(poolName, virtualMachineInfo.LowPriority, id => ConvertPoolSpecificationToModelsPool(
+                    poolInformation = (await GetOrAddPoolAsync(poolName, virtualMachineInfo.LowPriority, id => ConvertPoolSpecificationToModelsPool(
                         name: id,
                         displayName: displayName,
                         GetBatchPoolIdentity(tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default),
@@ -421,7 +425,7 @@ namespace TesApi.Web
                             containerConfiguration)))).Pool;
                 }
 
-                tesTask.PoolId = poolInformation.PoolId ?? "<autopool>";
+                tesTask.PoolId = poolInformation.PoolId;
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, containerConfiguration is not null);
 
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
@@ -534,7 +538,7 @@ namespace TesApi.Web
                 }
                 else
                 {
-                    if (TryGet(azureBatchJobAndTaskState.PoolId, out var pool))
+                    if (TryGetPool(azureBatchJobAndTaskState.PoolId, out var pool))
                     {
                         azureBatchJobAndTaskState.NodeAllocationFailed = pool.PopNextResizeError() is not null;
                         ProcessStartTaskFailure(pool.PopNextStartTaskFailure());
@@ -1564,7 +1568,7 @@ namespace TesApi.Web
         #region BatchPools
         private readonly BatchPools batchPools = new();
 
-        internal bool TryGet(string poolId, out IBatchPool batchPool)
+        internal bool TryGetPool(string poolId, out IBatchPool batchPool)
         {
             batchPool = batchPools.FirstOrDefault(p => p.Pool.PoolId.Equals(poolId, StringComparison.Ordinal));
             return batchPool is not null;
@@ -1573,7 +1577,7 @@ namespace TesApi.Web
         internal bool IsPoolAvailable(string key)
             => batchPools.TryGetValue(key, out var pools) && pools.Any(p => p.IsAvailable);
 
-        internal async Task<IBatchPool> GetOrAddAsync(string key, bool isPreemptable, Func<string, BatchModels.Pool> modelPoolFactory)
+        internal async Task<IBatchPool> GetOrAddPoolAsync(string key, bool isPreemptable, Func<string, BatchModels.Pool> modelPoolFactory)
         {
             if (enableBatchAutopool)
             {
@@ -1670,10 +1674,10 @@ namespace TesApi.Web
         private class BatchPoolEqualityComparer : IEqualityComparer<IBatchPool>
         {
             bool IEqualityComparer<IBatchPool>.Equals(IBatchPool x, IBatchPool y)
-                => x.Pool.PoolId.Equals(y.Pool.PoolId);
+                => x.Pool.PoolId?.Equals(y.Pool.PoolId) ?? false;
 
             int IEqualityComparer<IBatchPool>.GetHashCode(IBatchPool obj)
-                => obj.Pool.PoolId.GetHashCode();
+                => obj.Pool.PoolId?.GetHashCode() ?? 0;
         }
 
         #region Used for unit/module testing
