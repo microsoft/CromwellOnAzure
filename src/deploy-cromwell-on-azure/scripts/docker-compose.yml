@@ -36,7 +36,6 @@ services:
       - MarthaKeyVaultName=$MarthaKeyVaultName
       - MarthaSecretName=$MarthaSecretName
       - BatchPoolIdleNodeMinutes=$BatchPoolIdleNodeMinutes
-      - BatchPoolIdlePoolDays=$BatchPoolIdlePoolDays
       - BatchPoolRotationForcedDays=$BatchPoolRotationForcedDays
       - HOSTNAME=$HOSTNAME
       - PostgreSqlServerName=$PostgreSqlServerName

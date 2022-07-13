@@ -212,19 +212,6 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
-        public async Task RotateMarksPoolUnavailableWhenIdleForIdlePeriod()
-        {
-            var services = GetServiceProvider();
-            var pool = await AddPool(services.GetT(), false);
-
-            TimeShift(((BatchPool)pool).TestIdlePoolTime, pool);
-            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Rotate);
-
-            Assert.IsFalse(pool.IsAvailable);
-            Assert.AreEqual(0, ((BatchPool)pool).TestTargetDedicated + ((BatchPool)pool).TestTargetLowPriority);
-        }
-
-        [TestMethod]
         public async Task RotateMarksPoolUnavailableWhenRotateIntervalHasPassed()
         {
             var azureProxy = AzureProxyReturnValues.Get();
@@ -295,7 +282,7 @@ namespace TesApi.Tests
             => new(wrapAzureProxy: true, configuration: GetMockConfig(), azureProxy: PrepareMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Get()), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
         private static async Task<IBatchPool> AddPool(BatchScheduler batchPools, bool isPreemtable)
-            => await batchPools.GetOrAddAsync("key1", isPreemtable, id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
+            => await batchPools.GetOrAddPoolAsync("key1", isPreemtable, id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
 
         private static void TimeShift(TimeSpan shift, IBatchPool pool)
             => ((BatchPool)pool).TimeShift(shift);

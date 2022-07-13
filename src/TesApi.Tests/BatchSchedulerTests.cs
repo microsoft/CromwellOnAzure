@@ -40,10 +40,10 @@ namespace TesApi.Tests
             Assert.IsTrue(batchScheduler.RemovePoolFromList(pool));
             Assert.AreEqual(0, batchScheduler.GetPoolGroupKeys().Count());
 
-            pool = await batchScheduler.GetOrAddAsync(key, false, id => new Pool(name: id));
+            pool = await batchScheduler.GetOrAddPoolAsync(key, false, id => new Pool(name: id));
 
             Assert.AreEqual(1, batchScheduler.GetPoolGroupKeys().Count());
-            Assert.IsTrue(batchScheduler.TryGet(pool.Pool.PoolId, out var pool1));
+            Assert.IsTrue(batchScheduler.TryGetPool(pool.Pool.PoolId, out var pool1));
             Assert.AreSame(pool, pool1);
         }
 
@@ -59,8 +59,8 @@ namespace TesApi.Tests
             var count = batchScheduler.GetPools().Count();
             serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>(), It.IsAny<bool>()), Times.Once);
 
-            var pool = await batchScheduler.GetOrAddAsync(key, false, id => new Pool(name: id));
-            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
+            var pool = await batchScheduler.GetOrAddPoolAsync(key, false, id => new Pool(name: id));
+            await pool.ServicePoolAsync();
 
             Assert.AreEqual(batchScheduler.GetPools().Count(), count);
             Assert.AreEqual(batchScheduler.GetPoolGroupKeys().Count(), keyCount);
@@ -77,13 +77,13 @@ namespace TesApi.Tests
             var batchScheduler = serviceProvider.GetT();
             var info = await AddPool(batchScheduler);
             ((BatchPool)info).TestSetAvailable(false);
-            await info.ServicePoolAsync(IBatchPool.ServiceKind.Update);
+            //await info.ServicePoolAsync(IBatchPool.ServiceKind.Update);
             var keyCount = batchScheduler.GetPoolGroupKeys().Count();
             var key = batchScheduler.GetPoolGroupKeys().First();
             var count = batchScheduler.GetPools().Count();
 
-            var pool = await batchScheduler.GetOrAddAsync(key, false, id => new Pool(name: id));
-            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
+            var pool = await batchScheduler.GetOrAddPoolAsync(key, false, id => new Pool(name: id));
+            await pool.ServicePoolAsync();
 
             Assert.AreNotEqual(batchScheduler.GetPools().Count(), count);
             Assert.AreEqual(batchScheduler.GetPoolGroupKeys().Count(), keyCount);
@@ -100,7 +100,7 @@ namespace TesApi.Tests
             var batchScheduler = serviceProvider.GetT();
             var info = await AddPool(batchScheduler);
 
-            var result = batchScheduler.TryGet(info.Pool.PoolId, out var pool);
+            var result = batchScheduler.TryGetPool(info.Pool.PoolId, out var pool);
 
             Assert.IsTrue(result);
             //Assert.AreSame(infoPoolId, pool);
@@ -115,7 +115,7 @@ namespace TesApi.Tests
             var batchScheduler = serviceProvider.GetT();
             _ = await AddPool(batchScheduler);
 
-            var result = batchScheduler.TryGet("key2", out _);
+            var result = batchScheduler.TryGetPool("key2", out _);
 
             Assert.IsFalse(result);
         }
@@ -129,7 +129,7 @@ namespace TesApi.Tests
             var pool = await AddPool(batchScheduler);
             ((BatchPool)pool).TestSetAvailable(false);
 
-            var result = batchScheduler.TryGet("key1", out _);
+            var result = batchScheduler.TryGetPool("key1", out _);
 
             Assert.IsFalse(result);
         }
@@ -141,7 +141,7 @@ namespace TesApi.Tests
             using var serviceProvider = GetServiceProvider();
             var batchScheduler = serviceProvider.GetT();
 
-            var result = batchScheduler.TryGet(null, out _);
+            var result = batchScheduler.TryGetPool(null, out _);
 
             Assert.IsFalse(result);
             return Task.CompletedTask;
@@ -160,7 +160,6 @@ namespace TesApi.Tests
             var pool = await AddPool(batchScheduler);
             Assert.IsTrue(batchScheduler.IsPoolAvailable("key1"));
             ((BatchPool)pool).TestSetAvailable(false);
-            await pool.ServicePoolAsync(IBatchPool.ServiceKind.Update);
             Assert.IsFalse(batchScheduler.IsPoolAvailable("key1"));
             Assert.IsTrue(batchScheduler.GetPools().Any());
 
@@ -390,7 +389,7 @@ namespace TesApi.Tests
             Assert.IsNotNull(poolInformation.PoolId);
             Assert.AreEqual("hostname-dicated1-NMVHRFXS7KOVIGMDN4OYUDQAJP3WEVIN-", poolInformation.PoolId[0..^13]);
             Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
-            Assert.IsTrue(batchScheduler.TryGet(poolInformation.PoolId, out _));
+            Assert.IsTrue(batchScheduler.TryGetPool(poolInformation.PoolId, out _));
             Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
         }
 
@@ -1264,7 +1263,7 @@ namespace TesApi.Tests
             => new(wrapAzureProxy: true, configuration: GetMockConfig()(), azureProxy: GetMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Defaults), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
         private static async Task<IBatchPool> AddPool(BatchScheduler batchPools)
-            => await batchPools.GetOrAddAsync("key1", false, id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
+            => await batchPools.GetOrAddPoolAsync("key1", false, id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
 
         private struct BatchJobAndTaskStates
         {
