@@ -465,7 +465,7 @@ namespace CromwellOnAzureDeployer
                                     aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
                                 kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
-                                await kubernetesManager.DeployCoAServicesToCluster(kubernetesClient, resourceGroup, settings, storageAccount);
+                                await kubernetesManager.DeployHelmChartToCluster(kubernetesClient, resourceGroup, settings, storageAccount);
                                 await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
                                 await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
                             });

@@ -20,6 +20,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.ComponentModel;
 
 namespace CromwellOnAzureDeployer
 {
@@ -163,6 +164,68 @@ namespace CromwellOnAzureDeployer
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
             var k8sConfig = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
             return new Kubernetes(k8sConfig);
+        }
+
+        public async Task DeployHelmChartToCluster(IKubernetes client, IResource resourceGroupObject, Dictionary<string, string> settings, IStorageAccount storageAccount)
+        {
+            UpdateHelmValues(storageAccount.Name, resourceGroupObject.Name, settings["azureServicesAuthConnectionString"], settings["applicationInsightsAccountName"], settings["cosmosDbAccountName"], settings["batchAccountName"], settings["batchNodesSubnetId"]);
+            DeployBlobCSIDriverHelmChart();
+
+            try
+            {
+                Process p = new Process();
+                p.StartInfo.UseShellExecute = false;
+                p.StartInfo.RedirectStandardOutput = true;
+                p.StartInfo.FileName = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
+                p.StartInfo.Arguments = "install --generate-name ./scripts/helm --kubeconfig kubeconfig.txt";
+                p.Start();
+                string output = p.StandardOutput.ReadToEnd();
+                ConsoleEx.WriteLine(output);
+                p.WaitForExit();
+            }
+            catch (Exception e)
+            {
+                ConsoleEx.WriteLine(e.Message);
+            }
+        }
+
+        private void UpdateHelmValues(string storageAccountName, string resourceGroupName, string azureServiceAuthString, string appInsightsName, string cosmosDbName, string batchAccountName, string batchNodesSubnetId)
+        {
+            var values = Yaml.LoadFromString<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
+            values.Persistence["storageAccount"] = storageAccountName;
+            values.Config["resourceGroup"] = resourceGroupName;
+            values.Config["azureServicesAuthConnectionString"] = azureServiceAuthString;
+            values.Config["applicationInsightsAccountName"] = appInsightsName;
+            values.Config["cosmosDbAccountName"] = cosmosDbName;
+            values.Config["batchAccountName"] = batchAccountName;
+            values.Config["batchNodesSubnetId"] = batchNodesSubnetId;
+
+            var writer = new StreamWriter(Path.Join("scripts", "helm", "values.yaml"));
+            writer.Write(Yaml.SaveToString(values));
+            writer.Close();
+        }
+
+        private void DeployBlobCSIDriverHelmChart()
+        {
+            Process p = new Process();
+            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.FileName = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
+            p.StartInfo.Arguments = "repo add blob-csi-driver https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
+            p.Start();
+            string output = p.StandardOutput.ReadToEnd();
+            ConsoleEx.WriteLine(output);
+            p.WaitForExit();
+
+            p = new Process();
+            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.FileName = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
+            p.StartInfo.Arguments = "install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version v1.15.0";
+            p.Start();
+            output = p.StandardOutput.ReadToEnd();
+            ConsoleEx.WriteLine(output);
+            p.WaitForExit();
         }
 
         public async Task DeployCoAServicesToCluster(IKubernetes client, IResource resourceGroupObject, Dictionary<string, string> settings, IStorageAccount storageAccount)
@@ -738,6 +801,16 @@ namespace CromwellOnAzureDeployer
                     return HashCode.Combine(StorageAccount.GetHashCode(), ContainerName.GetHashCode(), SasToken.GetHashCode());
                 }
             }
+        }
+
+        private class HelmValues
+        {
+            public Dictionary<string, string> Service { get; set; }
+            public Dictionary<string, string> Config { get; set; }
+            public Dictionary<string, string> Images { get; set; }
+            public Dictionary<string, string> Containers { get; set; }
+            public Dictionary<string, string> Persistence { get; set; }
+            public Dictionary<string, string> Db { get; set; }
         }
     }
 }

@@ -1,0 +1,4 @@
+name: cromwell-on-azure
+description: A cromwell deployment designed to run on Azure with MySQL. 
+version: 0.0.1
+apiVersion: v1

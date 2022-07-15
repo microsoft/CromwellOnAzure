@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: cromwell
+  name: cromwell
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: cromwell
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: cromwell
+    spec:
+      containers:
+        - args:
+            -  java -Djava.io.tmpdir=/cromwell-tmp/ -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server
+          command:
+            - /bin/sh
+            - -c
+          image: {{ .Values.images.cromwell }}
+          name: cromwell
+          stdin: true
+          tty: true
+          ports:
+            - containerPort: {{ .Values.service.cromwellPort }}
+          resources: {}
+          volumeMounts:
+            - mountPath: /cromwell-tmp
+              name: cromwell-tmp-claim
+            - mountPath: /configuration
+              name: configuration-claim1
+            - mountPath: /cromwell-executions
+              name: cromwell-executions-claim1
+            - mountPath: /cromwell-workflow-logs
+              name: cromwell-workflow-logs-claim1
+            - mountPath: /workflows
+              name: workflows-claim1
+            - mountPath: /inputs
+              name: inputs-claim1
+            - mountPath: /outputs
+              name: outputs-claim1
+      restartPolicy: Always
+      volumes:
+        - name: cromwell-tmp-claim
+          persistentVolumeClaim:
+            claimName: cromwell-tmp-claim
+        - name: configuration-claim1
+          persistentVolumeClaim:
+            claimName: configuration-claim1
+        - name: cromwell-executions-claim1
+          persistentVolumeClaim:
+            claimName: cromwell-executions-claim1
+        - name: cromwell-workflow-logs-claim1
+          persistentVolumeClaim:
+            claimName: cromwell-workflow-logs-claim1
+        - name: workflows-claim1
+          persistentVolumeClaim:
+            claimName: workflows-claim1
+        - name: inputs-claim1
+          persistentVolumeClaim:
+            claimName: inputs-claim1
+        - name: outputs-claim1
+          persistentVolumeClaim:
+            claimName: outputs-claim1
+status: {}

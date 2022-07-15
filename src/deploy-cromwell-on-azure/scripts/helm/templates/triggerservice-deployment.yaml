@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: triggerservice
+  name: triggerservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: triggerservice
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        io.kompose.service: triggerservice
+    spec:
+      containers:
+        - env:
+            - name: DefaultStorageAccountName
+              value: {{ .Values.persistence.storageAccount }}
+            - name: AzureServicesAuthConnectionString
+              value: {{ .Values.config.azureServicesAuthConnectionString }}
+            - name: ApplicationInsightsAccountName
+              value: {{ .Values.config.applicationInsightsAccountName }}
+            - name: CosmosDbAccountName
+              value: {{ .Values.config.cosmosDbAccountName }}
+          image: {{ .Values.images.triggerservice }}
+          name: triggerservice
+          resources: {}
+      restartPolicy: Always
+status: {}

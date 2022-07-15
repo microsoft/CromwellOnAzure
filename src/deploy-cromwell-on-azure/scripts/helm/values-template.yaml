@@ -1,0 +1,43 @@
+﻿service:
+  tesPort: 80
+  cromwellPort: 8000
+
+config:
+  resourceGroup: RUNTIME_PARAMETER
+  azureServicesAuthConnectionString: RUNTIME_PARAMETER
+  applicationInsightsAccountName: RUNTIME_PARAMETER
+  cosmosDbAccountName: RUNTIME_PARAMETER
+  azureOfferDurableId: MS-AZR-0003p
+  batchAccountName: RUNTIME_PARAMETER
+  batchNodesSubnetId: RUNTIME_PARAMETER
+  blobxferImageName: ""
+  disableBatchNodesPublicIpAddress: false
+  disableBatchScheduling: false
+  dockerInDockerImageName: ""
+  usePreemptibleVmsOnly: false
+
+images:
+  mysql: mysql:latest
+  cromwell: broadinstitute/cromwell:70
+  tes: mcr.microsoft.com/cromwellonazure/tes:2
+  triggerservice: mcr.microsoft.com/cromwellonazure/triggerservice:2
+
+containers:
+  - configuration
+  - cromwell-executions
+  - cromwell-workflow-logs
+  - inputs
+  - outputs
+  - workflows
+
+persistence:
+  blobPvcSize: 10Gi
+  cromwellTmpSize: 32Gi
+  mysqlSize: 32Gi
+  storageAccount: RUNTIME_PARAMETER
+
+db:
+  name: cromwell_db
+  port: 3306
+  user: cromwell
+  password: cromwell

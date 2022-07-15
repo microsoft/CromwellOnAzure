@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: tes
+  name: tes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: tes
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: tes
+    spec:
+      containers:
+        - env:
+            - name: DefaultStorageAccountName
+              value: {{ .Values.persistence.storageAccount }}
+            - name: AzureServicesAuthConnectionString
+              value: {{ .Values.config.azureServicesAuthConnectionString }}
+            - name: ApplicationInsightsAccountName
+              value: {{ .Values.config.applicationInsightsAccountName }}
+            - name: CosmosDbAccountName
+              value: {{ .Values.config.cosmosDbAccountName }}
+            - name: AzureOfferDurableId
+              value: {{ .Values.config.azureOfferDurableId }}
+            - name: BatchAccountName
+              value: {{ .Values.config.batchAccountName }}
+            - name: BatchNodesSubnetId
+              value: {{ .Values.config.batchNodesSubnetId }}
+            - name: BlobxferImageName
+              value: {{ .Values.config.blobxferImageName }}
+            - name: DisableBatchNodesPublicIpAddress
+              value: {{ .Values.config.disableBatchNodesPublicIpAddress | quote }}
+            - name: DisableBatchScheduling
+              value: {{ .Values.config.disableBatchScheduling | quote }}
+            - name: DockerInDockerImageName
+              value: {{ .Values.config.dockerInDockerImageName }}
+            - name: UsePreemptibleVmsOnly
+              value: {{ .Values.config.usePreemptibleVmsOnly | quote}}
+          image: {{ .Values.images.tes }}
+          name: tes
+          ports:
+            - containerPort: {{ .Values.service.tesPort }}
+          resources: {}
+          volumeMounts:
+            - mountPath: /outputs
+              name: outputs-claim1
+      restartPolicy: Always
+      volumes:
+        - name: outputs-claim1
+          persistentVolumeClaim:
+            claimName: outputs-claim1
+status: {}

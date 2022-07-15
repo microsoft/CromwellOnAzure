@@ -1,0 +1,59 @@
+﻿apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: cromwell-tmp-claim
+  name: cromwell-tmp-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.cromwellTmpSize }}
+status: {}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: mysqldb-data-claim
+  name: mysqldb-data-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.mysqlSize }}
+status: {}
+---
+{{- $rg  := .Values.config.resourceGroup -}}
+{{- $storageAccount  := .Values.persistence.storageAccount -}}
+{{- $size  := .Values.persistence.blobPvcSize -}}
+{{- range .Values.containers }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: blob-{{ . }}
+provisioner: blob.csi.azure.com
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  resourceGroup: {{ $rg }}
+  storageAccount: {{ $storageAccount }}
+  containerName: {{ . }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ . }}-claim1
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ $size }}
+  storageClassName: blob-{{ . }}
+---
+{{- end }}

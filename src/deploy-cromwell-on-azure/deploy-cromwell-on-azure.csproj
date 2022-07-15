@@ -18,6 +18,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="scripts\helm\Chart.yaml" />
+    <None Remove="scripts\helm\README.md" />
+    <None Remove="scripts\helm\templates\cromwell-deployment.yaml" />
+    <None Remove="scripts\helm\templates\mysqldb-deployment.yaml" />
+    <None Remove="scripts\helm\templates\persistence.yaml" />
+    <None Remove="scripts\helm\templates\service.yaml" />
+    <None Remove="scripts\helm\templates\tes-deployment.yaml" />
+    <None Remove="scripts\helm\templates\triggerservice-deployment.yaml" />
+    <None Remove="scripts\helm\values-template.yaml" />
     <None Remove="scripts\k8s\cromwell-deployment.yaml" />
     <None Remove="scripts\k8s\cromwell-service.yaml" />
     <None Remove="scripts\k8s\cromwell-tmp-claim.yaml" />
@@ -92,6 +101,33 @@
     <EmbeddedResource Include="scripts\env-04-settings.txt" />
     <EmbeddedResource Include="scripts\env-12-local-my-sql-db.txt" />
     <EmbeddedResource Include="scripts\env-13-postgre-sql-db.txt" />
+    <EmbeddedResource Include="scripts\helm\Chart.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\README.md">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\cromwell-deployment.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\mysqldb-deployment.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\persistence.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\service.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\tes-deployment.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\triggerservice-deployment.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\values-template.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
     <EmbeddedResource Include="scripts\install-cromwellazure.sh" />
     <EmbeddedResource Include="scripts\k8s\cromwell-deployment.yaml" />
     <EmbeddedResource Include="scripts\k8s\cromwell-service.yaml" />
