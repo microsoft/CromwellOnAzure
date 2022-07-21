@@ -1196,8 +1196,8 @@ namespace TesApi.Web
             {
                 poolSpecification.AutoScaleEnabled = true;
                 poolSpecification.AutoScaleEvaluationInterval = TimeSpan.FromMinutes(5);
-                var dedicated = preemptable ? "0" : "$ActiveTasks";
-                poolSpecification.AutoScaleFormula = $"TargetDedicated={dedicated};\r\nNodeDeallocationOption=requeue;";
+                var target = preemptable ? "$TargetLowPriorityNodes" : "$TargetDedicated";
+                poolSpecification.AutoScaleFormula = $"{target}=max($PendingTasks.GetSample(90 * TimeInterval_Second, 10));\r\n$NodeDeallocationOption=requeue;";
             }
             else
             {
@@ -1232,19 +1232,12 @@ namespace TesApi.Web
             ValidateString(name, nameof(name), 64);
             ValidateString(displayName, nameof(displayName), 1024);
 
+            var scaleSettings = true == pool.AutoScaleEnabled ? ConvertAutoScale() : ConvertManualScale();
+
             return new(name: name, displayName: displayName, identity: poolIdentity)
             {
                 VmSize = pool.VirtualMachineSize,
-                ScaleSettings = new()
-                {
-                    FixedScale = new()
-                    {
-                        TargetDedicatedNodes = pool.TargetDedicatedComputeNodes,
-                        TargetLowPriorityNodes = pool.TargetLowPriorityComputeNodes,
-                        ResizeTimeout = pool.ResizeTimeout,
-                        NodeDeallocationOption = BatchModels.ComputeNodeDeallocationOption.TaskCompletion
-                    }
-                },
+                ScaleSettings = scaleSettings,
                 DeploymentConfiguration = new()
                 {
                     VirtualMachineConfiguration = new(ConvertImageReference(pool.VirtualMachineConfiguration.ImageReference), pool.VirtualMachineConfiguration.NodeAgentSkuId, containerConfiguration: ConvertContainerConfiguration(pool.VirtualMachineConfiguration.ContainerConfiguration))
@@ -1253,6 +1246,28 @@ namespace TesApi.Web
                 NetworkConfiguration = ConvertNetworkConfiguration(pool.NetworkConfiguration),
                 StartTask = ConvertStartTask(pool.StartTask)
             };
+
+            BatchModels.ScaleSettings ConvertManualScale()
+                => new()
+                {
+                    FixedScale = new()
+                    {
+                        TargetDedicatedNodes = pool.TargetDedicatedComputeNodes,
+                        TargetLowPriorityNodes = pool.TargetLowPriorityComputeNodes,
+                        ResizeTimeout = pool.ResizeTimeout,
+                        NodeDeallocationOption = BatchModels.ComputeNodeDeallocationOption.TaskCompletion
+                    }
+                };
+
+            BatchModels.ScaleSettings ConvertAutoScale()
+                => new()
+                {
+                    AutoScale = new()
+                    {
+                        Formula = pool.AutoScaleFormula,
+                        EvaluationInterval = pool.AutoScaleEvaluationInterval
+                    }
+                };
 
             static void ValidateString(string value, string name, int length)
             {
