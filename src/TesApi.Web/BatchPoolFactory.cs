@@ -51,14 +51,13 @@ namespace TesApi.Web
         /// Creates <see cref="BatchPool"/> instances.
         /// </summary>
         /// <param name="poolInformation"></param>
-        /// <param name="isPreemptable"></param>
         /// <param name="batchScheduler"></param>
         /// <returns></returns>
-        public IBatchPool CreateNew(PoolInformation poolInformation, bool isPreemptable, IBatchScheduler batchScheduler)
-            => (IBatchPool)_batchPoolCreator(_serviceProvider, new object[] { poolInformation, isPreemptable, batchScheduler });
+        public IBatchPool CreateNew(PoolInformation poolInformation, IBatchScheduler batchScheduler)
+            => (IBatchPool)_batchPoolCreator(_serviceProvider, new object[] { poolInformation, batchScheduler });
 
         private static ObjectFactory BatchPoolCreatorFactory()
-            => ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(PoolInformation), typeof(bool), typeof(IBatchScheduler) });
+            => ActivatorUtilities.CreateFactory(typeof(BatchPool), new Type[] { typeof(PoolInformation), typeof(IBatchScheduler) });
 
         /// <summary>
         /// Retrieves <see cref="BatchPool"/> instances.

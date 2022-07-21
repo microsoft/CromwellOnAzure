@@ -25,9 +25,6 @@ namespace TesApi.Web
         /// </summary>
         public const string CloudPoolSelectClause = "id,creationTime,metadata";
 
-        internal const string PoolDataName = "CoA-TES-PoolData";
-
-        private readonly PoolData _poolData;
         private readonly ILogger _logger;
         private readonly IAzureProxy _azureProxy;
 
@@ -35,15 +32,13 @@ namespace TesApi.Web
         /// Constructor of <see cref="BatchPool"/> for new pools
         /// </summary>
         /// <param name="poolInformation"></param>
-        /// <param name="isPreemptable"></param>
         /// <param name="batchScheduler"></param>
         /// <param name="configuration"></param>
         /// <param name="azureProxy"></param>
         /// <param name="logger"></param>
         /// <exception cref="ArgumentException"></exception>
-        public BatchPool(PoolInformation poolInformation, bool isPreemptable, IBatchScheduler batchScheduler, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+        public BatchPool(PoolInformation poolInformation, IBatchScheduler batchScheduler, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
             : this(azureProxy.GetBatchPoolAsync(poolInformation.PoolId, new ODATADetailLevel { SelectClause = CloudPoolSelectClause }).Result,
-                new() { IsDedicated = !isPreemptable },
                 poolInformation,
                 batchScheduler,
                 configuration,
@@ -61,7 +56,6 @@ namespace TesApi.Web
         /// <param name="logger"></param>
         public BatchPool(CloudPool pool, IBatchScheduler batchScheduler, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
             : this(pool,
-                GetPoolData(pool),
                 new() { PoolId = pool.Id },
                 batchScheduler,
                 configuration,
@@ -79,8 +73,7 @@ namespace TesApi.Web
         /// <param name="logger"></param>
         /// <exception cref="ArgumentException"></exception>
         public BatchPool(string poolId, IBatchScheduler batchScheduler, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
-            : this(null,
-                null,
+            : this((CloudPool)default,
                 new() { PoolId = poolId },
                 batchScheduler,
                 configuration,
@@ -88,10 +81,9 @@ namespace TesApi.Web
                 logger)
         { }
 
-        private BatchPool(CloudPool cloudPool, PoolData data, PoolInformation poolInfo, IBatchScheduler batchScheduler, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
+        private BatchPool(CloudPool cloudPool, PoolInformation poolInfo, IBatchScheduler batchScheduler, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
         {
             Pool = poolInfo ?? throw new ArgumentNullException(nameof(poolInfo));
-            _poolData = data ?? new();
 
             _idleNodeCheck = TimeSpan.FromMinutes(GetConfigurationValue(configuration, "BatchPoolIdleNodeMinutes", 0.125));
             _forcePoolRotationAge = TimeSpan.FromDays(GetConfigurationValue(configuration, "BatchPoolRotationForcedDays", 30));
@@ -101,14 +93,7 @@ namespace TesApi.Web
             _batchPools = batchScheduler as BatchScheduler ?? throw new ArgumentException("batchScheduler must be of type BatchScheduler", nameof(batchScheduler));
 
             Creation = cloudPool?.CreationTime;
-            IsPreemptable = !_poolData.IsDedicated;
             IsAvailable = cloudPool is not null;
-
-            if (IsAvailable)
-            {
-                cloudPool.Metadata = SetPoolData(this, _poolData, cloudPool.Metadata).ToList();
-                azureProxy.CommitBatchPoolChangesAsync(cloudPool).Wait();
-            }
 
             // IConfiguration.GetValue<double>(string key, double defaultValue) throws an exception if the value is defined as blank
             static double GetConfigurationValue(IConfiguration configuration, string key, double defaultValue)
@@ -121,25 +106,6 @@ namespace TesApi.Web
         private Queue<TaskFailureInformation> StartTaskFailures { get; } = new();
         private Queue<ResizeError> ResizeErrors { get; } = new();
 
-        /// <summary>
-        /// Retrieve stored metadata from pool's metadata collection
-        /// </summary>
-        /// <param name="pool"></param>
-        /// <returns></returns>
-        private static PoolData GetPoolData(CloudPool pool)
-        {
-            var metadata = pool.Metadata.FirstOrDefault(t => PoolDataName.Equals(t.Name, StringComparison.Ordinal));
-            using var reader = metadata is null ? default : new StringReader(metadata.Value);
-            return BatchUtils.ReadJson<PoolData>(reader, () => default);
-        }
-
-        private static IEnumerable<MetadataItem> SetPoolData(BatchPool pool, PoolData data, IEnumerable<MetadataItem> metadataItems)
-        {
-            return Enumerable.Empty<MetadataItem>()
-                .Concat(metadataItems?.Where(t => !PoolDataName.Equals(t.Name, StringComparison.Ordinal)) ?? Enumerable.Empty<MetadataItem>())
-                .Append(new(PoolDataName, BatchUtils.WriteJson(data)));
-        }
-
         internal IAsyncEnumerable<CloudJob> GetJobsAsync()
             => _azureProxy.ListJobsAsync(new ODATADetailLevel { SelectClause = "id,stateTransitionTime", FilterClause = $"state eq 'active' and executionInfo/poolId eq '{Pool.PoolId}'" });
 
@@ -148,15 +114,6 @@ namespace TesApi.Web
             _logger.LogDebug("Removing {Nodes} nodes from {PoolId}", nodesToRemove.Count, Pool.PoolId);
             _resizeErrorsRetrieved = false;
             await _azureProxy.DeleteBatchComputeNodesAsync(Pool.PoolId, nodesToRemove, cancellationToken);
-        }
-
-        /// <summary>
-        /// Stateful data we need to survive reboots
-        /// </summary>
-        private class PoolData
-        {
-            [Newtonsoft.Json.JsonProperty("isDedicated")]
-            internal bool IsDedicated { get; set; }
         }
     }
 
@@ -195,59 +152,22 @@ namespace TesApi.Web
             }
         }
 
-        private async ValueTask ServicePoolResizeAsync(CancellationToken cancellationToken)
+        private async ValueTask ServicePoolRemoveNodeIfStartTaskFailedAsync(CancellationToken cancellationToken)
         {
-            var (allocationState, targetLowPri, targetDedicated) = await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken);
-            var currentTargetNodes = IsPreemptable ? targetLowPri ?? 0 : targetDedicated ?? 0;
-
-            if (allocationState == AllocationState.Steady)
-            {
-                var jobCount = (await GetJobsAsync().CountAsync(cancellationToken));
-
-                // This method never reduces the nodes target. ServicePoolRemoveNodeIfIdleAsync() removes nodes.
-                if (jobCount > currentTargetNodes)
-                {
-                    _nodesToRemove = default; // Since we are upsizing, cancel any idle node removals (they are actually needed).
-                    _logger.LogDebug("Resizing {PoolId} to contain at least {Nodes} nodes", Pool.PoolId, jobCount);
-                    _resizeErrorsRetrieved = false;
-                    await _azureProxy.SetComputeNodeTargetsAsync(
-                        Pool.PoolId,
-                        IsPreemptable ? jobCount : 0,
-                        IsPreemptable ? 0 : jobCount,
-                        cancellationToken);
-                }
-            }
-        }
-
-        private async ValueTask ServicePoolRemoveNodeIfIdleAsync(CancellationToken cancellationToken)
-        {
-            _nodesToRemove = default;
-
             if ((await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken)).AllocationState == AllocationState.Steady)
             {
                 var nodesToRemove = Enumerable.Empty<ComputeNode>();
-                var expiryTime = (DateTime.UtcNow - _idleNodeCheck).ToString("yyyy-MM-dd'T'HH:mm:ssZ", CultureInfo.InvariantCulture);
 
                 await foreach (var node in _azureProxy
                     .ListComputeNodesAsync(
                         Pool.PoolId,
                         new ODATADetailLevel(
-                            filterClause: $"state eq 'starttaskfailed' or (state eq 'idle' and stateTransitionTime le DateTime'{expiryTime}')",
-                            selectClause: "id,state,stateTransitionTime,startTaskInfo"))
+                            filterClause: $"state eq 'starttaskfailed'",
+                            selectClause: "id,startTaskInfo"))
                     .WithCancellation(cancellationToken))
                 {
-                    switch (node.State)
-                    {
-                        case ComputeNodeState.Idle:
-                            _logger.LogDebug("Found idle node {NodeId}", node.Id);
-                            break;
-                        case ComputeNodeState.StartTaskFailed:
-                            _logger.LogDebug("Found starttaskfailed node {NodeId}", node.Id);
-                            StartTaskFailures.Enqueue(node.StartTaskInformation.FailureInformation);
-                            break;
-                        default:
-                            throw new InvalidOperationException($"Unexpected compute node state found for node {node.Id}/{node.State} (should never happen).");
-                    }
+                    _logger.LogDebug("Found starttaskfailed node {NodeId}", node.Id);
+                    StartTaskFailures.Enqueue(node.StartTaskInformation.FailureInformation);
                     nodesToRemove = nodesToRemove.Append(node);
                     _resizeErrorsRetrieved = false;
                 }
@@ -255,8 +175,6 @@ namespace TesApi.Web
                 // It's documented that a max of 100 nodes can be removed at a time. Excess eligible nodes will be removed in a future call.
                 // Prioritize removing "start task failed" nodes, followed by longest waiting nodes.
                 var orderedNodes = nodesToRemove
-                    .OrderByDescending(n => n.State)
-                    .ThenBy(n => n.StateTransitionTime)
                     .Take(100)
                     .ToList();
 
@@ -264,11 +182,7 @@ namespace TesApi.Web
                 { // No work to do
                     return;
                 }
-                else if (!orderedNodes.Any(n => n.State == ComputeNodeState.StartTaskFailed))
-                { // No StartTaskFailed nodes. Defer all node removals (in case any idle nodes haven't been assigned yet)
-                    _nodesToRemove = orderedNodes;
-                    return;
-                }
+
                 // Even if there are both Idle nodes and StartTaskFailed nodes mixed together, remove them in one call. We can't scale the pool in either direction again anytime soon, and it's simply an egregious waste of money to defer removal of start task failed nodes.
 
                 await RemoveNodesAsync(orderedNodes, cancellationToken);
@@ -305,13 +219,9 @@ namespace TesApi.Web
     public sealed partial class BatchPool : IBatchPool
     {
         private readonly object _lockObj = new();
-        private IList<ComputeNode> _nodesToRemove;
 
         /// <inheritdoc/>
         public bool IsAvailable { get; private set; } = true;
-
-        /// <inheritdoc/>
-        public bool IsPreemptable { get; }
 
         /// <inheritdoc/>
         public PoolInformation Pool { get; }
@@ -357,9 +267,8 @@ namespace TesApi.Web
                 return serviceKind switch
                 {
                     IBatchPool.ServiceKind.GetResizeErrors => ServicePoolGetResizeErrorsAsync(cancellationToken),
-                    IBatchPool.ServiceKind.RemoveNodeIfIdle => ServicePoolRemoveNodeIfIdleAsync(cancellationToken),
+                    IBatchPool.ServiceKind.RemoveNodeIfStartTaskFailed => ServicePoolRemoveNodeIfStartTaskFailedAsync(cancellationToken),
                     IBatchPool.ServiceKind.RemovePoolIfEmpty => ServicePoolRemovePoolIfEmptyAsync(cancellationToken),
-                    IBatchPool.ServiceKind.Resize => ServicePoolResizeAsync(cancellationToken),
                     IBatchPool.ServiceKind.Rotate => ServicePoolRotateAsync(cancellationToken),
                     _ => throw new ArgumentOutOfRangeException(nameof(serviceKind)),
                 };
@@ -374,14 +283,7 @@ namespace TesApi.Web
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.GetResizeErrors, cancellationToken), cancellationToken);
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty, cancellationToken), cancellationToken);
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Rotate, cancellationToken), cancellationToken);
-            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfIdle, cancellationToken), cancellationToken);
-            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Resize, cancellationToken), cancellationToken);
-
-            if (_nodesToRemove is not null)
-            {
-                await RemoveNodesAsync(_nodesToRemove, cancellationToken);
-                _nodesToRemove = default;
-            }
+            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfStartTaskFailed, cancellationToken), cancellationToken);
 
             switch (exceptions.Count)
             {
@@ -437,15 +339,6 @@ namespace TesApi.Web
 
         internal void TestSetAvailable(bool available)
             => IsAvailable = available;
-
-        internal async ValueTask TestRemoveNodes()
-        {
-            if (_nodesToRemove is not null)
-            {
-                await RemoveNodesAsync(_nodesToRemove, default);
-                _nodesToRemove = default;
-            }
-        }
 
         internal void TimeShift(TimeSpan shift)
             => Creation -= shift;
