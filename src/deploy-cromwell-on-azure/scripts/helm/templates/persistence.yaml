@@ -31,7 +31,7 @@ status: {}
 {{- $rg  := .Values.config.resourceGroup -}}
 {{- $storageAccount  := .Values.persistence.storageAccount -}}
 {{- $size  := .Values.persistence.blobPvcSize -}}
-{{- range .Values.containers }}
+{{- range .Values.defaultContainers }}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -56,4 +56,82 @@ spec:
       storage: {{ $size }}
   storageClassName: blob-{{ . }}
 ---
+{{- end }}
+{{- range .Values.externalContainers }}
+apiVersion: v1
+data:
+  azurestorageaccountname: {{.accountName | b64enc}}
+  azurestorageaccountkey: {{.accountKey | b64enc}}
+kind: Secret
+metadata:
+  name: sa-secret-{{ .accountName }}-{{.containerName}}
+type: Opaque
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: blob-{{ .accountName }}-{{.containerName}}
+provisioner: blob.csi.azure.com
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  resourceGroup: {{ .resourceGroup }}
+  storageAccount: {{ .accountName }}
+  containerName: {{ .containerName }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .accountName }}-{{ .containerName }}-claim1
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ $size }}
+  storageClassName: blob-{{ .accountName }}-{{.containerName}}
+---
+{{- end }}
+{{- range .Values.externalSasContainers }}
+apiVersion: v1
+data:
+  azurestorageaccountname: {{.accountName | b64enc}}
+  azurestorageaccountsastoken: {{.sasToken | b64enc}}
+kind: Secret
+metadata:
+  name: sa-secret-{{ .accountName }}-{{ .containerName }}
+type: Opaque
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-blob-{{ .accountName }}-{{ .containerName }}
+spec:
+  capacity:
+    storage: {{ $size }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: blob.csi.azure.com
+    readOnly: false
+    volumeHandle: {{ uuidv4 }}
+    volumeAttributes:
+      containerName: {{ .containerName }}
+    nodeStageSecretRef:
+      name: sa-secret-{{ .accountName }}-{{.containerName}}
+      namespace: coa
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ .accountName }}-{{ .containerName }}-claim1
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ $size }}
+  volumeName: pv-blob-{{ .accountName }}-{{ .containerName }}
+  storageClassName: ""
 {{- end }}

@@ -168,7 +168,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task DeployHelmChartToCluster(IKubernetes client, IResource resourceGroupObject, Dictionary<string, string> settings, IStorageAccount storageAccount)
         {
-            UpdateHelmValues(storageAccount.Name, resourceGroupObject.Name, settings["azureServicesAuthConnectionString"], settings["applicationInsightsAccountName"], settings["cosmosDbAccountName"], settings["batchAccountName"], settings["batchNodesSubnetId"]);
+            UpdateHelmValues(storageAccount.Name, resourceGroupObject.Name, settings["AzureServicesAuthConnectionString"], settings["ApplicationInsightsAccountName"], settings["CosmosDbAccountName"], settings["BatchAccountName"], settings["BatchNodesSubnetId"]);
             DeployBlobCSIDriverHelmChart();
 
             try
@@ -176,8 +176,8 @@ namespace CromwellOnAzureDeployer
                 Process p = new Process();
                 p.StartInfo.UseShellExecute = false;
                 p.StartInfo.RedirectStandardOutput = true;
-                p.StartInfo.FileName = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
-                p.StartInfo.Arguments = "install --generate-name ./scripts/helm --kubeconfig kubeconfig.txt";
+                p.StartInfo.FileName = configuration.HelmExePath;
+                p.StartInfo.Arguments = $"install --generate-name ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace";
                 p.Start();
                 string output = p.StandardOutput.ReadToEnd();
                 ConsoleEx.WriteLine(output);
@@ -186,6 +186,15 @@ namespace CromwellOnAzureDeployer
             catch (Exception e)
             {
                 ConsoleEx.WriteLine(e.Message);
+            }
+
+            if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+            {
+                var commands = new List<string[]>
+                {
+                    new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" },
+                };
+                await ExecuteCommandsOnPod(client, "mysqldb", commands, TimeSpan.FromMinutes(6));
             }
         }
 
@@ -210,7 +219,7 @@ namespace CromwellOnAzureDeployer
             Process p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.FileName = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
+            p.StartInfo.FileName = configuration.HelmExePath;
             p.StartInfo.Arguments = "repo add blob-csi-driver https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
             p.Start();
             string output = p.StandardOutput.ReadToEnd();
@@ -220,8 +229,8 @@ namespace CromwellOnAzureDeployer
             p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.FileName = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
-            p.StartInfo.Arguments = "install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version v1.15.0";
+            p.StartInfo.FileName = configuration.HelmExePath;
+            p.StartInfo.Arguments = "install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version v1.15.0 --kubeconfig kubeconfig.txt";
             p.Start();
             output = p.StandardOutput.ReadToEnd();
             ConsoleEx.WriteLine(output);
@@ -314,11 +323,11 @@ namespace CromwellOnAzureDeployer
                 throw new Exception($"Timed out waiting for {podName} to start.");
             }
             // For some reason even if a pod says it ready, calls made immediately will fail. Wait for 20 seconds for safety. 
-            await Task.Delay(TimeSpan.FromSeconds(20));
+            await Task.Delay(TimeSpan.FromSeconds(40));
 
             foreach (var command in commands)
             {
-                await client.NamespacedPodExecAsync(workloadPod.Metadata.Name, configuration.AksCoANamespace, podName, command, true, silentHandler, CancellationToken.None);
+                await client.NamespacedPodExecAsync(workloadPod.Metadata.Name, configuration.AksCoANamespace, podName, command, true, printHandler, CancellationToken.None);
             }
         }
 
@@ -808,7 +817,9 @@ namespace CromwellOnAzureDeployer
             public Dictionary<string, string> Service { get; set; }
             public Dictionary<string, string> Config { get; set; }
             public Dictionary<string, string> Images { get; set; }
-            public Dictionary<string, string> Containers { get; set; }
+            public List<string> DefaultContainers { get; set; }
+            public List<Dictionary<string, string>> ExternalContainers { get; set; }
+            public List<Dictionary<string, string>> ExternalSasContainers { get; set; }
             public Dictionary<string, string> Persistence { get; set; }
             public Dictionary<string, string> Db { get; set; }
         }
