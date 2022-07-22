@@ -22,16 +22,25 @@ images:
   tes: mcr.microsoft.com/cromwellonazure/tes:2
   triggerservice: mcr.microsoft.com/cromwellonazure/triggerservice:2
 
-containers:
+defaultContainers:
   - configuration
   - cromwell-executions
   - cromwell-workflow-logs
   - inputs
-  - outputs
-  - workflows
+
+externalContainers:
+#  - accountName: jsaundevsa
+#    accountKey: <key>
+#    containerName: code
+#    resourceGroup: jsaun-dev
+
+externalSasContainers:
+  - accountName: datasettestinputs
+    sasToken: "sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D"
+    containerName: dataset
 
 persistence:
-  blobPvcSize: 10Gi
+  blobPvcSize: 32Gi
   cromwellTmpSize: 32Gi
   mysqlSize: 32Gi
   storageAccount: RUNTIME_PARAMETER

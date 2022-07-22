@@ -32,39 +32,36 @@ spec:
           volumeMounts:
             - mountPath: /cromwell-tmp
               name: cromwell-tmp-claim
-            - mountPath: /configuration
-              name: configuration-claim1
-            - mountPath: /cromwell-executions
-              name: cromwell-executions-claim1
-            - mountPath: /cromwell-workflow-logs
-              name: cromwell-workflow-logs-claim1
-            - mountPath: /workflows
-              name: workflows-claim1
-            - mountPath: /inputs
-              name: inputs-claim1
-            - mountPath: /outputs
-              name: outputs-claim1
+{{- range .Values.defaultContainers }}
+            - mountPath: {{.}}
+              name: {{.}}-claim1
+{{- end }}
+{{- range .Values.externalContainers }}
+            - mountPath: /{{.accountName}}/{{.containerName}}
+              name: {{.accountName}}-{{.containerName}}-claim1
+{{- end }}
+{{- range .Values.externalSasContainers }}
+            - mountPath: /{{.accountName}}/{{.containerName}}
+              name: {{.accountName}}-{{.containerName}}-claim1
+{{- end }}
       restartPolicy: Always
       volumes:
         - name: cromwell-tmp-claim
           persistentVolumeClaim:
             claimName: cromwell-tmp-claim
-        - name: configuration-claim1
+{{- range .Values.defaultContainers }}
+        - name: {{.}}-claim1
           persistentVolumeClaim:
-            claimName: configuration-claim1
-        - name: cromwell-executions-claim1
+            claimName: {{.}}-claim1
+{{- end }}
+{{- range .Values.externalContainers }}
+        - name: {{.accountName}}-{{.containerName}}-claim1
           persistentVolumeClaim:
-            claimName: cromwell-executions-claim1
-        - name: cromwell-workflow-logs-claim1
+            claimName: {{.accountName}}-{{.containerName}}-claim1
+{{- end }}
+{{- range .Values.externalSasContainers }}
+        - name: {{.accountName}}-{{.containerName}}-claim1
           persistentVolumeClaim:
-            claimName: cromwell-workflow-logs-claim1
-        - name: workflows-claim1
-          persistentVolumeClaim:
-            claimName: workflows-claim1
-        - name: inputs-claim1
-          persistentVolumeClaim:
-            claimName: inputs-claim1
-        - name: outputs-claim1
-          persistentVolumeClaim:
-            claimName: outputs-claim1
+            claimName: {{.accountName}}-{{.containerName}}-claim1
+{{- end }}
 status: {}

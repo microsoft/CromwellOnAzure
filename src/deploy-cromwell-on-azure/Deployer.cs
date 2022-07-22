@@ -464,8 +464,18 @@ namespace CromwellOnAzureDeployer
                                 {
                                     aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
-                                kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
-                                await kubernetesManager.DeployHelmChartToCluster(kubernetesClient, resourceGroup, settings, storageAccount);
+
+                                if (configuration.ManualHelmDeployment)
+                                {
+                                    ConsoleEx.WriteLine("Please deploy helm chart, and press any key to continue.");
+                                    ConsoleEx.ReadLine();
+                                }
+                                else
+                                {
+                                    kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
+                                    await kubernetesManager.DeployHelmChartToCluster(kubernetesClient, resourceGroup, settings, storageAccount);
+                                }
+
                                 await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
                                 await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
                             });
@@ -540,7 +550,7 @@ namespace CromwellOnAzureDeployer
                         }
                     }
 
-                    if (configuration.UseAks)
+                    if (configuration.UseAks && kubernetesClient != null)
                     {
                         await kubernetesManager.WaitForCromwell(kubernetesClient);
                     }
@@ -647,7 +657,7 @@ namespace CromwellOnAzureDeployer
                 }
                 
                 ConsoleEx.WriteLine();
-                Debugger.Break();
+                //Debugger.Break();
                 WriteGeneralRetryMessageToConsole();
                 await DeleteResourceGroupIfUserConsentsAsync();
                 return 1;
@@ -2323,7 +2333,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
-            ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
+            //ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
         }
 
         private static void DisplayBillingReaderInsufficientAccessLevelWarning()
