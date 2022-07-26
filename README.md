@@ -9,6 +9,7 @@ Check the "Update Instructions" section in the version 3.1.0 [release notes](doc
  * What is [Cromwell on Azure?](#Cromwell-on-Azure) <br/>
  * Deploy Cromwell on Azure now using this [guide](#Deploy-your-instance-of-Cromwell-on-Azure)<br/>
  * A brief [demo video](https://youtu.be/QlRQ63n_mKw) on how to run workflows using Cromwell on Azure<br/>
+ * When working with the code, please note that the stable branch is `main`.  The `develop` branch is unstable, and is used for development between releases.
 
 #### Running workflows
  * Prepare, start or abort your workflow [using this guide](docs/managing-your-workflow.md/#Managing-your-workflow)<br/>
