@@ -20,6 +20,11 @@ namespace TriggerService
 {
     internal class Program
     {
+        public Program()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         public static async Task Main()
             => await InitAndRunAsync();
 

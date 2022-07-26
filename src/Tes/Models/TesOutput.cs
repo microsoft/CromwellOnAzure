@@ -24,6 +24,11 @@ namespace Tes.Models
     [DataContract]
     public partial class TesOutput : IEquatable<TesOutput>
     {
+        public TesOutput()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         /// <summary>
         /// Gets or Sets Name
         /// </summary>

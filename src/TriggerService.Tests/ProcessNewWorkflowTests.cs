@@ -19,6 +19,11 @@ namespace TriggerService.Tests
     [TestClass]
     public class ProcessNewWorkflowTests
     {
+        public ProcessNewWorkflowTests()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         [TestMethod]
         public async Task NewWorkflowsAreMovedToInProgressSubdirectory()
         {
