@@ -14,6 +14,11 @@ namespace TriggerService.Tests
     [TestClass]
     public class TriggerEngineTests
     {
+        public TriggerEngineTests()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         [TestMethod]
         public async Task TriggerEngineRunsAndOnlyLogsAvailabilityOncePerSystemUponAvailableStateAsync()
         {

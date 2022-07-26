@@ -26,6 +26,10 @@ namespace Tes.Models
     [DataContract]
     public partial class TesTaskLog : IEquatable<TesTaskLog>
     {
+        public TesTaskLog()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
         /// <summary>
         /// Logs for each executor
         /// </summary>
