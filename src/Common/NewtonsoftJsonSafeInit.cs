@@ -1,6 +1,6 @@
 ﻿namespace Common
 {
-    public class NewtonsoftJsonSafeInit
+    public static class NewtonsoftJsonSafeInit
     {
         private static bool isInitialized = false;
 
