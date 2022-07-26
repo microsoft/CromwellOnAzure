@@ -1021,6 +1021,7 @@ namespace CromwellOnAzureDeployer
                     .WithExistingResourceGroup(configuration.ResourceGroupName)
                     .WithGeneralPurposeAccountKindV2()
                     .WithOnlyHttpsTraffic()
+                    .WithSku(StorageAccountSkuType.Standard_LRS)
                     .CreateAsync(cts.Token));
 
         private async Task<IStorageAccount> GetExistingStorageAccountAsync(string storageAccountName)
