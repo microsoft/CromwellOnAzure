@@ -3,6 +3,7 @@
     public class NewtonsoftJsonSafeInit
     {
         private static bool isInitialized = false;
+
         public static void SetDefaultSettings()
         {
             if (!isInitialized)
