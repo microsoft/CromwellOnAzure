@@ -33,6 +33,7 @@ namespace Tes.Repository
         /// <param name="partitionKeyValue">Partition key value. Only the items matching this value will be visible.</param>
         public CosmosDbRepository(string endpoint, string key, string databaseId, string containerId, string partitionKeyValue)
         {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
             this.cosmosClient = new CosmosClient(endpoint, key);
             this.container = cosmosClient.GetContainer(databaseId, containerId);
             this.partitionKeyValue = partitionKeyValue;

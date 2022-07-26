@@ -24,6 +24,11 @@ namespace Tes.Models
     [DataContract]
     public partial class TesCreateTaskResponse : IEquatable<TesCreateTaskResponse>
     {
+        public TesCreateTaskResponse()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         /// <summary>
         /// Task identifier assigned by the server.
         /// </summary>

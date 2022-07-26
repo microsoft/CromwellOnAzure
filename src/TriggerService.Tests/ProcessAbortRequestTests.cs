@@ -18,6 +18,11 @@ namespace TriggerService.Tests
     [TestClass]
     public class ProcessAbortRequestTests
     {
+        public ProcessAbortRequestTests()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         [TestMethod]
         public async Task SuccessfulAbortRequestFileGetsMovedToFailedSubdirectory()
         {
