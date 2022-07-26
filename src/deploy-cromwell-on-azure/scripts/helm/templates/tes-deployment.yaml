@@ -42,6 +42,12 @@ spec:
               value: {{ .Values.config.dockerInDockerImageName }}
             - name: UsePreemptibleVmsOnly
               value: {{ .Values.config.usePreemptibleVmsOnly | quote}}
+            - name: ExternalStorageContainers
+{{- $containers  := list -}}
+{{- range .Values.externalSasContainers }}
+{{- $containers = append $containers (printf "https://%s.blob.core.windows.net/%s?%s" .accountName .containerName .sasToken) -}}
+{{- end }}
+              value: {{ join ";" $containers}}
           image: {{ .Values.images.tes }}
           name: tes
           ports:
