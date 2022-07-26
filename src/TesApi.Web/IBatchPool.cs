@@ -25,17 +25,12 @@ namespace TesApi.Web
             /// <summary>
             /// Removes idle compute nodes from the pool.
             /// </summary>
-            RemoveNodeIfIdle,
+            RemoveNodeIfStartTaskFailed,
 
             /// <summary>
             /// Removes <see cref="CloudPool"/> if it's retired and empty.
             /// </summary>
             RemovePoolIfEmpty,
-
-            /// <summary>
-            /// Updates the targeted numbers of dedicated and low priority compute nodes in the pool.
-            /// </summary>
-            Resize,
 
             /// <summary>
             /// Stages rotating or retiring this <see cref="CloudPool"/> if needed.
@@ -47,11 +42,6 @@ namespace TesApi.Web
         /// Indicates that the pool is available for new jobs/tasks.
         /// </summary>
         bool IsAvailable { get; }
-
-        /// <summary>
-        /// Indicates that the pool contains only preemptable nodes. If false, indicates that the pool contains only dedicated nodes.
-        /// </summary>
-        bool IsPreemptable { get; }
 
         /// <summary>
         /// Provides the <see cref="PoolInformation"/> for the pool.
