@@ -54,7 +54,7 @@ Note: Build instructions only provided for the latest release.
 
 #### Linux
 *Preqrequisites*:<br/>
-.NET 5 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
+.NET 6 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
 
 For example, instructions for *Ubuntu 18.04* are available [here](https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu#1804-) and below for convenience:
 
@@ -65,19 +65,19 @@ rm packages-microsoft-prod.deb
 sudo apt-get update && \
 sudo apt-get install -y apt-transport-https && \
 sudo apt-get update && \
-sudo apt-get install -y dotnet-sdk-5.0
+sudo apt-get install -y dotnet-sdk-6.0
 ```
 
 #### Windows
 *Preqrequisites*:<br/>
-.NET 5 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
+.NET 6 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
 
 *Recommended*:<br/>
-VS 2019
+VS 2022
 
 #### Build steps
 1. Clone the [Cromwell on Azure repository](https://github.com/microsoft/CromwellOnAzure)
-2. Build the solution using `dotnet build` on bash or Powershell. For Windows, you can choose to build and test using VS 2019
+2. Build the solution using `dotnet build` on bash or Powershell. For Windows, you can choose to build and test using VS 2022
 3. Run tests using `dotnet test` on bash or Powershell
 4. [Publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish#synopsis) the `deploy-cromwell-on-azure` project [as a self-contained deployment with your target runtime identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/deploying/#self-contained-deployments-scd) to produce the executable
 
