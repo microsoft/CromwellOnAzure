@@ -20,6 +20,11 @@ namespace TriggerService.Tests
     [TestClass]
     public class UpdateWorkflowStatusTests
     {
+        public UpdateWorkflowStatusTests()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         [TestMethod]
         public async Task SurfaceWorkflowFailure_BatchNodeAllocationFailed()
         {
