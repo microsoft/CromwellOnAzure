@@ -26,6 +26,10 @@ namespace Tes.Models
     [DataContract]
     public partial class TesResources : IEquatable<TesResources>
     {
+        public TesResources()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
         public enum SupportedBackendParameters { vm_size, workflow_execution_identity };
 
         /// <summary>

@@ -5,12 +5,18 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Newtonsoft.Json;
 
 namespace Common.Tests
 {
     [TestClass]
     public class AvailabilityTrackerTests
     {
+        public AvailabilityTrackerTests()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         [TestMethod]
         public void CommonAvailabilityMessageMatches()
         {
