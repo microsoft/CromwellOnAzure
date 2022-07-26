@@ -11,6 +11,11 @@ namespace Common.Tests
     [TestClass]
     public class AvailabilityTrackerTests
     {
+        public AvailabilityTrackerTests()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         [TestMethod]
         public void CommonAvailabilityMessageMatches()
         {

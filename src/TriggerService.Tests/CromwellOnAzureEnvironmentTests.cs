@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -29,6 +29,11 @@ namespace TriggerService.Tests
             $"https://fake.azure.storage.account/{azureName}/test.input_2.json"
         };
         private readonly string fakeAzureWdlWithSas = @"https://fake.azure.storage.account/{azureName}/test.wdl?sp=r&st=2019-12-18T18:55:41Z&se=2019-12-19T02:55:41Z&spr=https&sv=2019-02-02&sr=b&sig=EMJyBMOxdG2NvBqiwUsg71ZdYqwqMWda9242KU43%2F5Y%3D";
+
+        public CromwellOnAzureEnvironmentTests()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
 
         [TestMethod]
         public async Task GetBlobFileNameAndDataWithDefaultStorageAccountUsingUrl()

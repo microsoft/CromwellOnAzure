@@ -26,6 +26,11 @@ namespace Tes.Models
     [DataContract]
     public partial class TesListTasksResponse : IEquatable<TesListTasksResponse>
     {
+        public TesListTasksResponse()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         /// <summary>
         /// List of tasks.
         /// </summary>

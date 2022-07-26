@@ -108,8 +108,7 @@ namespace CromwellOnAzureDeployer
 
             while (true)
             {
-                var buffer = new byte[length];
-                RandomNumberGenerator.Fill(buffer);
+                var buffer = RandomNumberGenerator.GetBytes(length);
 
                 var password = Convert.ToBase64String(buffer)
                     .Replace("+", "-")
