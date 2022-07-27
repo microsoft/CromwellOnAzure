@@ -37,31 +37,6 @@ namespace CromwellOnAzureDeployer
         private IAuthenticated azureClient { get; set; }
         private CancellationTokenSource cts { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
-        private ExecAsyncCallback printHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
-        {
-            using (var reader = new StreamReader(stdOut))
-            {
-                ConsoleEx.Write(reader.ReadToEnd());
-            }
-
-            using (var reader = new StreamReader(stdError))
-            {
-                ConsoleEx.Write(reader.ReadToEnd());
-            }
-        });
-
-        private ExecAsyncCallback silentHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) => {
-            using (var reader = new StreamReader(stdOut))
-            {
-                reader.ReadToEnd();
-            }
-
-            using (var reader = new StreamReader(stdError))
-            {
-                reader.ReadToEnd();
-            }
-        });
-
 
         public KubernetesManager(Configuration config, AzureCredentials credentials, IAuthenticated azureClient, IEnumerable<string> subscriptionIds, CancellationTokenSource cts)
         {
@@ -94,17 +69,10 @@ namespace CromwellOnAzureDeployer
         public async Task DeployHelmChartToCluster(IKubernetes client, IResource resourceGroupObject, Dictionary<string, string> settings, IStorageAccount storageAccount)
         {
             UpdateHelmValues(storageAccount.Name, resourceGroupObject.Name, settings["AzureServicesAuthConnectionString"], settings["ApplicationInsightsAccountName"], settings["CosmosDbAccountName"], settings["BatchAccountName"], settings["BatchNodesSubnetId"]);
-            await DeployBlobCSIDriverHelmChart();
-
-            Process p = new Process();
-            p.StartInfo.UseShellExecute = false;
-            p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.FileName = configuration.HelmExePath;
-            p.StartInfo.Arguments = $"install --generate-name ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace";
-            p.Start();
-            string output = p.StandardOutput.ReadToEnd();
-            ConsoleEx.WriteLine(output);
-            await p.WaitForExitAsync();
+            
+            await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
+            await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig kubeconfig.txt");
+            await ExecHelmProcess($"install --generate-name ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace");
 
             if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
             {
@@ -132,29 +100,27 @@ namespace CromwellOnAzureDeployer
             writer.Close();
         }
 
-        private async Task DeployBlobCSIDriverHelmChart()
+        private async Task ExecHelmProcess(string command)
         {
             Process p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
             p.StartInfo.FileName = configuration.HelmExePath;
-            p.StartInfo.Arguments = $"repo add blob-csi-driver {BlobCsiRepo}";
+            p.StartInfo.Arguments = command;
             p.Start();
-            string output = p.StandardOutput.ReadToEnd();
-            ConsoleEx.WriteLine(output);
-            await p.WaitForExitAsync();
 
-            p = new Process();
-            p.StartInfo.UseShellExecute = false;
-            p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.FileName = configuration.HelmExePath;
-            p.StartInfo.Arguments = $"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig kubeconfig.txt";
-            p.Start();
-            output = p.StandardOutput.ReadToEnd();
-            ConsoleEx.WriteLine(output);
+            if (configuration.DebugLogging)
+            {
+                string line = p.StandardOutput.ReadLine();
+                while (line != null)
+                {
+                    ConsoleEx.WriteLine("HELM: " + line);
+                    line = p.StandardOutput.ReadLine();
+                }
+            }
+
             await p.WaitForExitAsync();
         }
-
 
         public async Task UnlockCromwellChangeLog(IKubernetes client)
         {
@@ -167,6 +133,37 @@ namespace CromwellOnAzureDeployer
 
         public async Task ExecuteCommandsOnPod(IKubernetes client, string podName, IEnumerable<string[]> commands, TimeSpan timeout)
         {
+            var printHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
+            {
+                using (var reader = new StreamReader(stdOut))
+                {
+                    var line = reader.ReadLine();
+
+                    while (line != null)
+                    {
+                        if (configuration.DebugLogging)
+                        {
+                            ConsoleEx.WriteLine(podName + ": " + line);
+                        }
+                        line = reader.ReadLine();
+                    }
+                }
+
+                using (var reader = new StreamReader(stdError))
+                {
+                    var line = reader.ReadLine();
+
+                    while (line != null)
+                    {
+                        if (configuration.DebugLogging)
+                        {
+                            ConsoleEx.WriteLine(podName + ": " + line);
+                        }
+                        line = reader.ReadLine();
+                    }
+                }
+            });
+
             var pods = await client.ListNamespacedPodAsync(configuration.AksCoANamespace);
             var workloadPod = pods.Items.Where(x => x.Metadata.Name.Contains(podName)).FirstOrDefault();
 

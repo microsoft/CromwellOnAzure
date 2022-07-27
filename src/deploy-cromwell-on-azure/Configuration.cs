@@ -81,6 +81,7 @@ namespace CromwellOnAzureDeployer
         public string BlobxferImageName { get; set; } = null;
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool? KeepSshPortOpen { get; set; } = null;
+        public bool DebugLogging { get; set; } = false;
 
         public static Configuration BuildConfiguration(string[] args)
         {

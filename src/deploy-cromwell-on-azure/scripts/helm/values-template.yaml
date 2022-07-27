@@ -29,10 +29,10 @@ defaultContainers:
   - inputs
 
 externalContainers:
-#  - accountName: jsaundevsa
+#  - accountName: storageAccount
 #    accountKey: <key>
-#    containerName: code
-#    resourceGroup: jsaun-dev
+#    containerName: dataset1
+#    resourceGroup: resourceGroup1
 
 externalSasContainers:
   - accountName: datasettestinputs
