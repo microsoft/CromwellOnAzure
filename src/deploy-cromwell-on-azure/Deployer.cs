@@ -468,6 +468,9 @@ namespace CromwellOnAzureDeployer
                                 if (configuration.ManualHelmDeployment)
                                 {
                                     ConsoleEx.WriteLine("Please deploy helm chart, and press any key to continue.");
+                                    ConsoleEx.WriteLine("\tHELM Setting AzureServicesAuthConnectionString: " + settings["AzureServicesAuthConnectionString"]);
+                                    ConsoleEx.WriteLine("\tHELM Setting BatchNodesSubnetId: " + settings["BatchNodesSubnetId"]);
+                                    ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateUserCommand());
                                     ConsoleEx.ReadLine();
                                 }
                                 else
@@ -1666,13 +1669,18 @@ namespace CromwellOnAzureDeployer
                 return await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"mysql -u cromwell -pcromwell -h {mySQLServer.FullyQualifiedDomainName} -P 3306 -D cromwell_db -e \"{initScript}\"");
             });
 
+        private string GetPostgreSQLCreateUserCommand()
+        {
+            var sqlCommand = $"CREATE USER {configuration.PostgreSqlUserLogin} WITH PASSWORD '{configuration.PostgreSqlUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlDatabaseName} TO {configuration.PostgreSqlUserLogin};";
+            return $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} -c \"{sqlCommand}\"";
+        }
+
         private Task CreatePostgreSqlDatabaseUser(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Creating PostgreSQL database user...",
                 () =>
                 {
-                    var sqlCommand = $"CREATE USER {configuration.PostgreSqlUserLogin} WITH PASSWORD '{configuration.PostgreSqlUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlDatabaseName} TO {configuration.PostgreSqlUserLogin};";
-                    return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} -c \"{sqlCommand}\"");
+                    return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, GetPostgreSQLCreateUserCommand());
                 }
             );
 
