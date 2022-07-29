@@ -34,16 +34,12 @@ namespace CromwellOnAzureDeployer
 
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
-        private IAuthenticated azureClient { get; set; }
         private CancellationTokenSource cts { get; set; }
-        private IEnumerable<string> subscriptionIds { get; set; }
 
-        public KubernetesManager(Configuration config, AzureCredentials credentials, IAuthenticated azureClient, IEnumerable<string> subscriptionIds, CancellationTokenSource cts)
+        public KubernetesManager(Configuration config, AzureCredentials credentials, CancellationTokenSource cts)
         {
             this.configuration = config;
             this.azureCredentials = credentials;
-            this.azureClient = azureClient;
-            this.subscriptionIds = subscriptionIds;
             this.cts = cts;
         }
 
@@ -171,7 +167,7 @@ namespace CromwellOnAzureDeployer
             {
                 throw new Exception($"Timed out waiting for {podName} to start.");
             }
-            // For some reason even if a pod says it ready, calls made immediately will fail. Wait for 20 seconds for safety. 
+            // For some reason even if a pod says it ready, calls made immediately will fail. Wait for 40 seconds for safety. 
             await Task.Delay(TimeSpan.FromSeconds(40));
 
             foreach (var command in commands)
@@ -231,33 +227,6 @@ namespace CromwellOnAzureDeployer
 
             await UnlockCromwellChangeLog(client);
             await DeployHelmChartToCluster(client, resourceGroup, settings, storageAccount);
-        }
-
-        private class MountableContainer
-        {
-            public string StorageAccount { get; set; }
-            public string ContainerName { get; set; }
-            public string SasToken { get; set; }
-
-
-            public override bool Equals(object other)
-            {
-                return string.Equals(StorageAccount, ((MountableContainer)other).StorageAccount, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(ContainerName, ((MountableContainer)other).ContainerName, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(SasToken, ((MountableContainer)other).SasToken, StringComparison.OrdinalIgnoreCase);
-            }
-
-            public override int GetHashCode()
-            {
-                if (SasToken is null)
-                {
-                    return HashCode.Combine(StorageAccount.GetHashCode(), ContainerName.GetHashCode());
-                }
-                else
-                {
-                    return HashCode.Combine(StorageAccount.GetHashCode(), ContainerName.GetHashCode(), SasToken.GetHashCode());
-                }
-            }
         }
 
         private class HelmValues
