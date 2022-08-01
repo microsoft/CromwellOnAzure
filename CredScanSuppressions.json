@@ -2,15 +2,15 @@
   "tool": "Credential Scanner",
   "suppressions": [
     {
-      "file": "\\\\files\\docs\\release-notes\\2.0.0.md",
+      "file": ".\docs\release-notes\2.0.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
-      "file": "\\\\files\\docs\\release-notes\\2.1.0.md",
+      "file": ".\docs\\release-notes\\2.1.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
-      "file": "\\\\files\\docs\\release-notes\\2.2.0.md",
+      "file": ".\docs\\release-notes\\2.2.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
