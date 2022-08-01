@@ -18,4 +18,5 @@ RUN dotnet publish -c Release -o out --no-restore TesApi.Web/TesApi.Web.csproj
 FROM mcr.microsoft.com/dotnet/aspnet:6.0
 WORKDIR /app
 COPY --from=build-env /app/out .
+RUN apt update && apt upgrade -y && rm -rf /var/lib/apt/lists/* 
 ENTRYPOINT ["dotnet", "tesapi.dll"]
