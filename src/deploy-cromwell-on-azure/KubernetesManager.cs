@@ -62,10 +62,8 @@ namespace CromwellOnAzureDeployer
             return new Kubernetes(k8sConfig);
         }
 
-        public async Task DeployHelmChartToCluster(IKubernetes client, IResource resourceGroupObject, Dictionary<string, string> settings, IStorageAccount storageAccount)
+        public async Task DeployHelmChartToCluster(IKubernetes client)
         {
-            UpdateHelmValues(storageAccount.Name, resourceGroupObject.Name, settings["AzureServicesAuthConnectionString"], settings["ApplicationInsightsAccountName"], settings["CosmosDbAccountName"], settings["BatchAccountName"], settings["BatchNodesSubnetId"]);
-            
             await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
             await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig kubeconfig.txt");
             await ExecHelmProcess($"install --generate-name ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace");
@@ -80,7 +78,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private void UpdateHelmValues(string storageAccountName, string resourceGroupName, string azureServiceAuthString, string appInsightsName, string cosmosDbName, string batchAccountName, string batchNodesSubnetId)
+        public void UpdateHelmValues(string storageAccountName, string resourceGroupName, string azureServiceAuthString, string appInsightsName, string cosmosDbName, string batchAccountName, string batchNodesSubnetId)
         {
             var values = Yaml.LoadFromString<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
             values.Persistence["storageAccount"] = storageAccountName;
@@ -227,7 +225,8 @@ namespace CromwellOnAzureDeployer
             IKubernetes client = new Kubernetes(k8sConfig);
 
             await UnlockCromwellChangeLog(client);
-            await DeployHelmChartToCluster(client, resourceGroup, settings, storageAccount);
+            UpdateHelmValues(storageAccount.Name, resourceGroup.Name, settings["AzureServicesAuthConnectionString"], settings["ApplicationInsightsAccountName"], settings["CosmosDbAccountName"], settings["BatchAccountName"], settings["BatchNodesSubnetId"]);
+            await DeployHelmChartToCluster(client);
         }
 
         private class HelmValues

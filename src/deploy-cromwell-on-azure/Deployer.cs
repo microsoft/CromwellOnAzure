@@ -435,9 +435,10 @@ namespace CromwellOnAzureDeployer
                                     aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
+                                kubernetesManager.UpdateHelmValues(storageAccount.Name, resourceGroup.Name, settings["AzureServicesAuthConnectionString"], settings["ApplicationInsightsAccountName"], settings["CosmosDbAccountName"], settings["BatchAccountName"], settings["BatchNodesSubnetId"]);
                                 if (configuration.ManualHelmDeployment)
                                 {
-                                    ConsoleEx.WriteLine("Please deploy helm chart, and press any key to continue.");
+                                    ConsoleEx.WriteLine("Please deploy helm chart, and press Enter to continue.");
                                     ConsoleEx.WriteLine("\tHELM Setting AzureServicesAuthConnectionString: " + settings["AzureServicesAuthConnectionString"]);
                                     ConsoleEx.WriteLine("\tHELM Setting BatchNodesSubnetId: " + settings["BatchNodesSubnetId"]);
                                     ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateUserCommand());
@@ -446,7 +447,7 @@ namespace CromwellOnAzureDeployer
                                 else
                                 {
                                     kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
-                                    await kubernetesManager.DeployHelmChartToCluster(kubernetesClient, resourceGroup, settings, storageAccount);
+                                    await kubernetesManager.DeployHelmChartToCluster(kubernetesClient);
                                 }
 
                                 await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
@@ -508,7 +509,7 @@ namespace CromwellOnAzureDeployer
                                     // Wait for either kubernetes pod to start or ssh connection info to be set.
                                     await compute;
 
-                                    if (configuration.UseAks)
+                                    if (configuration.UseAks && !configuration.ManualHelmDeployment)
                                     {
                                         await ExecuteQueriesOnAzurePostgreSQLDbFromK8(postgreSqlServer);
                                     }
@@ -523,9 +524,12 @@ namespace CromwellOnAzureDeployer
                         }
                     }
 
-                    if (configuration.UseAks && kubernetesClient != null)
+                    if (configuration.UseAks)
                     {
-                        await kubernetesManager.WaitForCromwell(kubernetesClient);
+                        if (kubernetesClient != null)
+                        {
+                            await kubernetesManager.WaitForCromwell(kubernetesClient);
+                        }
                     }
                     else
                     {
@@ -557,6 +561,7 @@ namespace CromwellOnAzureDeployer
                     }
                 }
 
+                batchAccount = await GetExistingBatchAccountAsync(configuration.BatchAccountName);
                 var maxPerFamilyQuota = batchAccount.DedicatedCoreQuotaPerVMFamilyEnforced ? batchAccount.DedicatedCoreQuotaPerVMFamily.Select(q => q.CoreQuota).Where(q => 0 != q) : Enumerable.Repeat(batchAccount.DedicatedCoreQuota ?? 0, 1);
                 var isBatchQuotaAvailable = batchAccount.LowPriorityCoreQuota > 0 || (batchAccount.DedicatedCoreQuota > 0 && maxPerFamilyQuota.Append(0).Max() > 0);
 
