@@ -110,7 +110,7 @@
     <EmbeddedResource Include="scripts\helm\templates\cromwell-deployment.yaml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\mysqldb-deployment.yaml">
+    <EmbeddedResource Include="scripts\mysql\mysqldb-deployment.yaml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="scripts\helm\templates\persistence.yaml">

@@ -13,21 +13,6 @@ spec:
       storage: {{ .Values.persistence.cromwellTmpSize }}
 status: {}
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  creationTimestamp: null
-  labels:
-    io.kompose.service: mysqldb-data-claim
-  name: mysqldb-data-claim
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: {{ .Values.persistence.mysqlSize }}
-status: {}
----
 {{- $rg  := .Values.config.resourceGroup -}}
 {{- $namespace := .Values.config.coaNamespace -}}
 {{- $storageAccount  := .Values.persistence.storageAccount -}}

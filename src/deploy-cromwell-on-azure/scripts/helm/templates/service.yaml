@@ -29,19 +29,3 @@ spec:
     io.kompose.service: tes
 status:
   loadBalancer: {}
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    io.kompose.service: mysqldb
-  name: mysqldb
-spec:
-  ports:
-    - name: {{ .Values.db.port | quote }}
-      port: {{ .Values.db.port }}
-      targetPort: {{ .Values.db.port }}
-  selector:
-    io.kompose.service: mysqldb
-status:
-  loadBalancer: {}
