@@ -90,6 +90,7 @@ namespace CromwellOnAzureDeployer
             values.Config["cosmosDbAccountName"] = cosmosDbName;
             values.Config["batchAccountName"] = batchAccountName;
             values.Config["batchNodesSubnetId"] = batchNodesSubnetId;
+            values.Config["coaNamespace"] = configuration.AksCoANamespace;
 
             var writer = new StreamWriter(Path.Join("scripts", "helm", "values.yaml"));
             writer.Write(Yaml.SaveToString(values));

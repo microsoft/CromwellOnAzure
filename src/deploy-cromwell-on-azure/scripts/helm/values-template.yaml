@@ -3,6 +3,7 @@
   cromwellPort: 8000
 
 config:
+  coaNamespace: RUNTIME_PARAMETER
   resourceGroup: RUNTIME_PARAMETER
   azureServicesAuthConnectionString: RUNTIME_PARAMETER
   applicationInsightsAccountName: RUNTIME_PARAMETER
