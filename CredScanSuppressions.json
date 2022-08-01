@@ -2,39 +2,39 @@
   "tool": "Credential Scanner",
   "suppressions": [
     {
-      "file": ".\docs\release-notes\2.0.0.md",
+      "file": "\\\\files\\d\\a\\1\\s\\docs\\release-notes\\2.0.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
-      "file": ".\docs\\release-notes\\2.1.0.md",
+      "file": "\\\\files\\d\\a\\1\\s\\docs\\release-notes\\2.1.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
-      "file": ".\docs\\release-notes\\2.2.0.md",
+      "file": "\\\\files\\d\\a\\1\\s\\docs\\release-notes\\2.2.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
-      "file": "\\\\files\\docs\\release-notes\\2.2.1.md",
+      "file": "\\\\files\\d\\a\\1\\s\\docs\\release-notes\\2.2.1.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
-      "file": "\\\\files\\docs\\release-notes\\2.3.0.md",
+      "file": "\\\\files\\d\\a\\1\\s\\docs\\release-notes\\2.3.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
-      "file": "\\\\files\\docs\\release-notes\\2.4.0.md",
+      "file": "\\\\files\\d\\a\\1\\s\\docs\\release-notes\\2.4.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
-      "file": "\\\\files\\docs\\release-notes\\2.5.0.md",
+      "file": "\\\\files\\d\\a\\1\\s\\docs\\release-notes\\2.5.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
-      "file": "\\\\files\\docs\\release-notes\\3.0.0.md",
+      "file": "\\\\files\\d\\a\\1\\s\\docs\\release-notes\\3.0.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     },
     {
-      "file": "\\\\files\\docs\\release-notes\\3.1.0.md",
+      "file": "\\\\files\\d\\a\\1\\s\\docs\\release-notes\\3.1.0.md",
       "_justification": "Fake password is used as a example and not a real password"
     }
   ]
