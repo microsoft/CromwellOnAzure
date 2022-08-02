@@ -68,6 +68,9 @@ namespace Tes.Models
         [DataMember(Name = "content")]
         public string Content { get; set; }
 
+        [DataMember(Name = "localize")]
+        public bool Localize { get; set; } = true;
+
         /// <summary>
         /// Returns the string presentation of the object
         /// </summary>
