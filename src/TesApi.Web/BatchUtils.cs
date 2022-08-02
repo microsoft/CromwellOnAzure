@@ -17,6 +17,19 @@ namespace TesApi.Web
         private static readonly string HostConfigsDirectory = AppContext.BaseDirectory + @"/HostConfigs";
         private static readonly string PackageHashesFile = @"Hashes.json";
         private static readonly string ApplicationVersionsFile = @"Versions.json";
+        private static readonly string ContainerImagesFile = @"Images.json";
+
+        /// <summary>
+        /// Returns the host configuration associated with the docker container
+        /// </summary>
+        /// <param name="container"></param>
+        /// <returns>The value to pass to <see cref="GetHostConfig(string)"/>.</returns>
+        public static string GetHostConfigForContainer(string container)
+        {
+            var file = new FileInfo(Path.Combine(HostConfigsDirectory, ContainerImagesFile));
+            var images = ReadJson<Dictionary<string, string>>(file.Exists ? file.OpenText() : default, () => default);
+            return images?.TryGetValue(container, out var value) ?? false ? value : default;
+        }
 
         /// <summary>
         /// Returns the host config file.
@@ -126,13 +139,27 @@ namespace TesApi.Web
         /// </summary>
         public static void WriteHostConfiguration(HostConfig configuration)
         {
+            var images = new Dictionary<string, string>();
             var hostConfigsDir = Directory.CreateDirectory(HostConfigsDirectory);
+
             File.WriteAllText(Path.Combine(hostConfigsDir.FullName, ApplicationVersionsFile), WriteJson(configuration.ApplicationVersions));
             File.WriteAllText(Path.Combine(hostConfigsDir.FullName, PackageHashesFile), WriteJson(configuration.PackageHashes));
+
             foreach (var config in configuration.HostConfigurations)
             {
+                foreach (var vmSize in config.Value.VmSizes)
+                {
+                    var container = vmSize.Container;
+
+                    if (!string.IsNullOrWhiteSpace(container))
+                    {
+                        images.Add(container, config.Key);
+                    }
+                }
                 File.WriteAllText(Path.Combine(hostConfigsDir.FullName, $"{config.Key}.json"), WriteJson(config.Value));
             }
+
+            File.WriteAllText(Path.Combine(hostConfigsDir.FullName, ContainerImagesFile), WriteJson(images));
         }
     }
 }

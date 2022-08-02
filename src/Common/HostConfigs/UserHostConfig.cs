@@ -35,8 +35,8 @@ namespace Common.HostConfigs
         /// <summary>
         /// HostConfig specified vmSize information.
         /// </summary>
-        [DataMember(Name = "virtualMachineSize")]
-        public VirtualMachineSize? VirtualMachineSize { get; set; }
+        [DataMember(Name = "virtualMachineSizes")]
+        public VirtualMachineSizes VirtualMachineSizes { get; set; } = VirtualMachineSizes.Empty;
 
         /// <summary>
         /// A Task which is run when a Node joins a Pool in the Azure Batch service, or when the Compute Node is rebooted or reimaged.

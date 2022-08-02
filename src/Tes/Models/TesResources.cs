@@ -31,7 +31,7 @@ namespace Tes.Models
             Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
         }
 
-        public enum SupportedBackendParameters { vm_size, workflow_execution_identity, docker_host_configuration };
+        public enum SupportedBackendParameters { vm_size, vm_family, workflow_execution_identity, docker_host_configuration };
 
         /// <summary>
         /// Requested number of CPUs

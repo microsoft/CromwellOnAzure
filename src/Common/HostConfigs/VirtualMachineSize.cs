@@ -3,34 +3,48 @@
 
 #nullable enable
 
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 
 namespace Common.HostConfigs
 {
+    public class VirtualMachineSizes : List<VirtualMachineSize>
+    {
+        public static VirtualMachineSizes Empty => new();
+    }
+
     /// <summary>
     /// Describes the properties of relevant VM sizes.
     /// </summary>
-    /// <remarks>
-    /// Either <see cref="Name"/> or <see cref="Family"/> should be set, or <see cref="HostConfiguration.VmSize"/> should not be provided. It is unexpected that both properties would be provided.
-    /// </remarks>
+    /// <remarks>TODO</remarks>
     public class VirtualMachineSize
     {
         /// <summary>
+        /// Name of the container image, for example: ubuntu quay.io/aptible/ubuntu gcr.io/my-org/my-image etc...
+        /// </summary>
+        /// <remarks>TODO</remarks>
+        [DataMember(Name = "container")]
+        public string? Container { get; set; }
+
+        /// <summary>
         /// The family name of the virtual machine size from which to select.
         /// </summary>
-        /// <remarks>
-        /// Either <see cref="Name"/> or <see cref="Family"/> should be set, or <see cref="HostConfiguration.VmSize"/> should not be provided. It is unexpected that both properties would be provided.
-        /// </remarks>
-        [DataMember(Name = "family")]
-        public string? Family { get; set; }
+        /// <remarks>TODO</remarks>
+        [DataMember(Name = "familyName")]
+        public string? FamilyName { get; set; }
 
         /// <summary>
         /// The name of the virtual machine size to use.
         /// </summary>
-        /// <remarks>
-        /// Either <see cref="Name"/> or <see cref="Family"/> should be set, or <see cref="HostConfiguration.VmSize"/> should not be provided. It is unexpected that both properties would be provided.
-        /// </remarks>
-        [DataMember(Name = "name")]
-        public string? Name { get; set; }
+        /// <remarks>TODO</remarks>
+        [DataMember(Name = "vmSize")]
+        public string? VmSize { get; set; }
+
+        /// <summary>
+        /// The name of the virtual machine size to use.
+        /// </summary>
+        /// <remarks>TODO</remarks>
+        [DataMember(Name = "minVmSize")]
+        public string? MinVmSize { get; set; }
     }
 }

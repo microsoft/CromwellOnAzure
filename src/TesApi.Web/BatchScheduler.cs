@@ -21,6 +21,7 @@ using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.WindowsAzure.Storage.Core;
 
 using Newtonsoft.Json;
 
@@ -403,8 +404,9 @@ namespace TesApi.Web
             try
             {
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
-                var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
+                var (dockerParams, preCommand, vmSizes, poolSpec) = GetDockerHostConfiguration(tesTask);
+                var virtualMachineInfo = await GetVmSizeAsync(tesTask, vmSizes);
                 var (poolName, displayName) = this.enableBatchAutopool ? default : await GetPoolName(tesTask, virtualMachineInfo);
                 await CheckBatchAccountQuotas(virtualMachineInfo, poolName);
 
@@ -413,7 +415,6 @@ namespace TesApi.Web
 
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var containerConfiguration = await GetContainerConfigurationIfNeeded(tesTask.Executors.First().Image);
-                var (dockerParams, preCommand, poolSpec) = GetDockerHostConfiguration(tesTask);
 
                 if (this.enableBatchAutopool)
                 {
@@ -1041,15 +1042,16 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="tesTask">The <see cref="TesTask"/> to schedule on Azure Batch</param>
         /// <returns></returns>
-        private (string dockerParams, string[] preCommand, Lazy<(StartTask startTask, BatchNodeInfo nodeInfo, IEnumerable<ApplicationPackageReference> applicationPackages)> poolSpec) GetDockerHostConfiguration(TesTask tesTask)
+        private (string dockerParams, string[] preCommand, HostConfigs.VirtualMachineSizes vmSizes, Lazy<(StartTask startTask, BatchNodeInfo nodeInfo, IEnumerable<ApplicationPackageReference> applicationPackages)> poolSpec) GetDockerHostConfiguration(TesTask tesTask)
         {
             string dockerParams = null;
             string[] preCommand = null;
+            HostConfigs.VirtualMachineSizes vmSizes = null;
             Lazy<(ApplicationPackageReference, StartTask)> startTask = default;
             Lazy<BatchNodeInfo> batchResult = default;
             //Lazy<ApplicationPackageReference> dockerAppPkg = default;
 
-            //var dockerImage = tesTask.Executors.First().Image;
+            var dockerImage = tesTask.Executors.First().Image;
             //if (dockerImage.StartsWith("coa:65536/"))
             //{
             //    dockerAppPkg = new(() => GetDockerBlob());
@@ -1067,18 +1069,14 @@ namespace TesApi.Web
             //    }
             //}
 
-            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) == true)
+            var hostConfigKey = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration) == true
+                ? tesTask.Resources.GetBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration)
+                : BatchUtils.GetHostConfigForContainer(Common.Utilities.NormalizeContainerImageName(dockerImage).AbsoluteUri);
+
+            if (!string.IsNullOrWhiteSpace(hostConfigKey))
             {
-                var hostConfigName = tesTask.Resources.GetBackendParameterValue(TesResources.SupportedBackendParameters.docker_host_configuration);
-                logger.LogInformation($"Preparing pool and task using docker host configuration '{hostConfigName}'");
-                HostConfigs.HostConfiguration hostConfig = default;
-                try
-                {
-                    hostConfig = BatchUtils.GetHostConfig(hostConfigName);
-                }
-                catch (FileNotFoundException e) { ThrowHostConfigNotFound(hostConfigName, e); }
-                catch (DirectoryNotFoundException e) { ThrowHostConfigNotFound(hostConfigName, e); }
-                catch (ArgumentException e) { ThrowHostConfigNotFound(hostConfigName, e); }
+                logger.LogInformation($"Preparing pool and task using docker host configuration '{hostConfigKey}'");
+                var hostConfig = GetHostConfig(hostConfigKey, tesTask);
 
                 if (hostConfig.BatchImage is not null)
                 {
@@ -1092,6 +1090,7 @@ namespace TesApi.Web
                     });
                 }
 
+                vmSizes = hostConfig.VmSizes;
                 dockerParams = hostConfig.DockerRun?.Parameters;
                 preCommand = hostConfig.DockerRun?.PreTaskCmd;
 
@@ -1106,10 +1105,10 @@ namespace TesApi.Web
                         ApplicationPackageReference appPkg = default;
                         try
                         {
-                            var (Id, Version, Variable) = BatchUtils.GetBatchApplicationForHostConfigTask(hostConfigName, "start");
+                            var (Id, Version, Variable) = BatchUtils.GetBatchApplicationForHostConfigTask(hostConfigKey, "start");
                             appPkg = new ApplicationPackageReference { ApplicationId = Id, Version = Version };
                             appDir = Variable;
-                            isScriptInApp = BatchUtils.DoesHostConfigTaskIncludeTaskScript(hostConfigName, "start");
+                            isScriptInApp = BatchUtils.DoesHostConfigTaskIncludeTaskScript(hostConfigKey, "start");
                         }
                         catch (KeyNotFoundException) { }
 
@@ -1124,7 +1123,7 @@ namespace TesApi.Web
                             resources = resources.Append(ResourceFile.FromUrl(resource.HttpUrl, resource.FilePath, resource.FileMode));
                         }
 
-                        var environment = Enumerable.Empty<EnvironmentSetting>().Append(new("docker_host_configuration", hostConfigName));
+                        var environment = Enumerable.Empty<EnvironmentSetting>().Append(new("docker_host_configuration", hostConfigKey));
                         if (appPkg is not null)
                         {
                             environment = environment.Append(new("docker_host_application", appDir));
@@ -1149,7 +1148,7 @@ namespace TesApi.Web
                 }
             }
 
-            return (dockerParams, preCommand, new(() => AssemblePoolSpec()));
+            return (dockerParams, preCommand, vmSizes, new(() => AssemblePoolSpec()));
 
             (StartTask startTask, BatchNodeInfo nodeInfo, IEnumerable<ApplicationPackageReference> applicationPackages) AssemblePoolSpec()
             {
@@ -1160,8 +1159,19 @@ namespace TesApi.Web
                 return (nodeStartTask, batchResult?.Value, packages);
             }
 
-            void ThrowHostConfigNotFound(string name, Exception e)
-                => throw new TesException("NoHostConfig", $"Could not identify the configuration for the host config {name} for task {tesTask.Id}", e);
+            static HostConfigs.HostConfiguration GetHostConfig(string name, TesTask tesTask)
+            {
+                try
+                {
+                    return BatchUtils.GetHostConfig(name);
+                }
+                catch (FileNotFoundException e) { throw HostConfigNotFound(name, e, tesTask); }
+                catch (DirectoryNotFoundException e) { throw HostConfigNotFound(name, e, tesTask); }
+                catch (ArgumentException e) { throw HostConfigNotFound(name, e, tesTask); }
+            }
+
+            static Exception HostConfigNotFound(string name, Exception exception, TesTask tesTask)
+                => new TesException("NoHostConfig", $"Could not identify the configuration for the host config {name} for task {tesTask.Id}", exception);
         }
 
         /// <summary>
@@ -1522,9 +1532,10 @@ namespace TesApi.Web
         /// Gets the cheapest available VM size that satisfies the <see cref="TesTask"/> execution requirements
         /// </summary>
         /// <param name="tesTask"><see cref="TesTask"/></param>
+        /// <param name="hostConfigVmSizes"></param>
         /// <param name="forcePreemptibleVmsOnly">Force consideration of preemptible virtual machines only.</param>
         /// <returns>The virtual machine info</returns>
-        public async Task<VirtualMachineInformation> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
+        public async Task<VirtualMachineInformation> GetVmSizeAsync(TesTask tesTask, HostConfigs.VirtualMachineSizes hostConfigVmSizes, bool forcePreemptibleVmsOnly = false)
         {
             var tesResources = tesTask.Resources;
 
@@ -1540,17 +1551,70 @@ namespace TesApi.Web
             var eligibleVms = new List<VirtualMachineInformation>();
             var noVmFoundMessage = string.Empty;
 
-            var vmSize = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size);
+            var vmFamilies = tesResources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_family)?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            var vmSizes = tesResources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size)?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
-            if (!string.IsNullOrWhiteSpace(vmSize))
+            if (vmFamilies is not null || vmSizes is not null || hostConfigVmSizes is not null)
             {
                 eligibleVms = virtualMachineInfoList
-                    .Where(vm =>
-                        vm.LowPriority == preemptible
-                        && vm.VmSize.Equals(vmSize, StringComparison.OrdinalIgnoreCase))
+                    .Where(vm => vm.LowPriority == preemptible)
+                    .Where(vm => vmFamilies?.Contains(vm.VmFamily, StringComparer.OrdinalIgnoreCase) ?? true)
+                    .Where(vm => vmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? true)
+                    .Where(vm => hostConfigVmSizes is null || !hostConfigVmSizes.Any() || hostConfigVmSizes.Any(size => Matches(vm, size)))
                     .ToList();
 
-                noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (vmsize: {vmSize}, preemptible: {preemptible}) for task id {tesTask.Id}.";
+                var hostConfigInsertedMessage = true switch
+                {
+                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}', vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && !hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && !hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && !hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}', vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && !hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && !hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && !hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && !hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && !hostConfigVmSizes.Any(vm => vm.VmSize is not null) && !hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}'), ",
+                    _ => string.Empty,
+                };
+
+                noVmFoundMessage = true switch
+                    {
+                        var a when vmFamilies is not null && vmSizes is not null => $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources ({hostConfigInsertedMessage}vmfamily: '{string.Join(", ", vmFamilies)}', vmsize: '{string.Join(", ", vmSizes)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
+                        var a when vmFamilies is null && vmSizes is not null => $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources ({hostConfigInsertedMessage}vmsize: '{string.Join(", ", vmSizes)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
+                        var a when vmFamilies is not null && vmSizes is null => $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources ({hostConfigInsertedMessage}vmfamily: '{string.Join(", ", vmFamilies)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
+                        _ => $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources ({hostConfigInsertedMessage}preemptible: {preemptible}) for task id {tesTask.Id}.",
+                    };
+
+                bool Matches(VirtualMachineInformation vmInfo, HostConfigs.VirtualMachineSize vmSize)
+                {
+                    if (vmSize.Container is not null && !Common.Utilities.NormalizeContainerImageName(vmSize.Container).Equals(Common.Utilities.NormalizeContainerImageName(tesTask.Executors.FirstOrDefault()?.Image)))
+                    {
+                        return false;
+                    }
+
+                    var family = vmSize.FamilyName ?? virtualMachineInfoList.FirstOrDefault(vm => string.Equals(vm.VmSize, vmSize.MinVmSize, StringComparison.OrdinalIgnoreCase))?.VmFamily;
+
+                    if (family is not null)
+                    {
+                        if (!string.Equals(family, vmInfo.VmFamily, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return false;
+                        }
+
+                        var sizesInFamily = virtualMachineInfoList
+                            .Where(vm => string.Equals(vm.VmFamily, family, StringComparison.OrdinalIgnoreCase))
+                            .OrderBy(vm => vm.PricePerHour)
+                            .SkipWhile(vm => vmSize.MinVmSize is not null && !string.Equals(vmSize.MinVmSize, vm.VmSize, StringComparison.OrdinalIgnoreCase));
+
+                        return sizesInFamily.Select(vm => vm.VmSize).Contains(vmInfo.VmSize);
+                    }
+                    else if (vmSize.VmSize is not null)
+                    {
+                        return string.Equals(vmInfo.VmSize, vmSize.VmSize, StringComparison.OrdinalIgnoreCase);
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
             }
             else
             {
@@ -1595,7 +1659,7 @@ namespace TesApi.Web
                         $"This task ran on low priority machine because dedicated quota was not available for VM Series '{idealVm.VmFamily}'.",
                         $"Increase the quota for VM Series '{idealVm.VmFamily}' to run this task on a dedicated VM. Please submit an Azure Support request to increase your quota: {AzureSupportUrl}");
 
-                    return await GetVmSizeAsync(tesTask, true);
+                    return await GetVmSizeAsync(tesTask, hostConfigVmSizes, true);
                 }
             }
 

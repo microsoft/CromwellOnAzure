@@ -289,7 +289,7 @@ namespace TesApi.Tests
             using var serviceProvider = GetServiceProvider(GetMockConfig()(), GetMockAzureProxy(AzureProxyReturnValues.Defaults));
             var batchScheduler = serviceProvider.GetT();
 
-            var size = await batchScheduler.GetVmSizeAsync(task);
+            var size = await batchScheduler.GetVmSizeAsync(task, null);
             Assert.AreEqual(vmSize, size.VmSize);
         }
 
