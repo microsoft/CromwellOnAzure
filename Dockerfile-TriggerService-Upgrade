@@ -1,5 +1,0 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
-FROM mcr.microsoft.com/cromwellonazure/triggerservice:upgrade-${BUILDNUMBER}
-RUN apt update && apt upgrade -y && rm -rf /var/lib/apt/lists/*
