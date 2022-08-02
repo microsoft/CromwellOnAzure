@@ -8,9 +8,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		CodeCoverage.runsettings = CodeCoverage.runsettings
 		src\CommonAssemblyInfo.cs = src\CommonAssemblyInfo.cs
 		src\Dockerfile-Tes = src\Dockerfile-Tes
-		Dockerfile-Tes-Upgrade = Dockerfile-Tes-Upgrade
 		src\Dockerfile-TriggerService = src\Dockerfile-TriggerService
-		Dockerfile-TriggerService-Upgrade = Dockerfile-TriggerService-Upgrade
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CromwellApiClient", "src\CromwellApiClient\CromwellApiClient.csproj", "{98D92D1C-7D23-4517-A5FB-D7948544F15F}"
