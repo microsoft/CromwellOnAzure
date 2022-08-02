@@ -160,11 +160,8 @@ namespace CromwellOnAzureDeployer
 
                         ConsoleEx.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
-                        var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
-                        var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
+                                                var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
                         configuration.UseAks = existingAksCluster != null;
-
-                        networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(g => g.NetworkInterfaceIds.Contains(linuxVm.GetPrimaryNetworkInterface().Id));
 
                         Dictionary<string, string> accountNames = null;
                         if (configuration.UseAks)
@@ -173,7 +170,6 @@ namespace CromwellOnAzureDeployer
                             {
                                 storageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName)
                                     ?? throw new ValidationException($"Storage account {configuration.StorageAccountName}, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
-
                             }
                             else
                             {
@@ -193,6 +189,8 @@ namespace CromwellOnAzureDeployer
                         }   
                         else
                         {
+                            var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
+
                             if (!existingVms.Any())
                             {
                                 throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any virtual machines.");
@@ -220,6 +218,8 @@ namespace CromwellOnAzureDeployer
                             configuration.VmName = linuxVm.Name;
                             configuration.RegionName = linuxVm.RegionName;
                             configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() is null;
+                            networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(g => g.NetworkInterfaceIds.Contains(linuxVm.GetPrimaryNetworkInterface().Id));
+
 
                             if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup is null)
                             {
@@ -541,7 +541,6 @@ namespace CromwellOnAzureDeployer
                         {
                             ConsoleEx.WriteLine($"Startup script on the VM failed. Check {CromwellAzureRootDir}/startup.log for details", ConsoleColor.Red);
                             return 1;
-
                         }
 
                         if (await MountWarningsExistAsync(sshConnectionInfo))
@@ -609,33 +608,36 @@ namespace CromwellOnAzureDeployer
             }
             catch (Exception exc)
             {
-                if (exc is KubernetesException)
+                if (configuration.DebugLogging)
                 {
-                    var kExc = (KubernetesException)exc;
-                    ConsoleEx.WriteLine($"Kubenetes Status: {kExc.Status}");
-                }
+                    if (exc is KubernetesException)
+                    {
+                        var kExc = (KubernetesException)exc;
+                        ConsoleEx.WriteLine($"Kubenetes Status: {kExc.Status}");
+                    }
 
-                if (exc is WebSocketException)
-                {
-                    var wExc = (WebSocketException)exc;
-                    ConsoleEx.WriteLine($"WebSocket ErrorCode: {wExc.WebSocketErrorCode}"); 
-                }
+                    if (exc is WebSocketException)
+                    {
+                        var wExc = (WebSocketException)exc;
+                        ConsoleEx.WriteLine($"WebSocket ErrorCode: {wExc.WebSocketErrorCode}");
+                    }
 
-                if (exc is HttpOperationException)
-                {
-                    var hExc = (HttpOperationException)exc;
-                    ConsoleEx.WriteLine($"HTTP Response: {hExc.Response.Content}");
+                    if (exc is HttpOperationException)
+                    {
+                        var hExc = (HttpOperationException)exc;
+                        ConsoleEx.WriteLine($"HTTP Response: {hExc.Response.Content}");
+                    }
+                    ConsoleEx.WriteLine(exc.StackTrace, ConsoleColor.Red);
                 }
 
                 if (!(exc is OperationCanceledException && cts.Token.IsCancellationRequested))
                 {
                     ConsoleEx.WriteLine();
                     ConsoleEx.WriteLine($"{exc.GetType().Name}: {exc.Message}", ConsoleColor.Red);
-                    ConsoleEx.WriteLine(exc.StackTrace, ConsoleColor.Red);
                 }
                 
                 ConsoleEx.WriteLine();
-                //Debugger.Break();
+                Debugger.Break();
                 WriteGeneralRetryMessageToConsole();
                 await DeleteResourceGroupIfUserConsentsAsync();
                 return 1;
@@ -838,7 +840,7 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-            // env 05-12
+            // Get settings from env files numbered 05-12
             OverrideSettingsFromConfiguration(settings, configuration);
 
             settings["DefaultStorageAccountName"] = configuration.StorageAccountName;
@@ -1414,7 +1416,6 @@ namespace CromwellOnAzureDeployer
                     }
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "init-user.sql", Utility.GetFileContent("scripts", "mysql", "init-user.sql"));
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "unlock-change-log.sql", Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"));
                 });
 
