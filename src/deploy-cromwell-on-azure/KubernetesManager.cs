@@ -90,6 +90,21 @@ namespace CromwellOnAzureDeployer
             values.Config["batchNodesSubnetId"] = batchNodesSubnetId;
             values.Config["coaNamespace"] = configuration.AksCoANamespace;
 
+            if (!string.IsNullOrWhiteSpace(configuration.CustomTesImagePath))
+            {
+                values.Images["tes"] = configuration.CustomTesImagePath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuration.CustomTriggerServiceImagePath))
+            {
+                values.Images["triggerservice"] = configuration.CustomTriggerServiceImagePath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuration.CustomCromwellImagePath))
+            {
+                values.Images["cromwell"] = configuration.CustomCromwellImagePath;
+            }
+
             var writer = new StreamWriter(Path.Join("scripts", "helm", "values.yaml"));
             writer.Write(Yaml.SaveToString(values));
             writer.Close();
