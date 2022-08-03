@@ -47,7 +47,15 @@ namespace TesApi.Web
 
                             if (instrumentationKey is not null)
                             {
-                                logging.AddApplicationInsights(instrumentationKey);
+                                var connectionString = $"InstrumentationKey={instrumentationKey}";
+                                logging.AddApplicationInsights(
+                                    configuration =>
+                                    {
+                                        configuration.ConnectionString = connectionString;
+                                    },
+                                    options =>
+                                    {
+                                    });
                             }
                         }
                         else
