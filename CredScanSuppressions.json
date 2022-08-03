@@ -1,0 +1,49 @@
+{
+  "tool": "Credential Scanner",
+  "suppressions": [
+    {
+      "file": "\\docs\\release-notes\\2.0.0.md",
+      "_justification": "Fake password is used as a example and not a real password"
+    },
+    {
+      "file": "\\docs\\release-notes\\2.1.0.md",
+      "_justification": "Fake password is used as a example and not a real password"
+    },
+    {
+      "file": "\\docs\\release-notes\\2.2.0.md",
+      "_justification": "Fake password is used as a example and not a real password"
+    },
+    {
+      "file": "\\docs\\release-notes\\2.2.1.md",
+      "_justification": "Fake password is used as a example and not a real password"
+    },
+    {
+      "file": "\\docs\\release-notes\\2.3.0.md",
+      "_justification": "Fake password is used as a example and not a real password"
+    },
+    {
+      "file": "\\docs\\release-notes\\2.4.0.md",
+      "_justification": "Fake password is used as a example and not a real password"
+    },
+    {
+      "file": "\\docs\\release-notes\\2.5.0.md",
+      "_justification": "Fake password is used as a example and not a real password"
+    },
+    {
+      "file": "\\docs\\release-notes\\3.0.0.md",
+      "_justification": "Fake password is used as a example and not a real password"
+    },
+    {
+      "file": "\\docs\\release-notes\\3.1.0.md",
+      "_justification": "Fake password is used as a example and not a real password"
+    },
+    {
+      "file": "\\src\\deploy-cromwell-on-azure\\scripts\\docker-compose.yml",
+      "_justification": "Default database password that's not available on the Internet and the user can change"
+    },
+    {
+      "file": "\\src\\deploy-cromwell-on-azure\\scripts\\docker-compose.mysql.yml",
+      "_justification": "Default database password that's not available on the Internet and the user can change"
+    }
+  ]
+}
