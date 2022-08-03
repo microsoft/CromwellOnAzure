@@ -160,7 +160,7 @@ namespace CromwellOnAzureDeployer
 
                         ConsoleEx.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
-                                                var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
+                        var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
                         configuration.UseAks = existingAksCluster != null;
 
                         Dictionary<string, string> accountNames = null;
@@ -430,9 +430,9 @@ namespace CromwellOnAzureDeployer
                                 var settings = new Dictionary<string, string>(personalizedSettings);
                                 systemSettings.ToList().ForEach(x => settings.Add(x.Key, x.Value));
 
-                                if (aksCluster == null)
+                                if (aksCluster == null && !configuration.ManualHelmDeployment)
                                 {
-                                    aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
+                                    await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
                                 kubernetesManager.UpdateHelmValues(storageAccount.Name, resourceGroup.Name, settings["AzureServicesAuthConnectionString"], settings["ApplicationInsightsAccountName"], settings["CosmosDbAccountName"], settings["BatchAccountName"], settings["BatchNodesSubnetId"]);
