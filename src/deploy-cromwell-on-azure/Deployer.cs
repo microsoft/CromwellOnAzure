@@ -1024,11 +1024,11 @@ namespace CromwellOnAzureDeployer
                     .CreateAsync(cts.Token));
 
         private async Task<IStorageAccount> GetExistingStorageAccountAsync(string storageAccountName)
-            => (await Task.WhenAll(subscriptionIds.Select(s =>
+            => (await Task.WhenAll(subscriptionIds.Select(async s =>
             {
                 try
                 {
-                    return azureClient.WithSubscription(s).StorageAccounts.ListAsync();
+                    return await azureClient.WithSubscription(s).StorageAccounts.ListAsync();
                 }
                 catch (Exception)
                 {
@@ -1036,8 +1036,8 @@ namespace CromwellOnAzureDeployer
                     return null;
                 }
             })))
-                .SelectMany(a => a)
                 .Where(a => a is not null)
+                .SelectMany(a => a)
                 .SingleOrDefault(a => a.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase) && a.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
 
         private async Task<BatchAccount> GetExistingBatchAccountAsync(string batchAccountName)
