@@ -1342,11 +1342,11 @@ namespace CromwellOnAzureDeployer
             => await GetExistingStorageAccountAsync(storageAccountName, azureClient, subscriptionIds, configuration);
 
         public static async Task<IStorageAccount> GetExistingStorageAccountAsync(string storageAccountName, Microsoft.Azure.Management.Fluent.Azure.IAuthenticated azureClient, IEnumerable<string> subscriptionIds, Configuration configuration)
-            => (await Task.WhenAll(subscriptionIds.Select(s =>
+            => (await Task.WhenAll(subscriptionIds.Select(async s =>
             {
                 try
                 {
-                    return azureClient.WithSubscription(s).StorageAccounts.ListAsync();
+                    return await azureClient.WithSubscription(s).StorageAccounts.ListAsync();
                 }
                 catch (Exception)
                 {
