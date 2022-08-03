@@ -2,7 +2,8 @@
 # Licensed under the MIT License.
 
 # build runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:5.0
+FROM mcr.microsoft.com/dotnet/aspnet:6.0
 WORKDIR /app
 COPY . ./
+RUN apt update && apt full-upgrade -y && apt autoremove -y
 ENTRYPOINT ["dotnet", "tesapi.dll"]
