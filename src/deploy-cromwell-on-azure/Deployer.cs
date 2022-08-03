@@ -1636,18 +1636,9 @@ namespace CromwellOnAzureDeployer
             return $"CREATE USER {configuration.PostgreSqlUserLogin} WITH PASSWORD '{configuration.PostgreSqlUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlDatabaseName} TO {configuration.PostgreSqlUserLogin};";
         }
 
-        private Task ExecuteQueriesOnAzureMySqlDb(ConnectionInfo sshConnectionInfo, Server mySQLServer)
-        => Execute(
-            $"Executing scripts on cromwell_db.",
-            async () => {
-                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y mysql-client");
-                var initScript = GetInitSqlString();
-                return await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"mysql -u cromwell -pcromwell -h {mySQLServer.FullyQualifiedDomainName} -P 3306 -D cromwell_db -e \"{initScript}\"");
-            });
-
         private string GetPostgreSQLCreateUserCommand()
         {
-            var sqlCommand = $"CREATE USER {configuration.PostgreSqlUserLogin} WITH PASSWORD '{configuration.PostgreSqlUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlDatabaseName} TO {configuration.PostgreSqlUserLogin};";
+            var sqlCommand = GetInitSqlString();
             return $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} -c \"{sqlCommand}\"";
         }
 
@@ -1687,6 +1678,7 @@ namespace CromwellOnAzureDeployer
 
                     var commands = new List<string[]>() 
                     {
+                        new string[] { "apt", "update" },
                         new string[] { "apt", "install", "-y", "postgresql-client" },
                         new string[] { "psql", $"postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName}", "-c", $"{initScript}" }
                     };
