@@ -121,7 +121,11 @@ namespace TesApi.Web
 
                     if (instrumentationKey is not null)
                     {
-                        return s.AddApplicationInsightsTelemetry(instrumentationKey);
+                        var connectionString = $"InstrumentationKey={instrumentationKey}";
+                        return s.AddApplicationInsightsTelemetry(options =>
+                            {
+                                options.ConnectionString = connectionString;
+                            });
                     }
 
                     return s;
