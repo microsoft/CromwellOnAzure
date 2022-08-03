@@ -439,8 +439,6 @@ namespace CromwellOnAzureDeployer
                                 if (configuration.ManualHelmDeployment)
                                 {
                                     ConsoleEx.WriteLine("Please deploy helm chart, and press Enter to continue.");
-                                    ConsoleEx.WriteLine("\tHELM Setting AzureServicesAuthConnectionString: " + settings["AzureServicesAuthConnectionString"]);
-                                    ConsoleEx.WriteLine("\tHELM Setting BatchNodesSubnetId: " + settings["BatchNodesSubnetId"]);
                                     ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateUserCommand());
                                     ConsoleEx.ReadLine();
                                 }
