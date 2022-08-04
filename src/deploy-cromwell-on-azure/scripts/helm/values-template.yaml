@@ -11,11 +11,11 @@ config:
   azureOfferDurableId: MS-AZR-0003p
   batchAccountName: RUNTIME_PARAMETER
   batchNodesSubnetId: RUNTIME_PARAMETER
-  blobxferImageName: ""
-  disableBatchNodesPublicIpAddress: false
-  disableBatchScheduling: false
-  dockerInDockerImageName: ""
-  usePreemptibleVmsOnly: false
+  blobxferImageName: RUNTIME_PARAMETER
+  disableBatchNodesPublicIpAddress: RUNTIME_PARAMETER
+  disableBatchScheduling: RUNTIME_PARAMETER
+  dockerInDockerImageName: RUNTIME_PARAMETER
+  usePreemptibleVmsOnly: RUNTIME_PARAMETER
 
 images:
   cromwell: broadinstitute/cromwell:70

@@ -435,7 +435,7 @@ namespace CromwellOnAzureDeployer
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
-                                kubernetesManager.UpdateHelmValues(storageAccount.Name, resourceGroup.Name, settings["AzureServicesAuthConnectionString"], settings["ApplicationInsightsAccountName"], settings["CosmosDbAccountName"], settings["BatchAccountName"], settings["BatchNodesSubnetId"]);
+                                kubernetesManager.UpdateHelmValues(storageAccount.Name, resourceGroup.Name, settings);
                                 if (configuration.ManualHelmDeployment)
                                 {
                                     ConsoleEx.WriteLine("Please deploy helm chart, and press Enter to continue.");
@@ -818,15 +818,8 @@ namespace CromwellOnAzureDeployer
             settings["DockerInDockerImageName"] = configuration.DockerInDockerImageName;
             settings["BlobxferImageName"] = configuration.BlobxferImageName;
 
-            if (configuration.DisableBatchNodesPublicIpAddress.HasValue)
-            {
-                settings["DisableBatchNodesPublicIpAddress"] = configuration.DisableBatchNodesPublicIpAddress.Value.ToString();
-            }
-
-            if (configuration.KeepSshPortOpen.HasValue)
-            {
-                settings["KeepSshPortOpen"] = configuration.KeepSshPortOpen.Value.ToString();
-            }
+            settings["DisableBatchNodesPublicIpAddress"] = configuration.DisableBatchNodesPublicIpAddress.GetValueOrDefault().ToString();
+            settings["KeepSshPortOpen"] = configuration.KeepSshPortOpen.GetValueOrDefault().ToString();
 
             return settings;
         }
@@ -1151,7 +1144,6 @@ namespace CromwellOnAzureDeployer
                         await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y postgresql-client");
                     }
                 });
-
 
         private string GetAccountNames(IIdentity managedIdentity)
         {

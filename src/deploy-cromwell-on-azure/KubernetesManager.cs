@@ -73,17 +73,22 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        public void UpdateHelmValues(string storageAccountName, string resourceGroupName, string azureServiceAuthString, string appInsightsName, string cosmosDbName, string batchAccountName, string batchNodesSubnetId)
+        public void UpdateHelmValues(string storageAccountName, string resourceGroupName, Dictionary<string, string> settings)
         {
             var values = Yaml.LoadFromString<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
             values.Persistence["storageAccount"] = storageAccountName;
             values.Config["resourceGroup"] = resourceGroupName;
-            values.Config["azureServicesAuthConnectionString"] = azureServiceAuthString;
-            values.Config["applicationInsightsAccountName"] = appInsightsName;
-            values.Config["cosmosDbAccountName"] = cosmosDbName;
-            values.Config["batchAccountName"] = batchAccountName;
-            values.Config["batchNodesSubnetId"] = batchNodesSubnetId;
+            values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
+            values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
+            values.Config["cosmosDbAccountName"] = settings["CosmosDbAccountName"];
+            values.Config["batchAccountName"] = settings["BatchAccountName"];
+            values.Config["batchNodesSubnetId"] = settings["BatchNodesSubnetId"];
             values.Config["coaNamespace"] = configuration.AksCoANamespace;
+            values.Config["disableBatchNodesPublicIpAddress"] = settings["DisableBatchNodesPublicIpAddress"];
+            values.Config["disableBatchScheduling"] = settings["DisableBatchScheduling"];
+            values.Config["usePreemptibleVmsOnly"] = settings["UsePreemptibleVmsOnly"];
+            values.Config["blobxferImageName"] = settings["BlobxferImageName"];
+            values.Config["dockerInDockerImageName"] = settings["DockerInDockerImageName"];
 
             if (!string.IsNullOrWhiteSpace(configuration.CustomTesImagePath))
             {
@@ -235,7 +240,7 @@ namespace CromwellOnAzureDeployer
             IKubernetes client = new Kubernetes(k8sConfig);
 
             await UnlockCromwellChangeLog(client);
-            UpdateHelmValues(storageAccount.Name, resourceGroup.Name, settings["AzureServicesAuthConnectionString"], settings["ApplicationInsightsAccountName"], settings["CosmosDbAccountName"], settings["BatchAccountName"], settings["BatchNodesSubnetId"]);
+            UpdateHelmValues(storageAccount.Name, resourceGroup.Name, settings);
             await DeployHelmChartToCluster(client);
         }
 
