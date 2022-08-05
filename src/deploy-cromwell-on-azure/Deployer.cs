@@ -305,11 +305,19 @@ namespace CromwellOnAzureDeployer
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
                         aksCluster = await ValidateAndGetExistingAKSClusterAsync();
+                        postgreSqlServer = await ValidateAndGetExistingPostgresqlServer();
 
                         // Configuration preferences not currently settable by user.
-                        configuration.PostgreSqlServerName = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15) : String.Empty;
+                        if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName) && configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                        {
+                            configuration.PostgreSqlServerName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                        }
+
                         configuration.PostgreSqlAdministratorPassword = Utility.GeneratePassword();
-                        configuration.PostgreSqlUserPassword = Utility.GeneratePassword();
+                        if (string.IsNullOrWhiteSpace(configuration.PostgreSqlUserPassword))
+                        {
+                            configuration.PostgreSqlUserPassword = Utility.GeneratePassword();
+                        }
 
                         if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
                         {
@@ -415,7 +423,7 @@ namespace CromwellOnAzureDeployer
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                         });
 
-                        if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                        if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() && postgreSqlServer == null)
                         {
                             postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork);
                         }
@@ -502,7 +510,7 @@ namespace CromwellOnAzureDeployer
                             Task.Run(async () => { 
                                 if(configuration.ProvisionPostgreSqlOnAzure == true) 
                                 { 
-                                    postgreSqlServer = await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone);
+                                    postgreSqlServer ??= await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone);
 
                                     // Wait for either kubernetes pod to start or ssh connection info to be set.
                                     await compute;
@@ -642,6 +650,18 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private async Task<Server> ValidateAndGetExistingPostgresqlServer()
+        {
+            if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName))
+            {
+                return null;
+            }
+
+            return (await GetExistingPostgresqlService(configuration.PostgreSqlServerName))
+                ?? throw new ValidationException($"If Postgresql server name is provided, the server must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+
+        }
+
         private async Task<ManagedCluster> ValidateAndGetExistingAKSClusterAsync()
         {
             if (string.IsNullOrWhiteSpace(configuration.AksClusterName))
@@ -651,7 +671,25 @@ namespace CromwellOnAzureDeployer
 
             return (await GetExistingAKSClusterAsync(configuration.AksClusterName))
                 ?? throw new ValidationException($"If AKS cluster name is provided, the cluster must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
-
+        }
+        
+        private async Task<Server> GetExistingPostgresqlService(string serverName)
+        {
+            return (await Task.WhenAll(subscriptionIds.Select(async s =>
+            {
+                try
+                {
+                    var client = new PostgreSQLManagementClient(tokenCredentials) { SubscriptionId = s };
+                    return await client.Servers.ListAsync();
+                }
+                catch (Exception)
+                {
+                    return null;
+                }
+            })))
+                .Where(a => a is not null)
+                .SelectMany(a => a)
+                .SingleOrDefault(a => a.Name.Equals(serverName, StringComparison.OrdinalIgnoreCase) && Regex.Replace(a.Location, @"\s+", "").Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
         }
 
         private async Task<ManagedCluster> GetExistingAKSClusterAsync(string aksClusterName)
