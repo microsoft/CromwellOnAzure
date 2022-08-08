@@ -491,6 +491,11 @@ namespace TesApi.Web
                 tesTask.SetFailureReason("BatchClientException", string.Join(",", exc.Data.Values), exc.Message, exc.StackTrace);
                 logger.LogError(exc, exc.Message + ", " + string.Join(",", exc.Data.Values));
             }
+            catch (BatchException exc) when (exc.InnerException is Microsoft.Azure.Batch.Protocol.Models.BatchErrorException beex && @"ActiveJobAndScheduleQuotaReached".Equals(beex.Body.Code, StringComparison.OrdinalIgnoreCase))
+            {
+                tesTask.SetWarning(beex.Body.Message.Value, Array.Empty<string>());
+                logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {beex.Body.Message.Value}. Task will remain in queue.");
+            }
             catch (Exception exc)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
