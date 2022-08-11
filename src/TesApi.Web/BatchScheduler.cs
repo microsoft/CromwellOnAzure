@@ -1579,13 +1579,20 @@ namespace TesApi.Web
 
                 hostConfigInsertedMessage = true switch
                 {
-                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}', vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
-                    var a when hostConfigVmSizes is not null && !hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
-                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && !hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
-                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && !hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}', vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}'), ",
-                    var a when hostConfigVmSizes is not null && !hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && !hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
-                    var a when hostConfigVmSizes is not null && !hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && !hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}'), ",
-                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && !hostConfigVmSizes.Any(vm => vm.VmSize is not null) && !hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}'), ",
+                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null)
+                        => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}', vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && !hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null)
+                        => $"host_config(vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && !hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null)
+                        => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && !hostConfigVmSizes.Any(vm => vm.MinVmSize is not null)
+                        => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}', vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && !hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && !hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null)
+                        => $"host_config(minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && !hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && !hostConfigVmSizes.Any(vm => vm.MinVmSize is not null)
+                        => $"host_config(vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}'), ",
+                    var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && !hostConfigVmSizes.Any(vm => vm.VmSize is not null) && !hostConfigVmSizes.Any(vm => vm.MinVmSize is not null)
+                        => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}'), ",
                     _ => string.Empty,
                 };
 
@@ -1613,38 +1620,53 @@ namespace TesApi.Web
                 }
             }
 
-            if (vmFamilies is not null || vmSizes is not null)
-            {
-                eligibleVms = virtualMachineInfoList
-                    .Where(vm => vm.LowPriority == preemptible)
-                    .Where(vm => vmFamilies?.Contains(vm.VmFamily, StringComparer.OrdinalIgnoreCase) ?? true)
-                    .Where(vm => vmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? true)
-                    .ToList();
+            var requiredNumberOfCores = tesResources.CpuCores.GetValueOrDefault(DefaultCoreCount);
+            var requiredMemoryInGB = tesResources.RamGb.GetValueOrDefault(DefaultMemoryGb);
+            var requiredDiskSizeInGB = tesResources.DiskGb.GetValueOrDefault(DefaultDiskGb);
 
-                noVmFoundMessage = true switch
-                    {
-                        var a when vmFamilies is not null && vmSizes is not null => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}vmfamily: '{string.Join(", ", vmFamilies)}', vmsize: '{string.Join(", ", vmSizes)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
-                        var a when vmFamilies is null && vmSizes is not null => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}vmsize: '{string.Join(", ", vmSizes)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
-                        var a when vmFamilies is not null && vmSizes is null => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}vmfamily: '{string.Join(", ", vmFamilies)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
-                        _ => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}preemptible: {preemptible}) for task id {tesTask.Id}.",
-                    };
+            noVmFoundMessage = true switch
+            {
+                var a when vmFamilies is not null && vmSizes is not null
+                    => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}vmsize: '{string.Join(", ", vmSizes)}', vmfamily: '{string.Join(", ", vmFamilies)}', cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}.",
+                var a when vmFamilies is null && vmSizes is not null
+                    => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}vmsize: '{string.Join(", ", vmSizes)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
+                var a when vmFamilies is not null && vmSizes is null
+                    => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}vmfamily: '{string.Join(", ", vmFamilies)}', cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}.",
+                _ => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}.",
+            };
+
+            eligibleVms = (vmSizes is null ? Enumerable.Empty<VirtualMachineInformation>() : GetEligibleVmsFromVmSizes(vmSizes, virtualMachineInfoList))
+                .Concat(vmFamilies is null ? Enumerable.Empty<VirtualMachineInformation>() : GetEligibleVmsFromVmFamilies(vmFamilies, virtualMachineInfoList))
+                .Concat(vmSizes is null && vmFamilies is null ? GetEligibleVms(virtualMachineInfoList).OrderBy(vm => vm.PricePerHour) : Enumerable.Empty<VirtualMachineInformation>())
+                .Distinct()
+                .ToList();
+
+            IEnumerable<VirtualMachineInformation> GetEligibleVmsFromVmSizes(IEnumerable<string> vmSizes, IEnumerable<VirtualMachineInformation> vmList)
+            {
+                var vmSizesIndexed = vmSizes.Select((v,i) => (v, i)).ToDictionary(s => s.v, s => s.i, StringComparer.OrdinalIgnoreCase);
+
+                return vmList
+                    .Where(vm => vm.LowPriority == preemptible && vmSizesIndexed.Keys.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
+                    .OrderBy(vm => vmSizesIndexed[vm.VmSize])
+                    .ThenBy(vm => vm.PricePerHour);
             }
-            else
-            {
-                var requiredNumberOfCores = tesResources.CpuCores.GetValueOrDefault(DefaultCoreCount);
-                var requiredMemoryInGB = tesResources.RamGb.GetValueOrDefault(DefaultMemoryGb);
-                var requiredDiskSizeInGB = tesResources.DiskGb.GetValueOrDefault(DefaultDiskGb);
 
-                eligibleVms = virtualMachineInfoList
-                    .Where(vm =>
-                        vm.LowPriority == preemptible
+            IEnumerable<VirtualMachineInformation> GetEligibleVmsFromVmFamilies(IEnumerable<string> vmFamilies, IEnumerable<VirtualMachineInformation> vmList)
+            {
+                var vmFamiliesIndexed = vmFamilies.Select((v, i) => (v, i)).ToDictionary(s => s.v, s => s.i, StringComparer.OrdinalIgnoreCase);
+
+                return GetEligibleVms(vmList
+                    .Where(vm => vmFamilies.Contains(vm.VmFamily, StringComparer.OrdinalIgnoreCase))
+                    .OrderBy(vm => vmFamiliesIndexed[vm.VmFamily])
+                    .ThenBy(vm => vm.PricePerHour));
+            }
+
+            IEnumerable<VirtualMachineInformation> GetEligibleVms(IEnumerable<VirtualMachineInformation> vmList)
+                => vmList.Where(vm
+                        => vm.LowPriority == preemptible
                         && vm.NumberOfCores >= requiredNumberOfCores
                         && vm.MemoryInGB >= requiredMemoryInGB
-                        && vm.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
-                    .ToList();
-
-                noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources ({hostConfigInsertedMessage}cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}.";
-            }
+                        && vm.ResourceDiskSizeInGB >= requiredDiskSizeInGB);
 
             var batchQuotas = await azureProxy.GetBatchAccountQuotasAsync();
 
@@ -1655,7 +1677,6 @@ namespace TesApi.Web
                     ? batchQuotas.LowPriorityCoreQuota >= vm.NumberOfCores
                     : batchQuotas.DedicatedCoreQuota >= vm.NumberOfCores
                         && (!batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced || batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(x => vm.VmFamily.Equals(x.Name, StringComparison.OrdinalIgnoreCase))?.CoreQuota >= vm.NumberOfCores))
-                .OrderBy(x => x.PricePerHour)
                 .FirstOrDefault();
 
             if (!preemptible && selectedVm is not null)
@@ -1663,7 +1684,6 @@ namespace TesApi.Web
                 var idealVm = eligibleVms
                     .Where(vm => !(allowedVmSizes?.Any() ?? false) || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
                     .Where(vm => !(previouslyFailedVmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? false))
-                    .OrderBy(x => x.PricePerHour)
                     .FirstOrDefault();
 
                 if (selectedVm.PricePerHour >= idealVm.PricePerHour * 2)
