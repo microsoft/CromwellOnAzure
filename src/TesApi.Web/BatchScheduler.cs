@@ -1568,11 +1568,14 @@ namespace TesApi.Web
                 foreach (var vmFamily in allVmFamilies)
                 {
                     vmsByFamily.Add(vmFamily, virtualMachineInfoList.Where(vm => vmFamily.Equals(vm.VmFamily, StringComparison.OrdinalIgnoreCase))
-                        .OrderBy(vm => vm.PricePerHour)
+                        .OrderBy(vm => vm.NumberOfCores)
                         .ToList());
                 }
 
-                virtualMachineInfoList = virtualMachineInfoList.Where(vm => hostConfigVmSizes.Any(size => Matches(vm, size))).ToList();
+                virtualMachineInfoList = hostConfigVmSizes
+                    .SelectMany(GetMatchingVMs)
+                    .Distinct()
+                    .ToList();
 
                 hostConfigInsertedMessage = true switch
                 {
@@ -1586,34 +1589,26 @@ namespace TesApi.Web
                     _ => string.Empty,
                 };
 
-                bool Matches(VirtualMachineInformation vmInfo, HostConfigs.VirtualMachineSize vmSize)
+                IEnumerable<VirtualMachineInformation> GetMatchingVMs(HostConfigs.VirtualMachineSize vmSize)
                 {
                     if (vmSize.Container is not null && !Common.Utilities.NormalizeContainerImageName(vmSize.Container).Equals(Common.Utilities.NormalizeContainerImageName(tesTask.Executors.FirstOrDefault()?.Image)))
                     {
-                        return false;
+                        return Enumerable.Empty<VirtualMachineInformation>();
                     }
 
                     var family = vmSize.FamilyName ?? virtualMachineInfoList.FirstOrDefault(vm => string.Equals(vm.VmSize, vmSize.MinVmSize, StringComparison.OrdinalIgnoreCase))?.VmFamily;
 
                     if (family is not null)
                     {
-                        if (!string.Equals(family, vmInfo.VmFamily, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return false;
-                        }
-
-                        return vmsByFamily[family]
-                            .SkipWhile(vm => vmSize.MinVmSize is not null && !string.Equals(vmSize.MinVmSize, vm.VmSize, StringComparison.OrdinalIgnoreCase))
-                            .Select(vm => vm.VmSize)
-                            .Contains(vmInfo.VmSize);
+                        return vmsByFamily[family].SkipWhile(vm => vmSize.MinVmSize is not null && !string.Equals(vmSize.MinVmSize, vm.VmSize, StringComparison.OrdinalIgnoreCase));
                     }
                     else if (vmSize.VmSize is not null)
                     {
-                        return string.Equals(vmInfo.VmSize, vmSize.VmSize, StringComparison.OrdinalIgnoreCase);
+                        return virtualMachineInfoList.Where(vm => string.Equals(vmSize.VmSize, vm.VmSize, StringComparison.OrdinalIgnoreCase));
                     }
                     else
                     {
-                        return false;
+                        return Enumerable.Empty<VirtualMachineInformation>();
                     }
                 }
             }

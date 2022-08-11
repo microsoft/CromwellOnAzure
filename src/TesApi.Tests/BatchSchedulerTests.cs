@@ -296,7 +296,7 @@ namespace TesApi.Tests
         //[TestCategory("TES 1.1")]
         //[DataRow("VmSizeLowPri1-2", true)]
         //[DataRow("VmSizeLowPri2", true)]
-        //[DataRow("VmSizeDedicated1", false)]
+        //[DataRow("VmSizeDedicated1-2", false)]
         //[DataRow("VmSizeDedicated2", false)]
         //[TestMethod]
         //public async Task TestIfVmSizeIsAvailable2(string vmSize, bool preemptible)
@@ -309,6 +309,7 @@ namespace TesApi.Tests
         //    var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
 
         //    azureProxyReturnValues.VmSizesAndPrices.Add(new() { VmSize = "VmSizeLowPri1-2", VmFamily = "VmFamily1", LowPriority = true, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 2 });
+        //    azureProxyReturnValues.VmSizesAndPrices.Add(new() { VmSize = "VmSizeDedicated1-2", VmFamily = "VmFamily1", LowPriority = false, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 22 });
 
         //    using var serviceProvider = GetServiceProvider(GetMockConfig()(), GetMockAzureProxy(azureProxyReturnValues));
         //    var batchScheduler = serviceProvider.GetT();
