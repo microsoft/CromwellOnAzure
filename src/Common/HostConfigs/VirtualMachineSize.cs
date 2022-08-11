@@ -8,6 +8,9 @@ using System.Runtime.Serialization;
 
 namespace Common.HostConfigs
 {
+    /// <summary>
+    /// Collection of <see cref="VirtualMachineSize"/>.
+    /// </summary>
     public class VirtualMachineSizes : List<VirtualMachineSize>
     {
         public static VirtualMachineSizes Empty => new();

@@ -1537,7 +1537,7 @@ namespace TesApi.Web
         /// Gets the cheapest available VM size that satisfies the <see cref="TesTask"/> execution requirements
         /// </summary>
         /// <param name="tesTask"><see cref="TesTask"/></param>
-        /// <param name="hostConfigVmSizes"></param>
+        /// <param name="hostConfigVmSizes"><see cref="HostConfigs.VirtualMachineSizes"/></param>
         /// <param name="forcePreemptibleVmsOnly">Force consideration of preemptible virtual machines only.</param>
         /// <returns>The virtual machine info</returns>
         public async Task<VirtualMachineInformation> GetVmSizeAsync(TesTask tesTask, HostConfigs.VirtualMachineSizes hostConfigVmSizes, bool forcePreemptibleVmsOnly = false)
@@ -1551,24 +1551,30 @@ namespace TesApi.Web
                 .ToList();
 
             var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
+            var virtualMachineInfoListCount = virtualMachineInfoList.Count;
             var preemptible = forcePreemptibleVmsOnly || usePreemptibleVmsOnly || tesResources.Preemptible.GetValueOrDefault(true);
 
             var eligibleVms = new List<VirtualMachineInformation>();
             var noVmFoundMessage = string.Empty;
+            var hostConfigInsertedMessage = string.Empty;
 
             var vmFamilies = tesResources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_family)?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             var vmSizes = tesResources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.vm_size)?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
-            if (vmFamilies is not null || vmSizes is not null || hostConfigVmSizes is not null)
+            if ((hostConfigVmSizes?.Count ?? 0) != 0)
             {
-                eligibleVms = virtualMachineInfoList
-                    .Where(vm => vm.LowPriority == preemptible)
-                    .Where(vm => vmFamilies?.Contains(vm.VmFamily, StringComparer.OrdinalIgnoreCase) ?? true)
-                    .Where(vm => vmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? true)
-                    .Where(vm => hostConfigVmSizes is null || !hostConfigVmSizes.Any() || hostConfigVmSizes.Any(size => Matches(vm, size)))
-                    .ToList();
+                var allVmFamilies = virtualMachineInfoList.Select(vm => vm.VmFamily).Distinct().ToList();
+                var vmsByFamily = new Dictionary<string, IEnumerable<VirtualMachineInformation>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var vmFamily in allVmFamilies)
+                {
+                    vmsByFamily.Add(vmFamily, virtualMachineInfoList.Where(vm => vmFamily.Equals(vm.VmFamily, StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(vm => vm.PricePerHour)
+                        .ToList());
+                }
 
-                var hostConfigInsertedMessage = true switch
+                virtualMachineInfoList = virtualMachineInfoList.Where(vm => hostConfigVmSizes.Any(size => Matches(vm, size))).ToList();
+
+                hostConfigInsertedMessage = true switch
                 {
                     var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}', vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
                     var a when hostConfigVmSizes is not null && !hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && hostConfigVmSizes.Any(vm => vm.VmSize is not null) && hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.VmSize))}', minvmsize: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.MinVmSize))}'), ",
@@ -1579,14 +1585,6 @@ namespace TesApi.Web
                     var a when hostConfigVmSizes is not null && hostConfigVmSizes.Any(vm => vm.FamilyName is not null) && !hostConfigVmSizes.Any(vm => vm.VmSize is not null) && !hostConfigVmSizes.Any(vm => vm.MinVmSize is not null) => $"host_config(vmfamily: '{string.Join(", ", hostConfigVmSizes.Select(vm => vm.FamilyName))}'), ",
                     _ => string.Empty,
                 };
-
-                noVmFoundMessage = true switch
-                    {
-                        var a when vmFamilies is not null && vmSizes is not null => $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources ({hostConfigInsertedMessage}vmfamily: '{string.Join(", ", vmFamilies)}', vmsize: '{string.Join(", ", vmSizes)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
-                        var a when vmFamilies is null && vmSizes is not null => $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources ({hostConfigInsertedMessage}vmsize: '{string.Join(", ", vmSizes)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
-                        var a when vmFamilies is not null && vmSizes is null => $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources ({hostConfigInsertedMessage}vmfamily: '{string.Join(", ", vmFamilies)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
-                        _ => $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources ({hostConfigInsertedMessage}preemptible: {preemptible}) for task id {tesTask.Id}.",
-                    };
 
                 bool Matches(VirtualMachineInformation vmInfo, HostConfigs.VirtualMachineSize vmSize)
                 {
@@ -1604,12 +1602,10 @@ namespace TesApi.Web
                             return false;
                         }
 
-                        var sizesInFamily = virtualMachineInfoList
-                            .Where(vm => string.Equals(vm.VmFamily, family, StringComparison.OrdinalIgnoreCase))
-                            .OrderBy(vm => vm.PricePerHour)
-                            .SkipWhile(vm => vmSize.MinVmSize is not null && !string.Equals(vmSize.MinVmSize, vm.VmSize, StringComparison.OrdinalIgnoreCase));
-
-                        return sizesInFamily.Select(vm => vm.VmSize).Contains(vmInfo.VmSize);
+                        return vmsByFamily[family]
+                            .SkipWhile(vm => vmSize.MinVmSize is not null && !string.Equals(vmSize.MinVmSize, vm.VmSize, StringComparison.OrdinalIgnoreCase))
+                            .Select(vm => vm.VmSize)
+                            .Contains(vmInfo.VmSize);
                     }
                     else if (vmSize.VmSize is not null)
                     {
@@ -1620,6 +1616,23 @@ namespace TesApi.Web
                         return false;
                     }
                 }
+            }
+
+            if (vmFamilies is not null || vmSizes is not null)
+            {
+                eligibleVms = virtualMachineInfoList
+                    .Where(vm => vm.LowPriority == preemptible)
+                    .Where(vm => vmFamilies?.Contains(vm.VmFamily, StringComparer.OrdinalIgnoreCase) ?? true)
+                    .Where(vm => vmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? true)
+                    .ToList();
+
+                noVmFoundMessage = true switch
+                    {
+                        var a when vmFamilies is not null && vmSizes is not null => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}vmfamily: '{string.Join(", ", vmFamilies)}', vmsize: '{string.Join(", ", vmSizes)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
+                        var a when vmFamilies is null && vmSizes is not null => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}vmsize: '{string.Join(", ", vmSizes)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
+                        var a when vmFamilies is not null && vmSizes is null => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}vmfamily: '{string.Join(", ", vmFamilies)}', preemptible: {preemptible}) for task id {tesTask.Id}.",
+                        _ => $"No VM (out of {virtualMachineInfoListCount}) available with the required resources ({hostConfigInsertedMessage}preemptible: {preemptible}) for task id {tesTask.Id}.",
+                    };
             }
             else
             {
@@ -1635,7 +1648,7 @@ namespace TesApi.Web
                         && vm.ResourceDiskSizeInGB >= requiredDiskSizeInGB)
                     .ToList();
 
-                noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources (cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}.";
+                noVmFoundMessage = $"No VM (out of {virtualMachineInfoList.Count}) available with the required resources ({hostConfigInsertedMessage}cores: {requiredNumberOfCores}, memory: {requiredMemoryInGB} GB, disk: {requiredDiskSizeInGB} GB, preemptible: {preemptible}) for task id {tesTask.Id}.";
             }
 
             var batchQuotas = await azureProxy.GetBatchAccountQuotasAsync();

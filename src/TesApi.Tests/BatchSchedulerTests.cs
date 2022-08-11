@@ -293,6 +293,35 @@ namespace TesApi.Tests
             Assert.AreEqual(vmSize, size.VmSize);
         }
 
+        //[TestCategory("TES 1.1")]
+        //[DataRow("VmSizeLowPri1-2", true)]
+        //[DataRow("VmSizeLowPri2", true)]
+        //[DataRow("VmSizeDedicated1", false)]
+        //[DataRow("VmSizeDedicated2", false)]
+        //[TestMethod]
+        //public async Task TestIfVmSizeIsAvailable2(string vmSize, bool preemptible)
+        //{
+        //    var backendParameters = new Dictionary<string, string> { { "vm_size", vmSize } };
+        //    var task = GetTesTask();
+        //    task.Resources.Preemptible = preemptible;
+        //    task.Resources.BackendParameters = backendParameters;
+
+        //    var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
+
+        //    azureProxyReturnValues.VmSizesAndPrices.Add(new() { VmSize = "VmSizeLowPri1-2", VmFamily = "VmFamily1", LowPriority = true, NumberOfCores = 2, MemoryInGB = 8, ResourceDiskSizeInGB = 40, PricePerHour = 2 });
+
+        //    using var serviceProvider = GetServiceProvider(GetMockConfig()(), GetMockAzureProxy(azureProxyReturnValues));
+        //    var batchScheduler = serviceProvider.GetT();
+
+        //    var vms = VirtualMachineSizes.Empty;
+        //    vms.Add(new() { FamilyName = "VmFamily1", MinVmSize = "VmSizeLowPri1-2" });
+        //    vms.Add(new() { VmSize = "VmSizeLowPri2" });
+        //    vms.Add(new() { VmSize = "VmSizeDedicated2" });
+
+        //    var size = await batchScheduler.GetVmSizeAsync(task, vms);
+        //    Assert.AreEqual(vmSize, size.VmSize);
+        //}
+
         [TestMethod]
         public async Task TesTaskFailsWithSystemErrorWhenNoSuitableVmExists()
         {

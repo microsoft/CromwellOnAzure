@@ -12,11 +12,16 @@ namespace Common
         /// </summary>
         /// <param name="image"></param>
         /// <returns></returns>
-        /// <remarks>This value is expected to be used for comparison purposes only, although in most circumstances it should be usable. There's very little validation performed at this time.</remarks>
+        /// <remarks>
+        /// This value is expected to be used for comparison purposes only, although in most circumstances it should be usable.
+        /// There's very little validation performed at this time.
+        /// Some URIs may be mangled by this implementation.
+        /// </remarks>
         public static Uri NormalizeContainerImageName(string image)
         {
-            // Find and store docker tag
             var tag = ":latest"; // default value if none specified
+
+            // Find and store docker tag
             var tagIdx = image.LastIndexOf(':');
 
             if (-1 != tagIdx && image.LastIndexOf('/') <= tagIdx)
@@ -26,7 +31,7 @@ namespace Common
             }
 
             // Add scheme if none specified
-            if (image.IndexOf('/') >= image.IndexOf(':'))
+            if (image.IndexOf('/') - 1 != image.IndexOf(':'))
             {
                 image = "docker://" + image;
             }
@@ -55,6 +60,7 @@ namespace Common
 
             // Add/restore docker tag
             builder.Path += tag;
+
             return builder.Uri;
         }
     }
