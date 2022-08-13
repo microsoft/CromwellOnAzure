@@ -13,22 +13,68 @@ spec:
       storage: {{ .Values.persistence.cromwellTmpSize }}
 status: {}
 ---
+apiVersion: v1
+data:
+  azurestorageaccountname: {{.Values.persistence.storageAccount | b64enc}}
+  azurestorageaccountkey: {{.Values.persistence.storageAccountKey | b64enc}}
+kind: Secret
+metadata:
+  name: azure-secret
+type: Opaque
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: blob-fuse
+provisioner: blob.csi.azure.com
+parameters:
+  skuName: Premium_LRS  # available values: Standard_LRS, Premium_LRS, Standard_GRS, Standard_RAGRS
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+mountOptions:
+  - -o allow_other
+  - --file-cache-timeout-in-seconds=120
+  - --use-attr-cache=true
+  - --cancel-list-on-mount-seconds=10  # prevent billing charges on mounting
+  - -o attr_timeout=120
+  - -o entry_timeout=120
+  - -o negative_timeout=120
+  - --log-level=LOG_WARNING  # LOG_WARNING, LOG_INFO, LOG_DEBUG
+  - --cache-size-mb=1000  # Default will be 80% of available memory, eviction will happen beyond that.
+---
 {{- $rg  := .Values.config.resourceGroup -}}
 {{- $namespace := .Values.config.coaNamespace -}}
 {{- $storageAccount  := .Values.persistence.storageAccount -}}
 {{- $size  := .Values.persistence.blobPvcSize -}}
 {{- range .Values.defaultContainers }}
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
+apiVersion: v1
+kind: PersistentVolume
 metadata:
-  name: blob-{{ . }}
-provisioner: blob.csi.azure.com
-reclaimPolicy: Retain
-volumeBindingMode: Immediate
-parameters:
-  resourceGroup: {{ $rg }}
-  storageAccount: {{ $storageAccount }}
-  containerName: {{ . }}
+  name: pv-blob-{{ . }}
+spec:
+  capacity:
+    storage: {{ $size }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain  # If set as "Delete" container would be removed after pvc deletion
+  storageClassName: blob-fuse
+  mountOptions:
+    - -o allow_other
+    - --file-cache-timeout-in-seconds=120
+  csi:
+    driver: blob.csi.azure.com
+    readOnly: false
+    # make sure this volumeid is unique in the cluster
+    # `#` is not allowed in self defined volumeHandle
+    volumeHandle: {{ uuidv4 }}
+    volumeAttributes:
+      resourceGroup: {{ $rg }}
+      storageAccount: {{ $storageAccount }}
+      containerName: {{ . }}
+    nodeStageSecretRef:
+      name: azure-secret
+      namespace: {{ $namespace }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -40,7 +86,8 @@ spec:
   resources:
     requests:
       storage: {{ $size }}
-  storageClassName: blob-{{ . }}
+  volumeName: pv-blob-{{ . }}
+  storageClassName: blob-fuse
 ---
 {{- end }}
 {{- range .Values.externalContainers }}

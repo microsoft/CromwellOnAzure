@@ -43,3 +43,4 @@ persistence:
   blobPvcSize: 32Gi
   cromwellTmpSize: 32Gi
   storageAccount: RUNTIME_PARAMETER
+  storageAccountKey: RUNTIME_PARAMETER

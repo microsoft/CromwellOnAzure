@@ -73,10 +73,11 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        public void UpdateHelmValues(string storageAccountName, string resourceGroupName, Dictionary<string, string> settings)
+        public void UpdateHelmValues(string storageAccountName, string saKey, string resourceGroupName, Dictionary<string, string> settings)
         {
             var values = Yaml.LoadFromString<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
             values.Persistence["storageAccount"] = storageAccountName;
+            values.Persistence["storageAccountKey"] = saKey;
             values.Config["resourceGroup"] = resourceGroupName;
             values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
             values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
@@ -240,7 +241,8 @@ namespace CromwellOnAzureDeployer
             IKubernetes client = new Kubernetes(k8sConfig);
 
             await UnlockCromwellChangeLog(client);
-            UpdateHelmValues(storageAccount.Name, resourceGroup.Name, settings);
+            var keys = await storageAccount.GetKeysAsync();
+            UpdateHelmValues(storageAccount.Name, keys.First().Value, resourceGroup.Name, settings);
             await DeployHelmChartToCluster(client);
         }
 

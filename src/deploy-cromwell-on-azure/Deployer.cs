@@ -443,7 +443,8 @@ namespace CromwellOnAzureDeployer
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
-                                kubernetesManager.UpdateHelmValues(storageAccount.Name, resourceGroup.Name, settings);
+                                var keys = await storageAccount.GetKeysAsync();
+                                kubernetesManager.UpdateHelmValues(storageAccount.Name, keys.First().Value, resourceGroup.Name, settings);
                                 if (configuration.ManualHelmDeployment)
                                 {
                                     ConsoleEx.WriteLine("Please deploy helm chart, and press Enter to continue.");
