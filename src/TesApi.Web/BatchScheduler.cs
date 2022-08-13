@@ -1201,8 +1201,16 @@ namespace TesApi.Web
             {
                 poolSpecification.AutoScaleEnabled = true;
                 poolSpecification.AutoScaleEvaluationInterval = TimeSpan.FromMinutes(5);
-                var target = preemptable ? "$TargetLowPriorityNodes" : "$TargetDedicated";
-                poolSpecification.AutoScaleFormula = $"{target}=max($PendingTasks.GetSample(90 * TimeInterval_Second, 10));\r\n$NodeDeallocationOption=requeue;";
+                //var target = preemptable ? "$TargetLowPriorityNodes" : "$TargetDedicated";
+                //poolSpecification.AutoScaleFormula = $"{target}=max($PendingTasks.GetSample(90 * TimeInterval_Second, 10));\r\n$NodeDeallocationOption=requeue;";
+                poolSpecification.AutoScaleFormula = string.Format(@"
+    $NodeDeallocationOption=requeue;
+    lifespan         = time() - time(""{1}"");
+    span             = TimeInterval_Second * 90;
+    startup          = TimeInterval_Minute * 2;
+    ratio            = 10;
+    {0} = (lifespan > startup ? max($RunningTasks.GetSample(span, ratio), $ActiveTasks.GetSample(span, ratio)) : {2});
+    ", preemptable ? "$TargetLowPriorityNodes" : "$TargetDedicated", DateTime.UtcNow.ToString("r"), 1);
             }
             else
             {
