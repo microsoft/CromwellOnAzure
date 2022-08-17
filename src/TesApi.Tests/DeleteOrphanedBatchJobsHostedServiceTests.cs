@@ -4,7 +4,6 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Tes.Models;
@@ -81,29 +80,29 @@ namespace TesApi.Tests
 
         private static async Task<Mock<IAzureProxy>> ArrangeTest(TesTask[] tasks)
         {
-            var azureProxy = new Mock<IAzureProxy>();
-            var mockRepo = new Mock<IRepository<TesTask>>();
-
-            azureProxy.Setup(p => p.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>())).ReturnsAsync(tasks.Select(i => i.Id + "-1"));
-
-            foreach (var item in tasks)
+            void SetupRepository(Mock<IRepository<TesTask>> mockRepo)
             {
-                mockRepo.Setup(repo => repo.TryGetItemAsync(item.Id, It.IsAny<Action<TesTask>>()))
-                    .Callback<string, Action<TesTask>>((id, action) =>
-                    {
-                        action(item);
-                    })
-                    .ReturnsAsync(true);
+                foreach (var item in tasks)
+                {
+                    mockRepo.Setup(repo => repo.TryGetItemAsync(item.Id, It.IsAny<Action<TesTask>>()))
+                        .Callback<string, Action<TesTask>>((id, action) =>
+                        {
+                            action(item);
+                        })
+                        .ReturnsAsync(true);
+                }
             }
 
-            var deleteOrphanedBatchJobsHostedService = new DeleteOrphanedBatchJobsHostedService(
-                azureProxy.Object,
-                mockRepo.Object,
-                new NullLogger<DeleteOrphanedBatchJobsHostedService>());
+            using var services = new TestServices.TestServiceProvider<DeleteOrphanedBatchJobsHostedService>(
+                configuration: Enumerable.Repeat(("BatchAutopool", true.ToString()), 1),
+                azureProxy: a => a.Setup(p => p.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>())).ReturnsAsync(tasks.Select(i => i.Id + "-1")),
+                tesTaskRepository: SetupRepository);
+
+            var deleteOrphanedBatchJobsHostedService = services.GetT();
 
             await deleteOrphanedBatchJobsHostedService.StartAsync(new System.Threading.CancellationToken());
 
-            return azureProxy;
+            return services.AzureProxy;
         }
     }
 }

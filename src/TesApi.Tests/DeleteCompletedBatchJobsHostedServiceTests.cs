@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Tes.Models;
@@ -15,22 +13,6 @@ namespace TesApi.Tests
     public class DeleteCompletedBatchJobsHostedServiceTests
     {
         private static readonly TimeSpan oldestJobAge = TimeSpan.FromDays(7);
-
-        private Mock<IAzureProxy> azureProxy;
-        private Mock<IRepository<TesTask>> mockRepo;
-        private DeleteCompletedBatchJobsHostedService deleteCompletedBatchJobsHostedService;
-
-        [TestInitialize]
-        public void InitializeTests()
-        {
-            azureProxy = new Mock<IAzureProxy>();
-            mockRepo = new Mock<IRepository<TesTask>>();
-            deleteCompletedBatchJobsHostedService = new DeleteCompletedBatchJobsHostedService(
-                new ConfigurationBuilder().Build(),
-                azureProxy.Object,
-                mockRepo.Object,
-                new NullLogger<DeleteCompletedBatchJobsHostedService>());
-        }
 
         [TestMethod]
         public async Task DeleteCompletedBatchJobs_DeletesJobs_TesStateCompleted()
@@ -95,21 +77,27 @@ namespace TesApi.Tests
 
         private async Task<Mock<IAzureProxy>> ArrangeTest(TesTask[] tasks)
         {
-            foreach (var item in tasks)
+            void SetupRepository(Mock<IRepository<TesTask>> mockRepo)
             {
-                mockRepo.Setup(repo => repo.TryGetItemAsync(item.Id, It.IsAny<Action<TesTask>>()))
-                    .Callback<string, Action<TesTask>>((id, action) =>
-                    {
-                        action(item);
-                    })
-                    .ReturnsAsync(true);
+                foreach (var item in tasks)
+                {
+                    mockRepo.Setup(repo => repo.TryGetItemAsync(item.Id, It.IsAny<Action<TesTask>>()))
+                        .Callback<string, Action<TesTask>>((id, action) =>
+                        {
+                            action(item);
+                        })
+                        .ReturnsAsync(true);
+                }
             }
 
-            azureProxy.Setup(p => p.ListOldJobsToDeleteAsync(oldestJobAge))
-                .ReturnsAsync(tasks.Select(i => i.Id + "-1"));
+            using var serviceProvider = new TestServices.TestServiceProvider<DeleteCompletedBatchJobsHostedService>(
+                configuration: Enumerable.Repeat(("BatchAutopool", true.ToString()), 1),
+                azureProxy: a => a.Setup(p => p.ListOldJobsToDeleteAsync(oldestJobAge))
+                    .ReturnsAsync(tasks.Select(i => i.Id + "-1")),
+                tesTaskRepository: SetupRepository);
 
-            await deleteCompletedBatchJobsHostedService.StartAsync(new System.Threading.CancellationToken());
-            return azureProxy;
+            await serviceProvider.GetT().StartAsync(new System.Threading.CancellationToken());
+            return serviceProvider.AzureProxy;
         }
     }
 }

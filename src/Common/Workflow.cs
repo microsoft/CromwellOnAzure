@@ -15,7 +15,7 @@ namespace Common
         public WorkflowFailureInfo WorkflowFailureInfo { get; set; }
         public List<TaskWarning> TaskWarnings { get; set; }
 
-        public bool ShouldSerializeWorkflowFailureInfo() => WorkflowFailureInfo is object;
+        public bool ShouldSerializeWorkflowFailureInfo() => WorkflowFailureInfo is not null;
         public bool ShouldSerializeTaskWarnings() => TaskWarnings?.Count > 0;
     }
 }

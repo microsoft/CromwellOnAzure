@@ -25,9 +25,7 @@ namespace Tes.Models
     public partial class TesInput : IEquatable<TesInput>
     {
         public TesInput()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
         /// <summary>
         /// Gets or Sets Name

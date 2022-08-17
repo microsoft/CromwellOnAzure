@@ -32,7 +32,7 @@ namespace TesApi.Web
         /// <param name="logger">Logger <see cref="ILogger"/></param>
         /// <param name="configuration">Configuration <see cref="IConfiguration"/></param>
         /// <param name="azureProxy">Azure proxy <see cref="IAzureProxy"/></param>
-        public StorageAccessProvider(ILogger logger, IConfiguration configuration, IAzureProxy azureProxy)
+        public StorageAccessProvider(ILogger<StorageAccessProvider> logger, IConfiguration configuration, IAzureProxy azureProxy)
         {
             this.logger = logger;
             this.azureProxy = azureProxy;
@@ -41,7 +41,8 @@ namespace TesApi.Web
             logger.LogInformation($"DefaultStorageAccountName: {defaultStorageAccountName}");
 
             externalStorageContainers = configuration["ExternalStorageContainers"]?.Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(uri => {
+                .Select(uri =>
+                {
                     if (StorageAccountUrlSegments.TryCreate(uri, out var s))
                     {
                         return new ExternalStorageContainerInfo { BlobEndpoint = s.BlobEndpoint, AccountName = s.AccountName, ContainerName = s.ContainerName, SasToken = s.SasToken };

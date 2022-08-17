@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,7 +46,7 @@ namespace TesApi.Web
         /// <summary>
         /// Start the service
         /// </summary>
-        /// <param name="cancellationToken">Not used</param>
+        /// <param name="cancellationToken"></param>
         public override Task StartAsync(CancellationToken cancellationToken)
         {
             if (isDisabled)
@@ -77,6 +78,7 @@ namespace TesApi.Web
                 try
                 {
                     await OrchestrateTesTasksOnBatch(stoppingToken);
+                    await Task.Delay(runInterval, stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -86,16 +88,8 @@ namespace TesApi.Web
                 {
                     logger.LogError(exc, exc.Message);
                 }
-
-                try
-                {
-                    await Task.Delay(runInterval, stoppingToken);
-                }
-                catch (TaskCanceledException)
-                {
-                    break;
-                }
             }
+
 
             logger.LogInformation("Scheduler gracefully stopped.");
         }
@@ -104,16 +98,17 @@ namespace TesApi.Web
         /// Retrieves all actionable TES tasks from the database, performs an action in the batch system, and updates the resultant state
         /// </summary>
         /// <returns></returns>
-        private async Task OrchestrateTesTasksOnBatch(CancellationToken cancellationToken) // TODO: implement
+        private async ValueTask OrchestrateTesTasksOnBatch(CancellationToken _1)
         {
             var tesTasks = (await repository.GetItemsAsync(
                     predicate: t => t.State == TesState.QUEUEDEnum
                         || t.State == TesState.INITIALIZINGEnum
                         || t.State == TesState.RUNNINGEnum
                         || (t.State == TesState.CANCELEDEnum && t.IsCancelRequested)))
+                .OrderBy(t => t.CreationTime)
                 .ToList();
 
-            if (!tesTasks.Any())
+            if (0 == tesTasks.Count)
             {
                 return;
             }
@@ -124,38 +119,83 @@ namespace TesApi.Web
             {
                 try
                 {
-                    var isModified = await batchScheduler.ProcessTesTaskAsync(tesTask);
+                    var isModified = false;
+                    try
+                    {
+                        isModified = await batchScheduler.ProcessTesTaskAsync(tesTask);
+                    }
+                    catch (Exception exc)
+                    {
+                        if (++tesTask.ErrorCount > 3) // TODO: Should we increment this for exceptions here (current behaviour) or the attempted executions on the batch?
+                        {
+                            tesTask.State = TesState.SYSTEMERROREnum;
+                            tesTask.EndTime = DateTimeOffset.UtcNow;
+                            tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
+                        }
+
+                        logger.LogError(exc, $"TES Task '{tesTask.Id}' threw an exception.");
+                        await repository.UpdateItemAsync(tesTask);
+                    }
 
                     if (isModified)
                     {
-                        //task has transitioned
-                        if (tesTask.State == TesState.CANCELEDEnum
-                           || tesTask.State == TesState.COMPLETEEnum
-                           || tesTask.State == TesState.EXECUTORERROREnum
-                           || tesTask.State == TesState.SYSTEMERROREnum)
+                        var hasErrored = false;
+                        var hasEnded = false;
+
+                        switch (tesTask.State)
+                        {
+                            case TesState.CANCELEDEnum:
+                            case TesState.COMPLETEEnum:
+                                hasEnded = true;
+                                break;
+
+                            case TesState.EXECUTORERROREnum:
+                            case TesState.SYSTEMERROREnum:
+                                hasErrored = true;
+                                hasEnded = true;
+                                break;
+
+                            default:
+                                break;
+                        }
+
+                        if (hasEnded)
                         {
                             tesTask.EndTime = DateTimeOffset.UtcNow;
+                        }
 
-                            if (tesTask.State == TesState.EXECUTORERROREnum || tesTask.State == TesState.SYSTEMERROREnum)
-                            {
-                                logger.LogDebug($"{tesTask.Id} failed, state: {tesTask.State}, reason: {tesTask.FailureReason}");
-                            }
+                        if (hasErrored)
+                        {
+                            logger.LogDebug($"{tesTask.Id} failed, state: {tesTask.State}, reason: {tesTask.FailureReason}");
                         }
 
                         await repository.UpdateItemAsync(tesTask);
                     }
                 }
-                catch (Exception exc)
+                catch (Microsoft.Azure.Cosmos.CosmosException exc)
                 {
-                    if (++tesTask.ErrorCount > 3) // TODO: Should we increment this for exceptions here (current behaviour) or the attempted executions on the batch?
+                    TesTask currentTesTask = default;
+                    _ = await repository.TryGetItemAsync(tesTask.Id, t => currentTesTask = t);
+
+                    if (exc.StatusCode == System.Net.HttpStatusCode.PreconditionFailed)
                     {
-                        tesTask.State = TesState.SYSTEMERROREnum;
-                        tesTask.EndTime = DateTimeOffset.UtcNow;
-                        tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
+                        logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw an exception attempting to set state: {tesTask.State}. Another actor set state: {currentTesTask?.State}");
+                        currentTesTask?.SetWarning("ConcurrencyWriteFailure", tesTask.State.ToString(), exc.Message, exc.StackTrace);
+                    }
+                    else
+                    {
+                        logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw {exc.GetType().FullName}: '{exc.Message}'. Stack trace: {exc.StackTrace}");
+                        currentTesTask?.SetWarning("UnknownError", exc.Message, exc.StackTrace);
                     }
 
-                    logger.LogError(exc, $"TES Task '{tesTask.Id}' threw an exception.");
-                    await repository.UpdateItemAsync(tesTask);
+                    if (currentTesTask is not null)
+                    {
+                        await repository.UpdateItemAsync(currentTesTask);
+                    }
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw {exc.GetType().FullName}: '{exc.Message}'. Stack trace: {exc.StackTrace}");
                 }
             }
 

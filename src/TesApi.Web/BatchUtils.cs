@@ -21,8 +21,6 @@ namespace TesApi.Web
         /// </summary>
         /// <returns>The string version of the shell script.</returns>
         private static string GetStartTaskScript()
-        {
-            return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Scripts/start-task.sh"));
-        }
+            => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Scripts/start-task.sh"));
     }
 }

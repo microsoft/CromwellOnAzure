@@ -8,7 +8,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using Common;
 using CromwellApiClient;
@@ -110,7 +109,7 @@ namespace TriggerService
                 catch (Exception e)
                 {
                     logger.LogError(e, $"Exception in ExecuteNewWorkflowsAsync for {blobTrigger.Uri}");
-                    
+
                     await MutateStateAsync(
                         blobTrigger.ContainerName,
                         blobTrigger.Name,
@@ -160,7 +159,7 @@ namespace TriggerService
         {
             var blobTriggers = (await storage.GetWorkflowsByStateAsync(WorkflowState.InProgress))
                 .Where(blob => DateTimeOffset.UtcNow.Subtract(blob.LastModified) > inProgressWorkflowInvisibilityPeriod);
-            
+
             foreach (var blobTrigger in blobTriggers)
             {
                 var id = Guid.Empty;
@@ -169,8 +168,8 @@ namespace TriggerService
                 {
                     id = ExtractWorkflowId(blobTrigger.Name, WorkflowState.InProgress);
                     var sampleName = ExtractSampleName(blobTrigger.Name, WorkflowState.InProgress);
-                    var statusResponse = await cromwellApiClient.GetStatusAsync(id);                  
-                    
+                    var statusResponse = await cromwellApiClient.GetStatusAsync(id);
+
                     switch (statusResponse.Status)
                     {
                         case WorkflowStatus.Running:
@@ -194,9 +193,9 @@ namespace TriggerService
                                 break;
                             }
                         case WorkflowStatus.Failed:
-                            {                                
-                                logger.LogInformation($"Setting to failed Id: {id}");                                
-                                
+                            {
+                                logger.LogInformation($"Setting to failed Id: {id}");
+
                                 await UploadOutputsAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
@@ -204,25 +203,27 @@ namespace TriggerService
                                 var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id);
 
                                 await MutateStateAsync(
-                                    blobTrigger.ContainerName, 
+                                    blobTrigger.ContainerName,
                                     blobTrigger.Name,
                                     WorkflowState.Failed,
-                                    wf => { 
-                                        wf.TaskWarnings = taskWarnings; 
-                                        wf.WorkflowFailureInfo = workflowFailureInfo; });
+                                    wf =>
+                                    {
+                                        wf.TaskWarnings = taskWarnings;
+                                        wf.WorkflowFailureInfo = workflowFailureInfo;
+                                    });
 
                                 break;
                             }
                         case WorkflowStatus.Succeeded:
-                            {                                
+                            {
                                 await UploadOutputsAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
                                 var taskWarnings = await GetWorkflowTaskWarningsAsync(id);
 
                                 await MutateStateAsync(
-                                    blobTrigger.ContainerName, 
-                                    blobTrigger.Name, 
+                                    blobTrigger.ContainerName,
+                                    blobTrigger.Name,
                                     WorkflowState.Succeeded,
                                     wf => wf.TaskWarnings = taskWarnings);
 
@@ -235,9 +236,9 @@ namespace TriggerService
                     logger.LogError(cromwellException, $"Exception in UpdateWorkflowStatusesAsync for {blobTrigger.Uri}.  Id: {id}  Cromwell reported workflow as NotFound (404).  Mutating state to Failed.");
 
                     await MutateStateAsync(
-                        blobTrigger.ContainerName, 
-                        blobTrigger.Name, 
-                        WorkflowState.Failed, 
+                        blobTrigger.ContainerName,
+                        blobTrigger.Name,
+                        WorkflowState.Failed,
                         wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo { WorkflowFailureReason = "WorkflowNotFoundInCromwell" });
 
                 }
@@ -251,7 +252,7 @@ namespace TriggerService
         public async Task AbortWorkflowsAsync()
         {
             var blobTriggers = await storage.GetWorkflowsByStateAsync(WorkflowState.Abort);
-            
+
             foreach (var blobTrigger in blobTriggers)
             {
                 var id = Guid.Empty;
@@ -263,18 +264,18 @@ namespace TriggerService
                     await cromwellApiClient.PostAbortAsync(id);
 
                     await MutateStateAsync(
-                        blobTrigger.ContainerName, 
-                        blobTrigger.Name, 
+                        blobTrigger.ContainerName,
+                        blobTrigger.Name,
                         WorkflowState.Failed,
-                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo{ WorkflowFailureReason = "AbortRequested" });
+                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo { WorkflowFailureReason = "AbortRequested" });
                 }
                 catch (Exception e)
                 {
                     logger.LogError(e, $"Exception in AbortWorkflowsAsync for {blobTrigger}.  Id: {id}");
 
                     await MutateStateAsync(
-                        blobTrigger.ContainerName, 
-                        blobTrigger.Name, 
+                        blobTrigger.ContainerName,
+                        blobTrigger.Name,
                         WorkflowState.Failed,
                         wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo { WorkflowFailureReason = "ErrorOccuredWhileAbortingWorkflow", WorkflowFailureReasonDetail = e.Message });
                 }
@@ -316,17 +317,17 @@ namespace TriggerService
 
                 bool IsBlockBlobUrl(IAzureStorage storage)
                     => (Uri.TryCreate(url, UriKind.Absolute, out var uri)
-                    && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase)
-                    && uri.ParseQueryString().Get("sig") is null)
-                    || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase);
+                        && uri.Authority.Equals(storage.AccountAuthority, StringComparison.OrdinalIgnoreCase)
+                        && uri.ParseQueryString().Get("sig") is null)
+                        || url.TrimStart('/').StartsWith(storage.AccountName + "/", StringComparison.OrdinalIgnoreCase);
             }
         }
 
         public async Task MutateStateAsync(
-            string container, 
-            string blobName, 
-            WorkflowState newState, 
-            Action<Workflow> workflowContentAction = null, 
+            string container,
+            string blobName,
+            WorkflowState newState,
+            Action<Workflow> workflowContentAction = null,
             Func<string, string> workflowNameAction = null)
         {
             var oldStateText = workflowStateRegex.Match(blobName).Value;
@@ -342,16 +343,20 @@ namespace TriggerService
 
             Exception error = default;
             var newBlobText = await storage.DownloadBlobTextAsync(container, blobName);
-            var workflow = JsonConvert.DeserializeObject<Workflow>(newBlobText, new JsonSerializerSettings() { Error = (o, a) =>
+            var workflow = JsonConvert.DeserializeObject<Workflow>(newBlobText, new JsonSerializerSettings()
             {
-                error = error switch
+                Error = (o, a) =>
                 {
-                    AggregateException ex => new AggregateException(ex.InnerExceptions.Append(a.ErrorContext.Error)),
-                    Exception ex => new AggregateException(Enumerable.Empty<Exception>().Append(ex).Append(a.ErrorContext.Error)),
-                    _ => a.ErrorContext.Error ?? new InvalidOperationException("Unknown error."),
-                };
-                a.ErrorContext.Handled = true;
-            }});
+                    error = error switch
+                    {
+                        AggregateException ex => new AggregateException(ex.InnerExceptions.Append(a.ErrorContext.Error)),
+                        Exception ex => new AggregateException(Enumerable.Empty<Exception>().Append(ex).Append(a.ErrorContext.Error)),
+                        _ => a.ErrorContext.Error ?? new InvalidOperationException("Unknown error."),
+                    };
+                    a.ErrorContext.Handled = true;
+                }
+            });
+
             if (error is not null)
             {
                 newBlobText += "\nError(s): " + error switch
@@ -368,6 +373,7 @@ namespace TriggerService
                 workflowContentAction?.Invoke(workflow);
                 newBlobText = JsonConvert.SerializeObject(workflow, Formatting.Indented, jsonSerializerSettings);
             }
+
             await storage.UploadFileTextAsync(newBlobText, container, newBlobName);
             await storage.DeleteBlobIfExistsAsync(container, blobName);
         }
@@ -393,8 +399,8 @@ namespace TriggerService
 
         private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId)
         {
-		    const string BatchExecutionDirectoryName = "__batch";
-			
+            const string BatchExecutionDirectoryName = "__batch";
+
             var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
 
             // Select the last attempt of each Cromwell task, and then select only the failed ones
@@ -403,7 +409,8 @@ namespace TriggerService
                 .GroupBy(t => new { t.CromwellTaskInstanceName, t.CromwellShard })
                 .Select(grp => grp.OrderBy(t => t.CromwellAttempt).Last())
                 .Where(t => t.FailureReason is not null || t.CromwellResultCode.GetValueOrDefault() != 0)
-                .Select(t => {
+                .Select(t =>
+                {
                     var cromwellScriptFailed = t.CromwellResultCode.GetValueOrDefault() != 0;
                     var batchTaskFailed = (t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode).GetValueOrDefault() != 0;
                     var executor = t.Executors?.LastOrDefault();
@@ -412,21 +419,25 @@ namespace TriggerService
                     var batchStdOut = batchExecutionDirectoryPath is not null ? $"{batchExecutionDirectoryPath}/stdout.txt" : null;
                     var batchStdErr = batchExecutionDirectoryPath is not null ? $"{batchExecutionDirectoryPath}/stderr.txt" : null;
 
-                    return new FailedTaskInfo {
+                    return new FailedTaskInfo
+                    {
                         TaskId = t.Id,
                         TaskName = t.Name,
                         FailureReason = cromwellScriptFailed ? "CromwellScriptFailed" : t.FailureReason,
                         SystemLogs = t.Logs?.LastOrDefault()?.SystemLogs?.Where(log => !log.Equals(t.FailureReason)).ToList(),
                         StdOut = cromwellScriptFailed ? executor?.Stdout : batchTaskFailed ? batchStdOut : null,
                         StdErr = cromwellScriptFailed ? executor?.Stderr : batchTaskFailed ? batchStdErr : null,
-                        CromwellResultCode = t.CromwellResultCode }; })
+                        CromwellResultCode = t.CromwellResultCode
+                    };
+                })
                 .ToList();
 
             logger.LogInformation($"Adding {failedTesTasks.Count} failed task details to trigger file for workflow {workflowId}");
 
-            return new WorkflowFailureInfo {
+            return new WorkflowFailureInfo
+            {
                 FailedTasks = failedTesTasks,
-                WorkflowFailureReason = failedTesTasks.Any() ? "OneOrMoreTasksFailed": "CromwellFailed"
+                WorkflowFailureReason = failedTesTasks.Any() ? "OneOrMoreTasksFailed" : "CromwellFailed"
             };
         }
 
@@ -439,11 +450,13 @@ namespace TriggerService
                 .GroupBy(t => new { t.CromwellTaskInstanceName, t.CromwellShard })
                 .Select(grp => grp.OrderBy(t => t.CromwellAttempt).Last())
                 .Where(t => t.Warning is not null)
-                .Select(t => new TaskWarning {
+                .Select(t => new TaskWarning
+                {
                     TaskId = t.Id,
                     TaskName = t.Name,
                     Warning = t.Warning,
-                    WarningDetails = t.Logs?.LastOrDefault()?.SystemLogs?.Where(log => !log.Equals(t.Warning)).ToList() })
+                    WarningDetails = t.Logs?.LastOrDefault()?.SystemLogs?.Where(log => !log.Equals(t.Warning)).ToList()
+                })
                 .ToList();
 
             logger.LogInformation($"Adding {taskWarnings.Count} task warnings to trigger file for workflow {workflowId}");
@@ -463,7 +476,7 @@ namespace TriggerService
         {
             var blobName = blobTriggerName[(currentState.ToString().Length + 1)..];
             var withoutExtension = Path.GetFileNameWithoutExtension(blobName);
-            return withoutExtension.Substring(0, withoutExtension.LastIndexOf('.'));
+            return withoutExtension[..withoutExtension.LastIndexOf('.')];
         }
 
         private static string GetBlobName(string url)

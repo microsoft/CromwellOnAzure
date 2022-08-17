@@ -79,7 +79,7 @@ namespace TesApi.Web
             logger.LogInformation("VM list refresh task gracefully stopped.");
         }
 
-        private async Task RefreshVMSizesAndPricesAsync() // TODO: implement
+        private async Task RefreshVMSizesAndPricesAsync()
         {
             logger.LogInformation("VM list cache refresh call to Azure started.");
             var virtualMachineInfos = await azureProxy.GetVmSizesAndPricesAsync();

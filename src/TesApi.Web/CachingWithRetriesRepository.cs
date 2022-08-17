@@ -16,16 +16,24 @@ namespace TesApi.Web
     /// Implements caching and retries for <see cref="IRepository{T}"/>
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public class CachingWithRetriesRepository<T> : IRepository<T> where T : RepositoryItem<T>
+    public sealed class CachingWithRetriesRepository<T> : IRepository<T> where T : RepositoryItem<T>
     {
         private readonly IRepository<T> repository;
         private readonly object cacheLock = new();
         private readonly IMemoryCache cache = new MemoryCache(new MemoryCacheOptions());
         private readonly IList<object> itemsPredicateCachedKeys = new List<object>();
 
-        private readonly AsyncRetryPolicy retryPolicy = Policy
+        private static readonly int RetryCount = 3;
+        private static TimeSpan SleepDurationProvider(int attempt)
+            => TimeSpan.FromSeconds(Math.Pow(2, attempt));
+
+        private readonly RetryPolicy retryPolicy = Policy
                 .Handle<Exception>()
-                .WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)));
+                .WaitAndRetry(RetryCount, SleepDurationProvider);
+
+        private readonly AsyncRetryPolicy asyncRetryPolicy = Policy
+                .Handle<Exception>()
+                .WaitAndRetryAsync(RetryCount, SleepDurationProvider);
 
         /// <summary>
         /// Constructor to create a cache and retry wrapper for <see cref="IRepository{T}"/>
@@ -37,7 +45,7 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public async Task<T> CreateItemAsync(T item)
         {
-            var repositoryItem = await retryPolicy.ExecuteAsync(() => repository.CreateItemAsync(item));
+            var repositoryItem = await asyncRetryPolicy.ExecuteAsync(() => repository.CreateItemAsync(item));
             ClearAllItemsPredicateCachedKeys();
             return repositoryItem;
         }
@@ -50,7 +58,7 @@ namespace TesApi.Web
                 cache.Remove(id);
             }
 
-            await retryPolicy.ExecuteAsync(() => repository.DeleteItemAsync(id));
+            await asyncRetryPolicy.ExecuteAsync(() => repository.DeleteItemAsync(id));
             ClearAllItemsPredicateCachedKeys();
         }
 
@@ -63,7 +71,7 @@ namespace TesApi.Web
                 return true;
             }
 
-            var repositoryItemFound = await retryPolicy.ExecuteAsync(() => repository.TryGetItemAsync(id, item => repositoryItem = item));
+            var repositoryItemFound = await asyncRetryPolicy.ExecuteAsync(() => repository.TryGetItemAsync(id, item => repositoryItem = item));
 
             if (repositoryItemFound)
             {
@@ -76,7 +84,7 @@ namespace TesApi.Web
 
         /// <inheritdoc/>
         public Task<(string, IEnumerable<T>)> GetItemsAsync(Expression<Func<T, bool>> predicate, int pageSize, string continuationToken)
-            => retryPolicy.ExecuteAsync(() => repository.GetItemsAsync(predicate, pageSize, continuationToken));
+            => asyncRetryPolicy.ExecuteAsync(() => repository.GetItemsAsync(predicate, pageSize, continuationToken));
 
         /// <inheritdoc/>
         public async Task<IEnumerable<T>> GetItemsAsync(Expression<Func<T, bool>> predicate)
@@ -89,7 +97,7 @@ namespace TesApi.Web
                 return repositoryItems;
             }
 
-            repositoryItems = await retryPolicy.ExecuteAsync(() => repository.GetItemsAsync(predicate));
+            repositoryItems = await asyncRetryPolicy.ExecuteAsync(() => repository.GetItemsAsync(predicate));
 
             lock (cacheLock)
             {
@@ -105,12 +113,12 @@ namespace TesApi.Web
         {
             var id = item.GetId();
 
-            if (cache.TryGetValue(id, out var cachedRepositoryItem))
+            if (cache.TryGetValue(id, out var _))
             {
                 cache.Remove(id);
             }
 
-            var repositoryItem = await retryPolicy.ExecuteAsync(() => repository.UpdateItemAsync(item));
+            var repositoryItem = await asyncRetryPolicy.ExecuteAsync(() => repository.UpdateItemAsync(item));
             ClearAllItemsPredicateCachedKeys();
             return repositoryItem;
         }
@@ -126,6 +134,13 @@ namespace TesApi.Web
 
                 itemsPredicateCachedKeys.Clear();
             }
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            cache?.Dispose();
+            repository?.Dispose();
         }
     }
 }

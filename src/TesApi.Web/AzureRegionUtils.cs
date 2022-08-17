@@ -10,7 +10,7 @@ namespace TesApi.Web
     /// </summary>
     public static class AzureRegionUtils
     {
-        private static readonly Dictionary<string, string> billingRegionLookup = new (
+        private static readonly Dictionary<string, string> billingRegionLookup = new(
             new List<KeyValuePair<string, string>> {
                 new KeyValuePair<string, string>("australiacentral", "AU Central"),
                 new KeyValuePair<string, string>("australiacentral2", "AU Central 2"),

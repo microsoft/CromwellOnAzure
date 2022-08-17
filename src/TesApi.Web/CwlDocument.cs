@@ -44,10 +44,10 @@ namespace TesApi.Web
 
                 return true;
             }
-            catch 
-            { 
+            catch
+            {
                 cwlDocument = null;
-                return false; 
+                return false;
             }
         }
 

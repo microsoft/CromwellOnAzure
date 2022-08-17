@@ -12,7 +12,7 @@ namespace Tes.Repository
     /// A general repository interface for persistence of T instances
     /// </summary>
     /// <typeparam name="T">The type of the instance</typeparam>
-    public interface IRepository<T> where T : RepositoryItem<T>
+    public interface IRepository<T> : IDisposable where T : RepositoryItem<T>
     {
         /// <summary>
         /// Create a new item

@@ -24,17 +24,17 @@ namespace TesApi.Web
         // plus additional custom fields added to support running TES with Cromwell on Azure
         private static readonly List<Tuple<Type, string>> PropertiesToSkip = new()
         {
-                Tuple.Create(typeof(TesExecutorLog), nameof(TesExecutorLog.Stdout)),
-                Tuple.Create(typeof(TesExecutorLog), nameof(TesExecutorLog.Stderr)),
-                Tuple.Create(typeof(TesInput), nameof(TesInput.Content)),
-                Tuple.Create(typeof(TesTaskLog), nameof(TesTaskLog.SystemLogs)),
-                Tuple.Create(typeof(TesTask), nameof(TesTask.IsCancelRequested)),
-                Tuple.Create(typeof(TesTask), nameof(TesTask.ErrorCount)),
-                Tuple.Create(typeof(TesTask), nameof(TesTask.EndTime)),
-                Tuple.Create(typeof(TesTask), nameof(TesTask.WorkflowId)),
-                Tuple.Create(typeof(RepositoryItem<TesTask>), nameof(RepositoryItem<TesTask>.ETag)),
-                Tuple.Create(typeof(RepositoryItem<TesTask>), nameof(RepositoryItem<TesTask>.PartitionKey))
-            };
+            Tuple.Create(typeof(TesExecutorLog), nameof(TesExecutorLog.Stdout)),
+            Tuple.Create(typeof(TesExecutorLog), nameof(TesExecutorLog.Stderr)),
+            Tuple.Create(typeof(TesInput), nameof(TesInput.Content)),
+            Tuple.Create(typeof(TesTaskLog), nameof(TesTaskLog.SystemLogs)),
+            Tuple.Create(typeof(TesTask), nameof(TesTask.IsCancelRequested)),
+            Tuple.Create(typeof(TesTask), nameof(TesTask.ErrorCount)),
+            Tuple.Create(typeof(TesTask), nameof(TesTask.EndTime)),
+            Tuple.Create(typeof(TesTask), nameof(TesTask.WorkflowId)),
+            Tuple.Create(typeof(RepositoryItem<TesTask>), nameof(RepositoryItem<TesTask>.ETag)),
+            Tuple.Create(typeof(RepositoryItem<TesTask>), nameof(RepositoryItem<TesTask>.PartitionKey))
+        };
 
         /// <summary>
         /// Instance of the resolver
