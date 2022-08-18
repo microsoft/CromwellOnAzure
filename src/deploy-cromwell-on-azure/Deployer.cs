@@ -304,7 +304,7 @@ namespace CromwellOnAzureDeployer
                             managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
-                            await kubernetesManager.UpgradeAKSDeployment(accountNames, resourceGroup, storageAccount);
+                            await kubernetesManager.UpgradeAKSDeployment(accountNames, resourceGroup, storageAccount, managedIdentity);
                         }
                         else
                         {
@@ -458,7 +458,7 @@ namespace CromwellOnAzureDeployer
                                 }
 
                                 var keys = await storageAccount.GetKeysAsync();
-                                kubernetesManager.UpdateHelmValues(storageAccount.Name, keys.First().Value, resourceGroup.Name, settings);
+                                kubernetesManager.UpdateHelmValues(storageAccount.Name, keys.First().Value, resourceGroup.Name, settings, managedIdentity);
                                 if (configuration.ManualHelmDeployment)
                                 {
                                     ConsoleEx.WriteLine("Please deploy helm chart, and press Enter to continue.");

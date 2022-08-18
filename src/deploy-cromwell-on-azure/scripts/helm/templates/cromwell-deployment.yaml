@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   labels:
     io.kompose.service: cromwell
+    aadpodidbinding: {{ .Values.identity.name }}
   name: cromwell
 spec:
   replicas: 1

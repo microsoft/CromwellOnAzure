@@ -4,6 +4,7 @@
 using k8s;
 using Microsoft.Azure.Management.ContainerService;
 using Microsoft.Azure.Management.ContainerService.Fluent;
+using Microsoft.Azure.Management.Msi.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
@@ -59,6 +60,8 @@ namespace CromwellOnAzureDeployer
 
         public async Task DeployHelmChartToCluster(IKubernetes client)
         {
+            await ExecHelmProcess($"repo add aad-pod-identity https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts");
+            await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity");
             await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
             await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig kubeconfig.txt");
             await ExecHelmProcess($"install --generate-name ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace");
@@ -73,7 +76,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        public void UpdateHelmValues(string storageAccountName, string saKey, string resourceGroupName, Dictionary<string, string> settings)
+        public void UpdateHelmValues(string storageAccountName, string saKey, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
         {
             var values = Yaml.LoadFromString<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
             values.Persistence["storageAccount"] = storageAccountName;
@@ -90,6 +93,9 @@ namespace CromwellOnAzureDeployer
             values.Config["usePreemptibleVmsOnly"] = settings["UsePreemptibleVmsOnly"];
             values.Config["blobxferImageName"] = settings["BlobxferImageName"];
             values.Config["dockerInDockerImageName"] = settings["DockerInDockerImageName"];
+            values.Identity["name"] = managedId.Name;
+            values.Identity["resourceId"] = managedId.Id;
+            values.Identity["clientId"] = managedId.ClientId;
 
             if (!string.IsNullOrWhiteSpace(configuration.CustomTesImagePath))
             {
@@ -222,7 +228,7 @@ namespace CromwellOnAzureDeployer
             return true;
         }
 
-        public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount)
+        public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId)
         {
             // Override any configuration that is used by the update.
             Deployer.OverrideSettingsFromConfiguration(settings, configuration);
@@ -242,7 +248,7 @@ namespace CromwellOnAzureDeployer
 
             await UnlockCromwellChangeLog(client);
             var keys = await storageAccount.GetKeysAsync();
-            UpdateHelmValues(storageAccount.Name, keys.First().Value, resourceGroup.Name, settings);
+            UpdateHelmValues(storageAccount.Name, keys.First().Value, resourceGroup.Name, settings, managedId);
             await DeployHelmChartToCluster(client);
         }
 
@@ -255,6 +261,7 @@ namespace CromwellOnAzureDeployer
             public List<Dictionary<string, string>> ExternalContainers { get; set; }
             public List<Dictionary<string, string>> ExternalSasContainers { get; set; }
             public Dictionary<string, string> Persistence { get; set; }
+            public Dictionary<string, string> Identity { get; set; }
             public Dictionary<string, string> Db { get; set; }
         }
     }

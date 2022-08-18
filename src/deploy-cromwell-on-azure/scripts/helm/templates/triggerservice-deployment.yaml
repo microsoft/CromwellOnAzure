@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   labels:
     io.kompose.service: triggerservice
+    aadpodidbinding: {{ .Values.identity.name }}
   name: triggerservice
 spec:
   replicas: 1

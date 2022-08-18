@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   labels:
     io.kompose.service: tes
+    aadpodidbinding: {{ .Values.identity.name }}
   name: tes
 spec:
   replicas: 1

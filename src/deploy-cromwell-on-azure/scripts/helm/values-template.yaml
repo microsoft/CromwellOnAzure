@@ -44,3 +44,8 @@ persistence:
   cromwellTmpSize: 32Gi
   storageAccount: RUNTIME_PARAMETER
   storageAccountKey: RUNTIME_PARAMETER
+
+identity:
+  name: RUNTIME_PARAMETER
+  resourceId: RUNTIME_PARAMETER
+  clientId: RUNTIME_PARAMETER
