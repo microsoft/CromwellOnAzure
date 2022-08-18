@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -22,16 +23,30 @@ namespace TesApi.Web
         private static readonly string autoPoolIdPrefix = "TES_";
         private readonly IAzureProxy azureProxy;
         private readonly ILogger<DeleteOrphanedAutoPoolsHostedService> logger;
+        private readonly bool isDisabled;
 
         /// <summary>
         /// Default constructor
         /// </summary>
+        /// <param name="configuration">The configuration instance settings</param>
         /// <param name="azureProxy">Azure Proxy</param>
         /// <param name="logger">The logger instance</param>
-        public DeleteOrphanedAutoPoolsHostedService(IAzureProxy azureProxy, ILogger<DeleteOrphanedAutoPoolsHostedService> logger)
+        public DeleteOrphanedAutoPoolsHostedService(IConfiguration configuration, IAzureProxy azureProxy, ILogger<DeleteOrphanedAutoPoolsHostedService> logger)
         {
             this.azureProxy = azureProxy;
             this.logger = logger;
+            this.isDisabled = !configuration.GetValue("BatchAutopool", false);
+        }
+
+        /// <inheritdoc />
+        public override Task StartAsync(CancellationToken cancellationToken)
+        {
+            if (isDisabled)
+            {
+                return Task.CompletedTask;
+            }
+
+            return base.StartAsync(cancellationToken);
         }
 
         /// <inheritdoc />

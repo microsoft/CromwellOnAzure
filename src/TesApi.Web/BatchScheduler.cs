@@ -35,7 +35,15 @@ namespace TesApi.Web
     /// </summary>
     public class BatchScheduler : IBatchScheduler
     {
+        internal const string PoolHostName = "CoA-TES-HostName";
+
+        /// <summary>
+        /// CosmosDB container id for storing pool metadata that needs to survive reboots/etc.
+        /// </summary>
+        public const string CosmosDbContainerId = "Pools";
+
         private const string AzureSupportUrl = "https://portal.azure.com/#blade/Microsoft_Azure_Support/HelpAndSupportBlade/newsupportrequest";
+        private const int PoolKeyLength = 50; // 64 max pool name length - 16 chars generating unique pool names
         private const int DefaultCoreCount = 1;
         private const int DefaultMemoryGb = 2;
         private const int DefaultDiskGb = 10;
@@ -45,6 +53,7 @@ namespace TesApi.Web
         private const string BatchScriptFileName = "batch_script";
         private const string UploadFilesScriptFileName = "upload_files_script";
         private const string DownloadFilesScriptFileName = "download_files_script";
+        //private const string startTaskScriptFilename = "start-task.sh";
         private static readonly Regex queryStringRegex = new(@"[^\?.]*(\?.*)");
         private readonly string dockerInDockerImageName;
         private readonly string blobxferImageName;
@@ -57,11 +66,14 @@ namespace TesApi.Web
         private readonly bool usePreemptibleVmsOnly;
         private readonly string batchNodesSubnetId;
         private readonly bool disableBatchNodesPublicIpAddress;
+        private readonly bool enableBatchAutopool;
         private readonly BatchNodeInfo batchNodeInfo;
         private readonly string marthaUrl;
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
         //private readonly string defaultStorageAccountName;
+        private readonly string hostname;
+        private readonly BatchPoolFactory _batchPoolFactory;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -70,7 +82,8 @@ namespace TesApi.Web
         /// <param name="configuration">Configuration <see cref="IConfiguration"/></param>
         /// <param name="azureProxy">Azure proxy <see cref="IAzureProxy"/></param>
         /// <param name="storageAccessProvider">Storage access provider <see cref="IStorageAccessProvider"/></param>
-        public BatchScheduler(ILogger<BatchScheduler> logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider)
+        /// <param name="poolFactory"></param>
+        public BatchScheduler(ILogger<BatchScheduler> logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, BatchPoolFactory poolFactory)
         {
             this.logger = logger;
             this.azureProxy = azureProxy;
@@ -86,10 +99,20 @@ namespace TesApi.Web
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
             this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
+            this.enableBatchAutopool = GetBoolValue(configuration, "BatchAutopool", false);
             //this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
+
+            if (!this.enableBatchAutopool)
+            {
+                _batchPoolFactory = poolFactory;
+                hostname = GetStringValue(configuration, "HOSTNAME");
+                logger.LogInformation($"hostname: {hostname}");
+
+                LoadExistingPools().Wait();
+            }
 
             this.batchNodeInfo = new BatchNodeInfo
             {
@@ -136,26 +159,29 @@ namespace TesApi.Web
 
             async Task SetTaskCompleted(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteBatchJobAndPoolIfExists(azureProxy, tesTask);
+                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
+                await RemovePool(tesTask, batchInfo);
                 SetTaskStateAndLog(tesTask, TesState.COMPLETEEnum, batchInfo);
             }
 
             async Task SetTaskExecutorError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteBatchJobAndPoolIfExists(azureProxy, tesTask);
+                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
+                await RemovePool(tesTask, batchInfo);
                 SetTaskStateAndLog(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             }
 
             async Task SetTaskSystemError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await DeleteBatchJobAndPoolIfExists(azureProxy, tesTask);
+                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
+                await RemovePool(tesTask, batchInfo);
                 SetTaskStateAndLog(tesTask, TesState.SYSTEMERROREnum, batchInfo);
             }
 
             async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
             {
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await RemovePool(tesTask, batchInfo);
                 SetTaskStateAndLog(tesTask, newTaskState, batchInfo);
             }
 
@@ -170,8 +196,19 @@ namespace TesApi.Web
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await RemovePool(tesTask, batchInfo);
                 tesTask.IsCancelRequested = false;
+            }
+
+            async Task RemovePool(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
+            {
+                if (enableBatchAutopool)
+                {
+                    if (!string.IsNullOrWhiteSpace(batchInfo.PoolId) && (!batchInfo.PoolId.StartsWith("TES_") || tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true))
+                    {
+                        await azureProxy.DeleteBatchPoolIfExistsAsync(batchInfo.PoolId);
+                    }
+                }
             }
 
             tesTaskStateTransitions = new List<TesTaskStateTransition>()
@@ -194,33 +231,11 @@ namespace TesApi.Web
             };
         }
 
-        private async Task DeleteBatchJobAndPoolIfExists(IAzureProxy azureProxy, TesTask tesTask)
+        private async Task LoadExistingPools(CancellationToken cancellationToken = default)
         {
-            var batchDeletionExceptions = new List<Exception>();
-
-            try
+            foreach (var cloudPool in await azureProxy.GetActivePoolsAsync(this.hostname, cancellationToken))
             {
-                await azureProxy.DeleteBatchJobAsync(tesTask.Id);
-            }
-            catch (Exception exc)
-            {
-                logger.LogError(exc, $"Exception deleting batch job with tesTask.Id: {tesTask?.Id}");
-                batchDeletionExceptions.Add(exc);
-            }
-
-            try
-            {
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
-            }
-            catch (Exception exc)
-            {
-                logger.LogError(exc, $"Exception deleting batch pool with tesTask.Id: {tesTask?.Id}");
-                batchDeletionExceptions.Add(exc);
-            }
-
-            if (batchDeletionExceptions.Any())
-            {
-                throw new AggregateException(batchDeletionExceptions);
+                batchPools.Add(_batchPoolFactory.Retrieve(cloudPool, this));
             }
         }
 
@@ -231,14 +246,6 @@ namespace TesApi.Web
         /// <returns>True if the TES task needs to be persisted.</returns>
         public async ValueTask<bool> ProcessTesTaskAsync(TesTask tesTask)
             => await HandleTesTaskTransitionAsync(tesTask, await GetBatchTaskStateAsync(tesTask));
-
-        private async Task DeleteManualBatchPoolIfExistsAsync(TesTask tesTask)
-        {
-            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
-            {
-                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
-            }
-        }
 
         private static string GetCromwellExecutionDirectoryPath(TesTask task)
             => GetParentPath(task.Inputs?.FirstOrDefault(IsCromwellCommandScript)?.Path.TrimStart('/'));
@@ -285,6 +292,92 @@ namespace TesApi.Web
             return localPath is not null;
         }
 
+        private async Task<(string PoolName, string DisplayName)> GetPoolName(TesTask tesTask, VirtualMachineInformation virtualMachineInformation)
+        {
+            var identityResourceId = tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default;
+            var containerInfo = await azureProxy.GetContainerRegistryInfoAsync(tesTask.Executors.FirstOrDefault()?.Image);
+            var registryServer = containerInfo is null ? default : containerInfo.RegistryServer;
+
+            var vmName = string.IsNullOrWhiteSpace(hostname) ? "<none>" : hostname;
+            var vmSize = virtualMachineInformation.VmSize ?? "<none>";
+            var isPreemptable = virtualMachineInformation.LowPriority;
+            registryServer ??= "<none>";
+            identityResourceId ??= "<none>";
+
+            // Generate hash of everything that differentiates this group of pools
+            var displayName = $"{vmName}:{vmSize}:{isPreemptable}:{registryServer}:{identityResourceId}";
+            var hash = ConvertToBase32(SHA1.HashData(Encoding.UTF8.GetBytes(displayName))).TrimEnd('='); // This becomes 32 chars
+
+            // Build a PoolName that is of legal length, while exposing the most important metadata without requiring user to find DisplayName
+            // Note that the hash covers all necessary parts to make name unique, so limiting the size of the other parts is not expected to appreciably change the risk of collisions. Those other parts are for convenience
+            var remainingLength = PoolKeyLength - hash.Length - 2; // 50 is max name length, 2 is number of inserted chars. This will always be 16 if we use an entire SHA1
+            var visibleVmSize = LimitVmSize(vmSize, Math.Max(remainingLength - vmName.Length, 6));
+            var visibleHostName = vmName[0..Math.Min(vmName.Length, remainingLength - visibleVmSize.Length)];
+            var name = LimitChars($"{visibleHostName}-{visibleVmSize}-{hash}");
+
+            // Trim DisplayName if needed
+            if (displayName.Length > 1024)
+            {
+                // Remove "path" of identityResourceId
+                displayName = displayName[..^identityResourceId.Length] + identityResourceId[(identityResourceId.LastIndexOf('/') + 1)..];
+                if (displayName.Length > 1024)
+                {
+                    // Trim end, leaving fake elipsys as marker
+                    displayName = displayName[..1021] + "...";
+                }
+            }
+
+            return (name, displayName);
+
+            static string LimitVmSize(string vmSize, int limit)
+            {
+                // First try optimizing by removing "Standard_" prefix.
+                var standard = "Standard_";
+                return vmSize.Length <= limit
+                    ? vmSize
+                    : vmSize.StartsWith(standard, StringComparison.OrdinalIgnoreCase)
+                    ? LimitVmSize(vmSize[standard.Length..], limit)
+                    : vmSize[^limit..];
+            }
+
+            static string LimitChars(string text) // ^[a-zA-Z0-9_-]+$
+            {
+                return new(text.AsEnumerable().Select(Limit).ToArray());
+
+                static char Limit(char ch)
+                    => ch switch
+                    {
+                        var x when x >= '0' || x <= '9' => x,
+                        var x when x >= 'A' || x <= 'Z' => x,
+                        var x when x >= 'a' || x <= 'z' => x,
+                        '_' => ch,
+                        '-' => ch,
+                        _ => '_',
+                    };
+            }
+        }
+
+        private static string ConvertToBase32(byte[] bytes) // https://datatracker.ietf.org/doc/html/rfc4648#section-6
+        {
+            const int groupBitlength = 5;
+            var Rfc4648Base32 = @"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".ToArray();
+            return new string(new BitArray(bytes)
+                    .Cast<bool>()
+                    .Select((b, i) => (Index: i, Value: b ? 1 << (groupBitlength - 1 - (i % groupBitlength)) : 0))
+                    .GroupBy(t => t.Index / groupBitlength)
+                    .Select(g => Rfc4648Base32[g.Sum(t => t.Value)])
+                    .ToArray())
+                + (bytes.Length % groupBitlength) switch
+                {
+                    0 => string.Empty,
+                    1 => @"======",
+                    2 => @"====",
+                    3 => @"===",
+                    4 => @"=",
+                    _ => throw new InvalidOperationException(), // Keeps the compiler happy.
+                };
+        }
+
         /// <summary>
         /// Adds a new Azure Batch pool/job/task for the given <see cref="TesTask"/>
         /// </summary>
@@ -299,7 +392,8 @@ namespace TesApi.Web
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
-                await CheckBatchAccountQuotas(virtualMachineInfo);
+                var (poolName, displayName) = this.enableBatchAutopool ? default : await GetPoolName(tesTask, virtualMachineInfo);
+                await CheckBatchAccountQuotas(virtualMachineInfo, poolName);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
@@ -307,15 +401,33 @@ namespace TesApi.Web
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var containerConfiguration = await GetContainerConfigurationIfNeeded(tesTask.Executors.First().Image);
 
-                poolInformation = await CreateAutoPoolModePoolInformation(
-                    GetPoolSpecification(
-                        virtualMachineInfo.VmSize,
-                        virtualMachineInfo.LowPriority,
-                        batchNodeInfo,
-                        containerConfiguration),
-                    jobId,
-                    tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default);
+                if (this.enableBatchAutopool)
+                {
+                    poolInformation = await CreateAutoPoolModePoolInformation(
+                        GetPoolSpecification(
+                            virtualMachineInfo.VmSize,
+                            false,
+                            virtualMachineInfo.LowPriority,
+                            batchNodeInfo,
+                            containerConfiguration),
+                        jobId,
+                        tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default);
+                }
+                else
+                {
+                    poolInformation = (await GetOrAddPoolAsync(poolName, virtualMachineInfo.LowPriority, id => ConvertPoolSpecificationToModelsPool(
+                        name: id,
+                        displayName: displayName,
+                        GetBatchPoolIdentity(tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default),
+                        GetPoolSpecification(
+                            virtualMachineInfo.VmSize,
+                            true,
+                            virtualMachineInfo.LowPriority,
+                            batchNodeInfo,
+                            containerConfiguration)))).Pool;
+                }
 
+                tesTask.PoolId = poolInformation.PoolId;
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, containerConfiguration is not null);
 
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
@@ -368,7 +480,7 @@ namespace TesApi.Web
             }
             finally
             {
-                if (poolInformation is not null && poolInformation.AutoPoolSpecification is null)
+                if (enableBatchAutopool && poolInformation is not null && poolInformation.AutoPoolSpecification is null)
                 {
                     await azureProxy.DeleteBatchPoolIfExistsAsync(poolInformation.PoolId);
                 }
@@ -409,7 +521,8 @@ namespace TesApi.Web
                 return new CombinedBatchTaskInfo
                 {
                     BatchTaskState = BatchTaskState.ActiveJobWithMissingAutoPool,
-                    FailureReason = BatchTaskState.ActiveJobWithMissingAutoPool.ToString()
+                    FailureReason = BatchTaskState.ActiveJobWithMissingAutoPool.ToString(),
+                    PoolId = azureBatchJobAndTaskState.PoolId
                 };
             }
 
@@ -418,8 +531,36 @@ namespace TesApi.Web
                 return new CombinedBatchTaskInfo
                 {
                     BatchTaskState = BatchTaskState.MoreThanOneActiveJobFound,
-                    FailureReason = BatchTaskState.MoreThanOneActiveJobFound.ToString()
+                    FailureReason = BatchTaskState.MoreThanOneActiveJobFound.ToString(),
+                    PoolId = azureBatchJobAndTaskState.PoolId
                 };
+            }
+
+            // Because a ComputeTask is not assigned to the compute node while the StartTask is running, IAzureProxy.GetBatchJobAndTaskStateAsync() does not see start task failures. Attempt to deal with that here.
+            if (azureBatchJobAndTaskState.NodeState is null && azureBatchJobAndTaskState.JobState == JobState.Active && azureBatchJobAndTaskState.TaskState == TaskState.Active && !string.IsNullOrWhiteSpace(azureBatchJobAndTaskState.PoolId))
+            {
+                if (this.enableBatchAutopool)
+                {
+                    ProcessStartTaskFailure((await azureProxy.ListComputeNodesAsync(azureBatchJobAndTaskState.PoolId, new ODATADetailLevel { FilterClause = "state eq 'starttaskfailed'", SelectClause = "id,startTaskInfo" }).FirstOrDefaultAsync())?.StartTaskInformation?.FailureInformation);
+                }
+                else
+                {
+                    if (TryGetPool(azureBatchJobAndTaskState.PoolId, out var pool))
+                    {
+                        azureBatchJobAndTaskState.NodeAllocationFailed = pool.PopNextResizeError() is not null;
+                        ProcessStartTaskFailure(pool.PopNextStartTaskFailure());
+                    }
+                }
+
+                void ProcessStartTaskFailure(TaskFailureInformation failureInformation)
+                {
+                    if (failureInformation is not null)
+                    {
+                        azureBatchJobAndTaskState.NodeState = ComputeNodeState.StartTaskFailed;
+                        azureBatchJobAndTaskState.NodeErrorCode = failureInformation.Code;
+                        azureBatchJobAndTaskState.NodeErrorDetails = failureInformation.Details?.Select(d => d.Value);
+                    }
+                }
             }
 
             switch (azureBatchJobAndTaskState.JobState)
@@ -429,7 +570,8 @@ namespace TesApi.Web
                     return new CombinedBatchTaskInfo
                     {
                         BatchTaskState = BatchTaskState.JobNotFound,
-                        FailureReason = BatchTaskState.JobNotFound.ToString()
+                        FailureReason = BatchTaskState.JobNotFound.ToString(),
+                        PoolId = azureBatchJobAndTaskState.PoolId
                     };
                 case JobState.Active:
                     {
@@ -439,7 +581,8 @@ namespace TesApi.Web
                             {
                                 BatchTaskState = BatchTaskState.NodeAllocationFailed,
                                 FailureReason = BatchTaskState.NodeAllocationFailed.ToString(),
-                                SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState)
+                                SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
+                                PoolId = azureBatchJobAndTaskState.PoolId
                             };
                         }
 
@@ -449,7 +592,8 @@ namespace TesApi.Web
                             {
                                 BatchTaskState = BatchTaskState.NodeUnusable,
                                 FailureReason = BatchTaskState.NodeUnusable.ToString(),
-                                SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState)
+                                SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
+                                PoolId = azureBatchJobAndTaskState.PoolId
                             };
                         }
 
@@ -459,7 +603,8 @@ namespace TesApi.Web
                             {
                                 BatchTaskState = BatchTaskState.NodePreempted,
                                 FailureReason = BatchTaskState.NodePreempted.ToString(),
-                                SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState)
+                                SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
+                                PoolId = azureBatchJobAndTaskState.PoolId
                             };
                         }
 
@@ -470,7 +615,8 @@ namespace TesApi.Web
                                 return new CombinedBatchTaskInfo
                                 {
                                     BatchTaskState = BatchTaskState.NodeFailedDuringStartupOrExecution,
-                                    FailureReason = azureBatchJobAndTaskState.NodeErrorCode
+                                    FailureReason = azureBatchJobAndTaskState.NodeErrorCode,
+                                    PoolId = azureBatchJobAndTaskState.PoolId
                                 };
                             }
                             else
@@ -479,7 +625,8 @@ namespace TesApi.Web
                                 {
                                     BatchTaskState = BatchTaskState.NodeFailedDuringStartupOrExecution,
                                     FailureReason = BatchTaskState.NodeFailedDuringStartupOrExecution.ToString(),
-                                    SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState)
+                                    SystemLogItems = ConvertNodeErrorsToSystemLogItems(azureBatchJobAndTaskState),
+                                    PoolId = azureBatchJobAndTaskState.PoolId
                                 };
                             }
                         }
@@ -499,18 +646,21 @@ namespace TesApi.Web
                     return new CombinedBatchTaskInfo
                     {
                         BatchTaskState = BatchTaskState.MissingBatchTask,
-                        FailureReason = BatchTaskState.MissingBatchTask.ToString()
+                        FailureReason = BatchTaskState.MissingBatchTask.ToString(),
+                        PoolId = azureBatchJobAndTaskState.PoolId
                     };
                 case TaskState.Active:
                 case TaskState.Preparing:
                     return new CombinedBatchTaskInfo
                     {
-                        BatchTaskState = BatchTaskState.Initializing
+                        BatchTaskState = BatchTaskState.Initializing,
+                        PoolId = azureBatchJobAndTaskState.PoolId
                     };
                 case TaskState.Running:
                     return new CombinedBatchTaskInfo
                     {
-                        BatchTaskState = BatchTaskState.Running
+                        BatchTaskState = BatchTaskState.Running,
+                        PoolId = azureBatchJobAndTaskState.PoolId
                     };
                 case TaskState.Completed:
                     var batchJobInfo = JsonConvert.SerializeObject(azureBatchJobAndTaskState);
@@ -526,7 +676,8 @@ namespace TesApi.Web
                             BatchTaskStartTime = metrics.TaskStartTime ?? azureBatchJobAndTaskState.TaskStartTime,
                             BatchTaskEndTime = metrics.TaskEndTime ?? azureBatchJobAndTaskState.TaskEndTime,
                             BatchNodeMetrics = metrics.BatchNodeMetrics,
-                            CromwellRcCode = metrics.CromwellRcCode
+                            CromwellRcCode = metrics.CromwellRcCode,
+                            PoolId = azureBatchJobAndTaskState.PoolId
                         };
                     }
                     else
@@ -540,7 +691,8 @@ namespace TesApi.Web
                             BatchTaskExitCode = azureBatchJobAndTaskState.TaskExitCode,
                             BatchTaskStartTime = azureBatchJobAndTaskState.TaskStartTime,
                             BatchTaskEndTime = azureBatchJobAndTaskState.TaskEndTime,
-                            SystemLogItems = new[] { azureBatchJobAndTaskState.TaskFailureInformation?.Details?.FirstOrDefault()?.Value }
+                            SystemLogItems = new[] { azureBatchJobAndTaskState.TaskFailureInformation?.Details?.FirstOrDefault()?.Value },
+                            PoolId = azureBatchJobAndTaskState.PoolId
                         };
                     }
                 default:
@@ -855,6 +1007,60 @@ namespace TesApi.Web
         }
 
         /// <summary>
+        /// Constructs an Azure Start Task instance if needed
+        /// </summary>
+        /// <param name="tesTask">The <see cref="TesTask"/> to schedule on Azure Batch</param>
+        /// <returns></returns>
+        private async Task<StartTask> StartTaskIfNeeded(TesTask tesTask)
+        {
+            await Task.Delay(1);
+            // <param name="batchExecutionDirectoryPath">Relative path to the Batch execution location</param>
+            // <param name="startTaskSasUrl">SAS URL for the start task</param>
+            // <param name="startTaskPath">Local path on the Azure Batch node for the script</param>
+            //var batchExecutionPath = GetBatchExecutionDirectoryPath(tesTask);
+            //string startTaskSasUrl = null;
+
+            // string startTaskSasUrl = null, string startTaskPath = null
+
+            //BatchModels.StartTask result = default;
+
+            //if (useStartTask)
+            //{
+            //    var scriptPath = $"{batchExecutionPath}/start-task.sh";
+            //    await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.StartTaskScript);
+            //    startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
+            //}
+
+            //if (useStartTask)
+            //{
+            //    var scriptPath = $"{batchExecutionDirectoryPath}/{startTaskScriptFilename}";
+            //    await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.StartTaskScript);
+            //    var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
+
+            //    startTask = new Microsoft.Azure.Batch.StartTask
+            //    {
+            //        // Pool StartTask: install Docker as start task if it's not already
+            //        CommandLine = $"sudo /bin/sh {batchStartTaskLocalPathOnBatchNode}",
+            //        UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+            //        ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchStartTaskLocalPathOnBatchNode) }
+            //    };
+            //}
+
+            //if (useStartTask)
+            //{
+            //    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
+            //    {
+            //        // Pool StartTask: install Docker as start task if it's not already
+            //        CommandLine = $"/bin/sh {startTaskPath}",
+            //        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
+            //        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
+            //    };
+            //}
+
+            return default;
+        }
+
+        /// <summary>
         /// Constructs an Azure Batch Container Configuration instance
         /// </summary>
         /// <param name="executorImage">The image name for the current <see cref="TesTask"/></param>
@@ -966,11 +1172,12 @@ namespace TesApi.Web
         /// Generate the PoolSpecification object
         /// </summary>
         /// <param name="vmSize"></param>
+        /// <param name="autoscaled"></param>
         /// <param name="preemptable"></param>
         /// <param name="nodeInfo"></param>
         /// <param name="containerConfiguration"></param>
         /// <returns></returns>
-        private PoolSpecification GetPoolSpecification(string vmSize, bool preemptable, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration)
+        private PoolSpecification GetPoolSpecification(string vmSize, bool autoscaled, bool preemptable, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration)
         {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
@@ -988,10 +1195,27 @@ namespace TesApi.Web
                 VirtualMachineConfiguration = vmConfig,
                 VirtualMachineSize = vmSize,
                 ResizeTimeout = TimeSpan.FromMinutes(30),
-                AutoScaleEnabled = false,
-                TargetLowPriorityComputeNodes = preemptable == true ? 1 : 0,
-                TargetDedicatedComputeNodes = preemptable == false ? 1 : 0,
             };
+
+            if (autoscaled)
+            {
+                poolSpecification.AutoScaleEnabled = true;
+                poolSpecification.AutoScaleEvaluationInterval = TimeSpan.FromMinutes(5);
+                poolSpecification.AutoScaleFormula = string.Format(@"
+    $NodeDeallocationOption=requeue;
+    lifespan         = time() - time(""{1}"");
+    span             = TimeInterval_Second * 90;
+    startup          = TimeInterval_Minute * 2;
+    ratio            = 10;
+    {0} = (lifespan > startup ? max($PendingTasks.GetSample(span, ratio)) : {2});
+    ", preemptable ? "$TargetLowPriorityNodes" : "$TargetDedicated", DateTime.UtcNow.ToString("r"), 1);
+            }
+            else
+            {
+                poolSpecification.AutoScaleEnabled = false;
+                poolSpecification.TargetLowPriorityComputeNodes = preemptable == true ? 1 : 0;
+                poolSpecification.TargetDedicatedComputeNodes = preemptable == false ? 1 : 0;
+            }
 
             if (!string.IsNullOrEmpty(this.batchNodesSubnetId))
             {
@@ -1019,10 +1243,12 @@ namespace TesApi.Web
             ValidateString(name, nameof(name), 64);
             ValidateString(displayName, nameof(displayName), 1024);
 
+            var scaleSettings = true == pool.AutoScaleEnabled ? ConvertAutoScale() : ConvertManualScale();
+
             return new(name: name, displayName: displayName, identity: poolIdentity)
             {
                 VmSize = pool.VirtualMachineSize,
-                ScaleSettings = ConvertManualScale(),
+                ScaleSettings = scaleSettings,
                 DeploymentConfiguration = new()
                 {
                     VirtualMachineConfiguration = new(ConvertImageReference(pool.VirtualMachineConfiguration.ImageReference), pool.VirtualMachineConfiguration.NodeAgentSkuId, containerConfiguration: ConvertContainerConfiguration(pool.VirtualMachineConfiguration.ContainerConfiguration))
@@ -1041,6 +1267,16 @@ namespace TesApi.Web
                         TargetLowPriorityNodes = pool.TargetLowPriorityComputeNodes,
                         ResizeTimeout = pool.ResizeTimeout,
                         NodeDeallocationOption = BatchModels.ComputeNodeDeallocationOption.TaskCompletion
+                    }
+                };
+
+            BatchModels.ScaleSettings ConvertAutoScale()
+                => new()
+                {
+                    AutoScale = new()
+                    {
+                        Formula = pool.AutoScaleFormula,
+                        EvaluationInterval = pool.AutoScaleEvaluationInterval
                     }
                 };
 
@@ -1117,7 +1353,8 @@ namespace TesApi.Web
         /// Check quotas for available active jobs, pool and CPU cores.
         /// </summary>
         /// <param name="vmInfo">Dedicated virtual machine information.</param>
-        private async Task CheckBatchAccountQuotas(VirtualMachineInformation vmInfo)
+        /// <param name="poolName">Name of pool</param>
+        private async Task CheckBatchAccountQuotas(VirtualMachineInformation vmInfo, string poolName)
         {
             var workflowCoresRequirement = vmInfo.NumberOfCores.Value;
             var preemptible = vmInfo.LowPriority;
@@ -1156,6 +1393,11 @@ namespace TesApi.Web
             if (activeJobsCount + 1 > activeJobAndJobScheduleQuota)
             {
                 throw new AzureBatchQuotaMaxedOutException($"No remaining active jobs quota available. There are {activeJobsCount} active jobs out of {activeJobAndJobScheduleQuota}");
+            }
+
+            if ((this.enableBatchAutopool || !IsPoolAvailable(poolName)) && activePoolsCount + 1 > poolQuota)
+            {
+                throw new AzureBatchQuotaMaxedOutException($"No remaining pool quota available. There are {activePoolsCount} pools in use out of {poolQuota}");
             }
 
             if ((totalCoresInUse + workflowCoresRequirement) > coreQuota)
@@ -1364,6 +1606,143 @@ namespace TesApi.Web
                 .Select(line => { var parts = line.Split(fieldDelimiter); return new KeyValuePair<string, string>(parts[0], parts[1]); })
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
 
+        #region BatchPools
+        private readonly BatchPools batchPools = new();
+
+        internal bool TryGetPool(string poolId, out IBatchPool batchPool)
+        {
+            batchPool = batchPools.FirstOrDefault(p => p.Pool.PoolId.Equals(poolId, StringComparison.Ordinal));
+            return batchPool is not null;
+        }
+
+        internal bool IsPoolAvailable(string key)
+            => batchPools.TryGetValue(key, out var pools) && pools.Any(p => p.IsAvailable);
+
+        internal async Task<IBatchPool> GetOrAddPoolAsync(string key, bool isPreemptable, Func<string, BatchModels.Pool> modelPoolFactory)
+        {
+            if (enableBatchAutopool)
+            {
+                return default;
+            }
+
+            _ = modelPoolFactory ?? throw new ArgumentNullException(nameof(modelPoolFactory));
+            var keyLength = key?.Length ?? 0;
+            if (keyLength > PoolKeyLength || keyLength < 1)
+            {
+                throw new ArgumentException("Key must be between 1-50 chars in length", nameof(key));
+            }
+            // TODO: Make sure key doesn't contain any unsupported chars
+
+            var pool = batchPools.TryGetValue(key, out var set) ? set.LastOrDefault(Available) : default;
+            if (pool is null)
+            {
+                var poolQuota = azureProxy.GetBatchAccountQuotasAsync().Result.PoolQuota;
+                var activePoolsCount = azureProxy.GetBatchActivePoolCount();
+                if (activePoolsCount + 1 > poolQuota)
+                {
+                    throw new AzureBatchQuotaMaxedOutException($"No remaining pool quota available. There are {activePoolsCount} pools in use out of {poolQuota}");
+                }
+
+                var uniquifier = new byte[8]; // This always becomes 13 chars when converted to base32 after removing the three '='s at the end. We won't ever decode this, so we don't need the '='s
+                RandomNumberGenerator.Fill(uniquifier);
+                var poolId = $"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"; // embedded '-' is required by GetKeyFromPoolId()
+
+                try
+                {
+                    var modelPool = modelPoolFactory(poolId);
+                    if (modelPool.Metadata is null) { modelPool.Metadata = new List<BatchModels.MetadataItem>(); }
+                    modelPool.Metadata.Add(new(PoolHostName, this.hostname));
+                    pool = _batchPoolFactory.CreateNew(await azureProxy.CreateBatchPoolAsync(modelPool, isPreemptable), this);
+                }
+                catch (OperationCanceledException)
+                {
+                    HandleTimeout(poolId);
+                }
+                catch (RequestFailedException ex) when (ex.Status == 0 && ex.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout)
+                {
+                    HandleTimeout(poolId);
+                }
+                catch (Exception ex) when (IsInnermostExceptionSocketException125(ex))
+                {
+                    HandleTimeout(poolId);
+                }
+
+                _ = AddPool(pool);
+            }
+            return pool;
+
+            static bool Available(IBatchPool pool)
+                => pool.IsAvailable;
+
+            void HandleTimeout(string poolId)
+            {
+                // When the batch management API creating the pool times out, it may or may not have created the pool. Add an inactive record to delete it if it did get created and try again later. That record will be removed later whether or not the pool was created.
+                _ = AddPool(_batchPoolFactory.CreateNew(poolId, this));
+                throw new AzureBatchQuotaMaxedOutException($"Pool creation timed out");
+            }
+
+            static bool IsInnermostExceptionSocketException125(Exception ex)
+            {
+                // errno: ECANCELED 125 Operation canceled
+                for (var e = ex; e is System.Net.Sockets.SocketException /*se && se.ErrorCode == 125*/; e = e.InnerException)
+                {
+                    if (e.InnerException is null) { return false; }
+                }
+                return true;
+            }
+        }
+
+        /// <inheritdoc/>
+        public async ValueTask<IEnumerable<Task>> GetShutdownCandidatePools(CancellationToken cancellationToken)
+        {
+            return (await batchPools
+                .ToAsyncEnumerable()
+                .WhereAwait(async p => await p.CanBeDeleted(cancellationToken))
+                .ToListAsync(cancellationToken))
+                .Select(t => azureProxy.DeleteBatchPoolAsync(t.Pool.PoolId));
+        }
+
+        /// <inheritdoc/>
+        public IEnumerable<IBatchPool> GetPools()
+            => batchPools;
+
+        private bool AddPool(IBatchPool pool)
+            => batchPools.Add(pool);
+
+        private static string GetKeyFromPoolId(string poolId)
+            => poolId[..poolId.LastIndexOf('-')];
+
+        private class BatchPoolEqualityComparer : IEqualityComparer<IBatchPool>
+        {
+            bool IEqualityComparer<IBatchPool>.Equals(IBatchPool x, IBatchPool y)
+                => x.Pool.PoolId?.Equals(y.Pool.PoolId) ?? false;
+
+            int IEqualityComparer<IBatchPool>.GetHashCode(IBatchPool obj)
+                => obj.Pool.PoolId?.GetHashCode() ?? 0;
+        }
+
+        #region Used for unit/module testing
+        internal bool RemovePoolFromList(IBatchPool pool)
+            => batchPools.Remove(pool);
+
+        internal IEnumerable<string> GetPoolGroupKeys()
+            => batchPools.Keys;
+        #endregion
+
+        private class BatchPools : KeyedGroup<IBatchPool, GroupableSet<IBatchPool>>
+        {
+            public BatchPools()
+                : base(p => p is null ? default : GetKeyFromPoolId(p.Pool.PoolId), StringComparer.Ordinal)
+            { }
+
+            protected override Func<IEnumerable<IBatchPool>, GroupableSet<IBatchPool>> CreateSetFunc
+                => e => new(e, new BatchPoolEqualityComparer());
+
+            public IBatchPool GetPoolOrDefault(string poolId)
+                => TryGetValue(GetKeyFromPoolId(poolId), out var batchPools) ? batchPools.FirstOrDefault(p => p.Pool.PoolId.Equals(poolId, StringComparison.Ordinal)) : default;
+        }
+        #endregion
+
         /// <summary>
         /// Class that captures how <see cref="TesTask"/> transitions from current state to the new state, given the current Batch task state and optional condition. 
         /// Transitions typically include an action that needs to run in order for the task to move to the new state.
@@ -1437,6 +1816,7 @@ namespace TesApi.Web
             public int? BatchTaskExitCode { get; set; }
             public int? CromwellRcCode { get; set; }
             public IEnumerable<string> SystemLogItems { get; set; }
+            public string PoolId { get; set; }
         }
     }
 }

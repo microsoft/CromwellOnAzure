@@ -24,7 +24,7 @@ namespace TesApi.Web
         /// <summary>
         /// Attempt number for this task. The other members are from this attempt.
         /// </summary>
-        public int AttemptNumber { get; set; }
+        public int AttemptNumber { get; set; } // TODO: consider removing
         /// <summary>
         /// The Batch service encountered an error while resizing
         ///     the pool or the pool's Microsoft.Azure.Batch.CloudPool.AllocationState
@@ -47,15 +47,15 @@ namespace TesApi.Web
         /// <summary>
         /// Gets the creation time of the Azure Batch job.
         /// </summary>
-        public DateTime? JobStartTime { get; set; }
+        public DateTime? JobStartTime { get; set; } // TODO: consider removing
         /// <summary>
         /// Gets the completion time of Azure Batch job.
         /// </summary>
-        public DateTime? JobEndTime { get; set; }
+        public DateTime? JobEndTime { get; set; } // TODO: consider removing
         /// <summary>
         /// Gets the error encountered by the Batch service in scheduling the Azure Batch job.
         /// </summary>
-        public JobSchedulingError JobSchedulingError { get; set; }
+        public JobSchedulingError JobSchedulingError { get; set; } // TODO: consider removing
         /// <summary>
         /// Gets the current state of the compute node.
         /// </summary>
@@ -84,7 +84,7 @@ namespace TesApi.Web
         ///     the details of the failure can be found in the TaskFailureInformation
         ///     property.
         /// </remarks>
-        public TaskExecutionResult? TaskExecutionResult { get; set; }
+        public TaskExecutionResult? TaskExecutionResult { get; set; } // TODO: consider removing
         /// <summary>
         /// Gets the time at which the task started running.
         /// </summary>
@@ -108,7 +108,7 @@ namespace TesApi.Web
         /// This is the state of the container according to the Docker service. It is equivilant
         ///     to the status field returned by "docker inspect".
         /// </remarks>
-        public string TaskContainerState { get; set; }
+        public string TaskContainerState { get; set; } // TODO: consider removing
         /// <summary>
         /// Gets detailed error information about the container under which the task is executing.
         /// </summary>
@@ -116,6 +116,10 @@ namespace TesApi.Web
         /// This is the detailed error string from the Docker service, if available. It is
         ///     equivilant to the error field returned by "docker inspect".
         /// </remarks>
-        public string TaskContainerError { get; set; }
+        public string TaskContainerError { get; set; } // TODO: consider removing
+        /// <summary>
+        /// Gets the task's pool Id.
+        /// </summary>
+        public string PoolId { get; set; }
     }
 }

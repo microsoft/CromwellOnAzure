@@ -31,9 +31,13 @@ services:
       - BatchImageVersion=$BatchImageVersion
       - BatchNodeAgentSkuId=$BatchNodeAgentSkuId
       - CromwellDrsLocalizerImageName=$CromwellDrsLocalizerImageName
+      - BatchAutopool=$BatchAutopool
       - MarthaUrl=$MarthaUrl
       - MarthaKeyVaultName=$MarthaKeyVaultName
       - MarthaSecretName=$MarthaSecretName
+      - BatchPoolIdleNodeMinutes=$BatchPoolIdleNodeMinutes
+      - BatchPoolRotationForcedDays=$BatchPoolRotationForcedDays
+      - HOSTNAME=$HOSTNAME
       - PostgreSqlServerName=$PostgreSqlServerName
       - PostgreSqlTesDatabaseName=$PostgreSqlTesDatabaseName
       - PostgreSqlTesUserLogin=$PostgreSqlTesUserLogin

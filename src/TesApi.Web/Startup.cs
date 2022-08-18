@@ -63,6 +63,7 @@ namespace TesApi.Web
                 (var cosmosDbEndpoint, var cosmosDbKey) = ((IAzureProxy)sp.GetService(typeof(IAzureProxy))).GetCosmosDbEndpointAndKeyAsync(Configuration["CosmosDbAccountName"]).Result;
                 return new(cosmosDbEndpoint, cosmosDbKey);
             })
+            .AddSingleton<BatchPoolFactory>()
 
             .AddControllers()
             .AddNewtonsoftJson(opts =>
@@ -105,6 +106,7 @@ namespace TesApi.Web
             })
 
             .AddHostedService<Scheduler>()
+            .AddHostedService<BatchPoolService>()
             .AddHostedService<DeleteCompletedBatchJobsHostedService>()
             .AddHostedService<DeleteOrphanedBatchJobsHostedService>()
             .AddHostedService<DeleteOrphanedAutoPoolsHostedService>()

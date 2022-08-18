@@ -42,7 +42,9 @@ namespace TesApi.Tests.TestServices
                 .AddTransient<ILogger<T>>(_ => NullLogger<T>.Instance)
                 .IfThenElse(mockStorageAccessProvider, s => s, s => s.AddTransient<ILogger<StorageAccessProvider>>(_ => NullLogger<StorageAccessProvider>.Instance))
                 .AddTransient<ILogger<BatchScheduler>>(_ => NullLogger<BatchScheduler>.Instance)
+                .AddTransient<ILogger<BatchPool>>(_ => NullLogger<BatchPool>.Instance)
                 .AddSingleton<TestRepositoryStorage>()
+                .AddSingleton<BatchPoolFactory>()
                 .AddSingleton<IBatchScheduler, BatchScheduler>()
             .BuildServiceProvider();
 
