@@ -82,6 +82,7 @@ namespace CromwellOnAzureDeployer
         public bool DebugLogging { get; set; } = false;
         public string PostgreSqlServerName { get; set; }
         public string PostgreSqlUserPassword { get; set; }
+        public bool UsePostgreSqlSingleServer { get; set; } = false;
 
         public static Configuration BuildConfiguration(string[] args)
         {

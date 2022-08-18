@@ -20,10 +20,18 @@ using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
+using Microsoft.Azure.Management.Network;
+using Microsoft.Azure.Management.Network.Models;
 using Microsoft.Azure.Management.Network.Fluent;
 using Microsoft.Azure.Management.Network.Fluent.Models;
-using Microsoft.Azure.Management.PostgreSQL.FlexibleServers;
-using Microsoft.Azure.Management.PostgreSQL.FlexibleServers.Models;
+using SingleServer = Microsoft.Azure.Management.PostgreSQL;
+using SingleServerModel = Microsoft.Azure.Management.PostgreSQL.Models;
+using static Microsoft.Azure.Management.PostgreSQL.ServersOperationsExtensions;
+using Microsoft.Azure.Management.PostgreSQL;
+using FlexibleServer = Microsoft.Azure.Management.PostgreSQL.FlexibleServers;
+using FlexibleServerModel = Microsoft.Azure.Management.PostgreSQL.FlexibleServers.Models;
+using static Microsoft.Azure.Management.PostgreSQL.FlexibleServers.ServersOperationsExtensions;
+using static Microsoft.Azure.Management.PostgreSQL.FlexibleServers.DatabasesOperationsExtensions;
 using Microsoft.Azure.Management.PrivateDns.Fluent;
 using Microsoft.Azure.Management.ResourceGraph;
 using Microsoft.Azure.Management.ResourceGraph.Models;
@@ -99,8 +107,10 @@ namespace CromwellOnAzureDeployer
         private IAzure azureSubscriptionClient { get; set; }
         private Microsoft.Azure.Management.Fluent.Azure.IAuthenticated azureClient { get; set; }
         private IResourceManager resourceManagerClient { get; set; }
+        private Microsoft.Azure.Management.Network.INetworkManagementClient networkManagementClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
-        private IPostgreSQLManagementClient postgreSqlManagementClient { get; set; }
+        private FlexibleServer.IPostgreSQLManagementClient postgreSqlFlexManagementClient { get; set; }
+        private SingleServer.IPostgreSQLManagementClient postgreSqlSingleManagementClient { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
         private bool SkipBillingReaderRoleAssignment { get; set; }
         private bool isResourceGroupCreated { get; set; }
@@ -131,7 +141,10 @@ namespace CromwellOnAzureDeployer
                 subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
                 kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
-                postgreSqlManagementClient = new PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+                networkManagementClient = new Microsoft.Azure.Management.Network.NetworkManagementClient(azureCredentials);
+                networkManagementClient.SubscriptionId = configuration.SubscriptionId;
+                postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+                postgreSqlSingleManagementClient = new SingleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
@@ -141,7 +154,8 @@ namespace CromwellOnAzureDeployer
                 IGenericResource logAnalyticsWorkspace = null;
                 IGenericResource appInsights = null;
                 ICosmosDBAccount cosmosDb = null;
-                Server postgreSqlServer = null;
+                FlexibleServerModel.Server postgreSqlFlexServer = null;
+                SingleServerModel.Server postgreSqlSingleServer = null;
                 IStorageAccount storageAccount = null;
                 IVirtualMachine linuxVm = null;
                 INetworkSecurityGroup networkSecurityGroup = null;
@@ -305,7 +319,7 @@ namespace CromwellOnAzureDeployer
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
                         aksCluster = await ValidateAndGetExistingAKSClusterAsync();
-                        postgreSqlServer = await ValidateAndGetExistingPostgresqlServer();
+                        postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
 
                         // Configuration preferences not currently settable by user.
                         if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName) && configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
@@ -423,7 +437,7 @@ namespace CromwellOnAzureDeployer
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                         });
 
-                        if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() && postgreSqlServer == null)
+                        if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() && postgreSqlFlexServer == null)
                         {
                             postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork);
                         }
@@ -508,17 +522,24 @@ namespace CromwellOnAzureDeployer
                                 cosmosDb = await CreateCosmosDbAsync();
                                 await AssignVmAsContributorToCosmosDb(managedIdentity, cosmosDb);
                             }),
-                            Task.Run(async () => { 
-                                if(configuration.ProvisionPostgreSqlOnAzure == true) 
-                                { 
-                                    postgreSqlServer ??= await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone);
-
+                            Task.Run(async () => {
+                                if(configuration.ProvisionPostgreSqlOnAzure == true)
+                                {
+                                    if (configuration.UsePostgreSqlSingleServer)
+                                    {
+                                        postgreSqlSingleServer ??= await CreateSinglePostgreSqlServerAndDatabaseAsync(postgreSqlSingleManagementClient, vnetAndSubnet.Value.vmSubnet, postgreSqlDnsZone);
+                                    }
+                                    else
+                                    {
+                                        postgreSqlFlexServer ??= await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlFlexManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone);
+                                    }
+                                    
                                     // Wait for either kubernetes pod to start or ssh connection info to be set.
                                     await compute;
 
                                     if (configuration.UseAks && !configuration.ManualHelmDeployment)
                                     {
-                                        await ExecuteQueriesOnAzurePostgreSQLDbFromK8(postgreSqlServer);
+                                        await ExecuteQueriesOnAzurePostgreSQLDbFromK8();
                                     }
                                 }
                             }),
@@ -651,7 +672,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task<Server> ValidateAndGetExistingPostgresqlServer()
+        private async Task<FlexibleServerModel.Server> ValidateAndGetExistingPostgresqlServer()
         {
             if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName))
             {
@@ -674,13 +695,13 @@ namespace CromwellOnAzureDeployer
                 ?? throw new ValidationException($"If AKS cluster name is provided, the cluster must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
         }
         
-        private async Task<Server> GetExistingPostgresqlService(string serverName)
+        private async Task<FlexibleServerModel.Server> GetExistingPostgresqlService(string serverName)
         {
             return (await Task.WhenAll(subscriptionIds.Select(async s =>
             {
                 try
                 {
-                    var client = new PostgreSQLManagementClient(tokenCredentials) { SubscriptionId = s };
+                    var client = new FlexibleServer.PostgreSQLManagementClient(tokenCredentials) { SubscriptionId = s };
                     return await client.Servers.ListAsync();
                 }
                 catch (Exception)
@@ -1327,9 +1348,8 @@ namespace CromwellOnAzureDeployer
         {
             // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#managed-identity-operator
             var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/f1a07417-d97a-45cb-824c-7a7467783830";
-
             return Execute(
-                $"Assigning Storage Blob Data Reader role for VM to Storage Account resource scope...",
+                $"Assigning Managed Id Operator role for the managed id to resource group scope...",
                 () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                     () => azureSubscriptionClient.AccessManagement.RoleAssignments
                         .Define(Guid.NewGuid().ToString())
@@ -1449,7 +1469,7 @@ namespace CromwellOnAzureDeployer
                         await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                         {
                             new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName}?sslmode=require\""),
-                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", $"\"{configuration.PostgreSqlUserLogin}\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", configuration.UsePostgreSqlSingleServer ? $"\"{configuration.PostgreSqlUserLogin}@{configuration.PostgreSqlServerName}\"": $"\"{configuration.PostgreSqlUserLogin}\""),
                             new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlUserPassword}\""),
                             new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
                             new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
@@ -1505,7 +1525,7 @@ namespace CromwellOnAzureDeployer
                     .WithWriteReplication(Region.Create(configuration.RegionName))
                     .CreateAsync(cts.Token));
 
-        private async Task<Server> CreatePostgreSqlServerAndDatabaseAsync(IPostgreSQLManagementClient postgresManagementClient, ISubnet subnet, IPrivateDnsZone postgreSqlDnsZone)
+        private async Task<FlexibleServerModel.Server> CreatePostgreSqlServerAndDatabaseAsync(FlexibleServer.IPostgreSQLManagementClient postgresManagementClient, ISubnet subnet, IPrivateDnsZone postgreSqlDnsZone)
         {
             if (!subnet.Inner.Delegations.Any())
             {
@@ -1513,22 +1533,22 @@ namespace CromwellOnAzureDeployer
                 await subnet.Parent.Update().ApplyAsync();
             }
 
-            Server server = null;
+            FlexibleServerModel.Server server = null;
 
             await Execute(
-                $"Creating Azure Server for PostgreSQL: {configuration.PostgreSqlServerName} ...",
+                $"Creating Azure Flexible Server for PostgreSQL: {configuration.PostgreSqlServerName} ...",
                 async () =>
                 {
                     server = await postgresManagementClient.Servers.CreateAsync(
                         configuration.ResourceGroupName, configuration.PostgreSqlServerName,
-                        new Server(
+                        new FlexibleServerModel.Server(
                            location: configuration.RegionName,
                            version: configuration.PostgreSqlVersion,
                            sku: new Sku(configuration.PostgreSqlSkuName, configuration.PostgreSqlTier),
-                           storage: new Storage(configuration.PostgreSqlStorageSize),
+                           storage: new FlexibleServerModel.Storage(configuration.PostgreSqlStorageSize),
                            administratorLogin: configuration.PostgreSqlAdministratorLogin,
                            administratorLoginPassword: configuration.PostgreSqlAdministratorPassword,
-                           network: new Network(publicNetworkAccess: "Disabled", delegatedSubnetResourceId: subnet.Inner.Id, privateDnsZoneArmResourceId: postgreSqlDnsZone.Id)
+                           network: new FlexibleServerModel.Network(publicNetworkAccess: "Disabled", delegatedSubnetResourceId: subnet.Inner.Id, privateDnsZoneArmResourceId: postgreSqlDnsZone.Id)
                         ));
                 });
 
@@ -1536,7 +1556,56 @@ namespace CromwellOnAzureDeployer
                 $"Creating PostgreSQL cromwell database: {configuration.PostgreSqlDatabaseName}...",
                 () => postgresManagementClient.Databases.CreateAsync(
                     configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlDatabaseName,
-                    new Database()));
+                    new FlexibleServerModel.Database()));
+
+            return server;
+        }
+
+        private async Task<SingleServerModel.Server> CreateSinglePostgreSqlServerAndDatabaseAsync(SingleServer.IPostgreSQLManagementClient postgresManagementClient, ISubnet subnet, IPrivateDnsZone postgreSqlDnsZone)
+        {
+            SingleServerModel.Server server = null;
+
+            await Execute(
+                $"Creating Azure Single Server for PostgreSQL: {configuration.PostgreSqlServerName} ...",
+                async () =>
+                {
+                    server = await postgresManagementClient.Servers.CreateAsync(
+                        configuration.ResourceGroupName, configuration.PostgreSqlServerName,
+                        new SingleServerModel.ServerForCreate(
+                           new SingleServerModel.ServerPropertiesForDefaultCreate(
+                               administratorLogin: configuration.PostgreSqlAdministratorLogin,
+                               administratorLoginPassword: configuration.PostgreSqlAdministratorPassword,
+                               version: configuration.PostgreSqlVersion,
+                               publicNetworkAccess: "Disabled",
+                               storageProfile: new Microsoft.Azure.Management.PostgreSQL.Models.StorageProfile(
+                                   storageMB: configuration.PostgreSqlStorageSize * 1000)),
+                           configuration.RegionName,
+                           sku: new Microsoft.Azure.Management.PostgreSQL.Models.Sku("GP_Gen5_4")
+                       ));
+
+                    var privateEndpoint = await networkManagementClient.PrivateEndpoints.CreateOrUpdateAsync(configuration.ResourceGroupName, "pe-postgres1",
+                        new Microsoft.Azure.Management.Network.Models.PrivateEndpoint(
+                            name: "myconnection123",
+                            location: configuration.RegionName,
+                            privateLinkServiceConnections: new List<Microsoft.Azure.Management.Network.Models.PrivateLinkServiceConnection>()
+                            { new PrivateLinkServiceConnection(name: "myconnection123", privateLinkServiceId: server.Id, groupIds: new List<string>(){"postgresqlServer"}) },
+                            subnet: new Subnet(subnet.Inner.Id)));
+                    var networkInterfaceName = privateEndpoint.NetworkInterfaces.First().Id.Split("/").Last();
+                    var networkInterface = await networkManagementClient.NetworkInterfaces.GetAsync(configuration.ResourceGroupName, networkInterfaceName);
+
+                    await postgreSqlDnsZone
+                        .Update()
+                        .DefineARecordSet(server.Name)
+                        .WithIPv4Address(networkInterface.IpConfigurations.First().PrivateIPAddress)
+                        .Attach()
+                        .ApplyAsync();
+               });
+
+            await Execute(
+                $"Creating PostgreSQL cromwell database: {configuration.PostgreSqlDatabaseName}...",
+                async () => await postgresManagementClient.Databases.CreateOrUpdateAsync(
+                    configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlDatabaseName,
+                    new SingleServerModel.Database()));
 
             return server;
         }
@@ -1633,7 +1702,7 @@ namespace CromwellOnAzureDeployer
                     .FromAnyPort()
                     .ToAnyAddress()
                     .ToPort(SshAllowedPort)
-                    .WithProtocol(SecurityRuleProtocol.Tcp)
+                    .WithProtocol(Microsoft.Azure.Management.Network.Fluent.Models.SecurityRuleProtocol.Tcp)
                     .WithPriority(SshDefaultPriority)
                     .Attach()
                     .CreateAsync(cts.Token)
@@ -1647,7 +1716,7 @@ namespace CromwellOnAzureDeployer
                 return networkSecurityGroup?.SecurityRules[SshNsgRuleName]?.Access switch
                 {
                     null => Task.CompletedTask,
-                    var x when SecurityRuleAccess.Allow.Equals(x) => SetKeepSshPortOpen(true),
+                    var x when Microsoft.Azure.Management.Network.Fluent.Models.SecurityRuleAccess.Allow.Equals(x) => SetKeepSshPortOpen(true),
                     _ => Execute(
                         "Enabling SSH on VM...",
                         () => EnableSshPort()),
@@ -1688,10 +1757,18 @@ namespace CromwellOnAzureDeployer
             return $"CREATE USER {configuration.PostgreSqlUserLogin} WITH PASSWORD '{configuration.PostgreSqlUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlDatabaseName} TO {configuration.PostgreSqlUserLogin};";
         }
 
-        private string GetPostgreSQLCreateUserCommand()
+        private string GetPostgreSQLCreateUserCommand(bool useSingleServer)
         {
             var sqlCommand = GetInitSqlString();
-            return $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} -c \"{sqlCommand}\"";
+            if (useSingleServer)
+            {
+                return $"PGPASSWORD={configuration.PostgreSqlAdministratorPassword} psql -U {configuration.PostgreSqlAdministratorLogin}@{configuration.PostgreSqlServerName} -h {configuration.PostgreSqlServerName}.postgres.database.azure.com -d cromwell_db  -v sslmode=true -c \"{sqlCommand}\"";
+            }
+            else
+            {
+                return $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} -c \"{sqlCommand}\"";
+
+            }
         }
 
         private Task CreatePostgreSqlDatabaseUser(ConnectionInfo sshConnectionInfo)
@@ -1699,7 +1776,7 @@ namespace CromwellOnAzureDeployer
                 $"Creating PostgreSQL database user...",
                 () =>
                 {
-                    return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, GetPostgreSQLCreateUserCommand());
+                    return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, GetPostgreSQLCreateUserCommand(configuration.UsePostgreSqlSingleServer));
                 }
             );
 
@@ -1711,7 +1788,7 @@ namespace CromwellOnAzureDeployer
                     // Note: for a potential future implementation of this method without Fluent,
                     // please see commit cbffa28 in #392
                     var postgreSqlDnsZone = await azureSubscriptionClient.PrivateDnsZones
-                        .Define($"{configuration.PostgreSqlServerName}.private.postgres.database.azure.com")
+                        .Define($"privatelink.postgres.database.azure.com")
                         .WithExistingResourceGroup(configuration.ResourceGroupName)
                         .DefineVirtualNetworkLink($"{virtualNetwork.Name}-link")
                         .WithReferencedVirtualNetworkId(virtualNetwork.Id)
@@ -1721,7 +1798,7 @@ namespace CromwellOnAzureDeployer
                     return postgreSqlDnsZone;
                 });
 
-        private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8(Server postgreSQLServer)
+        private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8()
             => Execute(
                 $"Executing scripts on cromwell_db.",
                 async () => 
@@ -1732,8 +1809,20 @@ namespace CromwellOnAzureDeployer
                     {
                         new string[] { "apt", "update" },
                         new string[] { "apt", "install", "-y", "postgresql-client" },
-                        new string[] { "psql", $"postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName}", "-c", $"{initScript}" }
                     };
+
+                    var serverPath = $"{configuration.PostgreSqlServerName}.postgres.database.azure.com";
+                    var username = configuration.PostgreSqlAdministratorLogin;
+
+                    if (configuration.UsePostgreSqlSingleServer)
+                    {
+                        username = $"{configuration.PostgreSqlAdministratorLogin}@{configuration.PostgreSqlServerName}";
+                    }
+                    commands.Add(new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:5432:{configuration.PostgreSqlDatabaseName}:{username}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" });
+                    commands.Add(new string[] { "chmod", "0600", "/root/.pgpass" });
+                    commands.Add(new string[] { "psql", "-h", serverPath, "-U", username, "-d", configuration.PostgreSqlDatabaseName, "-c", initScript });
+
+
                     await kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "tes", commands, System.TimeSpan.FromMinutes(5));
                 });
 
