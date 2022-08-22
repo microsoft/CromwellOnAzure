@@ -328,6 +328,15 @@ namespace CromwellOnAzureDeployer
                             }
                             await PatchCromwellConfigurationFileV310Async(storageAccount);
                         }
+
+                        if (installedVersion is null || installedVersion < new Version(3, 2))
+                        {
+                            if (!newSettingsAdded)
+                            {
+                                await AddNewSettingsAsync(sshConnectionInfo);
+                                newSettingsAdded = true;
+                            }
+                        }
                     }
 
                     if (!configuration.Update)
@@ -785,7 +794,7 @@ namespace CromwellOnAzureDeployer
 
             if (configuration.Update)
             {
-                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down");
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down --remove-orphans");
             }
 
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
