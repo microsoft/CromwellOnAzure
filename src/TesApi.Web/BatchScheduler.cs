@@ -71,7 +71,7 @@ namespace TesApi.Web
         private readonly string marthaUrl;
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
-        //private readonly string defaultStorageAccountName;
+        private readonly string defaultStorageAccountName;
         private readonly string hostname;
         private readonly BatchPoolFactory _batchPoolFactory;
 
@@ -100,7 +100,7 @@ namespace TesApi.Web
             this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
             this.enableBatchAutopool = GetBoolValue(configuration, "BatchAutopool", false);
-            //this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
+            this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
@@ -431,7 +431,7 @@ namespace TesApi.Web
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, containerConfiguration is not null);
 
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
-                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
+                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, GetJobPreparationTask(), await GetJobReleaseTask(tesTask));
 
                 tesTaskLog.StartTime = DateTimeOffset.UtcNow;
                 tesTask.State = TesState.INITIALIZINGEnum;
@@ -721,6 +721,35 @@ namespace TesApi.Web
             => await (tesTaskStateTransitions
                 .FirstOrDefault(m => (m.Condition is null || m.Condition(tesTask)) && (m.CurrentBatchTaskState is null || m.CurrentBatchTaskState == combinedBatchTaskInfo.BatchTaskState))
                 ?.ActionAsync(tesTask, combinedBatchTaskInfo) ?? ValueTask.FromResult(false));
+
+        /// <summary>
+        /// Returns a job preparation task for shared pool cleanup coordination.
+        /// </summary>
+        /// <returns></returns>
+        /// <remarks>Job Release tasks are run simultaneously with subsequent Azure Batch jobs's tasks. Combining this with <see cref="GetJobReleaseTask(TesTask)"/> ensures that will complete before the next job starts execuation.</remarks>
+        private JobPreparationTask GetJobPreparationTask()
+            => enableBatchAutopool ? default : new()
+            {
+                CommandLine = @"/bin/bash -c 'while [ -f /var/lock/coa.lock ]; do sleep 1; done && touch /var/lock/coa.lock && chmod a+w /var/lock/coa.lock",
+                RerunOnComputeNodeRebootAfterSuccess = false,
+                UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                WaitForSuccess = true,
+            };
+
+        /// <summary>
+        /// Returns a job release task for shared pool cleanup to prevent unusable compute nodes due to node reuse.
+        /// </summary>
+        /// <param name="tesTask"></param>
+        /// <returns></returns>
+        /// <remarks>Job Release tasks are run simultaneously with subsequent Azure Batch jobs's tasks. Combining this with <see cref="GetJobPreparationTask"/> ensures that this will complete before the next job starts execuation.</remarks>
+        private async ValueTask<JobReleaseTask> GetJobReleaseTask(TesTask tesTask)
+            => enableBatchAutopool ? default : new()
+            {
+                CommandLine = @"/bin/env ./jobrelease.sh",
+                EnvironmentSettings = new[] { new EnvironmentSetting("COA_EXECUTOR", tesTask.Executors.First().Image) },
+                ResourceFiles = new[] { ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/jobrelease.sh"), @"jobrelease.sh", @"0755") },
+                UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+            };
 
         /// <summary>
         /// Returns job preparation and main Batch tasks that represents the given <see cref="TesTask"/>

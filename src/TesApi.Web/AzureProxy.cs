@@ -216,9 +216,11 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
+        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask, JobReleaseTask jobReleaseTask)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
+            job.JobPreparationTask = jobPreparationTask;
+            job.JobReleaseTask = jobReleaseTask;
             await job.CommitAsync();
 
             try
