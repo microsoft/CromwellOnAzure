@@ -730,7 +730,7 @@ namespace TesApi.Web
         private JobPreparationTask GetJobPreparationTask()
             => enableBatchAutopool ? default : new()
             {
-                CommandLine = @"/bin/bash -c 'while [ -f /var/lock/coa.lock ]; do sleep 1; done && touch /var/lock/coa.lock && chmod a+w /var/lock/coa.lock",
+                CommandLine = @"/bin/bash -c 'while [ -f /var/lock/coa.lock ]; do sleep 1; done && touch /var/lock/coa.lock && chmod a+w /var/lock/coa.lock'",
                 RerunOnComputeNodeRebootAfterSuccess = false,
                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                 WaitForSuccess = true,
@@ -745,7 +745,7 @@ namespace TesApi.Web
         private async ValueTask<JobReleaseTask> GetJobReleaseTask(TesTask tesTask)
             => enableBatchAutopool ? default : new()
             {
-                CommandLine = @"/bin/env ./jobrelease.sh",
+                CommandLine = @"/bin/env ./jobRelease.sh",
                 EnvironmentSettings = new[] { new EnvironmentSetting("COA_EXECUTOR", tesTask.Executors.First().Image) },
                 ResourceFiles = new[] { ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/jobRelease.sh"), @"jobRelease.sh", @"0755") },
                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
