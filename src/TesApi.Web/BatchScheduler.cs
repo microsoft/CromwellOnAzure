@@ -1636,7 +1636,7 @@ namespace TesApi.Web
             var pool = batchPools.TryGetValue(key, out var set) ? set.LastOrDefault(Available) : default;
             if (pool is null)
             {
-                var poolQuota = azureProxy.GetBatchAccountQuotasAsync().Result.PoolQuota;
+                var poolQuota = (await azureProxy.GetBatchAccountQuotasAsync()).PoolQuota;
                 var activePoolsCount = azureProxy.GetBatchActivePoolCount();
                 if (activePoolsCount + 1 > poolQuota)
                 {
@@ -1650,7 +1650,7 @@ namespace TesApi.Web
                 try
                 {
                     var modelPool = modelPoolFactory(poolId);
-                    if (modelPool.Metadata is null) { modelPool.Metadata = new List<BatchModels.MetadataItem>(); }
+                    modelPool.Metadata ??= new List<BatchModels.MetadataItem>();
                     modelPool.Metadata.Add(new(PoolHostName, this.hostname));
                     pool = _batchPoolFactory.CreateNew(await azureProxy.CreateBatchPoolAsync(modelPool, isPreemptable), this);
                 }

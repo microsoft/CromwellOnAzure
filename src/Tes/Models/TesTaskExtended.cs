@@ -41,7 +41,7 @@ namespace Tes.Models
         public string WorkflowId { get; set; }
 
         /// <summary>
-        /// Top-most parent workflow ID from the workflow engine
+        /// Assigned Azure Batch PoolId
         /// </summary>
         [DataMember(Name = "pool_id")]
         public string PoolId { get; set; }

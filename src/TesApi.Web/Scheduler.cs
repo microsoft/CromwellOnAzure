@@ -26,7 +26,7 @@ namespace TesApi.Web
         private readonly IBatchScheduler batchScheduler;
         private readonly ILogger<Scheduler> logger;
         private readonly bool isDisabled;
-        private readonly bool usingBatchPools;
+        private readonly bool usingBatchAutopools;
         private IEnumerable<Task> shutdownCandidates = Enumerable.Empty<Task>();
         private readonly TimeSpan runInterval = TimeSpan.FromSeconds(5);
 
@@ -43,7 +43,7 @@ namespace TesApi.Web
             this.batchScheduler = batchScheduler;
             this.logger = logger;
             isDisabled = configuration.GetValue("DisableBatchScheduling", false);
-            usingBatchPools = !configuration.GetValue("BatchAutopool", false);
+            usingBatchAutopools = configuration.GetValue("BatchAutopool", false);
         }
 
         /// <summary>
@@ -84,7 +84,7 @@ namespace TesApi.Web
                 {
                     await OrchestrateTesTasksOnBatch(stoppingToken);
 
-                    if (usingBatchPools)
+                    if (!usingBatchAutopools)
                     {
                         shutdownCandidates = await batchScheduler.GetShutdownCandidatePools(stoppingToken);
                     }
