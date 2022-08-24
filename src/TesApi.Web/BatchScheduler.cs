@@ -747,7 +747,7 @@ namespace TesApi.Web
             {
                 CommandLine = @"/bin/env ./jobrelease.sh",
                 EnvironmentSettings = new[] { new EnvironmentSetting("COA_EXECUTOR", tesTask.Executors.First().Image) },
-                ResourceFiles = new[] { ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/jobrelease.sh"), @"jobrelease.sh", @"0755") },
+                ResourceFiles = new[] { ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/jobRelease.sh"), @"jobRelease.sh", @"0755") },
                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
             };
 
