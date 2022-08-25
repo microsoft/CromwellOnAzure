@@ -83,6 +83,9 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlServerName { get; set; }
         public string PostgreSqlUserPassword { get; set; }
         public bool UsePostgreSqlSingleServer { get; set; } = false;
+        public string KeyVaultName { get; set; }
+        // Temporary workaround until I can get Azure Graph RBAC client working. 
+        public string UserObjectId { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {

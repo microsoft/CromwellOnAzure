@@ -13,15 +13,6 @@ spec:
       storage: {{ .Values.persistence.cromwellTmpSize }}
 status: {}
 ---
-apiVersion: v1
-data:
-  azurestorageaccountname: {{.Values.persistence.storageAccount | b64enc}}
-  azurestorageaccountkey: {{.Values.persistence.storageAccountKey | b64enc}}
-kind: Secret
-metadata:
-  name: azure-secret
-type: Opaque
----
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -46,6 +37,8 @@ mountOptions:
 {{- $rg  := .Values.config.resourceGroup -}}
 {{- $namespace := .Values.config.coaNamespace -}}
 {{- $storageAccount  := .Values.persistence.storageAccount -}}
+{{- $keyVaultUrl  := .Values.persistence.keyVaultUrl -}}
+{{- $keyVaultSecretName  := .Values.persistence.keyVaultSecretName -}}
 {{- $size  := .Values.persistence.blobPvcSize -}}
 {{- range .Values.defaultContainers }}
 apiVersion: v1
@@ -59,9 +52,6 @@ spec:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain  # If set as "Delete" container would be removed after pvc deletion
   storageClassName: blob-fuse
-  mountOptions:
-    - -o allow_other
-    - --file-cache-timeout-in-seconds=120
   csi:
     driver: blob.csi.azure.com
     readOnly: false
@@ -69,12 +59,10 @@ spec:
     # `#` is not allowed in self defined volumeHandle
     volumeHandle: {{ uuidv4 }}
     volumeAttributes:
-      resourceGroup: {{ $rg }}
-      storageAccount: {{ $storageAccount }}
+      storageAccountName: {{ $storageAccount }}
       containerName: {{ . }}
-    nodeStageSecretRef:
-      name: azure-secret
-      namespace: {{ $namespace }}
+      keyVaultURL: {{ $keyVaultUrl | quote }}
+      keyVaultSecretName: {{ $keyVaultSecretName }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

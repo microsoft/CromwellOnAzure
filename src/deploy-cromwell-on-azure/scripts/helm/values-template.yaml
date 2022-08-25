@@ -43,7 +43,8 @@ persistence:
   blobPvcSize: 32Gi
   cromwellTmpSize: 32Gi
   storageAccount: RUNTIME_PARAMETER
-  storageAccountKey: RUNTIME_PARAMETER
+  keyVaultUrl: RUNTIME_PARAMETER
+  keyVaultSecretName: RUNTIME_PARAMETER
 
 identity:
   name: RUNTIME_PARAMETER

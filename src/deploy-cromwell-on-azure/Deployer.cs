@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using Common;
@@ -19,17 +21,21 @@ using Microsoft.Azure.Management.CosmosDB.Fluent.Models;
 using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent.Models;
+using Microsoft.Azure.Management.KeyVault.Fluent;
+using Microsoft.Azure.Management.KeyVault;
+using KeyVaultManagementClient = Microsoft.Azure.Management.KeyVault.KeyVaultManagementClient;
+using Microsoft.Azure.Management.KeyVault.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
 using Microsoft.Azure.Management.Network;
 using Microsoft.Azure.Management.Network.Models;
 using Microsoft.Azure.Management.Network.Fluent;
-using Microsoft.Azure.Management.Network.Fluent.Models;
 using SingleServer = Microsoft.Azure.Management.PostgreSQL;
 using SingleServerModel = Microsoft.Azure.Management.PostgreSQL.Models;
 using static Microsoft.Azure.Management.PostgreSQL.ServersOperationsExtensions;
 using Microsoft.Azure.Management.PostgreSQL;
 using FlexibleServer = Microsoft.Azure.Management.PostgreSQL.FlexibleServers;
 using FlexibleServerModel = Microsoft.Azure.Management.PostgreSQL.FlexibleServers.Models;
+using Sku = Microsoft.Azure.Management.PostgreSQL.FlexibleServers.Models.Sku;
 using static Microsoft.Azure.Management.PostgreSQL.FlexibleServers.ServersOperationsExtensions;
 using static Microsoft.Azure.Management.PostgreSQL.FlexibleServers.DatabasesOperationsExtensions;
 using Microsoft.Azure.Management.PrivateDns.Fluent;
@@ -60,9 +66,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Net.WebSockets;
 
-
-using Sku = Microsoft.Azure.Management.PostgreSQL.FlexibleServers.Models.Sku;
-
 namespace CromwellOnAzureDeployer
 {
     public class Deployer
@@ -86,6 +89,7 @@ namespace CromwellOnAzureDeployer
         public const string CromwellAzureRootDir = "/data/cromwellazure";
         public const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
         public const string SettingsDelimiter = "=:=";
+        public const string StorageAccountKeySecretName = "CoAStorageKey";
         public const string SshNsgRuleName = "SSH";
 
         private readonly CancellationTokenSource cts = new();
@@ -157,6 +161,7 @@ namespace CromwellOnAzureDeployer
                 FlexibleServerModel.Server postgreSqlFlexServer = null;
                 SingleServerModel.Server postgreSqlSingleServer = null;
                 IStorageAccount storageAccount = null;
+                Vault keyVault = null;
                 IVirtualMachine linuxVm = null;
                 INetworkSecurityGroup networkSecurityGroup = null;
                 IIdentity managedIdentity = null;
@@ -304,7 +309,7 @@ namespace CromwellOnAzureDeployer
                             managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
-                            await kubernetesManager.UpgradeAKSDeployment(accountNames, resourceGroup, storageAccount, managedIdentity);
+                            await kubernetesManager.UpgradeAKSDeployment(accountNames, resourceGroup, storageAccount, managedIdentity, keyVault.Properties.VaultUri);
                         }
                         else
                         {
@@ -373,6 +378,11 @@ namespace CromwellOnAzureDeployer
                             configuration.AksClusterName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 25);
                         }
 
+                        if (string.IsNullOrWhiteSpace(configuration.KeyVaultName))
+                        {
+                            configuration.KeyVaultName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                        }
+
                         await RegisterResourceProvidersAsync();
                         await ValidateVmAsync();
 
@@ -437,9 +447,16 @@ namespace CromwellOnAzureDeployer
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                         });
 
+                        await Task.Run(async () =>
+                        {
+                            keyVault = await CreateKeyVaultAsync(configuration.KeyVaultName, managedIdentity, vnetAndSubnet.Value.vmSubnet);
+                            var keys = await storageAccount.GetKeysAsync();
+                            await SetStorageKeySecret(keyVault.Properties.VaultUri, StorageAccountKeySecretName, keys.First().Value);
+                        });
+
                         if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() && postgreSqlFlexServer == null)
                         {
-                            postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork);
+                            postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
                         }
 
                         Task compute = null;
@@ -457,8 +474,7 @@ namespace CromwellOnAzureDeployer
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
-                                var keys = await storageAccount.GetKeysAsync();
-                                kubernetesManager.UpdateHelmValues(storageAccount.Name, keys.First().Value, resourceGroup.Name, settings, managedIdentity);
+                                kubernetesManager.UpdateHelmValues(storageAccount.Name, keyVault.Properties.VaultUri, resourceGroup.Name, settings, managedIdentity);
                                 if (configuration.ManualHelmDeployment)
                                 {
                                     ConsoleEx.WriteLine("Please deploy helm chart, and press Enter to continue.");
@@ -1585,10 +1601,10 @@ namespace CromwellOnAzureDeployer
 
                     var privateEndpoint = await networkManagementClient.PrivateEndpoints.CreateOrUpdateAsync(configuration.ResourceGroupName, "pe-postgres1",
                         new Microsoft.Azure.Management.Network.Models.PrivateEndpoint(
-                            name: "myconnection123",
+                            name: "pe-coa-postgresql",
                             location: configuration.RegionName,
                             privateLinkServiceConnections: new List<Microsoft.Azure.Management.Network.Models.PrivateLinkServiceConnection>()
-                            { new PrivateLinkServiceConnection(name: "myconnection123", privateLinkServiceId: server.Id, groupIds: new List<string>(){"postgresqlServer"}) },
+                            { new PrivateLinkServiceConnection(name: "pe-coa-postgresql", privateLinkServiceId: server.Id, groupIds: new List<string>(){"postgresqlServer"}) },
                             subnet: new Subnet(subnet.Inner.Id)));
                     var networkInterfaceName = privateEndpoint.NetworkInterfaces.First().Id.Split("/").Last();
                     var networkInterface = await networkManagementClient.NetworkInterfaces.GetAsync(configuration.ResourceGroupName, networkInterfaceName);
@@ -1780,22 +1796,22 @@ namespace CromwellOnAzureDeployer
                 }
             );
 
-        private Task<IPrivateDnsZone> CreatePrivateDnsZoneAsync(INetwork virtualNetwork)
+        private Task<IPrivateDnsZone> CreatePrivateDnsZoneAsync(INetwork virtualNetwork, string name, string title)
             => Execute(
-                "Creating private DNS Zone for PostgreSQL Server",
+                $"Creating private DNS Zone for {title}",
                 async () =>
                 {
                     // Note: for a potential future implementation of this method without Fluent,
                     // please see commit cbffa28 in #392
-                    var postgreSqlDnsZone = await azureSubscriptionClient.PrivateDnsZones
-                        .Define($"privatelink.postgres.database.azure.com")
+                    var dnsZone = await azureSubscriptionClient.PrivateDnsZones
+                        .Define(name)
                         .WithExistingResourceGroup(configuration.ResourceGroupName)
                         .DefineVirtualNetworkLink($"{virtualNetwork.Name}-link")
                         .WithReferencedVirtualNetworkId(virtualNetwork.Id)
                         .DisableAutoRegistration()
                         .Attach()
                         .CreateAsync();
-                    return postgreSqlDnsZone;
+                    return dnsZone;
                 });
 
         private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8()
@@ -1824,6 +1840,102 @@ namespace CromwellOnAzureDeployer
 
 
                     await kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "tes", commands, System.TimeSpan.FromMinutes(5));
+                });
+
+        private async Task SetStorageKeySecret(string vaultUrl, string secretName, string secretValue)
+        {
+            var client = new SecretClient(new Uri(vaultUrl), new DefaultAzureCredential());
+            await client.SetSecretAsync(secretName, secretValue);
+        }
+
+        private Task<Vault> CreateKeyVaultAsync(string vaultName, IIdentity managedIdentity, ISubnet subnet)
+            => Execute(
+                $"Creating Key Vault: {vaultName}...",
+                async () =>
+                {
+                    var tenantId = managedIdentity.TenantId;
+                    RestClient rest = RestClient
+                        .Configure()
+                        .WithEnvironment(AzureEnvironment.AzureGlobalCloud)
+                        .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                        .WithCredentials(azureCredentials)
+                        .Build();
+
+                    var rbacClient = new GraphRbacManagementClient(rest);
+                    rbacClient.TenantID = tenantId;
+                    //var user = await rbacClient.SignedInUser.GetAsync();
+                    var secrets = new List<string>
+                    {
+                        "get",
+                        "list",
+                        "set",
+                        "delete",
+                        "backup",
+                        "restore",
+                        "recover",
+                        "purge"
+                    };
+                    var keyVaultManagementClient = new KeyVaultManagementClient(azureCredentials);
+                    keyVaultManagementClient.SubscriptionId = configuration.SubscriptionId;
+                    var properties = new VaultCreateOrUpdateParameters()
+                    {
+                        Location = configuration.RegionName,
+                        Properties = new VaultProperties()
+                        {
+                            TenantId = new Guid(tenantId),
+                            Sku = new Microsoft.Azure.Management.KeyVault.Models.Sku(SkuName.Standard),
+                            NetworkAcls = new NetworkRuleSet()
+                            {
+                                DefaultAction = configuration.PrivateNetworking.GetValueOrDefault() ? "Deny" : "Allow"
+                            },
+                            AccessPolicies = new List<AccessPolicyEntry> ()
+                            { 
+                                new AccessPolicyEntry()
+                                {
+                                    TenantId = new Guid(tenantId),
+                                    ObjectId = configuration.UserObjectId,
+                                    Permissions = new Permissions()
+                                    {
+                                        Secrets = secrets
+                                    }
+                                },
+                                new AccessPolicyEntry()
+                                {
+                                    TenantId = new Guid(tenantId),
+                                    ObjectId = managedIdentity.PrincipalId,
+                                    Permissions = new Permissions()
+                                    {
+                                        Secrets = secrets
+                                    }
+                                }
+                            }
+                        }
+                    };
+                    var vault = await keyVaultManagementClient.Vaults.CreateOrUpdateAsync(configuration.ResourceGroupName, vaultName, properties);
+
+                    if (configuration.PrivateNetworking.GetValueOrDefault())
+                    {
+                        var privateEndpoint = await networkManagementClient.PrivateEndpoints.CreateOrUpdateAsync(configuration.ResourceGroupName, "pe-keyvault",
+                            new Microsoft.Azure.Management.Network.Models.PrivateEndpoint(
+                                name: "pe-coa-keyvault",
+                                location: configuration.RegionName,
+                                privateLinkServiceConnections: new List<Microsoft.Azure.Management.Network.Models.PrivateLinkServiceConnection>()
+                                { new PrivateLinkServiceConnection(name: "pe-coa-keyvault", privateLinkServiceId: vault.Id, groupIds: new List<string>(){"vault"}) },
+                                subnet: new Subnet(subnet.Inner.Id)));
+
+                        var networkInterfaceName = privateEndpoint.NetworkInterfaces.First().Id.Split("/").Last();
+                        var networkInterface = await networkManagementClient.NetworkInterfaces.GetAsync(configuration.ResourceGroupName, networkInterfaceName);
+
+                        var dnsZone = await CreatePrivateDnsZoneAsync(subnet.Parent, "privatelink.vaultcore.azure.net", "KeyVault");
+                        await dnsZone
+                            .Update()
+                            .DefineARecordSet(vault.Name)
+                            .WithIPv4Address(networkInterface.IpConfigurations.First().PrivateIPAddress)
+                            .Attach()
+                            .ApplyAsync();
+                    }
+
+                    return vault;
                 });
 
         private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)

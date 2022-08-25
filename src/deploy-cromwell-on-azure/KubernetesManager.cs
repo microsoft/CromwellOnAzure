@@ -61,7 +61,7 @@ namespace CromwellOnAzureDeployer
         public async Task DeployHelmChartToCluster(IKubernetes client)
         {
             await ExecHelmProcess($"repo add aad-pod-identity https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts");
-            await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity");
+            await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --kubeconfig kubeconfig.txt");
             await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
             await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig kubeconfig.txt");
             await ExecHelmProcess($"install --generate-name ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace");
@@ -76,11 +76,12 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        public void UpdateHelmValues(string storageAccountName, string saKey, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
+        public void UpdateHelmValues(string storageAccountName, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
         {
             var values = Yaml.LoadFromString<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
             values.Persistence["storageAccount"] = storageAccountName;
-            values.Persistence["storageAccountKey"] = saKey;
+            values.Persistence["keyVaultUrl"] = keyVaultUrl;
+            values.Persistence["keyVaultSecretName"] = Deployer.StorageAccountKeySecretName;
             values.Config["resourceGroup"] = resourceGroupName;
             values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
             values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
@@ -228,7 +229,7 @@ namespace CromwellOnAzureDeployer
             return true;
         }
 
-        public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId)
+        public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId, string keyVaultUrl)
         {
             // Override any configuration that is used by the update.
             Deployer.OverrideSettingsFromConfiguration(settings, configuration);
@@ -247,8 +248,8 @@ namespace CromwellOnAzureDeployer
             IKubernetes client = new Kubernetes(k8sConfig);
 
             await UnlockCromwellChangeLog(client);
-            var keys = await storageAccount.GetKeysAsync();
-            UpdateHelmValues(storageAccount.Name, keys.First().Value, resourceGroup.Name, settings, managedId);
+
+            UpdateHelmValues(storageAccount.Name, keyVaultUrl, resourceGroup.Name, settings, managedId);
             await DeployHelmChartToCluster(client);
         }
 
