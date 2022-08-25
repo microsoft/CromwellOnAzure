@@ -68,7 +68,7 @@ namespace Tes.Models
         [DataMember(Name = "content")]
         public string Content { get; set; }
 
-        [DataMember(Name = "localize")]
+        [DataMember(Name = "streamable")]
         public bool Streamable { get; set; }
 
         /// <summary>
@@ -84,6 +84,7 @@ namespace Tes.Models
             .Append("  Path: ").Append(Path).Append('\n')
             .Append("  Type: ").Append(Type).Append('\n')
             .Append("  Content: ").Append(Content).Append('\n')
+            .Append("  Streamable: ").Append(Streamable).Append('\n')
             .Append("}\n")
             .ToString();
 
@@ -146,6 +147,9 @@ namespace Tes.Models
                     Content == other.Content ||
                     Content is not null &&
                     Content.Equals(other.Content)
+                ) &&
+                (
+                    Streamable == other.Streamable
                 ),
             };
 
@@ -158,7 +162,7 @@ namespace Tes.Models
             unchecked // Overflow is fine, just wrap
             {
                 var hashCode = 41;
-                // Suitable nullity checks etc, of course :)
+
                 if (Name is not null)
                 {
                     hashCode = hashCode * 59 + Name.GetHashCode();
@@ -180,10 +184,13 @@ namespace Tes.Models
                 }
 
                 hashCode = hashCode * 59 + Type.GetHashCode();
+
                 if (Content is not null)
                 {
                     hashCode = hashCode * 59 + Content.GetHashCode();
                 }
+
+                hashCode = hashCode * 59 + Streamable.GetHashCode();
 
                 return hashCode;
             }
