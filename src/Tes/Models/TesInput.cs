@@ -69,7 +69,7 @@ namespace Tes.Models
         public string Content { get; set; }
 
         [DataMember(Name = "localize")]
-        public bool Localize { get; set; } = true;
+        public bool Streamable { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
