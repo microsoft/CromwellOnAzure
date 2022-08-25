@@ -42,6 +42,22 @@ spec:
               value: {{ .Values.config.disableBatchScheduling | quote }}
             - name: DockerInDockerImageName
               value: {{ .Values.config.dockerInDockerImageName }}
+            - name: BatchImageOffer
+              value: {{ .Values.config.batchImageOffer }}
+            - name: BatchImagePublisher
+              value: {{ .Values.config.batchImagePublisher }}
+            - name: BatchImageSku
+              value: {{ .Values.config.batchImageSku }}
+            - name: BatchImageVersion
+              value: {{ .Values.config.batchImageVersion }}
+            - name: BatchNodeAgentSkuId
+              value: {{ .Values.config.batchNodeAgentSkuId }}
+            - name: MarthaUrl
+              value: {{ .Values.config.marthaUrl }}
+            - name: MarthaKeyVaultName
+              value: {{ .Values.config.marthaKeyVaultName }}
+            - name: MarthaSecretName
+              value: {{ .Values.config.marthaSecretName }}
             - name: UsePreemptibleVmsOnly
               value: {{ .Values.config.usePreemptibleVmsOnly | quote}}
             - name: ExternalStorageContainers

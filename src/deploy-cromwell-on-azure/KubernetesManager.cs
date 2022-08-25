@@ -94,6 +94,15 @@ namespace CromwellOnAzureDeployer
             values.Config["usePreemptibleVmsOnly"] = settings["UsePreemptibleVmsOnly"];
             values.Config["blobxferImageName"] = settings["BlobxferImageName"];
             values.Config["dockerInDockerImageName"] = settings["DockerInDockerImageName"];
+            values.Config["batchImageOffer"] = settings["BatchImageOffer"];
+            values.Config["batchImagePublisher"] = settings["BatchImagePublisher"];
+            values.Config["batchImageSku"] = settings["BatchImageSku"];
+            values.Config["batchImageVersion"] = settings["BatchImageVersion"];
+            values.Config["batchNodeAgentSkuId"] = settings["BatchNodeAgentSkuId"];
+            values.Config["marthaUrl"] = settings["MarthaUrl"];
+            values.Config["marthaKeyVaultName"] = settings["MarthaKeyVaultName"];
+            values.Config["marthaSecretName"] = settings["MarthaSecretName"];
+
             values.Identity["name"] = managedId.Name;
             values.Identity["resourceId"] = managedId.Id;
             values.Identity["clientId"] = managedId.ClientId;
