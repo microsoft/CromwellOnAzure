@@ -604,7 +604,7 @@ namespace TesApi.Web
                 inputFiles
                 .Where(
                     f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) != true  // do not attempt to download DRS input files since the cromwell-drs-localizer will
-                    && !f.Streamable) // Don't download files where localization_optional is set to true in the WDL (corresponds to "Streamable" property being false on TesInput)
+                    && f?.Streamable != true) // Don't download files where localization_optional is set to true in the WDL (corresponds to "Streamable" property being false on TesInput)
                 .Union(additionalInputFiles)
                 .Select(async f => await GetTesInputFileUrl(f, task.Id, queryStringsToRemoveFromLocalFilePaths)));
 

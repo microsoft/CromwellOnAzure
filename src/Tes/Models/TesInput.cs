@@ -69,7 +69,7 @@ namespace Tes.Models
         public string Content { get; set; }
 
         [DataMember(Name = "streamable")]
-        public bool Streamable { get; set; }
+        public bool? Streamable { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -149,7 +149,9 @@ namespace Tes.Models
                     Content.Equals(other.Content)
                 ) &&
                 (
-                    Streamable == other.Streamable
+                    Streamable == other.Streamable ||
+                    Streamable is not null &&
+                    Streamable.Equals(other.Streamable)
                 ),
             };
 
@@ -190,7 +192,10 @@ namespace Tes.Models
                     hashCode = hashCode * 59 + Content.GetHashCode();
                 }
 
-                hashCode = hashCode * 59 + Streamable.GetHashCode();
+                if (Streamable is not null)
+                {
+                    hashCode = hashCode * 59 + Streamable.GetHashCode();
+                }
 
                 return hashCode;
             }
