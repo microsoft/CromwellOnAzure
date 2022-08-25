@@ -27,9 +27,7 @@ namespace Tes.Models
     public partial class TesExecutor : IEquatable<TesExecutor>
     {
         public TesExecutor()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
         /// <summary>
         /// Name of the container image, for example: ubuntu quay.io/aptible/ubuntu gcr.io/my-org/my-image etc...

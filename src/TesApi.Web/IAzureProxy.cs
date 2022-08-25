@@ -37,7 +37,9 @@ namespace TesApi.Web
         /// <param name="jobId"></param>
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
-        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation);
+        /// <param name="jobPreparationTask"></param>
+        /// <param name="jobReleaseTask"></param>
+        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask, JobReleaseTask jobReleaseTask);
 
         /// <summary>
         /// Gets the <see cref="ContainerRegistryInfo"/> for the given image name
@@ -194,6 +196,13 @@ namespace TesApi.Web
         /// <param name="poolId">The id of the pool.</param>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Deletes the specified pool if it exists
+        /// </summary>
+        /// <param name="poolId">The id of the pool.</param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
+        Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Retrieves the specified pool

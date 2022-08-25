@@ -75,6 +75,7 @@ namespace TesApi.Web
         private readonly string marthaUrl;
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
+        private readonly string defaultStorageAccountName;
         private readonly string hostname;
         private readonly BatchPoolFactory _batchPoolFactory;
 
@@ -103,6 +104,7 @@ namespace TesApi.Web
             this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
             this.enableBatchAutopool = GetBoolValue(configuration, "BatchAutopool", false);
+            this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
@@ -171,29 +173,29 @@ namespace TesApi.Web
 
             async Task SetTaskCompleted(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await RemovePool(batchInfo);
                 await azureProxy.DeleteBatchJobAsync(tesTask.Id);
+                await RemovePool(tesTask, batchInfo);
                 SetTaskStateAndLog(tesTask, TesState.COMPLETEEnum, batchInfo);
             }
 
             async Task SetTaskExecutorError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await RemovePool(batchInfo);
                 await azureProxy.DeleteBatchJobAsync(tesTask.Id);
+                await RemovePool(tesTask, batchInfo);
                 SetTaskStateAndLog(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             }
 
             async Task SetTaskSystemError(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await RemovePool(batchInfo);
                 await azureProxy.DeleteBatchJobAsync(tesTask.Id);
+                await RemovePool(tesTask, batchInfo);
                 SetTaskStateAndLog(tesTask, TesState.SYSTEMERROREnum, batchInfo);
             }
 
             async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
             {
-                await RemovePool(batchInfo);
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
+                await RemovePool(tesTask, batchInfo);
                 SetTaskStateAndLog(tesTask, newTaskState, batchInfo);
             }
 
@@ -207,18 +209,18 @@ namespace TesApi.Web
 
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
-                await RemovePool(batchInfo);
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
+                await RemovePool(tesTask, batchInfo);
                 tesTask.IsCancelRequested = false;
             }
 
-            async Task RemovePool(CombinedBatchTaskInfo batchInfo)
+            async Task RemovePool(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
                 if (enableBatchAutopool)
                 {
-                    if (!string.IsNullOrWhiteSpace(batchInfo.PoolId) && !batchInfo.PoolId.StartsWith("TES_"))
+                    if (!string.IsNullOrWhiteSpace(batchInfo.PoolId) && (!batchInfo.PoolId.StartsWith("TES_") || tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true))
                     {
-                        await azureProxy.DeleteBatchPoolAsync(batchInfo.PoolId);
+                        await azureProxy.DeleteBatchPoolIfExistsAsync(batchInfo.PoolId);
                     }
                 }
             }
@@ -455,7 +457,7 @@ namespace TesApi.Web
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, dockerParams, preCommand, containerConfiguration is not null);
 
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
-                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
+                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, GetJobPreparationTask(), await GetJobReleaseTask(tesTask));
 
                 tesTaskLog.StartTime = DateTimeOffset.UtcNow;
                 tesTask.State = TesState.INITIALIZINGEnum;
@@ -506,7 +508,7 @@ namespace TesApi.Web
             {
                 if (enableBatchAutopool && poolInformation is not null && poolInformation.AutoPoolSpecification is null)
                 {
-                    await azureProxy.DeleteBatchPoolAsync(poolInformation.PoolId);
+                    await azureProxy.DeleteBatchPoolIfExistsAsync(poolInformation.PoolId);
                 }
             }
         }
@@ -747,6 +749,35 @@ namespace TesApi.Web
                 ?.ActionAsync(tesTask, combinedBatchTaskInfo) ?? ValueTask.FromResult(false));
 
         /// <summary>
+        /// Returns a job preparation task for shared pool cleanup coordination.
+        /// </summary>
+        /// <returns></returns>
+        /// <remarks>Job Release tasks are run simultaneously with subsequent Azure Batch jobs's tasks. Combining this with <see cref="GetJobReleaseTask(TesTask)"/> ensures that will complete before the next job starts execuation.</remarks>
+        private JobPreparationTask GetJobPreparationTask()
+            => enableBatchAutopool ? default : new()
+            {
+                CommandLine = @"/bin/bash -c 'while [ -f /var/lock/coa.lock ]; do sleep 1; done && touch /var/lock/coa.lock && chmod a+w /var/lock/coa.lock'",
+                RerunOnComputeNodeRebootAfterSuccess = false,
+                UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                WaitForSuccess = true,
+            };
+
+        /// <summary>
+        /// Returns a job release task for shared pool cleanup to prevent unusable compute nodes due to node reuse.
+        /// </summary>
+        /// <param name="tesTask"></param>
+        /// <returns></returns>
+        /// <remarks>Job Release tasks are run simultaneously with subsequent Azure Batch jobs's tasks. Combining this with <see cref="GetJobPreparationTask"/> ensures that this will complete before the next job starts execuation.</remarks>
+        private async ValueTask<JobReleaseTask> GetJobReleaseTask(TesTask tesTask)
+            => enableBatchAutopool ? default : new()
+            {
+                CommandLine = @"/bin/env ./jobRelease.sh",
+                EnvironmentSettings = new[] { new EnvironmentSetting("COA_EXECUTOR", tesTask.Executors.First().Image) },
+                ResourceFiles = new[] { ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/jobRelease.sh"), @"jobRelease.sh", @"0755") },
+                UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+            };
+
+        /// <summary>
         /// Returns job preparation and main Batch tasks that represents the given <see cref="TesTask"/>
         /// </summary>
         /// <param name="task">The <see cref="TesTask"/></param>
@@ -915,6 +946,7 @@ namespace TesApi.Web
             sb.AppendLine($"write_ts DownloadEnd && \\");
             sb.AppendLine($"chmod -R o+rwx $AZ_BATCH_TASK_WORKING_DIR{cromwellPathPrefixWithoutEndSlash} && \\");
             sb.AppendLine($"write_ts ExecutorStart && \\");
+
             //if (preCommandCommand is not null)
             //{
             //    sb.Append($"docker run {dockerRunParams} --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {preCommandCommand[0]}");
@@ -924,6 +956,7 @@ namespace TesApi.Web
             //    }
             //    sb.AppendLine(" && \\");
             //}
+
             sb.AppendLine($"docker run {dockerRunParams} --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{string.Join(" && ", executor.Command.Skip(1))}\" && \\");
             sb.AppendLine($"write_ts ExecutorEnd && \\");
             sb.AppendLine($"write_ts UploadStart && \\");
@@ -1331,7 +1364,7 @@ namespace TesApi.Web
     span             = TimeInterval_Second * 90;
     startup          = TimeInterval_Minute * 2;
     ratio            = 10;
-    {0} = (lifespan > startup ? max($RunningTasks.GetSample(span, ratio), $ActiveTasks.GetSample(span, ratio)) : {2});
+    {0} = (lifespan > startup ? max($PendingTasks.GetSample(span, ratio)) : {2});
     ", preemptable ? "$TargetLowPriorityNodes" : "$TargetDedicated", DateTime.UtcNow.ToString("r"), 1);
             }
             else
@@ -1848,7 +1881,7 @@ namespace TesApi.Web
             var pool = batchPools.TryGetValue(key, out var set) ? set.LastOrDefault(Available) : default;
             if (pool is null)
             {
-                var poolQuota = azureProxy.GetBatchAccountQuotasAsync().Result.PoolQuota;
+                var poolQuota = (await azureProxy.GetBatchAccountQuotasAsync()).PoolQuota;
                 var activePoolsCount = azureProxy.GetBatchActivePoolCount();
                 if (activePoolsCount + 1 > poolQuota)
                 {
@@ -1862,7 +1895,7 @@ namespace TesApi.Web
                 try
                 {
                     var modelPool = modelPoolFactory(poolId);
-                    if (modelPool.Metadata is null) { modelPool.Metadata = new List<BatchModels.MetadataItem>(); }
+                    modelPool.Metadata ??= new List<BatchModels.MetadataItem>();
                     modelPool.Metadata.Add(new(PoolHostName, this.hostname));
                     pool = _batchPoolFactory.CreateNew(await azureProxy.CreateBatchPoolAsync(modelPool, isPreemptable), this);
                 }

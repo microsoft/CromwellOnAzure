@@ -27,9 +27,7 @@ namespace Tes.Models
     public partial class TesResources : IEquatable<TesResources>
     {
         public TesResources()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
         public enum SupportedBackendParameters { vm_size, vm_family, workflow_execution_identity, docker_host_configuration };
 

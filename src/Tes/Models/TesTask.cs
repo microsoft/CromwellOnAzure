@@ -27,9 +27,8 @@ namespace Tes.Models
     public partial class TesTask : IEquatable<TesTask>
     {
         public TesTask()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+
         /// <summary>
         /// Task identifier assigned by the server.
         /// </summary>

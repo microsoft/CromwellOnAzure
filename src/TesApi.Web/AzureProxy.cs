@@ -219,9 +219,11 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
+        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask, JobReleaseTask jobReleaseTask)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
+            job.JobPreparationTask = jobPreparationTask;
+            job.JobReleaseTask = jobReleaseTask;
             await job.CommitAsync();
 
             try
@@ -447,6 +449,32 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public Task DeleteBatchPoolAsync(string poolId, CancellationToken cancellationToken = default)
             => batchClient.PoolOperations.DeletePoolAsync(poolId, cancellationToken: cancellationToken);
+
+        /// <inheritdoc/>
+        public async Task DeleteBatchPoolIfExistsAsync(string poolId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var poolFilter = new ODATADetailLevel
+                {
+                    FilterClause = $"startswith(id,'{poolId}') and state ne 'deleting'",
+                    SelectClause = "id"
+                };
+
+                var poolsToDelete = await batchClient.PoolOperations.ListPools(poolFilter).ToListAsync(cancellationToken);
+
+                foreach (var pool in poolsToDelete)
+                {
+                    logger.LogInformation($"Deleting pool {pool.Id}");
+                    await batchClient.PoolOperations.DeletePoolAsync(pool.Id, cancellationToken: cancellationToken);
+                }
+            }
+            catch (Exception exc)
+            {
+                logger.LogError(exc, $"Exception while attempting to delete pool starting with ID: {poolId}");
+                throw;
+            }
+        }
 
         /// <inheritdoc/>
         public Task<CloudPool> GetBatchPoolAsync(string poolId, DetailLevel detailLevel = default, CancellationToken cancellationToken = default)

@@ -16,14 +16,13 @@ namespace Tes.Repository
     /// A repository for interacting with an Azure Cosmos DB instance
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public class CosmosDbRepository<T> : IRepository<T> where T : RepositoryItem<T>
+    public sealed class CosmosDbRepository<T> : IRepository<T> where T : RepositoryItem<T>
     {
         private const int MaxAutoScaleThroughput = 4000;
         private readonly CosmosClient cosmosClient;
         private readonly Container container;
         private readonly PartitionKey partitionKey;
         private readonly string partitionKeyValue;
-        private bool disposedValue;
 
         /// <summary>
         /// Default constructor
@@ -166,24 +165,7 @@ namespace Tes.Repository
             }
         }
 
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    cosmosClient?.Dispose();
-                }
-
-                disposedValue = true;
-            }
-        }
-
         public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
-        }
+            => cosmosClient?.Dispose();
     }
 }

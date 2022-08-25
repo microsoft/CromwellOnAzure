@@ -26,7 +26,7 @@ namespace TesApi.Web
         private readonly IBatchScheduler batchScheduler;
         private readonly ILogger<Scheduler> logger;
         private readonly bool isDisabled;
-        private readonly bool usingBatchPools;
+        private readonly bool usingBatchAutopools;
         private IEnumerable<Task> shutdownCandidates = Enumerable.Empty<Task>();
         private readonly TimeSpan runInterval = TimeSpan.FromSeconds(5);
 
@@ -43,7 +43,7 @@ namespace TesApi.Web
             this.batchScheduler = batchScheduler;
             this.logger = logger;
             isDisabled = configuration.GetValue("DisableBatchScheduling", false);
-            usingBatchPools = !configuration.GetValue("BatchAutopool", false);
+            usingBatchAutopools = configuration.GetValue("BatchAutopool", false);
         }
 
         /// <summary>
@@ -84,7 +84,7 @@ namespace TesApi.Web
                 {
                     await OrchestrateTesTasksOnBatch(stoppingToken);
 
-                    if (usingBatchPools)
+                    if (!usingBatchAutopools)
                     {
                         shutdownCandidates = await batchScheduler.GetShutdownCandidatePools(stoppingToken);
                     }
@@ -193,7 +193,9 @@ namespace TesApi.Web
                 }
                 catch (Microsoft.Azure.Cosmos.CosmosException exc)
                 {
-                    var currentTesTask = await repository.GetItemOrDefaultAsync(tesTask.Id);
+                    TesTask currentTesTask = default;
+                    _ = await repository.TryGetItemAsync(tesTask.Id, t => currentTesTask = t);
+
                     if (exc.StatusCode == System.Net.HttpStatusCode.PreconditionFailed)
                     {
                         logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw an exception attempting to set state: {tesTask.State}. Another actor set state: {currentTesTask?.State}");

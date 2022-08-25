@@ -8,13 +8,15 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Common.HostConfigs;
+
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
+
+using Common.HostConfigs;
 using Tes.Extensions;
 using Tes.Models;
 using TesApi.Web;
@@ -865,7 +867,7 @@ namespace TesApi.Tests
             var filesToDownload = GetFilesToDownload(azureProxy);
 
             Assert.AreEqual(TesState.INITIALIZINGEnum, tesTask.State);
-            Assert.IsFalse(filesToDownload.Any(f => f.LocalPath.Contains("?") || f.LocalPath.Contains("param=1") || f.LocalPath.Contains("param=2")), "Query string was not removed from local file path");
+            Assert.IsFalse(filesToDownload.Any(f => f.LocalPath.Contains('?') || f.LocalPath.Contains("param=1") || f.LocalPath.Contains("param=2")), "Query string was not removed from local file path");
             Assert.AreEqual(1, filesToDownload.Count(f => f.StorageUrl.Contains("?param=1")), "Query string was removed from blob URL");
             Assert.IsFalse(modifiedCommandScript.Contains("?param=2"), "Query string was not removed from local file path in command script");
         }
@@ -896,7 +898,7 @@ namespace TesApi.Tests
 
             Assert.AreEqual(TesState.INITIALIZINGEnum, tesTask.State);
             Assert.AreEqual(2, filesToDownload.Count());
-            Assert.IsFalse(filesToDownload.Any(f => f.LocalPath.Contains("?") || f.LocalPath.Contains("param=1") || f.LocalPath.Contains("param=2")), "Query string was not removed from local file path");
+            Assert.IsFalse(filesToDownload.Any(f => f.LocalPath.Contains('?') || f.LocalPath.Contains("param=1") || f.LocalPath.Contains("param=2")), "Query string was not removed from local file path");
             Assert.AreEqual(1, filesToDownload.Count(f => f.StorageUrl.Contains("?param=1")), "Query string was removed from blob URL");
             Assert.IsFalse(modifiedCommandScript.Contains("?param=2"), "Query string was not removed from local file path in command script");
         }
@@ -1239,6 +1241,10 @@ namespace TesApi.Tests
                 azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>(), It.IsAny<bool>()))
                     .Returns((Pool p, bool _1) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
 
+                azureProxy.Setup(a => a.DeleteBatchPoolIfExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPoolIfExists?.Invoke(poolId, cancellationToken))
+                    .Returns(Task.CompletedTask);
+
                 azureProxy.Setup(a => a.GetCurrentComputeNodesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                     .Returns(() => Task.FromResult(azureProxyReturnValues.AzureProxyGetCurrentComputeNodes?.Invoke() ?? (null, null)));
 
@@ -1315,6 +1321,7 @@ namespace TesApi.Tests
         private class AzureProxyReturnValues
         {
             internal Func<(int? lowPriorityNodes, int? dedicatedNodes)> AzureProxyGetCurrentComputeNodes { get; set; }
+            internal Action<string, CancellationToken> AzureProxyDeleteBatchPoolIfExists { get; set; }
             internal Action<string, CancellationToken> AzureProxyDeleteBatchPool { get; set; }
             internal Func<ODATADetailLevel, IAsyncEnumerable<CloudJob>> AzureProxyListJobs { get; set; } = detail => AsyncEnumerable.Empty<CloudJob>();
             public Dictionary<string, StorageAccountInfo> StorageAccountInfos { get; set; }
@@ -1333,6 +1340,7 @@ namespace TesApi.Tests
             public static AzureProxyReturnValues Defaults => new()
             {
                 AzureProxyGetCurrentComputeNodes = () => (0, 0),
+                AzureProxyDeleteBatchPoolIfExists = (poolId, cancellationToken) => { },
                 AzureProxyDeleteBatchPool = (poolId, cancellationToken) => { },
                 StorageAccountInfos = new Dictionary<string, StorageAccountInfo> {
                     { "defaultstorageaccount", new StorageAccountInfo { Name = "defaultstorageaccount", Id = "Id", BlobEndpoint = "https://defaultstorageaccount.blob.core.windows.net/", SubscriptionId = "SubId" } },

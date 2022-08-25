@@ -27,9 +27,8 @@ namespace Tes.Models
     public partial class TesTaskLog : IEquatable<TesTaskLog>
     {
         public TesTaskLog()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+
         /// <summary>
         /// Logs for each executor
         /// </summary>

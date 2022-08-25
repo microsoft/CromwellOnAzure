@@ -327,10 +327,21 @@ namespace CromwellOnAzureDeployer
                                 await AddNewSettingsAsync(sshConnectionInfo);
                                 newSettingsAdded = true;
                             }
+
                             await PatchCromwellConfigurationFileV310Async(storageAccount);
                         }
 
-                        await CreateDefaultStorageContainersAsync(storageAccount);
+                        if (installedVersion is null || installedVersion < new Version(3, 2))
+                        {
+                            if (!newSettingsAdded)
+                            {
+                                await AddNewSettingsAsync(sshConnectionInfo);
+                                newSettingsAdded = true;
+                            }
+
+                            await CreateDefaultStorageContainersAsync(storageAccount);
+                            await PatchContainersAddJobReleaseScriptV320Async(storageAccount);
+                        }
                     }
 
                     if (!configuration.Update)
@@ -788,7 +799,7 @@ namespace CromwellOnAzureDeployer
 
             if (configuration.Update)
             {
-                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down");
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down --remove-orphans");
             }
 
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
@@ -1083,6 +1094,7 @@ namespace CromwellOnAzureDeployer
                 {
                     await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
                     await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
+                    await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/jobRelease.sh", Utility.GetFileContent("scripts", "jobRelease.sh"));
                 });
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
@@ -1116,7 +1128,7 @@ namespace CromwellOnAzureDeployer
                             new Utility.ConfigReplaceTextItem("{DatabaseUser}", $"\"cromwell\""),
                             new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"cromwell\""),
                             new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"com.mysql.cj.jdbc.Driver\""),
-                        new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.MySQLProfile$\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.MySQLProfile$\""),
                         }, "scripts", CromwellConfigurationFileName));
                     }
 
@@ -1630,6 +1642,11 @@ namespace CromwellOnAzureDeployer
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
                 });
+
+        private Task PatchContainersAddJobReleaseScriptV320Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Adding job scripts...",
+                () => UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/jobRelease.sh", Utility.GetFileContent("scripts", "jobRelease.sh")));
 
         private Task AddNewSettingsAsync(ConnectionInfo sshConnectionInfo)
             => Execute(

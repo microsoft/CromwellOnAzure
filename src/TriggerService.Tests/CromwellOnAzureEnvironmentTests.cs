@@ -31,9 +31,7 @@ namespace TriggerService.Tests
         private readonly string fakeAzureWdlWithSas = @"https://fake.azure.storage.account/{azureName}/test.wdl?sp=r&st=2019-12-18T18:55:41Z&se=2019-12-19T02:55:41Z&spr=https&sv=2019-02-02&sr=b&sig=EMJyBMOxdG2NvBqiwUsg71ZdYqwqMWda9242KU43%2F5Y%3D";
 
         public CromwellOnAzureEnvironmentTests()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
         [TestMethod]
         public async Task GetBlobFileNameAndDataWithDefaultStorageAccountUsingUrl()
@@ -127,7 +125,7 @@ namespace TriggerService.Tests
 
             if (subdomainEndIndex > 0)
             {
-                accountName = accountAuthority.Substring(0, subdomainEndIndex);
+                accountName = accountAuthority[..subdomainEndIndex];
             }
 
             azStorageMock.SetupGet(az => az.AccountName).Returns(accountName);
@@ -144,10 +142,7 @@ namespace TriggerService.Tests
 
             var cosmosdbRepositoryMock = new Mock<IRepository<TesTask>>();
 
-            if (azureStorages is null)
-            {
-                azureStorages = Enumerable.Repeat(MockAzureStorage(accountAuthority), 1);
-            }
+            azureStorages ??= Enumerable.Repeat(MockAzureStorage(accountAuthority), 1);
 
             var environment = new CromwellOnAzureEnvironment(
                 serviceProvider.GetRequiredService<ILoggerFactory>(),
