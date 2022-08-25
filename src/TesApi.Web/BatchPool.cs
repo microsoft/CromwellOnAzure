@@ -12,6 +12,7 @@ using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using YamlDotNet.Core.Tokens;
 
 namespace TesApi.Web
 {
@@ -85,8 +86,8 @@ namespace TesApi.Web
         {
             Pool = poolInfo ?? throw new ArgumentNullException(nameof(poolInfo));
 
-            _idleNodeCheck = TimeSpan.FromMinutes(GetConfigurationValue(configuration, "BatchPoolIdleNodeMinutes", 0.125));
-            _forcePoolRotationAge = TimeSpan.FromDays(GetConfigurationValue(configuration, "BatchPoolRotationForcedDays", 30));
+            _idleNodeCheck = TimeSpan.FromMinutes(ConfigurationUtils.GetConfigurationValue(configuration, "BatchPoolIdleNodeMinutes", 0.125));
+            _forcePoolRotationAge = batchScheduler.ForcePoolRotationAge;
 
             this._azureProxy = azureProxy;
             this._logger = logger;
@@ -94,13 +95,6 @@ namespace TesApi.Web
 
             Creation = cloudPool?.CreationTime;
             IsAvailable = cloudPool is not null;
-
-            // IConfiguration.GetValue<double>(string key, double defaultValue) throws an exception if the value is defined as blank
-            static double GetConfigurationValue(IConfiguration configuration, string key, double defaultValue)
-            {
-                var value = configuration.GetValue(key, string.Empty);
-                return string.IsNullOrWhiteSpace(value) ? defaultValue : double.Parse(value);
-            }
         }
 
         private Queue<TaskFailureInformation> StartTaskFailures { get; } = new();

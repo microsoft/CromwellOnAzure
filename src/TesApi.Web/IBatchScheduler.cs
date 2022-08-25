@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,11 @@ namespace TesApi.Web
     /// </summary>
     public interface IBatchScheduler
     {
+        /// <summary>
+        /// Configured maximum batch pool age.
+        /// </summary>
+        TimeSpan ForcePoolRotationAge { get; }
+
         /// <summary>
         /// Iteratively schedule a <see cref="TesTask"/> on a batch system until completion or failure
         /// </summary>

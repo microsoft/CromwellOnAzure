@@ -129,7 +129,11 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc />
-        public async Task<string> MapLocalPathToSasUrlAsync(string path, bool getContainerSas = false)
+        public Task<string> MapLocalPathToSasUrlAsync(string path, bool getContainerSas = false)
+            => MapLocalPathToSasUrlAsync(path, sasTokenDuration, getContainerSas);
+
+        /// <inheritdoc />
+        public async Task<string> MapLocalPathToSasUrlAsync(string path, TimeSpan sasTokenDuration, bool getContainerSas = false)
         {
             // TODO: Optional: If path is /container/... where container matches the name of the container in the default storage account, prepend the account name to the path.
             // This would allow the user to omit the account name for files stored in the default storage account

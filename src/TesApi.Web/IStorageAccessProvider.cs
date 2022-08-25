@@ -57,7 +57,7 @@ namespace TesApi.Web
         public Task<bool> IsPublicHttpUrl(string uriString);
 
         /// <summary>
-        /// Returns an Azure Storage Blob or Container URL with SAS token given a path that uses one of the following formats: 
+        /// Returns an Azure Storage Blob or Container URL with SAS token given a path that uses one of the following formats:
         /// - /accountName/containerName
         /// - /accountName/containerName/blobName
         /// - /cromwell-executions/blobName
@@ -68,5 +68,19 @@ namespace TesApi.Web
         /// <param name="getContainerSas">Get the container SAS even if path is longer than two parts</param>
         /// <returns>An Azure Block Blob or Container URL with SAS token</returns>
         public Task<string> MapLocalPathToSasUrlAsync(string path, bool getContainerSas = false);
+
+        /// <summary>
+        /// Returns an Azure Storage Blob or Container URL with SAS token given a path that uses one of the following formats:
+        /// - /accountName/containerName
+        /// - /accountName/containerName/blobName
+        /// - /cromwell-executions/blobName
+        /// - https://accountName.blob.core.windows.net/containerName
+        /// - https://accountName.blob.core.windows.net/containerName/blobName
+        /// </summary>
+        /// <param name="path">The file path to convert. Two-part path is treated as container path. Paths with three or more parts are treated as blobs.</param>
+        /// <param name="sasTokenDuration">Duration SAS should be valid.</param>
+        /// <param name="getContainerSas">Get the container SAS even if path is longer than two parts</param>
+        /// <returns>An Azure Block Blob or Container URL with SAS token</returns>
+        public Task<string> MapLocalPathToSasUrlAsync(string path, TimeSpan sasTokenDuration, bool getContainerSas = false);
     }
 }

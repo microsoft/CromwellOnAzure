@@ -22,6 +22,21 @@ namespace TesApi.Web
         private readonly ILogger logger;
 
         /// <summary>
+        /// Gets non-string configuration values without crashing when values are declared as blank
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="configuration"></param>
+        /// <param name="key"></param>
+        /// <param name="defaultValue"></param>
+        /// <returns></returns>
+        /// <remarks><see cref="ConfigurationBinder.GetValue{T}(IConfiguration, string, T)"/> throws an exception if the value is defined as blank.</remarks>
+        public static T GetConfigurationValue<T>(IConfiguration configuration, string key, T defaultValue)
+        {
+            var value = configuration.GetValue(key, string.Empty);
+            return string.IsNullOrWhiteSpace(value) ? defaultValue : (T)Convert.ChangeType(value, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
         /// The constructor
         /// </summary>
         /// <param name="configuration"><see cref="IConfiguration"/></param>

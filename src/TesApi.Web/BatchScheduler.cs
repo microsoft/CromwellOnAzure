@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Data;
 using System.IO;
 using System.Linq;
@@ -96,6 +97,7 @@ namespace TesApi.Web
             static bool GetBoolValue(IConfiguration configuration, string key, bool defaultValue) => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : bool.Parse(configuration[key]);
             static string GetStringValue(IConfiguration configuration, string key, string defaultValue = "") => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : configuration[key];
 
+            ForcePoolRotationAge = TimeSpan.FromDays(ConfigurationUtils.GetConfigurationValue<double>(configuration, "BatchPoolRotationForcedDays", 30));
             this.allowedVmSizes = GetStringValue(configuration, "AllowedVmSizes", null)?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
             this.usePreemptibleVmsOnly = GetBoolValue(configuration, "UsePreemptibleVmsOnly", false);
             this.batchNodesSubnetId = GetStringValue(configuration, "BatchNodesSubnetId", string.Empty);
@@ -244,6 +246,9 @@ namespace TesApi.Web
                 new TesTaskStateTransition(tesTaskIsInitializingOrRunning, BatchTaskState.NodePreempted, DeleteBatchJobAndRequeueTaskAsync)
             };
         }
+
+        /// <inheritdoc/>
+        public TimeSpan ForcePoolRotationAge { get; }
 
         private async Task LoadExistingPools(CancellationToken cancellationToken = default)
         {
@@ -1136,6 +1141,7 @@ namespace TesApi.Web
                 {
                     startTask = new(() => GetStartTask());
 
+                    // TODO: Make async
                     (ApplicationPackageReference, StartTask) GetStartTask()
                     {
                         string appDir = default;
@@ -1153,8 +1159,13 @@ namespace TesApi.Web
                         var resources = Enumerable.Empty<ResourceFile>();
                         if (hostConfig.StartTask.StartTaskHash is not null)
                         {
-                            //var source = $"/{defaultStorageAccountName}/{HostConfigBlobsName}/{hostConfig.StartTask.StartTaskHash}/{StartTaskScriptFilename}";
-                            resources = resources.Append(ResourceFile.FromAutoStorageContainer(HostConfigBlobsName, StartTaskScriptFilename, hostConfig.StartTask.StartTaskHash, "0755"));
+                            resources = resources.Append(
+                                ResourceFile.FromUrl(
+                                    storageAccessProvider.MapLocalPathToSasUrlAsync(
+                                        $"/{defaultStorageAccountName}/{HostConfigBlobsName}/{hostConfig.StartTask.StartTaskHash}",
+                                        BatchPoolService.RunInterval.Multiply(2).Add(ForcePoolRotationAge).Add(TimeSpan.FromMinutes(15))).Result, // Assumes max 15 minute node allocation time
+                                    StartTaskScriptFilename,
+                                    "0755"));
                         }
                         foreach (var resource in hostConfig.StartTask.ResourceFiles ?? Array.Empty<HostConfigs.ResourceFile>())
                         {
