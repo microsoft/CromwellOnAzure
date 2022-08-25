@@ -16,6 +16,7 @@ spec:
     metadata:
       labels:
         io.kompose.service: cromwell
+        aadpodidbinding: {{ .Values.identity.name }}
     spec:
       containers:
         - args:

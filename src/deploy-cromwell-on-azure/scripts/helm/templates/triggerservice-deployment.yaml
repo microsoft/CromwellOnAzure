@@ -15,6 +15,7 @@ spec:
     metadata:
       labels:
         io.kompose.service: triggerservice
+        aadpodidbinding: {{ .Values.identity.name }}
     spec:
       containers:
         - env:
