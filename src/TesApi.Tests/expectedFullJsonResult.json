@@ -10,7 +10,8 @@
       "url": "string",
       "path": "string",
       "type": "FILE",
-      "content": "string"
+      "content": "string",
+      "streamable": null
     }
   ],
   "outputs": [
