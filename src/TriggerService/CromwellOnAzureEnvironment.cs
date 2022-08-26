@@ -89,7 +89,7 @@ namespace TriggerService
         public async Task ExecuteNewWorkflowsAsync()
         {
             var blobTriggers = await storage.GetWorkflowsByStateAsync(WorkflowState.New);
-
+            logger.LogInformation("Blobs to start: " + string.Join(",", blobTriggers.Select(x => x.Name)));
             foreach (var blobTrigger in blobTriggers)
             {
                 try
@@ -160,7 +160,7 @@ namespace TriggerService
         {
             var blobTriggers = (await storage.GetWorkflowsByStateAsync(WorkflowState.InProgress))
                 .Where(blob => DateTimeOffset.UtcNow.Subtract(blob.LastModified) > inProgressWorkflowInvisibilityPeriod);
-            
+            logger.LogInformation("Blobs to Update: " + string.Join(",", blobTriggers.Select(x => x.Name)));
             foreach (var blobTrigger in blobTriggers)
             {
                 var id = Guid.Empty;
@@ -251,7 +251,8 @@ namespace TriggerService
         public async Task AbortWorkflowsAsync()
         {
             var blobTriggers = await storage.GetWorkflowsByStateAsync(WorkflowState.Abort);
-            
+
+            logger.LogInformation("Blobs to Abort: " + string.Join(",", blobTriggers.Select(x => x.Name)));
             foreach (var blobTrigger in blobTriggers)
             {
                 var id = Guid.Empty;

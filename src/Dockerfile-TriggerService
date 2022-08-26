@@ -13,7 +13,7 @@ RUN dotnet restore TriggerService/TriggerService.csproj
 
 # Copy the rest of the files and publish
 COPY . ./
-RUN dotnet publish -c Release -o out --no-restore TriggerService/TriggerService.csproj
+RUN dotnet publish -c Release -o out TriggerService/TriggerService.csproj
 
 # Build runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:5.0
