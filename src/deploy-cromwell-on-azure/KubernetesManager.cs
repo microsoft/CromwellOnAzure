@@ -64,7 +64,7 @@ namespace CromwellOnAzureDeployer
             await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --kubeconfig kubeconfig.txt");
             await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
             await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig kubeconfig.txt");
-            await ExecHelmProcess($"install --generate-name ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace");
+            await ExecHelmProcess($"install cromwellonazure ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace");
 
             if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
             {
