@@ -1231,12 +1231,12 @@ namespace TesApi.Web
                 poolSpecification.AutoScaleEnabled = true;
                 poolSpecification.AutoScaleEvaluationInterval = TimeSpan.FromMinutes(5);
                 poolSpecification.AutoScaleFormula = string.Format(@"
-    $NodeDeallocationOption=requeue;
+    $NodeDeallocationOption=taskcompletion;
     lifespan         = time() - time(""{1}"");
     span             = TimeInterval_Second * 90;
     startup          = TimeInterval_Minute * 2;
     ratio            = 10;
-    {0} = (lifespan > startup ? max($PendingTasks.GetSample(span, ratio)) : {2});
+    {0} = (lifespan > startup ? avg($PendingTasks.GetSample(span, ratio)) : {2});
     ", preemptable ? "$TargetLowPriorityNodes" : "$TargetDedicated", DateTime.UtcNow.ToString("r"), 1);
             }
             else
