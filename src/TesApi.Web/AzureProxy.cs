@@ -25,7 +25,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Polly;
 using Polly.Retry;
 using Tes.Models;
@@ -887,6 +886,24 @@ namespace TesApi.Web
             await new CloudBlockBlob(new Uri(applicationPackage.StorageUrl, UriKind.Absolute)).UploadFromStreamAsync(package);
             _ = await batchManagementClient.ApplicationPackage.ActivateAsync(batchResourceGroupName, batchAccountName, name, version, "zip");
             return (await batchManagementClient.Application.UpdateAsync(batchResourceGroupName, batchAccountName, name, new BatchModels.Application(allowUpdates: false))).Id;
+        }
+
+        /// <inheritdoc/>
+        public async Task DisableBatchPoolAutoScaleAsync(string poolId, CancellationToken cancellationToken)
+            => await batchClient.PoolOperations.DisableAutoScaleAsync(poolId, cancellationToken: cancellationToken);
+
+        /// <inheritdoc/>
+        public async Task EnableBatchPoolAutoScaleAsync(string poolId, TimeSpan interval, IAzureProxy.BatchPoolAutoScaleFormulaFactory formulaFactory, CancellationToken cancellationToken)
+        {
+            var state = await GetComputeNodeAllocationStateAsync(poolId, cancellationToken);
+
+            if (state.AllocationState != AllocationState.Steady)
+            {
+                throw new InvalidOperationException();
+            }
+
+            var preempted = state.TargetDedicated == 0;
+            await batchClient.PoolOperations.EnableAutoScaleAsync(poolId, formulaFactory(preempted, preempted ? state.TargetLowPriority.Value : state.TargetDedicated.Value), interval, cancellationToken: cancellationToken);
         }
 
         private class VmPrice

@@ -10,6 +10,7 @@ using Microsoft.Azure.Batch;
 using Polly;
 using Polly.Retry;
 using Tes.Models;
+using static TesApi.Web.IAzureProxy;
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
 
 namespace TesApi.Web
@@ -219,5 +220,11 @@ namespace TesApi.Web
 
         /// <inheritdoc/>
         public Task<string> CreateAndActivateBatchApplication(string name, string version, System.IO.Stream package) => azureProxy.CreateAndActivateBatchApplication(name, version, package);
+
+        /// <inheritdoc/>
+        public Task DisableBatchPoolAutoScaleAsync(string poolId, CancellationToken cancellationToken) => azureProxy.DisableBatchPoolAutoScaleAsync(poolId, cancellationToken);
+
+        /// <inheritdoc/>
+        public Task EnableBatchPoolAutoScaleAsync(string poolId, TimeSpan interval, BatchPoolAutoScaleFormulaFactory formulaFactory, CancellationToken cancellationToken) => azureProxy.EnableBatchPoolAutoScaleAsync(poolId, interval, formulaFactory, cancellationToken);
     }
 }

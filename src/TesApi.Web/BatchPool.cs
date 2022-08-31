@@ -6,10 +6,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Common;
+using Microsoft.Azure.Management.AppService.Fluent.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using YamlDotNet.Core.Tokens;
@@ -116,6 +118,16 @@ namespace TesApi.Web
     /// </content>
     public sealed partial class BatchPool
     {
+        private enum ScalingMode
+        {
+            AutoScaleEnabled,
+            SettingManualScale,
+            RemovingFailedNodes,
+            SettingAutoScale
+        }
+
+        private ScalingMode _scalingMode = ScalingMode.AutoScaleEnabled;
+
         private readonly TimeSpan _idleNodeCheck;
         private readonly TimeSpan _forcePoolRotationAge;
         private readonly BatchScheduler _batchPools;
@@ -125,7 +137,7 @@ namespace TesApi.Web
 
         private async ValueTask ServicePoolGetResizeErrorsAsync(CancellationToken cancellationToken)
         {
-            if ((await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken)).AllocationState == AllocationState.Steady)
+            if (_scalingMode == ScalingMode.AutoScaleEnabled && (await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken)).AllocationState == AllocationState.Steady)
             {
                 if (!_resizeErrorsRetrieved)
                 {
@@ -146,41 +158,95 @@ namespace TesApi.Web
             }
         }
 
-        private async ValueTask ServicePoolRemoveNodeIfStartTaskFailedAsync(CancellationToken cancellationToken)
+        /// <summary>
+        /// Generates a formula for Azure batch account auto-pool usage
+        /// </summary>
+        /// <param name="preemptable">false if compute nodes are dedicated, true otherwise.</param>
+        /// <param name="initialTarget">Number of compute nodes to allocate the first time this formula is evaluated.</param>
+        /// <remarks>Implements <see cref="IAzureProxy.BatchPoolAutoScaleFormulaFactory"/>.</remarks>
+        /// <returns></returns>
+        public static string AutoPoolFormula(bool preemptable, int initialTarget)
+            => string.Format(@"
+    $NodeDeallocationOption=taskcompletion;
+    lifespan         = time() - time(""{1}"");
+    span             = TimeInterval_Second * 90;
+    startup          = TimeInterval_Minute * 2;
+    ratio            = 10;
+    {0} = (lifespan > startup ? min($PendingTasks.GetSample(span, ratio)) : {2});
+    ", preemptable ? "$TargetLowPriorityNodes" : "$TargetDedicated", DateTime.UtcNow.ToString("r"), initialTarget);
+
+        private async ValueTask ServicePoolRemoveFailedNodesAsync(CancellationToken cancellationToken)
         {
             if ((await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken)).AllocationState == AllocationState.Steady)
             {
-                var nodesToRemove = Enumerable.Empty<ComputeNode>();
-
-                await foreach (var node in _azureProxy
-                    .ListComputeNodesAsync(
-                        Pool.PoolId,
-                        new ODATADetailLevel(
-                            filterClause: $"state eq 'starttaskfailed'",
-                            selectClause: "id,startTaskInfo"))
-                    .WithCancellation(cancellationToken))
+                switch (_scalingMode)
                 {
-                    _logger.LogDebug("Found starttaskfailed node {NodeId}", node.Id);
-                    StartTaskFailures.Enqueue(node.StartTaskInformation.FailureInformation);
-                    nodesToRemove = nodesToRemove.Append(node);
-                    _resizeErrorsRetrieved = false;
+                    case ScalingMode.AutoScaleEnabled:
+                        if (await GetNodes(false).GetAsyncEnumerator().MoveNextAsync())
+                        {
+                            //await _azureProxy.DisableAutoScaleAsync(Pool.PoolId);
+                            _scalingMode = ScalingMode.SettingManualScale;
+                        }
+                        break;
+
+                    case ScalingMode.SettingManualScale:
+                        {
+                            var quantity = 0;
+                            var nodesToRemove = Enumerable.Empty<ComputeNode>();
+                            var nodes = GetNodes(true).GetAsyncEnumerator();
+
+                            // It's documented that a max of 100 nodes can be removed at a time. Excess eligible nodes will be removed in a future call.
+                            while (await nodes.MoveNextAsync() && quantity++ < 100)
+                            {
+                                var node = nodes.Current;
+
+                                switch (node.State)
+                                {
+                                    case ComputeNodeState.Unusable:
+                                        _logger.LogDebug("Found unusable node {NodeId}", node.Id);
+                                        goto default;
+
+                                    case ComputeNodeState.StartTaskFailed:
+                                        _logger.LogDebug("Found starttaskfailed node {NodeId}", node.Id);
+                                        StartTaskFailures.Enqueue(node.StartTaskInformation.FailureInformation);
+                                        goto default;
+
+                                    case ComputeNodeState.Preempted:
+                                        _logger.LogDebug("Found preempted node {NodeId}", node.Id);
+                                        goto default;
+
+                                    default:
+                                        nodesToRemove = nodesToRemove.Append(node);
+                                        _resizeErrorsRetrieved = false;
+                                        break;
+                                }
+                            }
+
+                            if (!nodesToRemove.Any())
+                            { // How did we get here?
+                                goto case ScalingMode.RemovingFailedNodes;
+                            }
+
+                            await RemoveNodesAsync(nodesToRemove.ToList(), cancellationToken);
+                        }
+                        _scalingMode = ScalingMode.RemovingFailedNodes;
+                        break;
+
+                    case ScalingMode.RemovingFailedNodes:
+                        await _azureProxy.EnableBatchPoolAutoScaleAsync(Pool.PoolId, TimeSpan.FromMinutes(5), AutoPoolFormula, cancellationToken);
+                        _scalingMode = ScalingMode.SettingAutoScale;
+                        break;
+
+                    case ScalingMode.SettingAutoScale:
+                        ResizeErrors.Clear();
+                        _resizeErrorsRetrieved = true;
+                        _scalingMode = ScalingMode.AutoScaleEnabled;
+                        break;
                 }
-
-                // It's documented that a max of 100 nodes can be removed at a time. Excess eligible nodes will be removed in a future call.
-                // Prioritize removing "start task failed" nodes, followed by longest waiting nodes.
-                var orderedNodes = nodesToRemove
-                    .Take(100)
-                    .ToList();
-
-                if (!orderedNodes.Any())
-                { // No work to do
-                    return;
-                }
-
-                // Even if there are both Idle nodes and StartTaskFailed nodes mixed together, remove them in one call. We can't scale the pool in either direction again anytime soon, and it's simply an egregious waste of money to defer removal of start task failed nodes.
-
-                await RemoveNodesAsync(orderedNodes, cancellationToken);
             }
+
+            ConfiguredCancelableAsyncEnumerable<ComputeNode> GetNodes(bool withState)
+                => _azureProxy.ListComputeNodesAsync(Pool.PoolId, new ODATADetailLevel(filterClause: @"state eq 'starttaskfailed' or state eq 'preempted' or state eq 'unusable'", selectClause: withState ? @"id,state,startTaskInfo" : @"id")).WithCancellation(cancellationToken);
         }
 
         private ValueTask ServicePoolRotateAsync(CancellationToken _1)
@@ -212,7 +278,29 @@ namespace TesApi.Web
     /// </content>
     public sealed partial class BatchPool : IBatchPool
     {
-        private readonly object _lockObj = new();
+        private sealed class LockObj : IDisposable
+        {
+            private static readonly SemaphoreSlim lockObj = new(1, 1);
+
+            public static async ValueTask<LockObj> Lock()
+            {
+                await lockObj.WaitAsync();
+                return new LockObj();
+            }
+
+            public static async ValueTask<LockObj> Lock(TimeSpan timeout)
+            {
+                if (await lockObj.WaitAsync(timeout))
+                {
+                    return new LockObj();
+                }
+
+                throw new TimeoutException();
+            }
+
+            public void Dispose()
+                => lockObj.Release();
+        }
 
         /// <inheritdoc/>
         public bool IsAvailable { get; private set; } = true;
@@ -254,19 +342,19 @@ namespace TesApi.Web
             => StartTaskFailures.TryDequeue(out var failure) ? failure : default;
 
         /// <inheritdoc/>
-        public ValueTask ServicePoolAsync(IBatchPool.ServiceKind serviceKind, CancellationToken cancellationToken = default)
+        public async ValueTask ServicePoolAsync(IBatchPool.ServiceKind serviceKind, CancellationToken cancellationToken = default)
         {
-            lock (_lockObj)
+            using var @lock = await LockObj.Lock();
+            Func<CancellationToken, ValueTask> func = serviceKind switch
             {
-                return serviceKind switch
-                {
-                    IBatchPool.ServiceKind.GetResizeErrors => ServicePoolGetResizeErrorsAsync(cancellationToken),
-                    IBatchPool.ServiceKind.RemoveNodeIfStartTaskFailed => ServicePoolRemoveNodeIfStartTaskFailedAsync(cancellationToken),
-                    IBatchPool.ServiceKind.RemovePoolIfEmpty => ServicePoolRemovePoolIfEmptyAsync(cancellationToken),
-                    IBatchPool.ServiceKind.Rotate => ServicePoolRotateAsync(cancellationToken),
-                    _ => throw new ArgumentOutOfRangeException(nameof(serviceKind)),
-                };
-            }
+                IBatchPool.ServiceKind.GetResizeErrors => ServicePoolGetResizeErrorsAsync,
+                IBatchPool.ServiceKind.RemoveFailedNodes => ServicePoolRemoveFailedNodesAsync,
+                IBatchPool.ServiceKind.RemovePoolIfEmpty => ServicePoolRemovePoolIfEmptyAsync,
+                IBatchPool.ServiceKind.Rotate => ServicePoolRotateAsync,
+                _ => throw new ArgumentOutOfRangeException(nameof(serviceKind)),
+            };
+
+            await func(cancellationToken);
         }
 
         /// <inheritdoc/>
@@ -275,9 +363,9 @@ namespace TesApi.Web
             var exceptions = new List<Exception>();
 
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.GetResizeErrors, cancellationToken), cancellationToken);
-            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty, cancellationToken), cancellationToken);
+            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemoveFailedNodes, cancellationToken), cancellationToken);
             await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.Rotate, cancellationToken), cancellationToken);
-            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemoveNodeIfStartTaskFailed, cancellationToken), cancellationToken);
+            await PerformTask(ServicePoolAsync(IBatchPool.ServiceKind.RemovePoolIfEmpty, cancellationToken), cancellationToken);
 
             switch (exceptions.Count)
             {
@@ -309,7 +397,29 @@ namespace TesApi.Web
                     catch (Exception ex)
                     {
                         exceptions.Add(ex);
+                        RemoveMissingPools(ex);
                     }
+                }
+            }
+
+            void RemoveMissingPools(Exception ex)
+            {
+                switch(ex)
+                {
+                    case AggregateException aggregateException:
+                        foreach (var e in aggregateException.InnerExceptions)
+                        {
+                            RemoveMissingPools(e);
+                        }
+                        break;
+
+                    case BatchException batchException:
+                        if (batchException.RequestInformation.BatchError.Code == BatchErrorCodeStrings.PoolNotFound)
+                        {
+                            _logger.LogError(ex, "Batch pool {PoolId} is missing. Removing it from TES's active pool list.", Pool.PoolId);
+                            _ = _batchPools.RemovePoolFromList(this);
+                        }
+                        break;
                 }
             }
         }
