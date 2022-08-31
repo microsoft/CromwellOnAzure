@@ -82,14 +82,14 @@ namespace TesApi.Web
 
             .AddSwaggerGen(c =>
             {
-                c.SwaggerDoc("0.3.0", new OpenApiInfo
+                c.SwaggerDoc("0.3.2", new OpenApiInfo
                 {
-                    Version = "0.3.0",
+                    Version = "0.3.2",
                     Title = "Task Execution Service",
-                    Description = "Task Execution Service (ASP.NET 5.0)",
+                    Description = "Task Execution Service (ASP.NET Core 6.0)",
                     Contact = new OpenApiContact()
                     {
-                        Name = "Microsoft Genomics",
+                        Name = "Microsoft Biomedical Platforms and Genomics",
                         Url = new Uri("https://github.com/microsoft/CromwellOnAzure")
                     },
                     License = new OpenApiLicense()

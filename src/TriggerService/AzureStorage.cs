@@ -93,6 +93,7 @@ namespace TriggerService
             var readmeBlobName = $"{lowercaseState}/readme.txt";
 
             return blobs
+                .Where(blob => !blob.Name.Equals(lowercaseState, StringComparison.OrdinalIgnoreCase))
                 .Where(blob => !blob.Name.Equals(readmeBlobName, StringComparison.OrdinalIgnoreCase))
                 .Where(blob => blob.Properties.LastModified.HasValue)
                 .Select(blob => new TriggerFile { Uri = blob.Uri.AbsoluteUri, ContainerName = WorkflowsContainerName, Name = blob.Name, LastModified = blob.Properties.LastModified.Value });
