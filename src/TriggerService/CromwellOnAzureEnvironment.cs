@@ -172,11 +172,6 @@ namespace TriggerService
 
                     switch (statusResponse.Status)
                     {
-                        case WorkflowStatus.Running:
-                            {
-                                await UploadTimingAsync(id, sampleName);
-                                break;
-                            }
                         case WorkflowStatus.Aborted:
                             {
                                 logger.LogInformation($"Setting to failed (aborted) Id: {id}");
@@ -229,6 +224,8 @@ namespace TriggerService
 
                                 break;
                             }
+                        default:
+                            break;
                     }
                 }
                 catch (CromwellApiException cromwellException) when (cromwellException?.HttpStatusCode == System.Net.HttpStatusCode.NotFound)

@@ -25,6 +25,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Polly;
+using Polly.Retry;
 using Tes.Models;
 using BatchModels = Microsoft.Azure.Management.Batch.Models;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
@@ -41,6 +44,9 @@ namespace TesApi.Web
         private const string DefaultAzureBillingRegionName = "US West";
 
         private static readonly HttpClient httpClient = new();
+        private static readonly RetryPolicy batchRaceConditionJobNotFoundRetryPolicy = Policy
+            .Handle<BatchException>(ex => ex.RequestInformation.BatchError.Code == BatchErrorCodeStrings.JobNotFound)
+            .WaitAndRetry(10, retryAttempt => TimeSpan.FromSeconds(1));
 
         private readonly ILogger logger;
         private readonly Func<Task<BatchModels.BatchAccount>> getBatchAccountFunc;
@@ -224,15 +230,15 @@ namespace TesApi.Web
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
             job.JobPreparationTask = jobPreparationTask;
             job.JobReleaseTask = jobReleaseTask;
+            job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
             await job.CommitAsync();
 
             try
             {
-                job = await batchClient.JobOperations.GetJobAsync(job.Id); // Retrieve the "bound" version of the job
-                job.PoolInformation = poolInformation;  // Redoing this since the container registry password is not retrieved by GetJobAsync()
-                job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
+                job = await batchRaceConditionJobNotFoundRetryPolicy.Execute(async () =>
+                    await batchClient.JobOperations.GetJobAsync(job.Id));
+
                 await job.AddTaskAsync(cloudTask);
-                await job.CommitAsync();
             }
             catch (Exception ex)
             {
