@@ -245,22 +245,42 @@ namespace TesApi.Web
         public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
-            await job.CommitAsync();
 
             try
             {
-                job = await batchClient.JobOperations.GetJobAsync(job.Id); // Retrieve the "bound" version of the job
-                job.PoolInformation = poolInformation;  // Redoing this since the container registry password is not retrieved by GetJobAsync()
                 job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
-                await job.AddTaskAsync(cloudTask);
                 await job.CommitAsync();
+
+                for (var i = 3; i > 0; --i)
+                {
+                    try
+                    {
+                        job = await batchClient.JobOperations.GetJobAsync(job.Id); // Retrieve the "bound" version of the job
+                        break;
+                    }
+                    catch (Exception e)
+                    {
+                        var batchError = JsonConvert.SerializeObject((e as BatchException)?.RequestInformation?.BatchError);
+                        logger.LogError(e, $"Failed to retrieve {job.Id}. Batch error: {batchError}");
+                    }
+                }
+
+                await job.AddTaskAsync(cloudTask);
             }
             catch (Exception ex)
             {
                 var batchError = JsonConvert.SerializeObject((ex as BatchException)?.RequestInformation?.BatchError);
                 logger.LogError(ex, $"Deleting {job.Id} because adding task to it failed. Batch error: {batchError}");
 
-                await batchClient.JobOperations.DeleteJobAsync(job.Id);
+                try
+                {
+                    await batchClient.JobOperations.DeleteJobAsync(job.Id);
+                }
+                catch (Exception e)
+                {
+                    var batchError2 = JsonConvert.SerializeObject((e as BatchException)?.RequestInformation?.BatchError);
+                    logger.LogError(e, $"Failed to delete {job.Id}. Batch error: {batchError2}");
+                }
 
                 if (!string.IsNullOrWhiteSpace(poolInformation?.PoolId))
                 {
