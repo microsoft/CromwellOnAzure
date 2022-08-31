@@ -840,6 +840,24 @@ namespace TesApi.Web
         public IAsyncEnumerable<CloudJob> ListJobsAsync(DetailLevel detailLevel = null)
             => batchClient.JobOperations.ListJobs(detailLevel: detailLevel).ToAsyncEnumerable();
 
+        /// <inheritdoc/>
+        public async Task DisableBatchPoolAutoScaleAsync(string poolId, CancellationToken cancellationToken)
+            => await batchClient.PoolOperations.DisableAutoScaleAsync(poolId, cancellationToken: cancellationToken);
+
+        /// <inheritdoc/>
+        public async Task EnableBatchPoolAutoScaleAsync(string poolId, TimeSpan interval, IAzureProxy.BatchPoolAutoScaleFormulaFactory formulaFactory, CancellationToken cancellationToken)
+        {
+            var state = await GetComputeNodeAllocationStateAsync(poolId, cancellationToken);
+
+            if (state.AllocationState != AllocationState.Steady)
+            {
+                throw new InvalidOperationException();
+            }
+
+            var preempted = state.TargetDedicated == 0;
+            await batchClient.PoolOperations.EnableAutoScaleAsync(poolId, formulaFactory(preempted, preempted ? state.TargetLowPriority.Value : state.TargetDedicated.Value), interval, cancellationToken: cancellationToken);
+        }
+
         private class VmPrice
         {
             public string VmSize { get; set; }
