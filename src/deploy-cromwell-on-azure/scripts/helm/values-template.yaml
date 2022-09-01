@@ -35,6 +35,7 @@ defaultContainers:
   - cromwell-executions
   - cromwell-workflow-logs
   - inputs
+  - outputs
 
 externalContainers:
 #  - accountName: storageAccount
