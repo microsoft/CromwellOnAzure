@@ -301,6 +301,12 @@ namespace CromwellOnAzureDeployer
 
                         if (existingAksCluster != null)
                         {
+                            if (!accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
+                            {
+                                throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
+                            }
+
+                            keyVault = await GetKeyVaultAsync(keyVaultName);
                             if (!accountNames.TryGetValue("ManagedIdentityClientId", out var managedIdentityClientId))
                             {
                                 throw new ValidationException($"Could not retrieve ManagedIdentityClientId.");
@@ -478,7 +484,7 @@ namespace CromwellOnAzureDeployer
                                 if (configuration.ManualHelmDeployment)
                                 {
                                     ConsoleEx.WriteLine("Please deploy helm chart, and press Enter to continue.");
-                                    ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateUserCommand());
+                                    ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateUserCommand(configuration.UsePostgreSqlSingleServer));
                                     ConsoleEx.ReadLine();
                                 }
                                 else
@@ -1847,6 +1853,13 @@ namespace CromwellOnAzureDeployer
             await client.SetSecretAsync(secretName, secretValue);
         }
 
+        private Task<Vault> GetKeyVaultAsync(string vaultName)
+        {
+            var keyVaultManagementClient = new KeyVaultManagementClient(azureCredentials);
+            keyVaultManagementClient.SubscriptionId = configuration.SubscriptionId;
+            return keyVaultManagementClient.Vaults.GetAsync(configuration.ResourceGroupName, vaultName);
+        }
+
         private Task<Vault> CreateKeyVaultAsync(string vaultName, IIdentity managedIdentity, ISubnet subnet)
             => Execute(
                 $"Creating Key Vault: {vaultName}...",
@@ -1862,6 +1875,7 @@ namespace CromwellOnAzureDeployer
 
                     var rbacClient = new GraphRbacManagementClient(rest);
                     rbacClient.TenantID = tenantId;
+                    // TODO: this doesn't work.
                     //var user = await rbacClient.SignedInUser.GetAsync();
                     var secrets = new List<string>
                     {
