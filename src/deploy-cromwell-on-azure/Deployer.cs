@@ -465,6 +465,11 @@ namespace CromwellOnAzureDeployer
                             postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
                         }
 
+                        if (!SkipBillingReaderRoleAssignment)
+                        {
+                            await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
+                        }
+
                         Task compute = null;
                         if (configuration.UseAks)
                         {
@@ -567,11 +572,6 @@ namespace CromwellOnAzureDeployer
                             }),
                             Task.Run(async () => await compute)
                         });;
-
-                        if (!SkipBillingReaderRoleAssignment)
-                        {
-                            await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
-                        }
                     }
 
                     if (configuration.UseAks)
