@@ -241,7 +241,7 @@ namespace CromwellOnAzureDeployer
         public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId, string keyVaultUrl)
         {
             // Override any configuration that is used by the update.
-            Deployer.OverrideSettingsFromConfiguration(settings, configuration);
+            Deployer.UpdateImageVersions(settings, configuration);
 
             var containerServiceClient = new ContainerServiceClient(azureCredentials);
             containerServiceClient.SubscriptionId = configuration.SubscriptionId;

@@ -919,7 +919,7 @@ namespace CromwellOnAzureDeployer
             }
 
             // Get settings from env files numbered 05-12
-            OverrideSettingsFromConfiguration(settings, configuration);
+            UpdateImageVersions(settings, configuration);
 
             settings["DefaultStorageAccountName"] = configuration.StorageAccountName;
             settings["CosmosDbAccountName"] = configuration.CosmosDbAccountName;
@@ -927,11 +927,21 @@ namespace CromwellOnAzureDeployer
             settings["ApplicationInsightsAccountName"] = configuration.ApplicationInsightsAccountName;
             settings["ManagedIdentityClientId"] = managedIdentity.ClientId;
             settings["AzureServicesAuthConnectionString"] = $"RunAs=App;AppId={managedIdentity.ClientId}";
-
+            settings["KeyVaultName"] = configuration.KeyVaultName;
+            settings["AksCoANamespace"] = configuration.AksCoANamespace;
+            
+            if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+            {
+                settings["PostgreSqlServerName"] = configuration.PostgreSqlServerName;
+                settings["PostgreSqlDatabaseName"] = configuration.PostgreSqlDatabaseName;
+                settings["PostgreSqlUserLogin"] = configuration.PostgreSqlUserLogin;
+                settings["PostgreSqlUserPassword"] = configuration.PostgreSqlUserPassword;
+                settings["UsePostgreSqlSingleServer"] = configuration.UsePostgreSqlSingleServer.ToString();
+            }
             return settings;
         }
 
-        public static void OverrideSettingsFromConfiguration(Dictionary<string, string> settings, Configuration configuration)
+        public static void UpdateImageVersions(Dictionary<string, string> settings, Configuration configuration)
         {
             if (!string.IsNullOrWhiteSpace(configuration.CromwellVersion))
             {
@@ -1220,17 +1230,6 @@ namespace CromwellOnAzureDeployer
                         await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo apt install -y postgresql-client");
                     }
                 });
-
-        private string GetAccountNames(IIdentity managedIdentity)
-        {
-            return Utility.GetFileContent("scripts", "env-01-account-names.txt")
-                        .Replace("{DefaultStorageAccountName}", configuration.StorageAccountName)
-                        .Replace("{CosmosDbAccountName}", configuration.CosmosDbAccountName)
-                        .Replace("{BatchAccountName}", configuration.BatchAccountName)
-                        .Replace("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName)
-                        .Replace("{ManagedIdentityClientId}", managedIdentity.ClientId)
-                        .Replace("{PostgreSqlServerName}", (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? configuration.PostgreSqlServerName : string.Empty));
-        }
 
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
         {
