@@ -495,6 +495,7 @@ namespace CromwellOnAzureDeployer
                                 else
                                 {
                                     kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
+                                    await kubernetesManager.DeployCoADependencies(kubernetesClient);
                                     await kubernetesManager.DeployHelmChartToCluster(kubernetesClient);
                                 }
 

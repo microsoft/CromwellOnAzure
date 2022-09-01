@@ -27,6 +27,8 @@ namespace CromwellOnAzureDeployer
     {
         private readonly string BlobCsiRepo = "https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
         private readonly string BlobCsiDriverVersion = "v1.15.0";
+        private readonly string AadPluginRepo = "https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts";
+        private readonly string AadPluginVersion = "4.1.12";
 
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
@@ -58,22 +60,17 @@ namespace CromwellOnAzureDeployer
             return new Kubernetes(k8sConfig);
         }
 
-        public async Task DeployHelmChartToCluster(IKubernetes client)
+        public async Task DeployCoADependencies(IKubernetes client)
         {
-            await ExecHelmProcess($"repo add aad-pod-identity https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts");
-            await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --kubeconfig kubeconfig.txt");
+            await ExecHelmProcess($"repo add aad-pod-identity {AadPluginRepo}");
+            await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig kubeconfig.txt");
             await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
             await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig kubeconfig.txt");
-            await ExecHelmProcess($"install cromwellonazure ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace");
+        }
 
-            if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
-            {
-                var commands = new List<string[]>
-                {
-                    new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/init-user.sql" },
-                };
-                await ExecuteCommandsOnPod(client, "mysqldb", commands, TimeSpan.FromMinutes(6));
-            }
+        public async Task DeployHelmChartToCluster(IKubernetes client)
+        {
+           await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace");
         }
 
         public void UpdateHelmValues(string storageAccountName, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
@@ -102,7 +99,6 @@ namespace CromwellOnAzureDeployer
             values.Config["marthaUrl"] = settings["MarthaUrl"];
             values.Config["marthaKeyVaultName"] = settings["MarthaKeyVaultName"];
             values.Config["marthaSecretName"] = settings["MarthaSecretName"];
-
             values.Identity["name"] = managedId.Name;
             values.Identity["resourceId"] = managedId.Id;
             values.Identity["clientId"] = managedId.ClientId;
@@ -149,22 +145,13 @@ namespace CromwellOnAzureDeployer
             await p.WaitForExitAsync();
         }
 
-        public async Task UnlockCromwellChangeLog(IKubernetes client)
-        {
-            var commands = new List<string[]>
-            {
-                new string[] { "bash", "-lic", "mysql -pcromwell < /configuration/unlock-change-log.sql" }
-            };
-            await ExecuteCommandsOnPod(client, "mysqldb", commands, TimeSpan.FromMinutes(3));
-        }
-
         public async Task ExecuteCommandsOnPod(IKubernetes client, string podName, IEnumerable<string[]> commands, TimeSpan timeout)
         {
             var printHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
             {
                 using (var reader = new StreamReader(stdOut))
                 {
-                    var line = reader.ReadLine();
+                    var line = await reader.ReadLineAsync();
 
                     while (line != null)
                     {
@@ -172,13 +159,13 @@ namespace CromwellOnAzureDeployer
                         {
                             ConsoleEx.WriteLine(podName + ": " + line);
                         }
-                        line = reader.ReadLine();
+                        line = await reader.ReadLineAsync();
                     }
                 }
 
                 using (var reader = new StreamReader(stdError))
                 {
-                    var line = reader.ReadLine();
+                    var line = await reader.ReadLineAsync();
 
                     while (line != null)
                     {
@@ -186,7 +173,7 @@ namespace CromwellOnAzureDeployer
                         {
                             ConsoleEx.WriteLine(podName + ": " + line);
                         }
-                        line = reader.ReadLine();
+                        line = await reader.ReadLineAsync();
                     }
                 }
             });
@@ -255,8 +242,6 @@ namespace CromwellOnAzureDeployer
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
             var k8sConfig = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
             IKubernetes client = new Kubernetes(k8sConfig);
-
-            await UnlockCromwellChangeLog(client);
 
             UpdateHelmValues(storageAccount.Name, keyVaultUrl, resourceGroup.Name, settings, managedId);
             await DeployHelmChartToCluster(client);
