@@ -79,7 +79,7 @@ namespace CromwellOnAzureDeployer
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool? KeepSshPortOpen { get; set; } = null;
         public bool DebugLogging { get; set; } = false;
-        public bool? ProvisionPostgreSqlOnAzure { get; set; } = false;
+        public bool? ProvisionPostgreSqlOnAzure { get; set; } = null;
         public string PostgreSqlServerName { get; set; }
         public string PostgreSqlUserPassword { get; set; }
         public bool UsePostgreSqlSingleServer { get; set; } = false;
