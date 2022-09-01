@@ -21,7 +21,6 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlVersion { get; set; } = "11";
         public string DefaultPostgreSqlSubnetName { get; set; } = "sqlsubnet";
         public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
-        public bool? ProvisionPostgreSqlOnAzure { get; set; } = false; // Will be accessible in 4.0 release
     }
     public abstract class UserAccessibleConfiguration
     {
@@ -80,6 +79,7 @@ namespace CromwellOnAzureDeployer
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool? KeepSshPortOpen { get; set; } = null;
         public bool DebugLogging { get; set; } = false;
+        public bool? ProvisionPostgreSqlOnAzure { get; set; } = false;
         public string PostgreSqlServerName { get; set; }
         public string PostgreSqlUserPassword { get; set; }
         public bool UsePostgreSqlSingleServer { get; set; } = false;
