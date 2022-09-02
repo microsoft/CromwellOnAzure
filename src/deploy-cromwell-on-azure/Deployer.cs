@@ -331,6 +331,7 @@ namespace CromwellOnAzureDeployer
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
                         aksCluster = await ValidateAndGetExistingAKSClusterAsync();
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
+                        keyVault = await ValidateAndGetExistingKeyVault();
 
                         // Configuration preferences not currently settable by user.
                         if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName) && configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
@@ -339,12 +340,7 @@ namespace CromwellOnAzureDeployer
                         }
 
                         configuration.PostgreSqlAdministratorPassword = Utility.GeneratePassword();
-
-                        if (string.IsNullOrWhiteSpace(configuration.PostgreSqlCromwellUserPassword))
-                        {
-                            configuration.PostgreSqlCromwellUserPassword = Utility.GeneratePassword();
-                        }
-
+                        configuration.PostgreSqlCromwellUserPassword = Utility.GeneratePassword();
                         configuration.PostgreSqlTesUserPassword = Utility.GeneratePassword();
 
                         if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
@@ -702,6 +698,17 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private async Task<Vault> ValidateAndGetExistingKeyVault()
+        {
+            if (string.IsNullOrWhiteSpace(configuration.KeyVaultName))
+            {
+                return null;
+            }
+
+            return (await GetKeyVaultAsync(configuration.KeyVaultName))
+                ?? throw new ValidationException($"If key vault name is provided, it must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+        }
+
         private async Task<FlexibleServerModel.Server> ValidateAndGetExistingPostgresqlServer()
         {
             if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName))
@@ -711,7 +718,6 @@ namespace CromwellOnAzureDeployer
 
             return (await GetExistingPostgresqlService(configuration.PostgreSqlServerName))
                 ?? throw new ValidationException($"If Postgresql server name is provided, the server must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
-
         }
 
         private async Task<ManagedCluster> ValidateAndGetExistingAKSClusterAsync()
@@ -1811,7 +1817,6 @@ namespace CromwellOnAzureDeployer
             else
             {
                 return $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlCromwellDatabaseName} -c \"{sqlCommand}\"";
-
             }
         }
 
@@ -1921,8 +1926,7 @@ namespace CromwellOnAzureDeployer
                         "recover",
                         "purge"
                     };
-                    var keyVaultManagementClient = new KeyVaultManagementClient(azureCredentials);
-                    keyVaultManagementClient.SubscriptionId = configuration.SubscriptionId;
+                    var keyVaultManagementClient = new KeyVaultManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
                     var properties = new VaultCreateOrUpdateParameters()
                     {
                         Location = configuration.RegionName,

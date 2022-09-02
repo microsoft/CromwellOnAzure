@@ -16,6 +16,7 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlAdministratorLogin { get; set; } = "coa_admin";
         public string PostgreSqlAdministratorPassword { get; set; }
         public string PostgreSqlCromwellUserLogin { get; set; } = "cromwell";
+        public string PostgreSqlCromwellUserPassword { get; set; }
         public string PostgreSqlTesUserLogin { get; set; } = "tes";
         public string PostgreSqlTesUserPassword { get; set; }
         public string PostgreSqlSkuName { get; set; } = "Standard_B2s";
@@ -85,7 +86,6 @@ namespace CromwellOnAzureDeployer
         public bool DebugLogging { get; set; } = false;
         public bool? ProvisionPostgreSqlOnAzure { get; set; } = null;
         public string PostgreSqlServerName { get; set; }
-        public string PostgreSqlCromwellUserPassword { get; set; }
         public bool UsePostgreSqlSingleServer { get; set; } = false;
         public string KeyVaultName { get; set; }
         // Temporary workaround until I can get Azure Graph RBAC client working. 
