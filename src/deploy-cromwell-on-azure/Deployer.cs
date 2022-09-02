@@ -477,7 +477,7 @@ namespace CromwellOnAzureDeployer
                             compute = Task.Run(async () =>
                             {
                                 var personalizedSettings = GetPersonalizedSettings(managedIdentity);
-                                var systemSettings = GetSystemSettings(managedIdentity);
+                                var systemSettings = GetSystemSettings();
                                 var settings = new Dictionary<string, string>(personalizedSettings);
                                 systemSettings.ToList().ForEach(x => settings.Add(x.Key, x.Value));
 
