@@ -456,12 +456,15 @@ namespace CromwellOnAzureDeployer
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                         });
 
-                        await Task.Run(async () =>
+                        if (configuration.UseAks)
                         {
-                            keyVault = await CreateKeyVaultAsync(configuration.KeyVaultName, managedIdentity, vnetAndSubnet.Value.vmSubnet);
-                            var keys = await storageAccount.GetKeysAsync();
-                            await SetStorageKeySecret(keyVault.Properties.VaultUri, StorageAccountKeySecretName, keys.First().Value);
-                        });
+                            await Task.Run(async () =>
+                            {
+                                keyVault = await CreateKeyVaultAsync(configuration.KeyVaultName, managedIdentity, vnetAndSubnet.Value.vmSubnet);
+                                var keys = await storageAccount.GetKeysAsync();
+                                await SetStorageKeySecret(keyVault.Properties.VaultUri, StorageAccountKeySecretName, keys.First().Value);
+                            });
+                        }
 
                         if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() && postgreSqlFlexServer == null)
                         {
