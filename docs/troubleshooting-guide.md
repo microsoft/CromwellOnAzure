@@ -239,9 +239,17 @@ bool     Update =   false; | Y | Y | Y | Set to true if you want to update your 
 bool     PrivateNetworking = false; | Y | Y | N | Available starting version 2.2. Set to true to create the host VM without public IP address. If set, VnetResourceGroupName, VnetName and SubnetName must be provided (and already exist). The deployment must be initiated from a machine that has access to that subnet.
 bool     KeepSshPortOpen =   false; | Y | Y | Y | Available starting version 3.0. Set to true if you need to keep the SSH port accessible on the host VM while deployer is not running (not recommended). 
 string   LogAnalyticsArmId | Y | N | N | Arm resource id for an exising Log Analytics workspace, workspace is used for App Insights - Not required, a workspace will be generated automatically if not provided.
-bool     ProvisionPostgreSqlOnAzure =   false; | Y | N | N | COMING SOON in version 4.0. Triggers whether to use Docker MySQL or Azure PostgreSQL when provisioning the database.
+bool     ProvisionPostgreSqlOnAzure =   false; | Y | N | N | Triggers whether to use Docker MySQL or Azure PostgreSQL when provisioning the database. Required for AKS deployment.
 bool     UseAks =   false; | Y | N | N | Uses Azure Kubernetes Service rather than a VM to run the CoA system services Cromwell/TES/TriggerService.
 string   AksClusterName | Y | Y | N | Cluster name of existing Azure Kubernetes Service cluster to use rather than provisioning a new one.
+string   AksCoANamespace = "coa" | Y | N | N | Kubernetes namespace.
+bool     ManualHelmDeployment | Y | N | N | For use if user doesn't have direct access to existing AKS cluster.
+string   HelmExePath = "C:\\ProgramData\\chocolatey\\bin\\helm.exe" | Y | N | N | Path to helm executable for AKS deployment.
+int      AksPoolSize = 2 | Y | N | N | Size of AKS node pool, two nodes are recommended for reliability, however a minimum of one can be used to save COGS. 
+bool DebugLogging = false | Y | N | N | Prints all log information.
+string PostgreSqlServerName | Y | Y | N | Name of existing postgresql server. 
+bool UsePostgreSqlSingleServer = false | Y | N | N | Use Postgresql single server rather than flexi servers, only recommended if you need to use private endpoints. 
+string KeyVaultName | Y | Y | N | Name of an existing key vault 
 
 The following are more advanced configuration parameters:
 
