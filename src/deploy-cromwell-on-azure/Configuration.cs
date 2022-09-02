@@ -16,7 +16,6 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlAdministratorLogin { get; set; } = "coa_admin";
         public string PostgreSqlAdministratorPassword { get; set; }
         public string PostgreSqlCromwellUserLogin { get; set; } = "cromwell";
-        public string PostgreSqlCromwellDatabaseName { get; set; } = "cromwell_db";
         public string PostgreSqlTesUserLogin { get; set; } = "tes";
         public string PostgreSqlTesUserPassword { get; set; }
         public string PostgreSqlSkuName { get; set; } = "Standard_B2s";

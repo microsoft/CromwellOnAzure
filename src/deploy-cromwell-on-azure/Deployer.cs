@@ -340,9 +340,9 @@ namespace CromwellOnAzureDeployer
 
                         configuration.PostgreSqlAdministratorPassword = Utility.GeneratePassword();
 
-                        if (string.IsNullOrWhiteSpace(configuration.PostgreSqlUserPassword))
+                        if (string.IsNullOrWhiteSpace(configuration.PostgreSqlCromwellUserPassword))
                         {
-                            configuration.PostgreSqlUserPassword = Utility.GeneratePassword();
+                            configuration.PostgreSqlCromwellUserPassword = Utility.GeneratePassword();
                         }
 
                         configuration.PostgreSqlTesUserPassword = Utility.GeneratePassword();
@@ -492,7 +492,7 @@ namespace CromwellOnAzureDeployer
                                 if (configuration.ManualHelmDeployment)
                                 {
                                     ConsoleEx.WriteLine("Please deploy helm chart, and press Enter to continue.");
-                                    ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateUserCommand(configuration.UsePostgreSqlSingleServer));
+                                    ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer));
                                     ConsoleEx.ReadLine();
                                 }
                                 else
@@ -529,7 +529,6 @@ namespace CromwellOnAzureDeployer
                                         await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
                                         if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                                         {
-                                            await CreatePostgreSqlDatabaseUser(sshConnectionInfo);
                                             await CreatePostgreSqlCromwellDatabaseUser(sshConnectionInfo);
                                             await CreatePostgreSqlTesDatabaseUser(sshConnectionInfo);
                                         }
@@ -945,9 +944,9 @@ namespace CromwellOnAzureDeployer
             if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
             {
                 settings["PostgreSqlServerName"] = configuration.PostgreSqlServerName;
-                settings["PostgreSqlDatabaseName"] = configuration.PostgreSqlDatabaseName;
-                settings["PostgreSqlUserLogin"] = configuration.PostgreSqlUserLogin;
-                settings["PostgreSqlUserPassword"] = configuration.PostgreSqlUserPassword;
+                settings["PostgreSqlDatabaseName"] = configuration.PostgreSqlCromwellDatabaseName;
+                settings["PostgreSqlUserLogin"] = configuration.PostgreSqlCromwellUserLogin;
+                settings["PostgreSqlUserPassword"] = configuration.PostgreSqlCromwellUserPassword;
                 settings["UsePostgreSqlSingleServer"] = configuration.UsePostgreSqlSingleServer.ToString();
             }
             return settings;
@@ -1593,7 +1592,7 @@ namespace CromwellOnAzureDeployer
                 $"Creating PostgreSQL tes database: {configuration.PostgreSqlTesDatabaseName}...",
                 () => postgresManagementClient.Databases.CreateAsync(
                     configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlTesDatabaseName,
-                    new Database()));
+                    new FlexibleServerModel.Database()));
 
             return server;
         }
@@ -1639,16 +1638,16 @@ namespace CromwellOnAzureDeployer
                });
 
             await Execute(
-                $"Creating PostgreSQL cromwell database: {configuration.PostgreSqlDatabaseName}...",
+                $"Creating PostgreSQL cromwell database: {configuration.PostgreSqlCromwellDatabaseName}...",
                 async () => await postgresManagementClient.Databases.CreateOrUpdateAsync(
                     configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlCromwellDatabaseName,
                     new SingleServerModel.Database()));
 
             await Execute(
                 $"Creating PostgreSQL tes database: {configuration.PostgreSqlTesDatabaseName}...",
-                () => postgresManagementClient.Databases.CreateAsync(
+                () => postgresManagementClient.Databases.CreateOrUpdateAsync(
                     configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlTesDatabaseName,
-                    new Database()));
+                    new SingleServerModel.Database()));
             return server;
         }
 
@@ -1796,10 +1795,10 @@ namespace CromwellOnAzureDeployer
 
         private string GetInitSqlString()
         {
-            return $"CREATE USER {configuration.PostgreSqlUserLogin} WITH PASSWORD '{configuration.PostgreSqlUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlDatabaseName} TO {configuration.PostgreSqlUserLogin};";
+            return $"CREATE USER {configuration.PostgreSqlCromwellUserLogin} WITH PASSWORD '{configuration.PostgreSqlCromwellUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlCromwellDatabaseName} TO {configuration.PostgreSqlCromwellUserLogin};";
         }
 
-        private string GetPostgreSQLCreateUserCommand(bool useSingleServer)
+        private string GetPostgreSQLCreateCromwellUserCommand(bool useSingleServer)
         {
             var sqlCommand = GetInitSqlString();
             if (useSingleServer)
@@ -1808,7 +1807,7 @@ namespace CromwellOnAzureDeployer
             }
             else
             {
-                return $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName} -c \"{sqlCommand}\"";
+                return $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlCromwellDatabaseName} -c \"{sqlCommand}\"";
 
             }
         }
@@ -1871,10 +1870,9 @@ namespace CromwellOnAzureDeployer
                     {
                         username = $"{configuration.PostgreSqlAdministratorLogin}@{configuration.PostgreSqlServerName}";
                     }
-                    commands.Add(new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:5432:{configuration.PostgreSqlDatabaseName}:{username}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" });
+                    commands.Add(new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:5432:{configuration.PostgreSqlCromwellDatabaseName}:{username}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" });
                     commands.Add(new string[] { "chmod", "0600", "/root/.pgpass" });
-                    commands.Add(new string[] { "psql", "-h", serverPath, "-U", username, "-d", configuration.PostgreSqlDatabaseName, "-c", initScript });
-
+                    commands.Add(new string[] { "psql", "-h", serverPath, "-U", username, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", initScript });
 
                     await kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "tes", commands, System.TimeSpan.FromMinutes(5));
                 });
