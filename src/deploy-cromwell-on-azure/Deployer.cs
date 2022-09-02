@@ -179,7 +179,7 @@ namespace CromwellOnAzureDeployer
                         ConsoleEx.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
                         var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
-                        configuration.UseAks = existingAksCluster != null;
+                        configuration.UseAks = existingAksCluster is not null;
 
                         Dictionary<string, string> accountNames = null;
                         if (configuration.UseAks)
@@ -298,7 +298,7 @@ namespace CromwellOnAzureDeployer
                         // However we do ancitipate including this change, this code is here to facilitate this future behavior.
                         configuration.PostgreSqlServerName = accountNames.GetValueOrDefault("PostgreSqlServerName");
 
-                        if (existingAksCluster != null)
+                        if (existingAksCluster is not null)
                         {
                             if (!accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
                             {
@@ -579,7 +579,7 @@ namespace CromwellOnAzureDeployer
 
                     if (configuration.UseAks)
                     {
-                        if (kubernetesClient != null)
+                        if (kubernetesClient is not null)
                         {
                             await kubernetesManager.WaitForCromwell(kubernetesClient);
                         }
@@ -916,13 +916,14 @@ namespace CromwellOnAzureDeployer
 
         private Dictionary<string, string> GetSystemSettings()
         {
-            var settings = new Dictionary<string, string>();
-            settings["BatchNodesSubnetId"] = configuration.BatchNodesSubnetId;
-            settings["DockerInDockerImageName"] = configuration.DockerInDockerImageName;
-            settings["BlobxferImageName"] = configuration.BlobxferImageName;
-
-            settings["DisableBatchNodesPublicIpAddress"] = configuration.DisableBatchNodesPublicIpAddress.GetValueOrDefault().ToString();
-            settings["KeepSshPortOpen"] = configuration.KeepSshPortOpen.GetValueOrDefault().ToString();
+            var settings = new Dictionary<string, string>
+            {
+                ["BatchNodesSubnetId"] = configuration.BatchNodesSubnetId,
+                ["DockerInDockerImageName"] = configuration.DockerInDockerImageName,
+                ["BlobxferImageName"] = configuration.BlobxferImageName,
+                ["DisableBatchNodesPublicIpAddress"] = configuration.DisableBatchNodesPublicIpAddress.GetValueOrDefault().ToString(),
+                ["KeepSshPortOpen"] = configuration.KeepSshPortOpen.GetValueOrDefault().ToString()
+            };
 
             return settings;
         }
@@ -1533,7 +1534,6 @@ namespace CromwellOnAzureDeployer
                     }
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "unlock-change-log.sql", Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"));
                 });
 
         private Task AssignVmAsContributorToBatchAccountAsync(IIdentity managedIdentity, BatchAccount batchAccount)
@@ -1917,7 +1917,7 @@ namespace CromwellOnAzureDeployer
                         .Build();
 
                     var rbacClient = new GraphRbacManagementClient(rest) { TenantID = tenantId };
-                    // TODO: this doesn't work.
+                    // TODO: this doesn't work. Manually passing user object id from command line for now. 
                     //var user = await rbacClient.SignedInUser.GetAsync();
                     var secrets = new List<string>
                     {
