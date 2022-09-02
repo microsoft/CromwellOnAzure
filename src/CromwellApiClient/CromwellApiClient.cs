@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -21,6 +21,8 @@ namespace CromwellApiClient
 
         public CromwellApiClient(string baseUrl)
         {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
                 throw new ArgumentException(null, nameof(baseUrl));

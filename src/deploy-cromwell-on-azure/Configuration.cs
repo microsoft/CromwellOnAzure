@@ -11,10 +11,14 @@ namespace CromwellOnAzureDeployer
 {
     public class Configuration : UserAccessibleConfiguration
     {
-        public string PostgreSqlDatabaseName { get; set; } = "cromwell_db";
+        public string PostgreSqlCromwellDatabaseName { get; set; } = "cromwell_db";
+        public string PostgreSqlTesDatabaseName { get; set; } = "tes_db";
         public string PostgreSqlAdministratorLogin { get; set; } = "coa_admin";
         public string PostgreSqlAdministratorPassword { get; set; }
-        public string PostgreSqlUserLogin { get; set; } = "cromwell";
+        public string PostgreSqlCromwellUserLogin { get; set; } = "cromwell";
+        public string PostgreSqlCromwellDatabaseName { get; set; } = "cromwell_db";
+        public string PostgreSqlTesUserLogin { get; set; } = "tes";
+        public string PostgreSqlTesUserPassword { get; set; }
         public string PostgreSqlSkuName { get; set; } = "Standard_B2s";
         public string PostgreSqlTier { get; set; } = "Burstable";
         public string DefaultVmSubnetName { get; set; } = "vmsubnet";
@@ -22,6 +26,7 @@ namespace CromwellOnAzureDeployer
         public string DefaultPostgreSqlSubnetName { get; set; } = "sqlsubnet";
         public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
     }
+    
     public abstract class UserAccessibleConfiguration
     {
         public string SubscriptionId { get; set; }
@@ -81,7 +86,7 @@ namespace CromwellOnAzureDeployer
         public bool DebugLogging { get; set; } = false;
         public bool? ProvisionPostgreSqlOnAzure { get; set; } = null;
         public string PostgreSqlServerName { get; set; }
-        public string PostgreSqlUserPassword { get; set; }
+        public string PostgreSqlCromwellUserPassword { get; set; }
         public bool UsePostgreSqlSingleServer { get; set; } = false;
         public string KeyVaultName { get; set; }
         // Temporary workaround until I can get Azure Graph RBAC client working. 

@@ -20,6 +20,11 @@ namespace TriggerService
 {
     internal class Program
     {
+        public Program()
+        {
+            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+        }
+
         public static async Task Main()
             => await InitAndRunAsync();
 
@@ -35,7 +40,12 @@ namespace TriggerService
                 {
                     if (!string.IsNullOrWhiteSpace(instrumentationKey))
                     {
-                        loggingBuilder.AddApplicationInsights(instrumentationKey,
+                        var connectionString = $"InstrumentationKey={instrumentationKey}";
+                        loggingBuilder.AddApplicationInsights(
+                            configuration =>
+                            {
+                                configuration.ConnectionString = connectionString;
+                            },
                             options =>
                             {
                                 options.TrackExceptionsAsExceptionTelemetry = false;

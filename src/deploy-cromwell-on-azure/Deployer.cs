@@ -339,10 +339,13 @@ namespace CromwellOnAzureDeployer
                         }
 
                         configuration.PostgreSqlAdministratorPassword = Utility.GeneratePassword();
+
                         if (string.IsNullOrWhiteSpace(configuration.PostgreSqlUserPassword))
                         {
                             configuration.PostgreSqlUserPassword = Utility.GeneratePassword();
                         }
+
+                        configuration.PostgreSqlTesUserPassword = Utility.GeneratePassword();
 
                         if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
                         {
@@ -527,6 +530,8 @@ namespace CromwellOnAzureDeployer
                                         if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                                         {
                                             await CreatePostgreSqlDatabaseUser(sshConnectionInfo);
+                                            await CreatePostgreSqlCromwellDatabaseUser(sshConnectionInfo);
+                                            await CreatePostgreSqlTesDatabaseUser(sshConnectionInfo);
                                         }
                                     },
                                     TaskContinuationOptions.OnlyOnRanToCompletion)
@@ -1260,9 +1265,12 @@ namespace CromwellOnAzureDeployer
             {
                 uploadList.Add((Utility.PersonalizeContent(new[]
                 {
-                    new Utility.ConfigReplaceTextItem("{PostgreSqlDatabaseName}", configuration.PostgreSqlDatabaseName),
-                    new Utility.ConfigReplaceTextItem("{PostgreSqlUserLogin}", configuration.PostgreSqlUserLogin),
-                    new Utility.ConfigReplaceTextItem("{PostgreSqlUserPassword}", configuration.PostgreSqlUserPassword),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlCromwellDatabaseName}", configuration.PostgreSqlCromwellDatabaseName),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlTesDatabaseName}", configuration.PostgreSqlTesDatabaseName),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlCromwellUserLogin}", configuration.PostgreSqlCromwellUserLogin),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlCromwellUserPassword}", configuration.PostgreSqlCromwellUserPassword),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlTesUserLogin}", configuration.PostgreSqlTesUserLogin),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlTesUserPassword}", configuration.PostgreSqlTesUserPassword),
                 }, "scripts", "env-13-postgre-sql-db.txt"),
                 $"{CromwellAzureRootDir}/env-13-postgre-sql-db.txt", false));
             }
@@ -1417,6 +1425,7 @@ namespace CromwellOnAzureDeployer
                     .WithExistingResourceGroup(configuration.ResourceGroupName)
                     .WithGeneralPurposeAccountKindV2()
                     .WithOnlyHttpsTraffic()
+                    .WithSku(StorageAccountSkuType.Standard_LRS)
                     .CreateAsync(cts.Token));
 
 
@@ -1441,7 +1450,7 @@ namespace CromwellOnAzureDeployer
                 .SingleOrDefault(a => a.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase) && a.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
 
         private async Task<BatchAccount> GetExistingBatchAccountAsync(string batchAccountName)
-            => (await Task.WhenAll(subscriptionIds.Select(async s => 
+            => (await Task.WhenAll(subscriptionIds.Select(async s =>
             {
                 try
                 {
@@ -1490,9 +1499,9 @@ namespace CromwellOnAzureDeployer
                     {
                         await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                         {
-                            new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlDatabaseName}?sslmode=require\""),
-                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", configuration.UsePostgreSqlSingleServer ? $"\"{configuration.PostgreSqlUserLogin}@{configuration.PostgreSqlServerName}\"": $"\"{configuration.PostgreSqlUserLogin}\""),
-                            new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlUserPassword}\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlCromwellDatabaseName}?sslmode=require\""),
+                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", configuration.UsePostgreSqlSingleServer ? $"\"{configuration.PostgreSqlCromwellUserLogin}@{configuration.PostgreSqlCromwellDatabaseName}\"": $"\"{configuration.PostgreSqlCromwellUserLogin}\""),
+                            new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),
                             new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
                             new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
                         }, "scripts", CromwellConfigurationFileName));
@@ -1575,10 +1584,16 @@ namespace CromwellOnAzureDeployer
                 });
 
             await Execute(
-                $"Creating PostgreSQL cromwell database: {configuration.PostgreSqlDatabaseName}...",
+                $"Creating PostgreSQL cromwell database: {configuration.PostgreSqlCromwellDatabaseName}...",
                 () => postgresManagementClient.Databases.CreateAsync(
-                    configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlDatabaseName,
+                    configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlCromwellDatabaseName,
                     new FlexibleServerModel.Database()));
+                    
+            await Execute(
+                $"Creating PostgreSQL tes database: {configuration.PostgreSqlTesDatabaseName}...",
+                () => postgresManagementClient.Databases.CreateAsync(
+                    configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlTesDatabaseName,
+                    new Database()));
 
             return server;
         }
@@ -1626,9 +1641,14 @@ namespace CromwellOnAzureDeployer
             await Execute(
                 $"Creating PostgreSQL cromwell database: {configuration.PostgreSqlDatabaseName}...",
                 async () => await postgresManagementClient.Databases.CreateOrUpdateAsync(
-                    configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlDatabaseName,
+                    configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlCromwellDatabaseName,
                     new SingleServerModel.Database()));
 
+            await Execute(
+                $"Creating PostgreSQL tes database: {configuration.PostgreSqlTesDatabaseName}...",
+                () => postgresManagementClient.Databases.CreateAsync(
+                    configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlTesDatabaseName,
+                    new Database()));
             return server;
         }
 
@@ -1793,12 +1813,23 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private Task CreatePostgreSqlDatabaseUser(ConnectionInfo sshConnectionInfo)
+        private Task CreatePostgreSqlCromwellDatabaseUser(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Creating PostgreSQL database user...",
                 () =>
                 {
-                    return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, GetPostgreSQLCreateUserCommand(configuration.UsePostgreSqlSingleServer));
+                    var sqlCommand = $"CREATE USER {configuration.PostgreSqlCromwellUserLogin} WITH PASSWORD '{configuration.PostgreSqlCromwellUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlCromwellDatabaseName} TO {configuration.PostgreSqlCromwellUserLogin};";
+                    return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlCromwellDatabaseName} -c \"{sqlCommand}\"");
+                }
+            );
+
+        private Task CreatePostgreSqlTesDatabaseUser(ConnectionInfo sshConnectionInfo)
+            => Execute(
+                $"Creating PostgreSQL database user...",
+                () =>
+                {
+                    var sqlCommand = $"CREATE USER {configuration.PostgreSqlTesUserLogin} WITH PASSWORD '{configuration.PostgreSqlTesUserPassword}'; GRANT ALL PRIVILEGES ON DATABASE {configuration.PostgreSqlTesDatabaseName} TO {configuration.PostgreSqlTesUserLogin};";
+                    return ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlTesDatabaseName} -c \"{sqlCommand}\"");
                 }
             );
 
