@@ -1443,7 +1443,6 @@ namespace CromwellOnAzureDeployer
                     .WithSku(StorageAccountSkuType.Standard_LRS)
                     .CreateAsync(cts.Token));
 
-
         private async Task<IStorageAccount> GetExistingStorageAccountAsync(string storageAccountName)
             => await GetExistingStorageAccountAsync(storageAccountName, azureClient, subscriptionIds, configuration);
 
