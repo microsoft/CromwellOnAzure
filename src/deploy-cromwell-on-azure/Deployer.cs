@@ -145,8 +145,7 @@ namespace CromwellOnAzureDeployer
                 subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
                 kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
-                networkManagementClient = new Microsoft.Azure.Management.Network.NetworkManagementClient(azureCredentials);
-                networkManagementClient.SubscriptionId = configuration.SubscriptionId;
+                networkManagementClient = new Microsoft.Azure.Management.Network.NetworkManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
                 postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
                 postgreSqlSingleManagementClient = new SingleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
 
@@ -497,8 +496,8 @@ namespace CromwellOnAzureDeployer
                                 else
                                 {
                                     kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
-                                    await kubernetesManager.DeployCoADependencies(kubernetesClient);
-                                    await kubernetesManager.DeployHelmChartToCluster(kubernetesClient);
+                                    await kubernetesManager.DeployCoADependencies();
+                                    await kubernetesManager.DeployHelmChartToCluster();
                                 }
 
                                 await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
@@ -664,21 +663,18 @@ namespace CromwellOnAzureDeployer
             {
                 if (configuration.DebugLogging)
                 {
-                    if (exc is KubernetesException)
+                    if (exc is KubernetesException kExc)
                     {
-                        var kExc = (KubernetesException)exc;
                         ConsoleEx.WriteLine($"Kubenetes Status: {kExc.Status}");
                     }
 
-                    if (exc is WebSocketException)
+                    if (exc is WebSocketException wExc)
                     {
-                        var wExc = (WebSocketException)exc;
                         ConsoleEx.WriteLine($"WebSocket ErrorCode: {wExc.WebSocketErrorCode}");
                     }
 
-                    if (exc is HttpOperationException)
+                    if (exc is HttpOperationException hExc)
                     {
-                        var hExc = (HttpOperationException)exc;
                         ConsoleEx.WriteLine($"HTTP Response: {hExc.Response.Content}");
                     }
                     ConsoleEx.WriteLine(exc.StackTrace, ConsoleColor.Red);
@@ -771,41 +767,52 @@ namespace CromwellOnAzureDeployer
 
         private async Task<ManagedCluster> ProvisionManagedCluster(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, bool privateNetworking)
         {
-            string resourceGroup = resourceGroupObject.Name;
-            string nodePoolName = "nodepool1";
-            var containerServiceClient = new ContainerServiceClient(azureCredentials);
-            containerServiceClient.SubscriptionId = configuration.SubscriptionId;
-            var cluster = new ManagedCluster();
-            cluster.AddonProfiles = new Dictionary<string, ManagedClusterAddonProfile>();
-            cluster.AddonProfiles.Add("omsagent", new ManagedClusterAddonProfile(true, new Dictionary<string, string>() { { "logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id } }));
-            cluster.Location = configuration.RegionName;
-            cluster.DnsPrefix = configuration.AksClusterName;
-            cluster.NetworkProfile = new ContainerServiceNetworkProfile();
-            cluster.NetworkProfile.NetworkPlugin = NetworkPlugin.Azure;
-            cluster.NetworkProfile.ServiceCidr = configuration.KubernetesServiceCidr;
-            cluster.NetworkProfile.DnsServiceIP = configuration.KubernetesDnsServiceIP;
-            cluster.NetworkProfile.DockerBridgeCidr = configuration.KubernetesDockerBridgeCidr;
-            cluster.NetworkProfile.NetworkPolicy = NetworkPolicy.Azure;
-            cluster.Identity = new ManagedClusterIdentity(managedIdentity.PrincipalId, managedIdentity.TenantId, Microsoft.Azure.Management.ContainerService.Models.ResourceIdentityType.UserAssigned);
-            cluster.Identity.UserAssignedIdentities = new Dictionary<string, ManagedClusterIdentityUserAssignedIdentitiesValue>();
-            cluster.Identity.UserAssignedIdentities.Add(managedIdentity.Id, new ManagedClusterIdentityUserAssignedIdentitiesValue(managedIdentity.PrincipalId, managedIdentity.ClientId));
-            cluster.IdentityProfile = new Dictionary<string, ManagedClusterPropertiesIdentityProfileValue>();
-            cluster.IdentityProfile.Add("kubeletidentity", new ManagedClusterPropertiesIdentityProfileValue(managedIdentity.Id, managedIdentity.ClientId, managedIdentity.PrincipalId));
-            cluster.AgentPoolProfiles = new List<ManagedClusterAgentPoolProfile>();
-            cluster.AgentPoolProfiles.Add(new ManagedClusterAgentPoolProfile()
+            var resourceGroup = resourceGroupObject.Name;
+            var nodePoolName = "nodepool1";
+            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+            var cluster = new ManagedCluster
             {
-                Name = nodePoolName,
-                Count = configuration.AksPoolSize,
-                VmSize = configuration.VmSize,
-                OsDiskSizeGB = 128,
-                OsDiskType = OSDiskType.Managed,
-                Type = "VirtualMachineScaleSets",
-                EnableAutoScaling = false,
-                EnableNodePublicIP = false,
-                OsType = "Linux",
-                Mode = "System",
-                VnetSubnetID = virtualNetwork.Subnets[subnetName].Inner.Id,
-            });
+                AddonProfiles = new Dictionary<string, ManagedClusterAddonProfile>
+                {
+                    { "omsagent", new ManagedClusterAddonProfile(true, new Dictionary<string, string>() { { "logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id } }) }
+                },
+                Location = configuration.RegionName,
+                DnsPrefix = configuration.AksClusterName,
+                NetworkProfile = new ContainerServiceNetworkProfile
+                {
+                    NetworkPlugin = NetworkPlugin.Azure,
+                    ServiceCidr = configuration.KubernetesServiceCidr,
+                    DnsServiceIP = configuration.KubernetesDnsServiceIP,
+                    DockerBridgeCidr = configuration.KubernetesDockerBridgeCidr,
+                    NetworkPolicy = NetworkPolicy.Azure
+                },
+                Identity = new ManagedClusterIdentity(managedIdentity.PrincipalId, managedIdentity.TenantId, Microsoft.Azure.Management.ContainerService.Models.ResourceIdentityType.UserAssigned)
+                {
+                    UserAssignedIdentities = new Dictionary<string, ManagedClusterIdentityUserAssignedIdentitiesValue>()
+                }
+            };
+            cluster.Identity.UserAssignedIdentities.Add(managedIdentity.Id, new ManagedClusterIdentityUserAssignedIdentitiesValue(managedIdentity.PrincipalId, managedIdentity.ClientId));
+            cluster.IdentityProfile = new Dictionary<string, ManagedClusterPropertiesIdentityProfileValue>
+            {
+                { "kubeletidentity", new ManagedClusterPropertiesIdentityProfileValue(managedIdentity.Id, managedIdentity.ClientId, managedIdentity.PrincipalId) }
+            };
+            cluster.AgentPoolProfiles = new List<ManagedClusterAgentPoolProfile>
+            {
+                new ManagedClusterAgentPoolProfile()
+                {
+                    Name = nodePoolName,
+                    Count = configuration.AksPoolSize,
+                    VmSize = configuration.VmSize,
+                    OsDiskSizeGB = 128,
+                    OsDiskType = OSDiskType.Managed,
+                    Type = "VirtualMachineScaleSets",
+                    EnableAutoScaling = false,
+                    EnableNodePublicIP = false,
+                    OsType = "Linux",
+                    Mode = "System",
+                    VnetSubnetID = virtualNetwork.Subnets[subnetName].Inner.Id,
+                }
+            };
 
             if (privateNetworking)
             {
@@ -907,7 +914,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private Dictionary<string, string> GetSystemSettings(IIdentity managedIdentity)
+        private Dictionary<string, string> GetSystemSettings()
         {
             var settings = new Dictionary<string, string>();
             settings["BatchNodesSubnetId"] = configuration.BatchNodesSubnetId;
@@ -1885,7 +1892,7 @@ namespace CromwellOnAzureDeployer
                     await kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "tes", commands, System.TimeSpan.FromMinutes(5));
                 });
 
-        private async Task SetStorageKeySecret(string vaultUrl, string secretName, string secretValue)
+        private static async Task SetStorageKeySecret(string vaultUrl, string secretName, string secretValue)
         {
             var client = new SecretClient(new Uri(vaultUrl), new DefaultAzureCredential());
             await client.SetSecretAsync(secretName, secretValue);
@@ -1893,8 +1900,7 @@ namespace CromwellOnAzureDeployer
 
         private Task<Vault> GetKeyVaultAsync(string vaultName)
         {
-            var keyVaultManagementClient = new KeyVaultManagementClient(azureCredentials);
-            keyVaultManagementClient.SubscriptionId = configuration.SubscriptionId;
+            var keyVaultManagementClient = new KeyVaultManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
             return keyVaultManagementClient.Vaults.GetAsync(configuration.ResourceGroupName, vaultName);
         }
 
@@ -1904,15 +1910,14 @@ namespace CromwellOnAzureDeployer
                 async () =>
                 {
                     var tenantId = managedIdentity.TenantId;
-                    RestClient rest = RestClient
+                    var rest = RestClient
                         .Configure()
                         .WithEnvironment(AzureEnvironment.AzureGlobalCloud)
                         .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                         .WithCredentials(azureCredentials)
                         .Build();
 
-                    var rbacClient = new GraphRbacManagementClient(rest);
-                    rbacClient.TenantID = tenantId;
+                    var rbacClient = new GraphRbacManagementClient(rest) { TenantID = tenantId };
                     // TODO: this doesn't work.
                     //var user = await rbacClient.SignedInUser.GetAsync();
                     var secrets = new List<string>
@@ -2066,13 +2071,6 @@ namespace CromwellOnAzureDeployer
                     .WithRegion(configuration.RegionName)
                     .WithExistingResourceGroup(resourceGroup)
                     .CreateAsync());
-        }
-
-        private Task<IIdentity> GetUserManagedIdentityAsync(string resourceGroup, string managedIdentityName)
-        {
-            return Execute(
-                $"Creating user-managed identity: {managedIdentityName}...",
-                () => azureSubscriptionClient.Identities.GetByResourceGroupAsync(resourceGroup, managedIdentityName));
         }
 
         private Task<IIdentity> ReplaceSystemManagedIdentityWithUserManagedIdentityAsync(IResourceGroup resourceGroup, IVirtualMachine linuxVm)
@@ -2458,7 +2456,7 @@ namespace CromwellOnAzureDeployer
 
                 var delegatedServices = postgreSqlSubnet.Inner.Delegations.Select(d => d.ServiceName);
                 var hasOtherDelegations = delegatedServices.Any(s => s != "Microsoft.DBforPostgreSQL/flexibleServers");
-                var hasNoDelegations = delegatedServices.Count() == 0;
+                var hasNoDelegations = !delegatedServices.Any();
 
                 if (hasOtherDelegations)
                 {

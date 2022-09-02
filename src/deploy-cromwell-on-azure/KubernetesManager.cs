@@ -44,8 +44,7 @@ namespace CromwellOnAzureDeployer
         public async Task<IKubernetes> GetKubernetesClient(IResource resourceGroupObject)
         {
             var resourceGroup = resourceGroupObject.Name;
-            var containerServiceClient = new ContainerServiceClient(azureCredentials);
-            containerServiceClient.SubscriptionId = configuration.SubscriptionId;
+            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
             var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup, configuration.AksClusterName);
@@ -60,7 +59,7 @@ namespace CromwellOnAzureDeployer
             return new Kubernetes(k8sConfig);
         }
 
-        public async Task DeployCoADependencies(IKubernetes client)
+        public async Task DeployCoADependencies()
         {
             await ExecHelmProcess($"repo add aad-pod-identity {AadPluginRepo}");
             await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig kubeconfig.txt");
@@ -68,7 +67,7 @@ namespace CromwellOnAzureDeployer
             await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig kubeconfig.txt");
         }
 
-        public async Task DeployHelmChartToCluster(IKubernetes client)
+        public async Task DeployHelmChartToCluster()
         {
            await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace");
         }
@@ -125,7 +124,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task ExecHelmProcess(string command)
         {
-            Process p = new Process();
+            var p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
             p.StartInfo.FileName = configuration.HelmExePath;
@@ -134,7 +133,7 @@ namespace CromwellOnAzureDeployer
 
             if (configuration.DebugLogging)
             {
-                string line = p.StandardOutput.ReadLine();
+                var line = p.StandardOutput.ReadLine();
                 while (line != null)
                 {
                     ConsoleEx.WriteLine("HELM: " + line);
@@ -205,7 +204,7 @@ namespace CromwellOnAzureDeployer
         private async Task<bool> WaitForWorkloadWithTimeout(IKubernetes client, string deploymentName, System.TimeSpan timeout, CancellationToken cancellationToken)
         {
             var timer = Stopwatch.StartNew();
-            var deployments = await client.ListNamespacedDeploymentAsync(configuration.AksCoANamespace);
+            var deployments = await client.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
             var deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
             
             while (deployment is null ||
@@ -217,8 +216,8 @@ namespace CromwellOnAzureDeployer
                 {
                     return false;
                 }
-                await Task.Delay(TimeSpan.FromSeconds(15));
-                deployments = await client.ListNamespacedDeploymentAsync(configuration.AksCoANamespace);
+                await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
+                deployments = await client.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
                 deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
             }
 
@@ -230,8 +229,7 @@ namespace CromwellOnAzureDeployer
             // Override any configuration that is used by the update.
             Deployer.UpdateImageVersions(settings, configuration);
 
-            var containerServiceClient = new ContainerServiceClient(azureCredentials);
-            containerServiceClient.SubscriptionId = configuration.SubscriptionId;
+            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
             var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup.Name, configuration.AksClusterName);
             var kubeConfigFile = new FileInfo("kubeconfig.txt");
             var contents = Encoding.Default.GetString(creds.Kubeconfigs.First().Value);
@@ -244,7 +242,7 @@ namespace CromwellOnAzureDeployer
             IKubernetes client = new Kubernetes(k8sConfig);
 
             UpdateHelmValues(storageAccount.Name, keyVaultUrl, resourceGroup.Name, settings, managedId);
-            await DeployHelmChartToCluster(client);
+            await DeployHelmChartToCluster();
         }
 
         private class HelmValues
