@@ -27,24 +27,6 @@
     <None Remove="scripts\helm\templates\tes-deployment.yaml" />
     <None Remove="scripts\helm\templates\triggerservice-deployment.yaml" />
     <None Remove="scripts\helm\values-template.yaml" />
-    <None Remove="scripts\k8s\cromwell-deployment.yaml" />
-    <None Remove="scripts\k8s\cromwell-service.yaml" />
-    <None Remove="scripts\k8s\cromwell-tmp-claim.yaml" />
-    <None Remove="scripts\k8s\csi\blobfuse-proxy.yaml" />
-    <None Remove="scripts\k8s\csi\csi-blob-controller.yaml" />
-    <None Remove="scripts\k8s\csi\csi-blob-driver.yaml" />
-    <None Remove="scripts\k8s\csi\csi-blob-node.yaml" />
-    <None Remove="scripts\k8s\csi\pv-blobfuse-csi-dataset.yaml" />
-    <None Remove="scripts\k8s\csi\pvc-blob-csi-dataset.yaml" />
-    <None Remove="scripts\k8s\csi\rbac-csi-blob-controller.yaml" />
-    <None Remove="scripts\k8s\csi\rbac-csi-blob-node.yaml" />
-    <None Remove="scripts\k8s\mysqldb-data-claim.yaml" />
-    <None Remove="scripts\k8s\mysqldb-deployment.yaml" />
-    <None Remove="scripts\k8s\mysqldb-service.yaml" />
-    <None Remove="scripts\k8s\noncaching-azure-disk.yaml" />
-    <None Remove="scripts\k8s\tes-deployment.yaml" />
-    <None Remove="scripts\k8s\tes-service.yaml" />
-    <None Remove="scripts\k8s\triggerservice-deployment.yaml" />
   </ItemGroup>
 
   <ItemGroup>
@@ -76,7 +58,6 @@
     <PackageReference Include="MySql.Data" Version="8.0.29" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="Polly" Version="7.2.3" />
-    <PackageReference Include="SharpZipLib" Version="1.3.3" />
     <PackageReference Include="SSH.NET" Version="2020.0.2" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.21.0" />
   </ItemGroup>
@@ -117,9 +98,6 @@
     <EmbeddedResource Include="scripts\helm\templates\cromwell-deployment.yaml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
-    <EmbeddedResource Include="scripts\mysql\mysqldb-deployment.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
     <EmbeddedResource Include="scripts\helm\templates\persistence.yaml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
@@ -136,24 +114,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="scripts\install-cromwellazure.sh" />
-    <EmbeddedResource Include="scripts\k8s\cromwell-deployment.yaml" />
-    <EmbeddedResource Include="scripts\k8s\cromwell-service.yaml" />
-    <EmbeddedResource Include="scripts\k8s\cromwell-tmp-claim.yaml" />
-    <EmbeddedResource Include="scripts\k8s\csi\blobfuse-proxy.yaml" />
-    <EmbeddedResource Include="scripts\k8s\csi\csi-blob-controller.yaml" />
-    <EmbeddedResource Include="scripts\k8s\csi\csi-blob-driver.yaml" />
-    <EmbeddedResource Include="scripts\k8s\csi\csi-blob-node.yaml" />
-    <EmbeddedResource Include="scripts\k8s\csi\pv-blobfuse-csi-dataset.yaml" />
-    <EmbeddedResource Include="scripts\k8s\csi\pvc-blob-csi-dataset.yaml" />
-    <EmbeddedResource Include="scripts\k8s\csi\rbac-csi-blob-controller.yaml" />
-    <EmbeddedResource Include="scripts\k8s\csi\rbac-csi-blob-node.yaml" />
-    <EmbeddedResource Include="scripts\k8s\mysqldb-data-claim.yaml" />
-    <EmbeddedResource Include="scripts\k8s\mysqldb-deployment.yaml" />
-    <EmbeddedResource Include="scripts\k8s\mysqldb-service.yaml" />
-    <EmbeddedResource Include="scripts\k8s\noncaching-azure-disk.yaml" />
-    <EmbeddedResource Include="scripts\k8s\tes-deployment.yaml" />
-    <EmbeddedResource Include="scripts\k8s\tes-service.yaml" />
-    <EmbeddedResource Include="scripts\k8s\triggerservice-deployment.yaml" />
     <EmbeddedResource Include="scripts\mount-data-disk.sh" />
     <EmbeddedResource Include="scripts\mount.blobfuse" />
     <EmbeddedResource Include="scripts\mount_containers.sh" />
