@@ -231,9 +231,13 @@ namespace TesApi.Web
             };
         }
 
-        private async Task LoadExistingPools(CancellationToken cancellationToken = default)
+        /// <inheritdoc/>
+        public IAsyncEnumerable<CloudPool> GetCloudPools()
+            => azureProxy.GetActivePoolsAsync(this.hostname);
+
+        private async Task LoadExistingPools()
         {
-            foreach (var cloudPool in await azureProxy.GetActivePoolsAsync(this.hostname, cancellationToken))
+            await foreach (var cloudPool in GetCloudPools())
             {
                 batchPools.Add(_batchPoolFactory.Retrieve(cloudPool, this));
             }
@@ -1728,6 +1732,10 @@ namespace TesApi.Web
         public IEnumerable<IBatchPool> GetPools()
             => batchPools;
 
+        /// <inheritdoc/>
+        public bool RemovePoolFromList(IBatchPool pool)
+            => batchPools.Remove(pool);
+
         private bool AddPool(IBatchPool pool)
             => batchPools.Add(pool);
 
@@ -1744,9 +1752,6 @@ namespace TesApi.Web
         }
 
         #region Used for unit/module testing
-        internal bool RemovePoolFromList(IBatchPool pool)
-            => batchPools.Remove(pool);
-
         internal IEnumerable<string> GetPoolGroupKeys()
             => batchPools.Keys;
         #endregion

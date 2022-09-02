@@ -426,7 +426,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task<IEnumerable<CloudPool>> GetActivePoolsAsync(string hostName, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<CloudPool> GetActivePoolsAsync(string hostName)
         {
             var activePoolsFilter = new ODATADetailLevel
             {
@@ -434,7 +434,7 @@ namespace TesApi.Web
                 SelectClause = BatchPool.CloudPoolSelectClause
             };
 
-            return (await batchClient.PoolOperations.ListPools(activePoolsFilter).ToListAsync(cancellationToken))
+            return batchClient.PoolOperations.ListPools(activePoolsFilter).ToAsyncEnumerable()
                 .Where(p => hostName.Equals(p.Metadata?.FirstOrDefault(m => BatchScheduler.PoolHostName.Equals(m.Name, StringComparison.Ordinal))?.Value, StringComparison.OrdinalIgnoreCase));
         }
 

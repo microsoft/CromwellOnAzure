@@ -1115,6 +1115,9 @@ namespace TesApi.Tests
         private static Action<Mock<IAzureProxy>> GetMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
             => azureProxy =>
             {
+                azureProxy.Setup(a => a.GetActivePoolsAsync(It.IsAny<string>()))
+                    .Returns(AsyncEnumerable.Empty<CloudPool>());
+
                 azureProxy.Setup(a => a.GetBatchJobAndTaskStateAsync(It.IsAny<string>()))
                     .Returns(Task.FromResult(azureProxyReturnValues.BatchJobAndTaskState));
 

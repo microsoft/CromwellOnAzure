@@ -75,7 +75,7 @@ namespace TesApi.Web
         public Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.GetActivePoolIdsAsync(prefix, minAge, ct), cancellationToken);
 
         /// <inheritdoc/>
-        public Task<IEnumerable<CloudPool>> GetActivePoolsAsync(string hostName, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.GetActivePoolsAsync(hostName, ct), cancellationToken);
+        public IAsyncEnumerable<CloudPool> GetActivePoolsAsync(string hostName) => retryPolicy.Execute(() => azureProxy.GetActivePoolsAsync(hostName));
 
         /// <inheritdoc/>
         public Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()

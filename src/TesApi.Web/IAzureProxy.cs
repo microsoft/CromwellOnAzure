@@ -172,9 +172,8 @@ namespace TesApi.Web
         /// Gets the list of active pools matching the hostname in the metadata
         /// </summary>
         /// <param name="hostName"></param>
-        /// <param name="cancellationToken"></param>
         /// <returns>List of <see cref="CloudPool"/> managed by the host.</returns>
-        Task<IEnumerable<CloudPool>> GetActivePoolsAsync(string hostName, CancellationToken cancellationToken = default);
+        IAsyncEnumerable<CloudPool> GetActivePoolsAsync(string hostName);
 
         /// <summary>
         /// Gets the list of pool ids referenced by the jobs

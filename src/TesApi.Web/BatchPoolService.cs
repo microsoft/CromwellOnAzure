@@ -68,6 +68,7 @@ namespace TesApi.Web
             {
                 try
                 {
+                    await RemoveUnknownPools(stoppingToken);
                     await ServiceBatchPools(stoppingToken);
                     await Task.Delay(RunInterval, stoppingToken);
                 }
@@ -85,9 +86,38 @@ namespace TesApi.Web
         }
 
         /// <summary>
+        /// Cleans up pools that are unknown/deleted.
+        /// </summary>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
+        /// <returns></returns>
+        private async ValueTask RemoveUnknownPools(CancellationToken cancellationToken)
+        {
+            var extraPools = _batchScheduler.GetPools().ToList();
+
+            await foreach (var pool in _batchScheduler.GetCloudPools().WithCancellation(cancellationToken))
+            {
+                var batchPool = extraPools.Find(p => p.Pool.PoolId.Equals(pool.Id, StringComparison.OrdinalIgnoreCase));
+
+                if (batchPool is not null)
+                {
+                    extraPools.Remove(batchPool);
+                }
+                else
+                {
+                    await pool.DeleteAsync(cancellationToken: cancellationToken);
+                }
+            }
+
+            foreach (var pool in extraPools)
+            {
+                _ = _batchScheduler.RemovePoolFromList(pool);
+            }
+        }
+
+        /// <summary>
         /// Retrieves all batch pools from the database and affords an opportunity to react to changes.
         /// </summary>
-        /// <param name="cancellationToken"></param>
+        /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
         private async ValueTask ServiceBatchPools(CancellationToken cancellationToken)
         {
