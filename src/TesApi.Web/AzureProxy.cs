@@ -494,10 +494,10 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task<(AllocationState? AllocationState, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
+        public async Task<(AllocationState? AllocationState, bool? AutoScaleEnabled, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
         {
-            var pool = await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState,targetLowPriorityNodes,targetDedicatedNodes"), cancellationToken: cancellationToken);
-            return (pool.AllocationState, pool.TargetLowPriorityComputeNodes, pool.TargetDedicatedComputeNodes);
+            var pool = await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState,enableAutoScale,targetLowPriorityNodes,targetDedicatedNodes"), cancellationToken: cancellationToken);
+            return (pool.AllocationState, pool.AutoScaleEnabled, pool.TargetLowPriorityComputeNodes, pool.TargetDedicatedComputeNodes);
         }
 
         /// <inheritdoc/>

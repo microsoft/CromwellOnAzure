@@ -23,9 +23,9 @@ namespace TesApi.Web
             GetResizeErrors,
 
             /// <summary>
-            /// Clears failed compute nodes from the pool (if any).
+            /// Proactively removes errored nodes from pool and manages certain autopool error conditions.
             /// </summary>
-            RemoveFailedNodes,
+            ManagePoolScaling,
 
             /// <summary>
             /// Removes <see cref="CloudPool"/> if it's retired and empty.

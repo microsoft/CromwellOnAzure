@@ -241,7 +241,7 @@ namespace TesApi.Web
         /// <param name="poolId">The id of the pool.</param>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
-        Task<(AllocationState? AllocationState, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
+        Task<(AllocationState? AllocationState, bool? AutoScaleEnabled, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Resizes the specified pool
