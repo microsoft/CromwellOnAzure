@@ -47,7 +47,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask, JobReleaseTask jobReleaseTask) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, jobPreparationTask, jobReleaseTask);
+        public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, jobPreparationTask);
 
         /// <inheritdoc/>
         public Task DeleteBatchJobAsync(string taskId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.DeleteBatchJobAsync(taskId, ct), cancellationToken);
@@ -75,7 +75,7 @@ namespace TesApi.Web
         public Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.GetActivePoolIdsAsync(prefix, minAge, ct), cancellationToken);
 
         /// <inheritdoc/>
-        public Task<IEnumerable<CloudPool>> GetActivePoolsAsync(string hostName, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.GetActivePoolsAsync(hostName, ct), cancellationToken);
+        public IAsyncEnumerable<CloudPool> GetActivePoolsAsync(string hostName) => retryPolicy.Execute(() => azureProxy.GetActivePoolsAsync(hostName));
 
         /// <inheritdoc/>
         public Task<AzureBatchAccountQuotas> GetBatchAccountQuotasAsync()
@@ -179,9 +179,9 @@ namespace TesApi.Web
         public Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.GetCurrentComputeNodesAsync(poolId, ct), cancellationToken);
 
         /// <inheritdoc/>
-        public async Task<(Microsoft.Azure.Batch.Common.AllocationState? AllocationState, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
+        public async Task<(Microsoft.Azure.Batch.Common.AllocationState? AllocationState, bool? AutoScaleEnabled, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
         {
-            var allocationState = cache.Get<(Microsoft.Azure.Batch.Common.AllocationState? AllocationState, int? TargetLowPriority, int? TargetDedicated)>(poolId);
+            var allocationState = cache.Get<(Microsoft.Azure.Batch.Common.AllocationState? AllocationState, bool? AutoScaleEnabled, int? TargetLowPriority, int? TargetDedicated)>(poolId);
 
             if (default == allocationState)
             {

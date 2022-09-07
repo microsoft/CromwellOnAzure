@@ -38,8 +38,7 @@ namespace TesApi.Web
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
         /// <param name="jobPreparationTask"></param>
-        /// <param name="jobReleaseTask"></param>
-        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask, JobReleaseTask jobReleaseTask);
+        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask);
 
         /// <summary>
         /// Gets the <see cref="ContainerRegistryInfo"/> for the given image name
@@ -179,9 +178,8 @@ namespace TesApi.Web
         /// Gets the list of active pools matching the hostname in the metadata
         /// </summary>
         /// <param name="hostName"></param>
-        /// <param name="cancellationToken"></param>
         /// <returns>List of <see cref="CloudPool"/> managed by the host.</returns>
-        Task<IEnumerable<CloudPool>> GetActivePoolsAsync(string hostName, CancellationToken cancellationToken = default);
+        IAsyncEnumerable<CloudPool> GetActivePoolsAsync(string hostName);
 
         /// <summary>
         /// Gets the list of pool ids referenced by the jobs
@@ -251,7 +249,7 @@ namespace TesApi.Web
         /// <param name="poolId">The id of the pool.</param>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
-        Task<(AllocationState? AllocationState, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
+        Task<(AllocationState? AllocationState, bool? AutoScaleEnabled, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Resizes the specified pool

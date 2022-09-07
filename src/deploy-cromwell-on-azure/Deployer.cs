@@ -340,7 +340,7 @@ namespace CromwellOnAzureDeployer
                             }
 
                             await CreateDefaultStorageContainersAsync(storageAccount);
-                            await PatchContainersAddJobReleaseScriptV320Async(storageAccount);
+                            await PatchContainersAddJobPreparationScriptV320Async(storageAccount);
                         }
                     }
 
@@ -1094,7 +1094,7 @@ namespace CromwellOnAzureDeployer
                 {
                     await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
                     await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
-                    await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/jobRelease.sh", Utility.GetFileContent("scripts", "jobRelease.sh"));
+                    await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/job-prep.sh", Utility.GetFileContent("scripts", "job-prep.sh"));
                 });
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
@@ -1643,10 +1643,10 @@ namespace CromwellOnAzureDeployer
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
                 });
 
-        private Task PatchContainersAddJobReleaseScriptV320Async(IStorageAccount storageAccount)
+        private Task PatchContainersAddJobPreparationScriptV320Async(IStorageAccount storageAccount)
             => Execute(
                 $"Adding job scripts...",
-                () => UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/jobRelease.sh", Utility.GetFileContent("scripts", "jobRelease.sh")));
+                () => UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/job-prep.sh", Utility.GetFileContent("scripts", "job-prep.sh")));
 
         private Task AddNewSettingsAsync(ConnectionInfo sshConnectionInfo)
             => Execute(

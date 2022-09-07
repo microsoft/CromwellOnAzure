@@ -250,9 +250,14 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public TimeSpan ForcePoolRotationAge { get; }
 
-        private async Task LoadExistingPools(CancellationToken cancellationToken = default)
+        /// <inheritdoc/>
+        public IAsyncEnumerable<CloudPool> GetCloudPools()
+            => azureProxy.GetActivePoolsAsync(this.hostname);
+
+        private async Task LoadExistingPools()
+
         {
-            foreach (var cloudPool in await azureProxy.GetActivePoolsAsync(this.hostname, cancellationToken))
+            await foreach (var cloudPool in GetCloudPools())
             {
                 batchPools.Add(_batchPoolFactory.Retrieve(cloudPool, this));
             }
@@ -462,7 +467,7 @@ namespace TesApi.Web
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, dockerParams, preCommand, containerConfiguration is not null);
 
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
-                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, GetJobPreparationTask(), await GetJobReleaseTask(tesTask));
+                await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, await GetJobPreparationTask(tesTask));
 
                 tesTaskLog.StartTime = DateTimeOffset.UtcNow;
                 tesTask.State = TesState.INITIALIZINGEnum;
@@ -756,30 +761,18 @@ namespace TesApi.Web
         /// <summary>
         /// Returns a job preparation task for shared pool cleanup coordination.
         /// </summary>
-        /// <returns></returns>
-        /// <remarks>Job Release tasks are run simultaneously with subsequent Azure Batch jobs's tasks. Combining this with <see cref="GetJobReleaseTask(TesTask)"/> ensures that will complete before the next job starts execuation.</remarks>
-        private JobPreparationTask GetJobPreparationTask()
-            => enableBatchAutopool ? default : new()
-            {
-                CommandLine = @"/bin/bash -c 'while [ -f /var/lock/coa.lock ]; do sleep 1; done && touch /var/lock/coa.lock && chmod a+w /var/lock/coa.lock'",
-                RerunOnComputeNodeRebootAfterSuccess = false,
-                UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-                WaitForSuccess = true,
-            };
-
-        /// <summary>
-        /// Returns a job release task for shared pool cleanup to prevent unusable compute nodes due to node reuse.
-        /// </summary>
         /// <param name="tesTask"></param>
         /// <returns></returns>
-        /// <remarks>Job Release tasks are run simultaneously with subsequent Azure Batch jobs's tasks. Combining this with <see cref="GetJobPreparationTask"/> ensures that this will complete before the next job starts execuation.</remarks>
-        private async ValueTask<JobReleaseTask> GetJobReleaseTask(TesTask tesTask)
+        /// <remarks>TODO: remarks</remarks>
+        private async ValueTask<JobPreparationTask> GetJobPreparationTask(TesTask tesTask)
             => enableBatchAutopool ? default : new()
             {
-                CommandLine = @"/bin/env ./jobRelease.sh",
+                CommandLine = @"/bin/env ./job-prep.sh",
                 EnvironmentSettings = new[] { new EnvironmentSetting("COA_EXECUTOR", tesTask.Executors.First().Image) },
-                ResourceFiles = new[] { ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/jobRelease.sh"), @"jobRelease.sh", @"0755") },
+                RerunOnComputeNodeRebootAfterSuccess = false,
+                ResourceFiles = new[] { ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/job-prep.sh"), @"job-prep.sh", @"0755") },
                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                WaitForSuccess = true,
             };
 
         /// <summary>
@@ -1953,6 +1946,10 @@ namespace TesApi.Web
         public IEnumerable<IBatchPool> GetPools()
             => batchPools;
 
+        /// <inheritdoc/>
+        public bool RemovePoolFromList(IBatchPool pool)
+            => batchPools.Remove(pool);
+
         private bool AddPool(IBatchPool pool)
             => batchPools.Add(pool);
 
@@ -1969,9 +1966,6 @@ namespace TesApi.Web
         }
 
         #region Used for unit/module testing
-        internal bool RemovePoolFromList(IBatchPool pool)
-            => batchPools.Remove(pool);
-
         internal IEnumerable<string> GetPoolGroupKeys()
             => batchPools.Keys;
         #endregion

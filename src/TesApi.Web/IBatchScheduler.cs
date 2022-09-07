@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-
+using Microsoft.Azure.Batch;
 using Tes.Models;
 
 namespace TesApi.Web
@@ -39,5 +39,18 @@ namespace TesApi.Web
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         ValueTask<IEnumerable<Task>> GetShutdownCandidatePools(CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Retrieves pools associated with this TES from the batch account.
+        /// </summary>
+        /// <returns></returns>
+        IAsyncEnumerable<CloudPool> GetCloudPools();
+
+        /// <summary>
+        /// Removes pool from list of managed pools.
+        /// </summary>
+        /// <param name="pool">Pool to remove.</param>
+        /// <returns></returns>
+        bool RemovePoolFromList(IBatchPool pool);
     }
 }

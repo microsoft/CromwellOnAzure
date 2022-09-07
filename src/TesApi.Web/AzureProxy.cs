@@ -224,11 +224,10 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask, JobReleaseTask jobReleaseTask)
+        public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask)
         {
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
             job.JobPreparationTask = jobPreparationTask;
-            job.JobReleaseTask = jobReleaseTask;
             job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
             await job.CommitAsync();
 
@@ -429,7 +428,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task<IEnumerable<CloudPool>> GetActivePoolsAsync(string hostName, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<CloudPool> GetActivePoolsAsync(string hostName)
         {
             var activePoolsFilter = new ODATADetailLevel
             {
@@ -437,7 +436,7 @@ namespace TesApi.Web
                 SelectClause = BatchPool.CloudPoolSelectClause
             };
 
-            return (await batchClient.PoolOperations.ListPools(activePoolsFilter).ToListAsync(cancellationToken))
+            return batchClient.PoolOperations.ListPools(activePoolsFilter).ToAsyncEnumerable()
                 .Where(p => hostName.Equals(p.Metadata?.FirstOrDefault(m => BatchScheduler.PoolHostName.Equals(m.Name, StringComparison.Ordinal))?.Value, StringComparison.OrdinalIgnoreCase));
         }
 
@@ -497,10 +496,10 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public async Task<(AllocationState? AllocationState, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
+        public async Task<(AllocationState? AllocationState, bool? AutoScaleEnabled, int? TargetLowPriority, int? TargetDedicated)> GetComputeNodeAllocationStateAsync(string poolId, CancellationToken cancellationToken = default)
         {
-            var pool = await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState,targetLowPriorityNodes,targetDedicatedNodes"), cancellationToken: cancellationToken);
-            return (pool.AllocationState, pool.TargetLowPriorityComputeNodes, pool.TargetDedicatedComputeNodes);
+            var pool = await batchClient.PoolOperations.GetPoolAsync(poolId, detailLevel: new ODATADetailLevel(selectClause: "allocationState,enableAutoScale,targetLowPriorityNodes,targetDedicatedNodes"), cancellationToken: cancellationToken);
+            return (pool.AllocationState, pool.AutoScaleEnabled, pool.TargetLowPriorityComputeNodes, pool.TargetDedicatedComputeNodes);
         }
 
         /// <inheritdoc/>
