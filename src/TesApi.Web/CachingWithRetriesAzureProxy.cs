@@ -47,7 +47,7 @@ namespace TesApi.Web
         }
 
         /// <inheritdoc/>
-        public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask, JobReleaseTask jobReleaseTask) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, jobPreparationTask, jobReleaseTask);
+        public Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask) => azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation, jobPreparationTask);
 
         /// <inheritdoc/>
         public Task DeleteBatchJobAsync(string taskId, CancellationToken cancellationToken = default) => asyncRetryPolicy.ExecuteAsync(ct => azureProxy.DeleteBatchJobAsync(taskId, ct), cancellationToken);

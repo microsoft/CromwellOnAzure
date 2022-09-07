@@ -38,8 +38,7 @@ namespace TesApi.Web
         /// <param name="cloudTask"></param>
         /// <param name="poolInformation"></param>
         /// <param name="jobPreparationTask"></param>
-        /// <param name="jobReleaseTask"></param>
-        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask, JobReleaseTask jobReleaseTask);
+        Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation, JobPreparationTask jobPreparationTask);
 
         /// <summary>
         /// Gets the <see cref="ContainerRegistryInfo"/> for the given image name
