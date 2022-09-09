@@ -10,7 +10,7 @@ The CoA deployer requires the user to have Helm 3 installed locally to deploy wi
 - ### Shared AKS account with CoA namespace
     Add the flags "--UseAks true --AksClusterName {existingClusterName}", where the user has admin access to the existing AKS account, the deployer will deploy blob-csi-driver, and aad-pod-identity to the kube-system namespace, and then deploy CoA to the namespace "coa". Add the flag "--AksCoANamespace {namespace}" to override the default namespace.
 - ### Shared AKS account without developer access. 
-    If the user is required to use an AKS account, but does not have the required access, the deployer will produce a Helm chart that can then be installed by an admin or existing CI/CD pipeline. Add the flags "--UseAks true --ManualHelmDeployment". The deployer will print a postgresql command, this would typically be run on the kubenetes node to setup the cromwell user however the user will need to run this manually since the deployer won't directly access the AKS account. 
+    If the user is required to use an AKS account, but does not have the required access, the deployer will produce a Helm chart that can then be installed by an admin or existing CI/CD pipeline. Add the flags "--UseAks true --ManualHelmDeployment". The deployer will print a postgresql command, this would typically be run on the kubernetes node to setup the cromwell user however the user will need to run this manually since the deployer won't directly access the AKS account. 
 
     - Run the deployer with supplied flags. 
     - Deployer will create initial resources and pause once its time deploy the Helm chart.
