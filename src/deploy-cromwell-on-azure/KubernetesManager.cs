@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -184,13 +185,31 @@ namespace CromwellOnAzureDeployer
             {
                 throw new Exception($"Timed out waiting for {podName} to start.");
             }
-            // For some reason even if a pod says it ready, calls made immediately will fail. Wait for 40 seconds for safety. 
-            await Task.Delay(TimeSpan.FromSeconds(40));
 
-            foreach (var command in commands)
+            // Pod Exec can fail even after the pod is marked ready.
+            // Retry on WebSocketExceptions for up to 40 secs. 
+            var retry = false;
+            var timer = new Stopwatch();
+            do
             {
-                await client.NamespacedPodExecAsync(workloadPod.Metadata.Name, configuration.AksCoANamespace, podName, command, true, printHandler, CancellationToken.None);
+                retry = false;
+                try
+                {
+                    foreach (var command in commands)
+                    {
+                        await client.NamespacedPodExecAsync(workloadPod.Metadata.Name, configuration.AksCoANamespace, podName, command, true, printHandler, CancellationToken.None);
+                    }
+                }
+                catch (WebSocketException e)
+                {
+                    if (e.WebSocketErrorCode == WebSocketError.NotAWebSocket && timer.Elapsed < TimeSpan.FromSeconds(40))
+                    {
+                        retry = true;
+                        await Task.Delay(TimeSpan.FromSeconds(5));
+                    }
+                }
             }
+            while (retry);
         }
 
         public async Task WaitForCromwell(IKubernetes client)
