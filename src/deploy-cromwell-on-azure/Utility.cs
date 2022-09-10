@@ -86,12 +86,6 @@ namespace CromwellOnAzureDeployer
         public static string DictionaryToDelimitedText(Dictionary<string, string> dictionary, string fieldDelimiter = "=", string rowDelimiter = "\n")
             => string.Join(rowDelimiter, dictionary.Select(kv => $"{kv.Key}{fieldDelimiter}{kv.Value}"));
 
-        public static Stream GetFileStream(params string[] pathComponentsRelativeToAppBase)
-        {
-            var embeddedResourceName = $"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}";
-            return typeof(Deployer).Assembly.GetManifestResourceStream(embeddedResourceName);
-        }
-
         public static string GetFileContent(params string[] pathComponentsRelativeToAppBase)
         {
             using var embeddedResourceStream = GetBinaryFileContent(pathComponentsRelativeToAppBase);

@@ -478,8 +478,7 @@ namespace CromwellOnAzureDeployer
                             {
                                 var personalizedSettings = GetPersonalizedSettings(managedIdentity);
                                 var systemSettings = GetSystemSettings();
-                                var settings = new Dictionary<string, string>(personalizedSettings);
-                                systemSettings.ToList().ForEach(x => settings.Add(x.Key, x.Value));
+                                var settings = personalizedSettings.Union(systemSettings).ToDictionary(kv => kv.Key, kv => kv.Value);
 
                                 if (aksCluster == null && !configuration.ManualHelmDeployment)
                                 {
@@ -935,15 +934,7 @@ namespace CromwellOnAzureDeployer
 
             foreach (var file in files)
             {
-                var fileContents = Utility.GetFileContent("scripts", file);
-                foreach (var line in fileContents.Split("\n"))
-                {
-                    var parts = line.Split("=");
-                    if (parts.Length == 2)
-                    {
-                        settings.Add(parts[0], parts[1]);
-                    }
-                }
+                settings = settings.Union(Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", file))).ToDictionary(kv => kv.Key, kv => kv.Value);
             }
 
             // Get settings from env files numbered 05-12
@@ -2591,6 +2582,14 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
+            void ThrowIfBothProvided(bool feature1Enabled, string feature1Name, bool feature2Enabled, string feature2Name)
+            {
+                if (feature1Enabled && feature2Enabled)
+                {
+                    throw new ValidationException($"{feature2Name} is incompatible with {feature1Name}");
+                }
+            }
+
             ThrowIfNotProvided(configuration.SubscriptionId, nameof(configuration.SubscriptionId));
 
             ThrowIfNotProvidedForInstall(configuration.RegionName, nameof(configuration.RegionName));
@@ -2610,6 +2609,9 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
             ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
+            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTesImagePath != null, nameof(configuration.CustomTesImagePath));
+            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTriggerServiceImagePath != null, nameof(configuration.CustomTriggerServiceImagePath));
+            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomCromwellImagePath != null, nameof(configuration.CustomCromwellImagePath));
         }
 
         private static void DisplayBillingReaderInsufficientAccessLevelWarning()

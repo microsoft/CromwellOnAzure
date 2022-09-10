@@ -56,8 +56,8 @@ namespace CromwellOnAzureDeployer
             writer.Close();
 
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
-            var k8sConfig = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
-            return new Kubernetes(k8sConfig);
+            var k8sClientConfiguration = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
+            return new Kubernetes(k8sClientConfiguration);
         }
 
         public async Task DeployCoADependencies()
@@ -103,19 +103,19 @@ namespace CromwellOnAzureDeployer
             values.Identity["resourceId"] = managedId.Id;
             values.Identity["clientId"] = managedId.ClientId;
 
-            if (!string.IsNullOrWhiteSpace(configuration.CustomTesImagePath))
+            if (!string.IsNullOrWhiteSpace(configuration.TesImageName))
             {
-                values.Images["tes"] = configuration.CustomTesImagePath;
+                values.Images["tes"] = configuration.TesImageName;
             }
 
-            if (!string.IsNullOrWhiteSpace(configuration.CustomTriggerServiceImagePath))
+            if (!string.IsNullOrWhiteSpace(configuration.TriggerServiceImageName))
             {
-                values.Images["triggerservice"] = configuration.CustomTriggerServiceImagePath;
+                values.Images["triggerservice"] = configuration.TriggerServiceImageName;
             }
 
-            if (!string.IsNullOrWhiteSpace(configuration.CustomCromwellImagePath))
+            if (!string.IsNullOrWhiteSpace(configuration.CromwellVersion))
             {
-                values.Images["cromwell"] = configuration.CustomCromwellImagePath;
+                values.Images["cromwell"] = $"broadinstitute/cromwell:{configuration.CromwellVersion}";
             }
 
             var writer = new StreamWriter(Path.Join("scripts", "helm", "values.yaml"));

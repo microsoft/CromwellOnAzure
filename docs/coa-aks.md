@@ -13,7 +13,7 @@ The CoA deployer requires the user to have Helm 3 installed locally to deploy wi
     If the user is required to use an AKS account, but does not have the required access, the deployer will produce a Helm chart that can then be installed by an admin or existing CI/CD pipeline. Add the flags "--UseAks true --ManualHelmDeployment". The deployer will print a postgresql command, this would typically be run on the kubernetes node to setup the cromwell user however the user will need to run this manually since the deployer won't directly access the AKS account. 
 
     - Run the deployer with supplied flags. 
-    - Deployer will create initial resources and pause once its time deploy the Helm chart.
+    - Deployer will create initial resources and pause once it's time to deploy the Helm chart.
     - Ensure the blob-csi-driver and aad-pod-identity are installed.
     - Install the CoA Helm chart. 
     - Run the postgresql command to create the cromwell user. 
