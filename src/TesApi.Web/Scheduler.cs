@@ -43,7 +43,7 @@ namespace TesApi.Web
             this.batchScheduler = batchScheduler;
             this.logger = logger;
             isDisabled = configuration.GetValue("DisableBatchScheduling", false);
-            usingBatchAutopools = configuration.GetValue("BatchAutopool", false);
+            usingBatchAutopools = configuration.GetValue("UseLegacyBatchImplementationWithAutopools", false);
         }
 
         /// <summary>

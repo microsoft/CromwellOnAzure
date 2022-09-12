@@ -22,7 +22,7 @@ namespace TesApi.Tests
             var poolIdsReferencedByJobs = new List<string> { "3", "4" };
 
             using var services = new TestServices.TestServiceProvider<DeleteOrphanedAutoPoolsHostedService>(
-                configuration: Enumerable.Repeat(("BatchAutopool", true.ToString()), 1),
+                configuration: Enumerable.Repeat(("UseLegacyBatchImplementationWithAutopools", true.ToString()), 1),
                 azureProxy: a =>
                 {
                     a.Setup(p => p.GetActivePoolIdsAsync(It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>())).ReturnsAsync(activePoolIds);

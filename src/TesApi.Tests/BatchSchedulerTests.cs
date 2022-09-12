@@ -1272,7 +1272,7 @@ namespace TesApi.Tests
                 .Append(("HOSTNAME", "hostname"));
                 if (autopool)
                 {
-                    config = config.Append(("BatchAutopool", "true"));
+                    config = config.Append(("UseLegacyBatchImplementationWithAutopools", "true"));
                 }
 
                 return config;

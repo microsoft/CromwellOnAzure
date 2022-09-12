@@ -263,14 +263,16 @@ namespace TesApi.Web
                 string poolId = null;
                 TaskExecutionInformation taskExecutionInformation = null;
 
+                // Normally, we will only find one job. If we find more, we always want the latest one. Thus, we use ListJobs()
                 var jobFilter = new ODATADetailLevel
                 {
                     FilterClause = $"startswith(id,'{tesTaskId}{BatchJobAttemptSeparator}')",
                     SelectClause = "*"
                 };
 
-                var jobInfos = (await batchClient.JobOperations.ListJobs(jobFilter).ToListAsync())
-                    .Select(j => new { Job = j, AttemptNumber = int.Parse(j.Id.Split(BatchJobAttemptSeparator)[1]) });
+                var jobInfos = await batchClient.JobOperations.ListJobs(jobFilter).ToAsyncEnumerable()
+                    .Select(j => new { Job = j, AttemptNumber = int.Parse(j.Id.Split(BatchJobAttemptSeparator)[1]) })
+                    .ToListAsync();
 
                 if (!jobInfos.Any())
                 {
@@ -290,13 +292,7 @@ namespace TesApi.Web
 
                 if (job.State == JobState.Active && poolId is not null)
                 {
-                    var poolFilter = new ODATADetailLevel
-                    {
-                        FilterClause = $"id eq '{poolId}'",
-                        SelectClause = "*"
-                    };
-
-                    var pool = await batchClient.PoolOperations.ListPools(poolFilter).ToAsyncEnumerable().FirstOrDefaultAsync();
+                    var pool = await batchClient.PoolOperations.GetPoolAsync(poolId);
 
                     if (pool is not null)
                     {
