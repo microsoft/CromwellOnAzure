@@ -1908,7 +1908,7 @@ namespace CromwellOnAzureDeployer
                         .Build();
 
                     var rbacClient = new GraphRbacManagementClient(rest) { TenantID = tenantId };
-                    // TODO: this doesn't work. Manually passing user object id from command line for now. 
+                    // TODO: Issue #474 this doesn't work. Manually passing user object id from command line for now. 
                     //var user = await rbacClient.SignedInUser.GetAsync();
                     var secrets = new List<string>
                     {

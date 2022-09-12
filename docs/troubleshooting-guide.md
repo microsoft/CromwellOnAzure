@@ -249,7 +249,8 @@ int      AksPoolSize = 2 | Y | N | N | Size of AKS node pool, two nodes are reco
 bool DebugLogging = false | Y | N | N | Prints all log information.
 string PostgreSqlServerName | Y | Y | N | Name of existing postgresql server. 
 bool UsePostgreSqlSingleServer = false | Y | N | N | Use Postgresql single server rather than flexi servers, only recommended if you need to use private endpoints. 
-string KeyVaultName | Y | Y | N | Name of an existing key vault 
+string KeyVaultName | Y | Y | N | Name of an existing key vault
+string UserObjectId | Y | N | N | ObjectId of the user running the deployer, can be found in AAD. Required to assign proper permissions to KeyVault when using AKS. 
 
 The following are more advanced configuration parameters:
 
