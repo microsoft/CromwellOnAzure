@@ -1443,10 +1443,19 @@ namespace CromwellOnAzureDeployer
 
             return Execute(
                 $"Creating user-managed identity: {managedIdentityName}...",
-                () => azureSubscriptionClient.Identities.Define(managedIdentityName)
-                    .WithRegion(configuration.RegionName)
-                    .WithExistingResourceGroup(resourceGroup)
-                    .CreateAsync());
+                async () =>
+                {
+                    var identity = await azureSubscriptionClient.Identities.GetByResourceGroupAsync(configuration.ResourceGroupName, managedIdentityName);
+                    if (identity != null)
+                    {
+                        return identity;
+                    }
+
+                    return await azureSubscriptionClient.Identities.Define(managedIdentityName)
+                        .WithRegion(configuration.RegionName)
+                        .WithExistingResourceGroup(resourceGroup)
+                        .CreateAsync();
+                });
         }
 
         private Task<IIdentity> ReplaceSystemManagedIdentityWithUserManagedIdentityAsync(IResourceGroup resourceGroup, IVirtualMachine linuxVm)
