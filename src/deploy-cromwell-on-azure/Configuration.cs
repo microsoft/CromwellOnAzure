@@ -59,7 +59,7 @@ namespace CromwellOnAzureDeployer
         public string AksClusterName { get; set; }
         public string AksCoANamespace { get; set; } = "coa";
         public bool ManualHelmDeployment { get; set; }
-        public string HelmExePath { get; set; } = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
+        public string HelmBinaryPath { get; set; } = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
         public int AksPoolSize { get; set; } = 2;
         public bool Silent { get; set; }
         public bool DeleteResourceGroupOnFailure { get; set; }

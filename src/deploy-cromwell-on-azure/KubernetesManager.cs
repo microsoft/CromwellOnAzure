@@ -138,7 +138,7 @@ namespace CromwellOnAzureDeployer
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.FileName = configuration.HelmExePath;
+            p.StartInfo.FileName = configuration.HelmBinaryPath;
             p.StartInfo.Arguments = command;
             p.Start();
 

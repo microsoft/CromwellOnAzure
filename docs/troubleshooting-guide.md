@@ -244,7 +244,7 @@ bool     UseAks =   false; | Y | N | N | Uses Azure Kubernetes Service rather th
 string   AksClusterName | Y | Y | N | Cluster name of existing Azure Kubernetes Service cluster to use rather than provisioning a new one.
 string   AksCoANamespace = "coa" | Y | N | N | Kubernetes namespace.
 bool     ManualHelmDeployment | Y | N | N | For use if user doesn't have direct access to existing AKS cluster.
-string   HelmExePath = "C:\\ProgramData\\chocolatey\\bin\\helm.exe" | Y | N | N | Path to helm executable for AKS deployment.
+string   HelmBinaryPath = "C:\\ProgramData\\chocolatey\\bin\\helm.exe" | Y | N | N | Path to helm binary for AKS deployment.
 int      AksPoolSize = 2 | Y | N | N | Size of AKS node pool, two nodes are recommended for reliability, however a minimum of one can be used to save COGS. 
 bool DebugLogging = false | Y | N | N | Prints all log information.
 string PostgreSqlServerName | Y | Y | N | Name of existing postgresql server. 
