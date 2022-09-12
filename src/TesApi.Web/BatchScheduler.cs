@@ -1374,12 +1374,17 @@ namespace TesApi.Web
         private async Task CheckBatchAccountQuotas(VirtualMachineInformation vmInfo, string poolName)
         {
             var workflowCoresRequirement = vmInfo.NumberOfCores.Value;
-            var preemptible = vmInfo.LowPriority;
+            var isDedicated = !vmInfo.LowPriority;
             var vmFamily = vmInfo.VmFamily;
 
             var batchQuotas = await azureProxy.GetBatchAccountQuotasAsync();
-            var coreQuota = preemptible ? batchQuotas.LowPriorityCoreQuota : batchQuotas.DedicatedCoreQuota;
-            var vmFamQuota = preemptible || !batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced ? workflowCoresRequirement : batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(q => vmFamily.Equals(q.Name, StringComparison.OrdinalIgnoreCase))?.CoreQuota ?? 0;
+            var totalCoreQuota = isDedicated ? batchQuotas.DedicatedCoreQuota : batchQuotas.LowPriorityCoreQuota;
+            var isDedicatedAndPerVmFamilyCoreQuotaEnforced = isDedicated && batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced;
+
+            var vmFamilyCoreQuota = isDedicatedAndPerVmFamilyCoreQuotaEnforced
+                ? batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(q => vmFamily.Equals(q.Name, StringComparison.OrdinalIgnoreCase))?.CoreQuota ?? 0
+                : workflowCoresRequirement;
+
             var poolQuota = batchQuotas.PoolQuota;
             var activeJobAndJobScheduleQuota = batchQuotas.ActiveJobAndJobScheduleQuota;
 
@@ -1389,21 +1394,20 @@ namespace TesApi.Web
             var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
 
             var totalCoresInUse = activeNodeCountByVmSize
-                .Sum(x => virtualMachineInfoList.FirstOrDefault(vm => vm.VmSize.Equals(x.VirtualMachineSize, StringComparison.OrdinalIgnoreCase)).NumberOfCores * (preemptible ? x.LowPriorityNodeCount : x.DedicatedNodeCount));
+                .Sum(x =>
+                    virtualMachineInfoList
+                        .FirstOrDefault(vm => vm.VmSize.Equals(x.VirtualMachineSize, StringComparison.OrdinalIgnoreCase))?
+                        .NumberOfCores * (isDedicated ? x.DedicatedNodeCount : x.LowPriorityNodeCount));
 
-            var totalCoresInUseByVmFam = preemptible ? 0 : activeNodeCountByVmSize
-                .Where(x => vmInfo.VmSize.Equals(x.VirtualMachineSize, StringComparison.OrdinalIgnoreCase))
-                .Sum(x => x.DedicatedNodeCount * workflowCoresRequirement);
-
-            if (workflowCoresRequirement > coreQuota)
+            if (workflowCoresRequirement > totalCoreQuota)
             {
-                // Here, the workflow task requires more cores than the total Batch account's cores quota - FAIL
-                throw new AzureBatchLowQuotaException($"Azure Batch Account does not have enough {(preemptible ? "low priority" : "dedicated")} cores quota to run a workflow with cpu core requirement of {workflowCoresRequirement}. Please submit an Azure Support request to increase your quota: {AzureSupportUrl}");
+                // The workflow task requires more cores than the total Batch account's cores quota - FAIL
+                throw new AzureBatchLowQuotaException($"Azure Batch Account does not have enough {(isDedicated ? "dedicated" : "low priority")} cores quota to run a workflow with cpu core requirement of {workflowCoresRequirement}. Please submit an Azure Support request to increase your quota: {AzureSupportUrl}");
             }
 
-            if (workflowCoresRequirement > vmFamQuota)
+            if (isDedicatedAndPerVmFamilyCoreQuotaEnforced && workflowCoresRequirement > vmFamilyCoreQuota)
             {
-                // Here, the workflow task requires more cores than the total Batch account's dedicated family quota - FAIL
+                // The workflow task requires more cores than the total Batch account's dedicated family quota - FAIL
                 throw new AzureBatchLowQuotaException($"Azure Batch Account does not have enough dedicated {vmFamily} cores quota to run a workflow with cpu core requirement of {workflowCoresRequirement}. Please submit an Azure Support request to increase your quota: {AzureSupportUrl}");
             }
 
@@ -1417,14 +1421,23 @@ namespace TesApi.Web
                 throw new AzureBatchQuotaMaxedOutException($"No remaining pool quota available. There are {activePoolsCount} pools in use out of {poolQuota}");
             }
 
-            if ((totalCoresInUse + workflowCoresRequirement) > coreQuota)
+            if ((totalCoresInUse + workflowCoresRequirement) > totalCoreQuota)
             {
-                throw new AzureBatchQuotaMaxedOutException($"Not enough core quota remaining to schedule task requiring {workflowCoresRequirement} {(preemptible ? "low priority" : "dedicated")} cores. There are {totalCoresInUse} cores in use out of {coreQuota}");
+                throw new AzureBatchQuotaMaxedOutException($"Not enough core quota remaining to schedule task requiring {workflowCoresRequirement} {(isDedicated ? "dedicated" : "low priority")} cores. There are {totalCoresInUse} cores in use out of {totalCoreQuota}.");
             }
 
-            if ((totalCoresInUseByVmFam + workflowCoresRequirement) > vmFamQuota)
+            if (isDedicatedAndPerVmFamilyCoreQuotaEnforced)
             {
-                throw new AzureBatchQuotaMaxedOutException($"Not enough core quota remaining to schedule task requiring {workflowCoresRequirement} dedicated {vmFamily} cores. There are {totalCoresInUseByVmFam} cores in use out of {vmFamQuota}");
+                var vmSizesInRequestedFamily = virtualMachineInfoList.Where(vm => vm.VmFamily.Equals(vmFamily, StringComparison.OrdinalIgnoreCase)).Select(vm => vm.VmSize).ToList();
+                var activeNodeCountByVmSizeInRequestedFamily = activeNodeCountByVmSize.Where(x => vmSizesInRequestedFamily.Contains(x.VirtualMachineSize, StringComparer.OrdinalIgnoreCase));
+
+                var dedicatedCoresInUseInRequestedVmFamily = activeNodeCountByVmSizeInRequestedFamily
+                    .Sum(x => virtualMachineInfoList.FirstOrDefault(vm => vm.VmSize.Equals(x.VirtualMachineSize, StringComparison.OrdinalIgnoreCase))?.NumberOfCores * x.DedicatedNodeCount);
+
+                if (dedicatedCoresInUseInRequestedVmFamily + workflowCoresRequirement > vmFamilyCoreQuota)
+                {
+                    throw new AzureBatchQuotaMaxedOutException($"Not enough core quota remaining to schedule task requiring {workflowCoresRequirement} dedicated {vmFamily} cores. There are {dedicatedCoresInUseInRequestedVmFamily} cores in use out of {vmFamilyCoreQuota}");
+                }
             }
         }
 
