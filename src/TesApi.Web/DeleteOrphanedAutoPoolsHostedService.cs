@@ -35,7 +35,7 @@ namespace TesApi.Web
         {
             this.azureProxy = azureProxy;
             this.logger = logger;
-            this.isDisabled = !configuration.GetValue("BatchAutopool", false);
+            this.isDisabled = !configuration.GetValue("UseLegacyBatchImplementationWithAutopools", false);
         }
 
         /// <inheritdoc />

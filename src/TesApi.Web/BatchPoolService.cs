@@ -38,7 +38,7 @@ namespace TesApi.Web
         {
             _batchScheduler = batchScheduler ?? throw new ArgumentNullException(nameof(batchScheduler));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _isDisabled = configuration.GetValue("BatchAutopool", false);
+            _isDisabled = configuration.GetValue("UseLegacyBatchImplementationWithAutopools", false);
         }
 
         /// <inheritdoc />

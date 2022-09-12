@@ -1,7 +1,7 @@
 ﻿UsePreemptibleVmsOnly=false
 DisableBatchScheduling=false
 AzureOfferDurableId=MS-AZR-0003p
-BatchAutopool=false
+UseLegacyBatchImplementationWithAutopools=false
 BatchImageOffer=ubuntu-server-container
 BatchImagePublisher=microsoft-azure-batch
 BatchImageSku=20-04-lts

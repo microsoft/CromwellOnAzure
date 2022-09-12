@@ -31,7 +31,7 @@ services:
       - BatchImageVersion=$BatchImageVersion
       - BatchNodeAgentSkuId=$BatchNodeAgentSkuId
       - CromwellDrsLocalizerImageName=$CromwellDrsLocalizerImageName
-      - BatchAutopool=$BatchAutopool
+      - UseLegacyBatchImplementationWithAutopools=$UseLegacyBatchImplementationWithAutopools
       - MarthaUrl=$MarthaUrl
       - MarthaKeyVaultName=$MarthaKeyVaultName
       - MarthaSecretName=$MarthaSecretName
