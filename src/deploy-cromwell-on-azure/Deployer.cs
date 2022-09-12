@@ -1446,6 +1446,7 @@ namespace CromwellOnAzureDeployer
                 async () =>
                 {
                     var identity = await azureSubscriptionClient.Identities.GetByResourceGroupAsync(configuration.ResourceGroupName, managedIdentityName);
+
                     if (identity != null)
                     {
                         return identity;
