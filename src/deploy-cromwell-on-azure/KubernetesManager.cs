@@ -9,6 +9,8 @@ using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Management.Storage.Fluent;
+using Polly;
+using Polly.Retry;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -26,6 +28,14 @@ namespace CromwellOnAzureDeployer
     /// </summary>
     internal class KubernetesManager
     {
+        private static readonly AsyncRetryPolicy WorkloadReadyRetryPolicy = Policy
+            .Handle<Exception>()
+            .WaitAndRetryAsync(12, retryAttempt => System.TimeSpan.FromSeconds(15));
+
+        private static readonly AsyncRetryPolicy KubeExecRetryPolicy = Policy
+            .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
+            .WaitAndRetryAsync(8, retryAttempt => System.TimeSpan.FromSeconds(5));
+
         private readonly string BlobCsiRepo = "https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
         private readonly string BlobCsiDriverVersion = "v1.15.0";
         private readonly string AadPluginRepo = "https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts";
@@ -188,28 +198,18 @@ namespace CromwellOnAzureDeployer
 
             // Pod Exec can fail even after the pod is marked ready.
             // Retry on WebSocketExceptions for up to 40 secs. 
-            var retry = false;
-            var timer = new Stopwatch();
-            do
+            var result = await KubeExecRetryPolicy.ExecuteAndCaptureAsync(async () =>
             {
-                retry = false;
-                try
+                foreach (var command in commands)
                 {
-                    foreach (var command in commands)
-                    {
-                        await client.NamespacedPodExecAsync(workloadPod.Metadata.Name, configuration.AksCoANamespace, podName, command, true, printHandler, CancellationToken.None);
-                    }
+                    await client.NamespacedPodExecAsync(workloadPod.Metadata.Name, configuration.AksCoANamespace, podName, command, true, printHandler, CancellationToken.None);
                 }
-                catch (WebSocketException e)
-                {
-                    if (e.WebSocketErrorCode == WebSocketError.NotAWebSocket && timer.Elapsed < TimeSpan.FromSeconds(40))
-                    {
-                        retry = true;
-                        await Task.Delay(TimeSpan.FromSeconds(5));
-                    }
-                }
+            });
+
+            if (result.Outcome != OutcomeType.Successful && result.FinalException != null)
+            {
+                throw result.FinalException;
             }
-            while (retry);
         }
 
         public async Task WaitForCromwell(IKubernetes client)
@@ -225,22 +225,19 @@ namespace CromwellOnAzureDeployer
             var timer = Stopwatch.StartNew();
             var deployments = await client.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
             var deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
-            
-            while (deployment is null ||
-                deployment.Status is null ||
-                deployment.Status.ReadyReplicas is null ||
-                deployment.Status.ReadyReplicas < 1)
+
+            var result = await WorkloadReadyRetryPolicy.ExecuteAndCaptureAsync(async () => 
             {
-                if (timer.Elapsed > timeout)
-                {
-                    return false;
-                }
-                await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
                 deployments = await client.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
                 deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
-            }
+                
+                if (deployment.Status.ReadyReplicas == null || deployment.Status.ReadyReplicas < 1)
+                {
+                    throw new Exception("Workload not ready.");
+                }
+            });
 
-            return true;
+            return result.Outcome == OutcomeType.Successful;
         }
 
         public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId, string keyVaultUrl)
