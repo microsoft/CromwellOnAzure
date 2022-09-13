@@ -83,6 +83,7 @@ namespace TesApi.Web
                 logger)
         { }
 
+        // Common constructor
         private BatchPool(CloudPool cloudPool, PoolInformation poolInfo, IBatchScheduler batchScheduler, IConfiguration configuration, IAzureProxy azureProxy, ILogger<BatchPool> logger)
         {
             Pool = poolInfo ?? throw new ArgumentNullException(nameof(poolInfo));
@@ -211,6 +212,28 @@ namespace TesApi.Web
         /// <remarks>Implements <see cref="IAzureProxy.BatchPoolAutoScaleFormulaFactory"/>.</remarks>
         /// <returns></returns>
         public static string AutoPoolFormula(bool preemptable, int initialTarget)
+            /*
+              Notes on the formula:
+                  Reference: https://docs.microsoft.com/en-us/azure/batch/batch-automatic-scaling
+
+              In my not at all humble opinion, some of the builtin variable names in batch's autoscale formulas are very badly named:
+                  running tasks are named RunningTasks, which is fine
+                  queued tasks are named ActiveTasks, which matches the "state", but isn't the best name around
+                  the sum of running & queued tasks (what should be named TotalTasks) is named PendingTasks, an absolutely awful name
+
+              The type of ~Tasks is what batch calls a "doubleVec", which needs to be first turned into a "doubleVecList" before it can be turned into a scaler.
+              This is accomplished by calling doubleVec's GetSample method, which returns some number of the most recent available samples of the related metric.
+              Then, function is used to extract a scaler from the list of scalers (measurements). NOTE: there does not seem to be a "last" function.
+
+              Whenever autoscaling is first turned on, including when the pool is first created, there are no sampled metrics available. Thus, we need to prevent the
+              expected errors that would result from trying to extract the samples. Later on, if recent samples aren't available, we prefer that the furmula fails
+              (1- so we can potentially capture that, and 2- so that we don't suddenly try to remove all nodes from the pool when there's still demand) so we use a
+              timed scheme to substitue an "initial value" (aka initialTarget).
+
+              We set NodeDeallocationOption to taskcompletion to prevent wasting time/money by stopping a running task, only to requeue it onto another node, or worse,
+              fail it, just because batch's last sample was taken longer ago than a job's assignment was made to a node, because the formula evaluations are not coordinated
+              with the metric sampling based on my observations.
+            */
             => string.Format(@"
     $NodeDeallocationOption=taskcompletion;
     lifespan         = time() - time(""{1}"");
@@ -220,8 +243,11 @@ namespace TesApi.Web
     {0} = (lifespan > startup ? min($PendingTasks.GetSample(span, ratio)) : {2});
     ", preemptable ? "$TargetLowPriorityNodes" : "$TargetDedicated", DateTime.UtcNow.ToString("r"), initialTarget);
 
+
         private async ValueTask ServicePoolManagePoolScalingAsync(CancellationToken cancellationToken)
         {
+            // This method implememts a state machine to disable/enable autoscaling as needed to clear certain conditions that have been observed
+
             var currentAllocationState = await _azureProxy.GetComputeNodeAllocationStateAsync(Pool.PoolId, cancellationToken);
             EnsureScalingModeSet(currentAllocationState.AutoScaleEnabled);
 
@@ -241,7 +267,7 @@ namespace TesApi.Web
                         {
                             var nodesToRemove = Enumerable.Empty<ComputeNode>();
 
-                            // It's documented that a max of 100 nodes can be removed at a time. Excess eligible nodes will be removed in a future call.
+                            // It's documented that a max of 100 nodes can be removed at a time. Excess eligible nodes will be removed in a future call to this method.
                             await foreach (var node in GetNodes(true).Take(100).WithCancellation(cancellationToken))
                             {
                                 switch (node.State)
@@ -388,7 +414,6 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public async ValueTask ServicePoolAsync(IBatchPool.ServiceKind serviceKind, CancellationToken cancellationToken = default)
         {
-            using var @lock = await LockObj.Lock();
             Func<CancellationToken, ValueTask> func = serviceKind switch
             {
                 IBatchPool.ServiceKind.GetResizeErrors => ServicePoolGetResizeErrorsAsync,
@@ -398,6 +423,7 @@ namespace TesApi.Web
                 _ => throw new ArgumentOutOfRangeException(nameof(serviceKind)),
             };
 
+            using var @lock = await LockObj.Lock();
             await func(cancellationToken);
         }
 
