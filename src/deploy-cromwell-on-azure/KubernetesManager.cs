@@ -44,12 +44,14 @@ namespace CromwellOnAzureDeployer
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
         private CancellationTokenSource cts { get; set; }
+        private string kubeConfigPath { get; set; }
 
         public KubernetesManager(Configuration config, AzureCredentials credentials, CancellationTokenSource cts)
         {
             this.configuration = config;
             this.azureCredentials = credentials;
             this.cts = cts;
+            this.kubeConfigPath = Path.Join(Path.GetTempPath(), "kubeconfig.txt");
         }
 
         public async Task<IKubernetes> GetKubernetesClient(IResource resourceGroupObject)
@@ -59,7 +61,7 @@ namespace CromwellOnAzureDeployer
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
             var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup, configuration.AksClusterName);
-            var kubeConfigFile = new FileInfo(Path.Join(Path.GetTempPath(), "kubeconfig.txt"));
+            var kubeConfigFile = new FileInfo(Path.Join(kubeConfigPath));
             File.WriteAllText(kubeConfigFile.FullName, Encoding.Default.GetString(creds.Kubeconfigs.First().Value));
 
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
@@ -70,14 +72,14 @@ namespace CromwellOnAzureDeployer
         public async Task DeployCoADependencies()
         {
             await ExecHelmProcess($"repo add aad-pod-identity {AadPluginRepo}");
-            await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig kubeconfig.txt");
+            await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig {kubeConfigPath}");
             await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
-            await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig kubeconfig.txt");
+            await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig {kubeConfigPath}");
         }
 
         public async Task DeployHelmChartToCluster()
         {
-           await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig kubeconfig.txt --namespace {configuration.AksCoANamespace} --create-namespace");
+           await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace");
         }
 
         public void UpdateHelmValues(string storageAccountName, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
