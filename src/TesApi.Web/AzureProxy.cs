@@ -289,10 +289,10 @@ namespace TesApi.Web
 
                 if (job.State == JobState.Active && poolId is not null)
                 {
-                    var pool = await batchClient.PoolOperations.GetPoolAsync(poolId);
-
-                    if (pool is not null)
+                    try
                     {
+                        var pool = await batchClient.PoolOperations.GetPoolAsync(poolId);
+
                         nodeAllocationFailed = pool.ResizeErrors?.Count > 0;
 
                         var node = await pool.ListComputeNodes().ToAsyncEnumerable().FirstOrDefaultAsync(n => (n.RecentTasks?.Select(t => t.JobId) ?? Enumerable.Empty<string>()).Contains(job.Id));
@@ -305,7 +305,7 @@ namespace TesApi.Web
                             nodeErrorDetails = nodeError?.ErrorDetails?.Select(e => e.Value);
                         }
                     }
-                    else
+                    catch (Exception)
                     {
                         if (job.CreationTime.HasValue && DateTime.UtcNow.Subtract(job.CreationTime.Value) > TimeSpan.FromMinutes(30))
                         {
