@@ -82,7 +82,7 @@ namespace CromwellOnAzureDeployer
 
         public void UpdateHelmValues(string storageAccountName, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
         {
-            var values = Yaml.LoadFromString<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
+            var values = KubernetesYaml.Deserialize<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
             values.Persistence["storageAccount"] = storageAccountName;
             values.Persistence["keyVaultUrl"] = keyVaultUrl;
             values.Persistence["keyVaultSecretName"] = Deployer.StorageAccountKeySecretName;
@@ -121,7 +121,7 @@ namespace CromwellOnAzureDeployer
                 values.Images["cromwell"] = settings["CromwellImageName"];
             }
 
-            File.WriteAllText(Path.Join("scripts", "helm", "values.yaml"), Yaml.SaveToString(values));
+            File.WriteAllText(Path.Join("scripts", "helm", "values.yaml"), KubernetesYaml.Serialize(values));
         }
 
         private async Task ExecHelmProcess(string command)
@@ -179,7 +179,7 @@ namespace CromwellOnAzureDeployer
                 }
             });
 
-            var pods = await client.ListNamespacedPodAsync(configuration.AksCoANamespace);
+            var pods = await client.CoreV1.ListNamespacedPodAsync(configuration.AksCoANamespace);
             var workloadPod = pods.Items.Where(x => x.Metadata.Name.Contains(podName)).FirstOrDefault();
 
             if (!await WaitForWorkloadWithTimeout(client, podName, timeout, cts.Token))
@@ -214,12 +214,12 @@ namespace CromwellOnAzureDeployer
         private async Task<bool> WaitForWorkloadWithTimeout(IKubernetes client, string deploymentName, System.TimeSpan timeout, CancellationToken cancellationToken)
         {
             var timer = Stopwatch.StartNew();
-            var deployments = await client.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
+            var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
             var deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
 
             var result = await WorkloadReadyRetryPolicy.ExecuteAndCaptureAsync(async () => 
             {
-                deployments = await client.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
+                deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
                 deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
                 
                 if (deployment.Status.ReadyReplicas == null || deployment.Status.ReadyReplicas < 1)
