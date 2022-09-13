@@ -192,6 +192,7 @@ namespace CromwellOnAzureDeployer
                             else
                             {
                                 var storageAccounts = await azureSubscriptionClient.StorageAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName);
+                                
                                 if (!storageAccounts.Any())
                                 {
                                     throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any storage accounts.");
@@ -200,6 +201,7 @@ namespace CromwellOnAzureDeployer
                                 {
                                     throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple storage accounts. {nameof(configuration.StorageAccountName)} must be provided.");
                                 }
+
                                 storageAccount = storageAccounts.First();
                             }
 
@@ -237,7 +239,6 @@ namespace CromwellOnAzureDeployer
                             configuration.RegionName = linuxVm.RegionName;
                             configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() is null;
                             networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(g => g.NetworkInterfaceIds.Contains(linuxVm.GetPrimaryNetworkInterface().Id));
-
 
                             if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup is null)
                             {
@@ -306,6 +307,7 @@ namespace CromwellOnAzureDeployer
                             }
 
                             keyVault = await GetKeyVaultAsync(keyVaultName);
+
                             if (!accountNames.TryGetValue("ManagedIdentityClientId", out var managedIdentityClientId))
                             {
                                 throw new ValidationException($"Could not retrieve ManagedIdentityClientId.");
@@ -486,6 +488,7 @@ namespace CromwellOnAzureDeployer
                                 }
 
                                 kubernetesManager.UpdateHelmValues(storageAccount.Name, keyVault.Properties.VaultUri, resourceGroup.Name, settings, managedIdentity);
+
                                 if (configuration.ManualHelmDeployment)
                                 {
                                     ConsoleEx.WriteLine("Please deploy helm chart, and press Enter to continue.");
@@ -524,6 +527,7 @@ namespace CromwellOnAzureDeployer
                                         sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
                                         await WaitForSshConnectivityAsync(sshConnectionInfo);
                                         await ConfigureVmAsync(sshConnectionInfo, managedIdentity);
+
                                         if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                                         {
                                             await CreatePostgreSqlCromwellDatabaseUser(sshConnectionInfo);
@@ -572,6 +576,7 @@ namespace CromwellOnAzureDeployer
                                     }
                                 }
                             }),
+
                             Task.Run(async () => await compute)
                         });;
                     }
@@ -1386,7 +1391,7 @@ namespace CromwellOnAzureDeployer
             // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#managed-identity-operator
             var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/f1a07417-d97a-45cb-824c-7a7467783830";
             return Execute(
-                $"Assigning Managed Id Operator role for the managed id to resource group scope...",
+                $"Assigning Managed ID Operator role for the managed id to resource group scope...",
                 () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                     () => azureSubscriptionClient.AccessManagement.RoleAssignments
                         .Define(Guid.NewGuid().ToString())
@@ -2590,6 +2595,14 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
+            void ValidateHelmInstall(string helmPath, string featureName)
+            {
+                if (!File.Exists(helmPath))
+                {
+                    throw new ValidationException($"Helm must be installed and set with the {featureName} flag. You can find instructions for install Helm here: https://helm.sh/docs/intro/install/");
+                }
+            }
+
             ThrowIfNotProvided(configuration.SubscriptionId, nameof(configuration.SubscriptionId));
 
             ThrowIfNotProvidedForInstall(configuration.RegionName, nameof(configuration.RegionName));
@@ -2612,6 +2625,11 @@ namespace CromwellOnAzureDeployer
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTesImagePath != null, nameof(configuration.CustomTesImagePath));
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTriggerServiceImagePath != null, nameof(configuration.CustomTriggerServiceImagePath));
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomCromwellImagePath != null, nameof(configuration.CustomCromwellImagePath));
+            
+            if (configuration.UseAks)
+            {
+                ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
+            }
         }
 
         private static void DisplayBillingReaderInsufficientAccessLevelWarning()

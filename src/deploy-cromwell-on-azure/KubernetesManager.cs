@@ -36,10 +36,10 @@ namespace CromwellOnAzureDeployer
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
             .WaitAndRetryAsync(8, retryAttempt => System.TimeSpan.FromSeconds(5));
 
-        private readonly string BlobCsiRepo = "https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
-        private readonly string BlobCsiDriverVersion = "v1.15.0";
-        private readonly string AadPluginRepo = "https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts";
-        private readonly string AadPluginVersion = "4.1.12";
+        private const string BlobCsiRepo = "https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
+        private const string BlobCsiDriverVersion = "v1.15.0";
+        private const string AadPluginRepo = "https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts";
+        private const string AadPluginVersion = "4.1.12";
 
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
@@ -59,11 +59,8 @@ namespace CromwellOnAzureDeployer
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
             var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup, configuration.AksClusterName);
-            var kubeConfigFile = new FileInfo("kubeconfig.txt");
-            var contents = Encoding.Default.GetString(creds.Kubeconfigs.First().Value);
-            var writer = kubeConfigFile.CreateText();
-            writer.Write(contents);
-            writer.Close();
+            var kubeConfigFile = new FileInfo(Path.Join(Path.GetTempPath(), "kubeconfig.txt"));
+            File.WriteAllText(kubeConfigFile.FullName, Encoding.Default.GetString(creds.Kubeconfigs.First().Value));
 
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
             var k8sClientConfiguration = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
@@ -112,25 +109,19 @@ namespace CromwellOnAzureDeployer
             values.Identity["name"] = managedId.Name;
             values.Identity["resourceId"] = managedId.Id;
             values.Identity["clientId"] = managedId.ClientId;
-
-            if (!string.IsNullOrWhiteSpace(configuration.TesImageName))
-            {
-                values.Images["tes"] = configuration.TesImageName;
-            }
-
-            if (!string.IsNullOrWhiteSpace(configuration.TriggerServiceImageName))
-            {
-                values.Images["triggerservice"] = configuration.TriggerServiceImageName;
-            }
+            values.Images["tes"] = settings["TesImageName"];
+            values.Images["triggerservice"] = settings["TriggerServiceImageName"];
 
             if (!string.IsNullOrWhiteSpace(configuration.CromwellVersion))
             {
                 values.Images["cromwell"] = $"broadinstitute/cromwell:{configuration.CromwellVersion}";
+            } 
+            else
+            {
+                values.Images["cromwell"] = settings["CromwellImageName"];
             }
 
-            var writer = new StreamWriter(Path.Join("scripts", "helm", "values.yaml"));
-            writer.Write(Yaml.SaveToString(values));
-            writer.Close();
+            File.WriteAllText(Path.Join("scripts", "helm", "values.yaml"), Yaml.SaveToString(values));
         }
 
         private async Task ExecHelmProcess(string command)
@@ -244,19 +235,6 @@ namespace CromwellOnAzureDeployer
         {
             // Override any configuration that is used by the update.
             Deployer.UpdateImageVersions(settings, configuration);
-
-            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
-            var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup.Name, configuration.AksClusterName);
-            var kubeConfigFile = new FileInfo("kubeconfig.txt");
-            var contents = Encoding.Default.GetString(creds.Kubeconfigs.First().Value);
-            var writer = kubeConfigFile.CreateText();
-            writer.Write(contents);
-            writer.Close();
-
-            var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
-            var k8sConfig = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
-            IKubernetes client = new Kubernetes(k8sConfig);
-
             UpdateHelmValues(storageAccount.Name, keyVaultUrl, resourceGroup.Name, settings, managedId);
             await DeployHelmChartToCluster();
         }

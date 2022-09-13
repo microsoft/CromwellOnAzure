@@ -26,9 +26,9 @@ config:
   marthaSecretName: RUNTIME_PARAMETER
 
 images:
-  cromwell: broadinstitute/cromwell:70
-  tes: mcr.microsoft.com/cromwellonazure/tes:2
-  triggerservice: mcr.microsoft.com/cromwellonazure/triggerservice:2
+  cromwell: RUNTIME_PARAMETER
+  tes: RUNTIME_PARAMETER
+  triggerservice: RUNTIME_PARAMETER
 
 defaultContainers:
   - configuration
