@@ -740,8 +740,9 @@ namespace CromwellOnAzureDeployer
                     var client = new FlexibleServer.PostgreSQLManagementClient(tokenCredentials) { SubscriptionId = s };
                     return await client.Servers.ListAsync();
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
+                    ConsoleEx.WriteLine(e.Message);
                     return null;
                 }
             })))
@@ -759,8 +760,9 @@ namespace CromwellOnAzureDeployer
                     var client = new ContainerServiceClient(tokenCredentials) { SubscriptionId = s };
                     return await client.ManagedClusters.ListAsync();
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
+                    ConsoleEx.WriteLine(e.Message);
                     return null;
                 }
             })))
@@ -860,8 +862,9 @@ namespace CromwellOnAzureDeployer
                     {
                         return existingUserManagedIdentity.Equals(identity.Result.ClientId, StringComparison.OrdinalIgnoreCase);
                     }
-                    catch
+                    catch (Exception e)
                     {
+                        ConsoleEx.WriteLine(e.Message);
                         _ = identity.Exception;
                         return false;
                     }
@@ -1468,8 +1471,9 @@ namespace CromwellOnAzureDeployer
                     var client = new BatchManagementClient(tokenCredentials) { SubscriptionId = s };
                     return await client.BatchAccount.ListAsync();
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
+                    ConsoleEx.WriteLine(e.Message);
                     return null;
                 }
             })))
