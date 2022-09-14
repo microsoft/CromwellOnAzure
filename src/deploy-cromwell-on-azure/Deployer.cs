@@ -457,7 +457,7 @@ namespace CromwellOnAzureDeployer
                         {
                             await Task.Run(async () =>
                             {
-                                keyVault = await CreateKeyVaultAsync(configuration.KeyVaultName, managedIdentity, vnetAndSubnet.Value.vmSubnet);
+                                keyVault ??= await CreateKeyVaultAsync(configuration.KeyVaultName, managedIdentity, vnetAndSubnet.Value.vmSubnet);
                                 var keys = await storageAccount.GetKeysAsync();
                                 await SetStorageKeySecret(keyVault.Properties.VaultUri, StorageAccountKeySecretName, keys.First().Value);
                             });
