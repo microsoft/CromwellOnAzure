@@ -1909,16 +1909,6 @@ namespace CromwellOnAzureDeployer
                 async () =>
                 {
                     var tenantId = managedIdentity.TenantId;
-                    var rest = RestClient
-                        .Configure()
-                        .WithEnvironment(AzureEnvironment.AzureGlobalCloud)
-                        .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
-                        .WithCredentials(azureCredentials)
-                        .Build();
-
-                    var rbacClient = new GraphRbacManagementClient(rest) { TenantID = tenantId };
-                    // TODO: Issue #474 this doesn't work. Manually passing user object id from command line for now. 
-                    //var user = await rbacClient.SignedInUser.GetAsync();
                     var secrets = new List<string>
                     {
                         "get",
@@ -1930,6 +1920,7 @@ namespace CromwellOnAzureDeployer
                         "recover",
                         "purge"
                     };
+
                     var keyVaultManagementClient = new KeyVaultManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
                     var properties = new VaultCreateOrUpdateParameters()
                     {
@@ -1965,6 +1956,7 @@ namespace CromwellOnAzureDeployer
                             }
                         }
                     };
+
                     var vault = await keyVaultManagementClient.Vaults.CreateOrUpdateAsync(configuration.ResourceGroupName, vaultName, properties);
 
                     if (configuration.PrivateNetworking.GetValueOrDefault())
