@@ -287,11 +287,12 @@ namespace TesApi.Web
         /// Enables AutoScale in a Batch Pool
         /// </summary>
         /// <param name="poolId">The id of the pool.</param>
+        /// <param name="preemptable">Type of compute nodes: false if dedicated, otherwise true.</param>
         /// <param name="interval">The interval for periodic reevaluation of the formula.</param>
         /// <param name="formulaFactory">A factory function that generates an auto-scale formula.</param>
         /// <param name="cancellationToken">A System.Threading.CancellationToken for controlling the lifetime of the asynchronous operation.</param>
         /// <returns></returns>
-        Task EnableBatchPoolAutoScaleAsync(string poolId, TimeSpan interval, BatchPoolAutoScaleFormulaFactory formulaFactory, CancellationToken cancellationToken);
+        Task EnableBatchPoolAutoScaleAsync(string poolId, bool preemptable, TimeSpan interval, BatchPoolAutoScaleFormulaFactory formulaFactory, CancellationToken cancellationToken);
 
         /// <summary>
         /// Describes a function to generate autoscale formulas

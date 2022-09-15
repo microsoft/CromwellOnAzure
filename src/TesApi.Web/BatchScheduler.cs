@@ -36,6 +36,7 @@ namespace TesApi.Web
     public class BatchScheduler : IBatchScheduler
     {
         internal const string PoolHostName = "CoA-TES-HostName";
+        internal const string PoolIsDedicated = "CoA-TES-IsDedicated";
 
         /// <summary>
         /// CosmosDB container id for storing pool metadata that needs to survive reboots/etc.
@@ -1682,6 +1683,7 @@ namespace TesApi.Web
                     var modelPool = modelPoolFactory(poolId);
                     modelPool.Metadata ??= new List<BatchModels.MetadataItem>();
                     modelPool.Metadata.Add(new(PoolHostName, this.hostname));
+                    modelPool.Metadata.Add(new(PoolIsDedicated, (!isPreemptable).ToString()));
                     pool = _batchPoolFactory.CreateNew(await azureProxy.CreateBatchPoolAsync(modelPool, isPreemptable), this);
                 }
                 catch (OperationCanceledException)
