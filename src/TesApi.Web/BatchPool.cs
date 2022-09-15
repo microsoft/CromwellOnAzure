@@ -97,6 +97,11 @@ namespace TesApi.Web
 
             Creation = cloudPool?.CreationTime;
             IsAvailable = cloudPool is not null;
+
+            if (IsAvailable)
+            {
+                IsDedicated = bool.Parse(cloudPool.Metadata.First(m => BatchScheduler.PoolIsDedicated.Equals(m.Name, StringComparison.Ordinal)).Value);
+            }
         }
 
         private Queue<TaskFailureInformation> StartTaskFailures { get; } = new();
@@ -124,10 +129,12 @@ namespace TesApi.Web
             AutoScaleEnabled,
             SettingManualScale,
             RemovingFailedNodes,
+            WaitingForAutoScale,
             SettingAutoScale
         }
 
         private ScalingMode _scalingMode = ScalingMode.Unknown;
+        private DateTime _autoScaleWaitTime;
 
         private readonly TimeSpan _forcePoolRotationAge;
         private readonly BatchScheduler _batchPools;
@@ -135,6 +142,7 @@ namespace TesApi.Web
         private bool _resizeStoppedReceived;
 
         private DateTime? Creation { get; set; }
+        private bool IsDedicated { get; set; }
 
         private void EnsureScalingModeSet(bool? autoScaleEnabled)
         {
@@ -175,12 +183,12 @@ namespace TesApi.Web
                                 case PoolResizeErrorCodes.AccountSpotCoreQuotaReached:
                                     break;
 
-                                // Errors to force autopools to be reset
+                                // Errors to force autoscale to be reset
                                 case PoolResizeErrorCodes.ResizeStopped:
                                     _resizeStoppedReceived |= true;
                                     break;
 
-                                // Direct any errors that should cause tasks to fail here
+                                // Errors to fail tasks should be directed here
                                 default:
                                     ResizeErrors.Enqueue(error);
                                     break;
@@ -297,13 +305,23 @@ namespace TesApi.Web
                         break;
 
                     case ScalingMode.RemovingFailedNodes:
-                        await _azureProxy.EnableBatchPoolAutoScaleAsync(Pool.PoolId, TimeSpan.FromMinutes(5), AutoPoolFormula, cancellationToken);
-                        _scalingMode = ScalingMode.SettingAutoScale;
+                        ResizeErrors.Clear();
+                        _resizeErrorsRetrieved = true;
+                        var timeout = TimeSpan.FromMinutes(5);
+                        await _azureProxy.EnableBatchPoolAutoScaleAsync(Pool.PoolId, !IsDedicated, timeout, AutoPoolFormula, cancellationToken);
+                        _autoScaleWaitTime = DateTime.UtcNow + timeout;
+                        _scalingMode = _resizeStoppedReceived ? ScalingMode.WaitingForAutoScale : ScalingMode.SettingAutoScale;
+                        break;
+
+                    case ScalingMode.WaitingForAutoScale:
+                        _resizeStoppedReceived = false;
+                        if (DateTime.UtcNow > _autoScaleWaitTime)
+                        {
+                            _scalingMode = ScalingMode.SettingAutoScale;
+                        }
                         break;
 
                     case ScalingMode.SettingAutoScale:
-                        ResizeErrors.Clear();
-                        _resizeErrorsRetrieved = true;
                         _scalingMode = ScalingMode.AutoScaleEnabled;
                         break;
                 }

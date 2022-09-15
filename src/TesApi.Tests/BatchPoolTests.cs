@@ -131,6 +131,35 @@ namespace TesApi.Tests
             internal Func<(int? lowPriorityNodes, int? dedicatedNodes)> AzureProxyGetCurrentComputeNodes { get; set; } = () => (0, 0);
             internal Action<string, CancellationToken> AzureProxyDeleteBatchPool { get; set; } = (poolId, cancellationToken) => { };
             internal Func<ODATADetailLevel, IAsyncEnumerable<CloudJob>> AzureProxyListJobs { get; set; } = detailLevel => AsyncEnumerable.Empty<CloudJob>();
+
+            private readonly Dictionary<string, IList<Microsoft.Azure.Batch.MetadataItem>> poolMetadata = new();
+
+            internal void AzureProxyDeleteBatchPoolImpl(string poolId, CancellationToken cancellationToken)
+            {
+                _ = poolMetadata.Remove(poolId);
+                AzureProxyDeleteBatchPool(poolId, cancellationToken);
+            }
+
+            internal PoolInformation CreateBatchPoolImpl(Pool pool)
+            {
+                var poolId = pool.Name;
+
+                poolMetadata.Add(poolId, pool.Metadata?.Select(Convert).ToList());
+                return new() { PoolId = poolId };
+
+                static Microsoft.Azure.Batch.MetadataItem Convert(Microsoft.Azure.Management.Batch.Models.MetadataItem item)
+                    => new(item.Name, item.Value);
+            }
+
+            internal CloudPool GetBatchPoolImpl(string poolId)
+            {
+                if (!poolMetadata.TryGetValue(poolId, out var items))
+                {
+                    items = null;
+                }
+
+                return GeneratePool(poolId, metadata: items);
+            }
         }
 
         private static Action<Mock<IAzureProxy>> PrepareMockAzureProxy(AzureProxyReturnValues azureProxyReturnValues)
@@ -142,17 +171,16 @@ namespace TesApi.Tests
                 azureProxy.Setup(a => a.GetStorageAccountInfoAsync("defaultstorageaccount")).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["defaultstorageaccount"]));
                 azureProxy.Setup(a => a.GetStorageAccountKeyAsync(It.IsAny<StorageAccountInfo>())).Returns(Task.FromResult(azureProxyReturnValues.StorageAccountKey));
                 azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>())).Returns(Task.FromResult(azureProxyReturnValues.DownloadedBlobContent));
-                azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>(), It.IsAny<bool>())).Returns((Pool p, bool _1) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
+                azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>(), It.IsAny<bool>())).Returns((Pool p, bool _1) => Task.FromResult(azureProxyReturnValues.CreateBatchPoolImpl(p)));
                 azureProxy.Setup(a => a.ListComputeNodesAsync(It.IsAny<string>(), It.IsAny<DetailLevel>())).Returns<string, ODATADetailLevel>((poolId, detailLevel) => azureProxyReturnValues.AzureProxyListComputeNodesAsync(poolId, detailLevel));
                 azureProxy.Setup(a => a.ListJobsAsync(It.IsAny<DetailLevel>())).Returns<ODATADetailLevel>(detailLevel => azureProxyReturnValues.AzureProxyListJobs(detailLevel));
                 azureProxy.Setup(a => a.DeleteBatchComputeNodesAsync(It.IsAny<string>(), It.IsAny<IEnumerable<ComputeNode>>(), It.IsAny<CancellationToken>())).Callback<string, IEnumerable<ComputeNode>, CancellationToken>((poolId, computeNodes, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchComputeNodes(poolId, computeNodes, cancellationToken)).Returns(Task.CompletedTask);
-                azureProxy.Setup(a => a.GetBatchPoolAsync(It.IsAny<string>(), It.IsAny<DetailLevel>(), It.IsAny<CancellationToken>())).Returns((string id, DetailLevel detailLevel, CancellationToken cancellationToken) => Task.FromResult(GeneratePool(id)));
+                azureProxy.Setup(a => a.GetBatchPoolAsync(It.IsAny<string>(), It.IsAny<DetailLevel>(), It.IsAny<CancellationToken>())).Returns((string id, DetailLevel detailLevel, CancellationToken cancellationToken) => Task.FromResult(azureProxyReturnValues.GetBatchPoolImpl(id)));
                 azureProxy.Setup(a => a.GetComputeNodeAllocationStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns((string poolId, CancellationToken _1) => Task.FromResult(azureProxyReturnValues.AzureProxyGetComputeNodeAllocationState(poolId)));
                 azureProxy.Setup(a => a.GetCurrentComputeNodesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(() => Task.FromResult<(int? lowPriorityNodes, int? dedicatedNodes)>(azureProxyReturnValues.AzureProxyGetCurrentComputeNodes?.Invoke() ?? (null, null)));
-                azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPool?.Invoke(poolId, cancellationToken)).Returns(Task.CompletedTask);
+                azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPoolImpl(poolId, cancellationToken)).Returns(Task.CompletedTask);
                 azureProxy.Setup(a => a.SetComputeNodeTargetsAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).Callback<string, int?, int?, CancellationToken>((id, loPri, dedic, cancel) => azureProxyReturnValues.AzureProxySetComputeNodeTargets?.Invoke(id, loPri, dedic)).Returns(Task.CompletedTask);
             };
-
 
         private static IEnumerable<(string Key, string Value)> GetMockConfig()
             => Enumerable

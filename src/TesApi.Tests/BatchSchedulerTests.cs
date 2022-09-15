@@ -1247,7 +1247,7 @@ namespace TesApi.Tests
                     .Returns(azureProxyReturnValues.ActivePoolCount);
 
                 azureProxy.Setup(a => a.GetBatchPoolAsync(It.IsAny<string>(), It.IsAny<DetailLevel>(), It.IsAny<CancellationToken>()))
-                    .Returns((string id, DetailLevel detailLevel, CancellationToken cancellationToken) => Task.FromResult(BatchPoolTests.GeneratePool(id)));
+                    .Returns((string id, DetailLevel detailLevel, CancellationToken cancellationToken) => Task.FromResult(azureProxyReturnValues.GetBatchPoolImpl(id)));
 
                 azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>()))
                     .Returns(Task.FromResult(azureProxyReturnValues.DownloadedBlobContent));
@@ -1256,10 +1256,10 @@ namespace TesApi.Tests
                     .Returns(azureProxyReturnValues.LocalFileExists);
 
                 azureProxy.Setup(a => a.CreateBatchPoolAsync(It.IsAny<Pool>(), It.IsAny<bool>()))
-                    .Returns((Pool p, bool _1) => Task.FromResult(new PoolInformation { PoolId = p.Name }));
+                    .Returns((Pool p, bool _1) => Task.FromResult(azureProxyReturnValues.CreateBatchPoolImpl(p)));
 
                 azureProxy.Setup(a => a.DeleteBatchPoolIfExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                    .Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPoolIfExists?.Invoke(poolId, cancellationToken))
+                    .Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPoolIfExistsImpl(poolId, cancellationToken))
                     .Returns(Task.CompletedTask);
 
                 azureProxy.Setup(a => a.GetCurrentComputeNodesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -1271,7 +1271,7 @@ namespace TesApi.Tests
                             .Append(BatchPoolTests.GenerateNode(poolId, "ComputeNodeDedicated1", true, true))));
 
                 azureProxy.Setup(a => a.DeleteBatchPoolAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                    .Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPool?.Invoke(poolId, cancellationToken))
+                    .Callback<string, CancellationToken>((poolId, cancellationToken) => azureProxyReturnValues.AzureProxyDeleteBatchPoolImpl(poolId, cancellationToken))
                     .Returns(Task.CompletedTask);
 
                 azureProxy.Setup(a => a.ListJobsAsync(It.IsAny<DetailLevel>()))
@@ -1397,6 +1397,41 @@ namespace TesApi.Tests
                     PoolQuota = proxy.BatchQuotas.PoolQuota
                 };
                 return proxy;
+            }
+
+            private readonly Dictionary<string, IList<Microsoft.Azure.Batch.MetadataItem>> poolMetadata = new();
+
+            internal void AzureProxyDeleteBatchPoolIfExistsImpl(string poolId, CancellationToken cancellationToken)
+            {
+                _ = poolMetadata.Remove(poolId);
+                AzureProxyDeleteBatchPoolIfExists(poolId, cancellationToken);
+            }
+
+            internal void AzureProxyDeleteBatchPoolImpl(string poolId, CancellationToken cancellationToken)
+            {
+                _ = poolMetadata.Remove(poolId);
+                AzureProxyDeleteBatchPool(poolId, cancellationToken);
+            }
+
+            internal PoolInformation CreateBatchPoolImpl(Pool pool)
+            {
+                var poolId = pool.Name;
+
+                poolMetadata.Add(poolId, pool.Metadata?.Select(Convert).ToList());
+                return new() { PoolId = poolId };
+
+                static Microsoft.Azure.Batch.MetadataItem Convert(Microsoft.Azure.Management.Batch.Models.MetadataItem item)
+                    => new(item.Name, item.Value);
+            }
+
+            internal CloudPool GetBatchPoolImpl(string poolId)
+            {
+                if (!poolMetadata.TryGetValue(poolId, out var items))
+                {
+                    items = null;
+                }
+
+                return BatchPoolTests.GeneratePool(poolId, metadata: items);
             }
         }
 

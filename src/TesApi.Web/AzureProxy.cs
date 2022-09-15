@@ -888,7 +888,7 @@ namespace TesApi.Web
             => await batchClient.PoolOperations.DisableAutoScaleAsync(poolId, cancellationToken: cancellationToken);
 
         /// <inheritdoc/>
-        public async Task EnableBatchPoolAutoScaleAsync(string poolId, TimeSpan interval, IAzureProxy.BatchPoolAutoScaleFormulaFactory formulaFactory, CancellationToken cancellationToken)
+        public async Task EnableBatchPoolAutoScaleAsync(string poolId, bool preemptable, TimeSpan interval, IAzureProxy.BatchPoolAutoScaleFormulaFactory formulaFactory, CancellationToken cancellationToken)
         {
             var state = await GetComputeNodeAllocationStateAsync(poolId, cancellationToken);
 
@@ -897,8 +897,7 @@ namespace TesApi.Web
                 throw new InvalidOperationException();
             }
 
-            var preempted = state.TargetDedicated == 0;
-            await batchClient.PoolOperations.EnableAutoScaleAsync(poolId, formulaFactory(preempted, preempted ? state.TargetLowPriority.Value : state.TargetDedicated.Value), interval, cancellationToken: cancellationToken);
+            await batchClient.PoolOperations.EnableAutoScaleAsync(poolId, formulaFactory(preemptable, preemptable ? state.TargetLowPriority.Value : state.TargetDedicated.Value), interval, cancellationToken: cancellationToken);
         }
 
         private class VmPrice
