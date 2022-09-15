@@ -77,12 +77,12 @@ namespace CromwellOnAzureDeployer
             await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig {kubeConfigPath}");
         }
 
-        public async Task DeployHelmChartToCluster()
+        public async Task DeployHelmChartToClusterAsync()
         {
            await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace");
         }
 
-        public void UpdateHelmValues(string storageAccountName, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
+        public async Task UpdateHelmValuesAsync(string storageAccountName, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
             values.Persistence["storageAccount"] = storageAccountName;
@@ -123,7 +123,7 @@ namespace CromwellOnAzureDeployer
                 values.Images["cromwell"] = settings["CromwellImageName"];
             }
 
-            File.WriteAllText(Path.Join("scripts", "helm", "values.yaml"), KubernetesYaml.Serialize(values));
+            await File.WriteAllTextAsync(Path.Join("scripts", "helm", "values.yaml"), KubernetesYaml.Serialize(values));
         }
 
         private async Task ExecHelmProcess(string command)
@@ -237,8 +237,8 @@ namespace CromwellOnAzureDeployer
         {
             // Override any configuration that is used by the update.
             Deployer.UpdateImageVersions(settings, configuration);
-            UpdateHelmValues(storageAccount.Name, keyVaultUrl, resourceGroup.Name, settings, managedId);
-            await DeployHelmChartToCluster();
+            await UpdateHelmValuesAsync(storageAccount.Name, keyVaultUrl, resourceGroup.Name, settings, managedId);
+            await DeployHelmChartToClusterAsync();
         }
 
         private class HelmValues

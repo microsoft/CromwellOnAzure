@@ -487,7 +487,7 @@ namespace CromwellOnAzureDeployer
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
-                                kubernetesManager.UpdateHelmValues(storageAccount.Name, keyVault.Properties.VaultUri, resourceGroup.Name, settings, managedIdentity);
+                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount.Name, keyVault.Properties.VaultUri, resourceGroup.Name, settings, managedIdentity);
 
                                 if (configuration.ManualHelmDeployment)
                                 {
@@ -499,7 +499,7 @@ namespace CromwellOnAzureDeployer
                                 {
                                     kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
                                     await kubernetesManager.DeployCoADependencies();
-                                    await kubernetesManager.DeployHelmChartToCluster();
+                                    await kubernetesManager.DeployHelmChartToClusterAsync();
                                 }
 
                                 await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
