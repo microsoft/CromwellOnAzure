@@ -33,6 +33,7 @@ namespace TesApi.Web
                 .UseUrls("http://0.0.0.0:80/")
                 .ConfigureAppConfiguration((context, config) =>
                 {
+                    Environment.SetEnvironmentVariable("HOSTNAME", System.Net.Dns.GetHostName());
                     config.AddEnvironmentVariables(); // For Docker-Compose
                 })
                 .ConfigureLogging((context, logging) =>
