@@ -18,14 +18,33 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="scripts\helm\Chart.yaml" />
+    <None Remove="scripts\helm\README.md" />
+    <None Remove="scripts\helm\templates\cromwell-deployment.yaml" />
+    <None Remove="scripts\helm\templates\identity.yaml" />
+    <None Remove="scripts\helm\templates\mysqldb-deployment.yaml" />
+    <None Remove="scripts\helm\templates\persistence.yaml" />
+    <None Remove="scripts\helm\templates\service.yaml" />
+    <None Remove="scripts\helm\templates\tes-deployment.yaml" />
+    <None Remove="scripts\helm\templates\triggerservice-deployment.yaml" />
+    <None Remove="scripts\helm\values-template.yaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="..\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.6.1" />
+    <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.3.0" />
+    <PackageReference Include="KubernetesClient" Version="8.0.68" />
+    <PackageReference Include="Microsoft.Azure.Management.KeyVault" Version="3.1.0" />
+    <PackageReference Include="Microsoft.Azure.Management.Network" Version="21.0.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.13.0" />
     <PackageReference Include="Microsoft.Azure.Management.Batch" Version="14.0.0" />
     <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.38.1" />
     <PackageReference Include="Microsoft.Azure.Management.PostgreSQL" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Azure.Management.ContainerService" Version="1.2.0" />
     <PackageReference Include="Microsoft.Azure.Management.ResourceGraph" Version="2.1.0" />
     <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.6.2" />
     <PackageReference Include="Microsoft.Extensions.CommandLineUtils" Version="1.1.1" />
@@ -41,7 +60,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="Polly" Version="7.2.3" />
     <PackageReference Include="SSH.NET" Version="2020.0.2" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.21.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.22.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -68,6 +87,33 @@
     <EmbeddedResource Include="scripts\env-04-settings.txt" />
     <EmbeddedResource Include="scripts\env-12-local-my-sql-db.txt" />
     <EmbeddedResource Include="scripts\env-13-postgre-sql-db.txt" />
+    <EmbeddedResource Include="scripts\helm\Chart.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\README.md">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\cromwell-deployment.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\identity.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\persistence.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\service.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\tes-deployment.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\templates\triggerservice-deployment.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\values-template.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
     <EmbeddedResource Include="scripts\install-cromwellazure.sh" />
     <EmbeddedResource Include="scripts\mount-data-disk.sh" />
     <EmbeddedResource Include="scripts\mount.blobfuse" />
