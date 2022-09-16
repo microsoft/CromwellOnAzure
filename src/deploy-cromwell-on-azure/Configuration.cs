@@ -11,7 +11,6 @@ namespace CromwellOnAzureDeployer
 {
     public class Configuration : UserAccessibleConfiguration
     {
-        public string PostgreSqlServerName { get; set; }
         public string PostgreSqlCromwellDatabaseName { get; set; } = "cromwell_db";
         public string PostgreSqlTesDatabaseName { get; set; } = "tes_db";
         public string PostgreSqlAdministratorLogin { get; set; } = "coa_admin";
@@ -23,11 +22,11 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlSkuName { get; set; } = "Standard_B2s";
         public string PostgreSqlTier { get; set; } = "Burstable";
         public string DefaultVmSubnetName { get; set; } = "vmsubnet";
-        public string DefaultPostgreSqlSubnetName { get; set; } = "mysqlsubnet";
         public string PostgreSqlVersion { get; set; } = "11";
+        public string DefaultPostgreSqlSubnetName { get; set; } = "sqlsubnet";
         public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
-        public bool? ProvisionPostgreSqlOnAzure { get; set; } // Will be accessible in 4.0 release
     }
+
     public abstract class UserAccessibleConfiguration
     {
         public string SubscriptionId { get; set; }
@@ -37,9 +36,15 @@ namespace CromwellOnAzureDeployer
         public string VmOsName { get; set; } = "UbuntuServer";
         public string VmOsVersion { get; set; } = "18.04-LTS";
         public string VmSize { get; set; } = "Standard_D3_v2";
-        public string VnetAddressSpace { get; set; } = "10.1.0.0/16";
-        public string VmSubnetAddressSpace { get; set; } = "10.1.0.0/24";
-        public string PostgreSqlSubnetAddressSpace { get; set; } = "10.1.1.0/24";
+        public string VnetAddressSpace { get; set; } = "10.1.0.0/16"; // 10.1.0.0 - 10.1.255.255, 65536 IPs
+        // Address space for CoA services.
+        public string VmSubnetAddressSpace { get; set; } = "10.1.0.0/24"; // 10.1.0.0 - 10.1.0.255, 256 IPs
+        public string PostgreSqlSubnetAddressSpace { get; set; } = "10.1.1.0/24"; // 10.1.1.0 - 10.1.1.255, 256 IPs
+        // Address space for kubernetes system services, must not overlap with any subnet.
+        public string KubernetesServiceCidr = "10.1.4.0/22"; // 10.1.4.0 -> 10.1.7.255, 1024 IPs
+        public string KubernetesDnsServiceIP = "10.1.4.10";
+        public string KubernetesDockerBridgeCidr = "172.17.0.1/16"; // 172.17.0.0 - 172.17.255.255, 65536 IPs
+
         public string VmUsername { get; set; } = "vmadmin";
         public string VmPassword { get; set; }
         public string ResourceGroupName { get; set; }
@@ -50,6 +55,12 @@ namespace CromwellOnAzureDeployer
         public string LogAnalyticsArmId { get; set; }
         public string ApplicationInsightsAccountName { get; set; }
         public string VmName { get; set; }
+        public bool UseAks { get; set; }
+        public string AksClusterName { get; set; }
+        public string AksCoANamespace { get; set; } = "coa";
+        public bool ManualHelmDeployment { get; set; }
+        public string HelmBinaryPath { get; set; } = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
+        public int AksPoolSize { get; set; } = 2;
         public bool Silent { get; set; }
         public bool DeleteResourceGroupOnFailure { get; set; }
         public string CromwellVersion { get; set; }
@@ -72,6 +83,13 @@ namespace CromwellOnAzureDeployer
         public string BlobxferImageName { get; set; } = null;
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool? KeepSshPortOpen { get; set; } = null;
+        public bool DebugLogging { get; set; } = false;
+        public bool? ProvisionPostgreSqlOnAzure { get; set; } = null;
+        public string PostgreSqlServerName { get; set; }
+        public bool UsePostgreSqlSingleServer { get; set; } = false;
+        public string KeyVaultName { get; set; }
+        // Temporary workaround until I can get Azure Graph RBAC client working.
+        public string UserObjectId { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {

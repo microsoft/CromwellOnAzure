@@ -208,7 +208,7 @@ Before deploying, you can choose to customize some input parameters to use exist
 .\deploy-cromwell-on-azure.exe --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> --VmSize "Standard_D2_v2"
 ```
 
-Here is the summary of all configuration parameters:
+Here is the summary of common configuration parameters:
 
 Configuration   parameter | Has default | Validated | Used by update | Comment
 -- | -- | -- | -- | --
@@ -239,7 +239,29 @@ bool     Update =   false; | Y | Y | Y | Set to true if you want to update your 
 bool     PrivateNetworking = false; | Y | Y | N | Available starting version 2.2. Set to true to create the host VM without public IP address. If set, VnetResourceGroupName, VnetName and SubnetName must be provided (and already exist). The deployment must be initiated from a machine that has access to that subnet.
 bool     KeepSshPortOpen =   false; | Y | Y | Y | Available starting version 3.0. Set to true if you need to keep the SSH port accessible on the host VM while deployer is not running (not recommended). 
 string   LogAnalyticsArmId | Y | N | N | Arm resource id for an exising Log Analytics workspace, workspace is used for App Insights - Not required, a workspace will be generated automatically if not provided.
-bool     ProvisionPostgreSqlOnAzure =   false; | Y | N | N | COMING SOON in version 4.0. Triggers whether to use Docker MySQL or Azure PostgreSQL when provisioning the database.
+bool     ProvisionPostgreSqlOnAzure =   false; | Y | N | N | Triggers whether to use Docker MySQL or Azure PostgreSQL when provisioning the database. Required for AKS deployment.
+bool     UseAks =   false; | Y | N | N | Uses Azure Kubernetes Service rather than a VM to run the CoA system services Cromwell/TES/TriggerService.
+string   AksClusterName | Y | Y | N | Cluster name of existing Azure Kubernetes Service cluster to use rather than provisioning a new one.
+string   AksCoANamespace = "coa" | Y | N | N | Kubernetes namespace.
+bool     ManualHelmDeployment | Y | N | N | For use if user doesn't have direct access to existing AKS cluster.
+string   HelmBinaryPath = "C:\\ProgramData\\chocolatey\\bin\\helm.exe" | Y | N | N | Path to helm binary for AKS deployment.
+int      AksPoolSize = 2 | Y | N | N | Size of AKS node pool, two nodes are recommended for reliability, however a minimum of one can be used to save COGS.
+bool DebugLogging = false | Y | N | N | Prints all log information.
+string PostgreSqlServerName | Y | Y | N | Name of existing postgresql server.
+bool UsePostgreSqlSingleServer = false | Y | N | N | Use Postgresql single server rather than flexi servers, only recommended if you need to use private endpoints.
+string KeyVaultName | Y | Y | N | Name of an existing key vault
+string UserObjectId | Y | N | N | ObjectId of the user running the deployer, can be found in AAD. Required to assign proper permissions to KeyVault when using AKS.
+
+The following are more advanced configuration parameters:
+
+Configuration   parameter | Has default | Validated | Used by update | Comment
+-- | -- | -- | -- | --
+string   VnetAddressSpace = "10.1.0.0/16" | Y | N | N | Total address space for CoA vnet.
+string   VmSubnetAddressSpace = "10.1.0.0/24" | Y | N | N | Address space for compute, VM or AKS.
+string   MySqlSubnetAddressSpace  = "10.1.1.0/24" | Y | N | N | Address space for database.
+string   KubernetesServiceCidr = "10.1.4.0/22" | Y | N | N | Address space for kubernetes system services, must not overlap with any subnets.
+string   KubernetesDnsServiceIP = "10.1.4.10" | Y | N | N | Kubernetes DNS service IP Address.
+string   KubernetesDockerBridgeCidr = "172.17.0.1/16" | Y | N | N | Kubernetes dock bridge Cidr.
 
 ### Use a specific Cromwell version
 #### Before deploying Cromwell on Azure
