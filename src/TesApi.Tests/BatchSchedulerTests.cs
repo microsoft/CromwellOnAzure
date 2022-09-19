@@ -1202,7 +1202,7 @@ namespace TesApi.Tests
             {
                 var config = Enumerable.Empty<(string Key, string Value)>()
                 .Append(("DefaultStorageAccountName", "defaultstorageaccount"))
-                .Append(("HOSTNAME", "hostname"));
+                .Append(("Name", "hostname"));
                 if (autopool)
                 {
                     config = config.Append(("UseLegacyBatchImplementationWithAutopools", "true"));
