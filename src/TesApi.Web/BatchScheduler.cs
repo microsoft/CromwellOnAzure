@@ -122,7 +122,7 @@ namespace TesApi.Web
             if (!this.enableBatchAutopool)
             {
                 _batchPoolFactory = poolFactory;
-                hostname = GetStringValue(configuration, "HOSTNAME");
+                hostname = GetStringValue(configuration, "Name");
                 logger.LogInformation($"hostname: {hostname}");
 
                 LoadExistingPools().Wait();
@@ -330,7 +330,7 @@ namespace TesApi.Web
 
             // Generate hash of everything that differentiates this group of pools
             var displayName = $"{vmName}:{vmSize}:{hostConfigName}:{isPreemptable}:{registryServer}:{identityResourceId}";
-            var hash = ConvertToBase32(SHA1.HashData(Encoding.UTF8.GetBytes(displayName))).TrimEnd('='); // This becomes 32 chars
+            var hash = BatchUtils.ConvertToBase32(SHA1.HashData(Encoding.UTF8.GetBytes(displayName))).TrimEnd('='); // This becomes 32 chars
 
             // Build a PoolName that is of legal length, while exposing the most important metadata without requiring user to find DisplayName
             // Note that the hash covers all necessary parts to make name unique, so limiting the size of the other parts is not expected to appreciably change the risk of collisions. Those other parts are for convenience
@@ -380,28 +380,6 @@ namespace TesApi.Web
                     };
             }
         }
-
-        private static string ConvertToBase32(byte[] bytes) // https://datatracker.ietf.org/doc/html/rfc4648#section-6
-        {
-            const int groupBitlength = 5;
-            return new string(new BitArray(bytes)
-                    .Cast<bool>()
-                    .Select((b, i) => (Index: i, Value: b ? 1 << (groupBitlength - 1 - (i % groupBitlength)) : 0))
-                    .GroupBy(t => t.Index / groupBitlength)
-                    .Select(g => Rfc4648Base32[g.Sum(t => t.Value)])
-                    .ToArray())
-                + (bytes.Length % groupBitlength) switch
-                {
-                    0 => string.Empty,
-                    1 => @"======",
-                    2 => @"====",
-                    3 => @"===",
-                    4 => @"=",
-                    _ => throw new InvalidOperationException(), // Keeps the compiler happy.
-                };
-        }
-
-        private static readonly char[] Rfc4648Base32 = new[] { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '2', '3', '4', '5', '6', '7' };
 
         /// <summary>
         /// Adds a new Azure Batch pool/job/task for the given <see cref="TesTask"/>
@@ -1899,7 +1877,7 @@ namespace TesApi.Web
 
                 var uniquifier = new byte[8]; // This always becomes 13 chars when converted to base32 after removing the three '='s at the end. We won't ever decode this, so we don't need the '='s
                 RandomNumberGenerator.Fill(uniquifier);
-                var poolId = $"{key}-{ConvertToBase32(uniquifier).TrimEnd('=')}"; // embedded '-' is required by GetKeyFromPoolId()
+                var poolId = $"{key}-{BatchUtils.ConvertToBase32(uniquifier).TrimEnd('=')}"; // embedded '-' is required by GetKeyFromPoolId()
 
                 try
                 {
