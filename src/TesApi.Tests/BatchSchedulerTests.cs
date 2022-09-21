@@ -433,7 +433,7 @@ namespace TesApi.Tests
 
             Assert.IsNull(poolInformation.AutoPoolSpecification);
             Assert.IsNotNull(poolInformation.PoolId);
-            Assert.AreEqual("hostname-dicated1-NMVHRFXS7KOVIGMDN4OYUDQAJP3WEVIN-", poolInformation.PoolId[0..^13]);
+            Assert.AreEqual("hostname-dicated1-2ZKB42KPL64SVGGB624FC4AA2LXUNKVQ-", poolInformation.PoolId[0..^13]);
             Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
             Assert.IsTrue(batchScheduler.TryGetPool(poolInformation.PoolId, out _));
             Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
