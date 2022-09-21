@@ -43,9 +43,9 @@ namespace TesApi.Web
         private const string DefaultAzureBillingRegionName = "US West";
 
         private static readonly HttpClient httpClient = new();
-        private static readonly RetryPolicy batchRaceConditionJobNotFoundRetryPolicy = Policy
+        private static readonly AsyncRetryPolicy batchRaceConditionJobNotFoundRetryPolicy = Policy
             .Handle<BatchException>(ex => ex.RequestInformation.BatchError.Code == BatchErrorCodeStrings.JobNotFound)
-            .WaitAndRetry(10, retryAttempt => TimeSpan.FromSeconds(1));
+            .WaitAndRetryAsync(10, retryAttempt => TimeSpan.FromSeconds(1));
 
         private readonly ILogger logger;
         private readonly Func<Task<BatchModels.BatchAccount>> getBatchAccountFunc;
@@ -233,8 +233,8 @@ namespace TesApi.Web
 
             try
             {
-                job = await batchRaceConditionJobNotFoundRetryPolicy.Execute(async () =>
-                    await batchClient.JobOperations.GetJobAsync(job.Id));
+                job = await batchRaceConditionJobNotFoundRetryPolicy.ExecuteAsync(() =>
+                    batchClient.JobOperations.GetJobAsync(job.Id));
 
                 await job.AddTaskAsync(cloudTask);
             }
