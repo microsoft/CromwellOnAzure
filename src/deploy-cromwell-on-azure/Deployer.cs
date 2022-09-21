@@ -970,6 +970,7 @@ namespace CromwellOnAzureDeployer
             // Get settings from env files numbered 05-12
             UpdateImageVersions(settings, configuration);
 
+            settings["Name"] = configuration.Name;
             settings["DefaultStorageAccountName"] = configuration.StorageAccountName;
             settings["CosmosDbAccountName"] = configuration.CosmosDbAccountName;
             settings["BatchAccountName"] = configuration.BatchAccountName;
@@ -1295,7 +1296,11 @@ namespace CromwellOnAzureDeployer
                 }, "scripts", "env-01-account-names.txt"),
                 $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
-                (Utility.GetFileContent("scripts", "env-04-settings.txt"), $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                (Utility.PersonalizeContent(new []
+                {
+                    new Utility.ConfigReplaceTextItem("{DefaultName}", configuration.Name),
+                }, "scripts", "env-04-settings.txt"),
+                $"{CromwellAzureRootDir}/env-04-settings.txt", false)
             };
 
             if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
@@ -2282,6 +2287,7 @@ namespace CromwellOnAzureDeployer
                     var existingFileContent = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
                     var existingSettings = Utility.DelimitedTextToDictionary(existingFileContent.Output.Trim());
                     var newSettings = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-04-settings.txt"));
+                    newSettings["Name"] = configuration.Name;
 
                     foreach (var key in newSettings.Keys.Except(existingSettings.Keys))
                     {

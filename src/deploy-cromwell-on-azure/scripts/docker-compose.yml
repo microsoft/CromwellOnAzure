@@ -36,6 +36,7 @@ services:
       - MarthaKeyVaultName=$MarthaKeyVaultName
       - MarthaSecretName=$MarthaSecretName
       - BatchPoolRotationForcedDays=$BatchPoolRotationForcedDays
+      - Name=$Name
       - PostgreSqlServerName=$PostgreSqlServerName
       - PostgreSqlTesDatabaseName=$PostgreSqlTesDatabaseName
       - PostgreSqlTesUserLogin=$PostgreSqlTesUserLogin

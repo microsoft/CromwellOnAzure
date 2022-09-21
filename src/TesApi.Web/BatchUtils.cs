@@ -163,33 +163,5 @@ namespace TesApi.Web
 
             File.WriteAllText(Path.Combine(hostConfigsDir.FullName, ContainerImagesFile), WriteJson(images));
         }
-
-        private static readonly char[] Rfc4648Base32 = new[] { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '2', '3', '4', '5', '6', '7' };
-
-        /// <summary>
-        /// Converts binary to Base32
-        /// </summary>
-        /// <param name="bytes">Data to convert.</param>
-        /// <returns>RFC 4648 Base32 representation</returns>
-        /// <exception cref="InvalidOperationException"></exception>
-        public static string ConvertToBase32(byte[] bytes) // https://datatracker.ietf.org/doc/html/rfc4648#section-6
-        {
-            const int groupBitlength = 5;
-            return new string(new BitArray(bytes)
-                    .Cast<bool>()
-                    .Select((b, i) => (Index: i, Value: b ? 1 << (groupBitlength - 1 - (i % groupBitlength)) : 0))
-                    .GroupBy(t => t.Index / groupBitlength)
-                    .Select(g => Rfc4648Base32[g.Sum(t => t.Value)])
-                    .ToArray())
-                + (bytes.Length % groupBitlength) switch
-                {
-                    0 => string.Empty,
-                    1 => @"======",
-                    2 => @"====",
-                    3 => @"===",
-                    4 => @"=",
-                    _ => throw new InvalidOperationException(), // Keeps the compiler happy.
-                };
-        }
     }
 }

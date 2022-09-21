@@ -57,6 +57,8 @@ spec:
             - name: BatchPoolRotationForcedDays
               value: {{ .Values.config.batchPoolRotationForcedDays }}
             - name: MarthaUrl
+              value: {{ .Values.config.name }}
+            - name: Name
               value: {{ .Values.config.marthaUrl }}
             - name: MarthaKeyVaultName
               value: {{ .Values.config.marthaKeyVaultName }}
