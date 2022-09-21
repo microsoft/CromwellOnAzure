@@ -8,6 +8,7 @@ BatchImageSku=20-04-lts
 BatchImageVersion=latest
 BatchNodeAgentSkuId=batch.node.ubuntu 20.04
 BatchPoolRotationForcedDays=7
+Name={DefaultName}
 MarthaUrl=
 MarthaKeyVaultName=
 MarthaSecretName=

@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Security.Cryptography;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -24,31 +23,6 @@ namespace TesApi.Web
         public static void Main(string[] args)
             => CreateWebHostBuilder(args).Build().Run();
 
-        private static void EnsureHostname(WebHostBuilderContext context, IConfigurationBuilder config)
-        {
-            //Environment.SetEnvironmentVariable("HOSTNAME", System.Net.Dns.GetHostName());
-            if (Environment.GetEnvironmentVariable("Name") is null)
-            {
-                // Path.Combine(AppContext.BaseDirectory, "DefaultVmPrices.json")
-                var hostJson = new System.IO.FileInfo(System.IO.Path.Combine(context.HostingEnvironment.ContentRootPath, "host.json"));
-
-                if (!hostJson.Exists)
-                {
-                    var blob = new byte[6];
-                    RandomNumberGenerator.Fill(blob);
-                    var host = BatchUtils.ConvertToBase32(blob).TrimEnd('=');
-                    Console.WriteLine($"Creating host.json with Name={host}");
-                    using var writer = hostJson.CreateText();
-                    writer.Write(BatchUtils.WriteJson(new HostJson { Name = host }));
-                    writer.Close();
-                }
-
-                config.AddJsonFile(hostJson.FullName);
-            }
-
-            config.AddEnvironmentVariables(); // For Docker-Compose
-        }
-
         /// <summary>
         /// Create the web host builder.
         /// </summary>
@@ -57,7 +31,7 @@ namespace TesApi.Web
         public static IWebHostBuilder CreateWebHostBuilder(string[] args)
             => WebHost.CreateDefaultBuilder<Startup>(args)
                 .UseUrls("http://0.0.0.0:80/")
-                .ConfigureAppConfiguration(EnsureHostname)
+                .ConfigureAppConfiguration((context, config) => config.AddEnvironmentVariables()) // For Docker-Compose
                 .ConfigureLogging((context, logging) =>
                 {
                     try
