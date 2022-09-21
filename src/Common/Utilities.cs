@@ -45,17 +45,17 @@ namespace Common
                     4 => @"=",
                     _ => throw new InvalidOperationException(), // Keeps the compiler happy.
                 };
-        }
 
-        private static byte FlipByte(byte data)
-            => (byte)(
-                (((data & 0x01) == 0) ? 0 : 0x80) |
-                (((data & 0x02) == 0) ? 0 : 0x40) |
-                (((data & 0x04) == 0) ? 0 : 0x20) |
-                (((data & 0x08) == 0) ? 0 : 0x10) |
-                (((data & 0x10) == 0) ? 0 : 0x08) |
-                (((data & 0x20) == 0) ? 0 : 0x04) |
-                (((data & 0x40) == 0) ? 0 : 0x02) |
-                (((data & 0x80) == 0) ? 0 : 0x01));
+            static byte FlipByte(byte data)
+                => (byte)(
+                    (((data & 0x01) == 0) ? 0 : 0x80) |
+                    (((data & 0x02) == 0) ? 0 : 0x40) |
+                    (((data & 0x04) == 0) ? 0 : 0x20) |
+                    (((data & 0x08) == 0) ? 0 : 0x10) |
+                    (((data & 0x10) == 0) ? 0 : 0x08) |
+                    (((data & 0x20) == 0) ? 0 : 0x04) |
+                    (((data & 0x40) == 0) ? 0 : 0x02) |
+                    (((data & 0x80) == 0) ? 0 : 0x01));
+        }
     }
 }
