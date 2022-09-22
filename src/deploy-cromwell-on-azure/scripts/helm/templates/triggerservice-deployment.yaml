@@ -16,7 +16,14 @@ spec:
       labels:
         io.kompose.service: triggerservice
         aadpodidbinding: {{ .Values.identity.name }}
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/triggerservice: runtime/default
     spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        supplementalGroups: [1000]
       containers:
         - env:
             - name: DefaultStorageAccountName
@@ -29,6 +36,13 @@ spec:
               value: {{ .Values.config.cosmosDbAccountName }}
           image: {{ .Values.images.triggerservice }}
           name: triggerservice
+          resources:
+            requests:
+              memory: "256Mi"
+            limits:
+              memory: "1024Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
           resources: {}
       restartPolicy: Always
 status: {}

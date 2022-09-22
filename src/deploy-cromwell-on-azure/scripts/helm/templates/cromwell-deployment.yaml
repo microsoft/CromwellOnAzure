@@ -17,6 +17,8 @@ spec:
       labels:
         io.kompose.service: cromwell
         aadpodidbinding: {{ .Values.identity.name }}
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/cromwell: runtime/default
     spec:
       containers:
         - args:
@@ -30,7 +32,13 @@ spec:
           tty: true
           ports:
             - containerPort: {{ .Values.service.cromwellPort }}
-          resources: {}
+          resources:
+            requests:
+              memory: "1024Mi"
+            limits:
+              memory: "4096Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
           volumeMounts:
             - mountPath: /cromwell-tmp
               name: cromwell-tmp-claim
