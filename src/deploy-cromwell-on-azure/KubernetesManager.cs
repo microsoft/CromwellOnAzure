@@ -124,21 +124,24 @@ namespace CromwellOnAzureDeployer
             if (configuration.CrossSubscriptionAKSDeployment)
             {
                 values.InternalContainersKeyVaultAuth = new List<Dictionary<string, string>>();
+
                 foreach (var container in values.DefaultContainers)
                 {
                     var containerConfig = new Dictionary<string, string>()
-                {
-                    { "accountName",  storageAccountName },
-                    { "containerName", container },
-                    { "keyVaultURL", keyVaultUrl },
-                    { "keyVaultSecretName", Deployer.StorageAccountKeySecretName}
-                };
+                    {
+                        { "accountName",  storageAccountName },
+                        { "containerName", container },
+                        { "keyVaultURL", keyVaultUrl },
+                        { "keyVaultSecretName", Deployer.StorageAccountKeySecretName}
+                    };
+
                     values.InternalContainersKeyVaultAuth.Add(containerConfig);
                 }
             }
             else
             {
                 values.InternalContainersMIAuth = new List<Dictionary<string, string>>();
+
                 foreach (var container in values.DefaultContainers)
                 {
                     var containerConfig = new Dictionary<string, string>()
@@ -147,6 +150,7 @@ namespace CromwellOnAzureDeployer
                         { "containerName", container },
                         { "resourceGroup", resourceGroupName },
                     };
+
                     values.InternalContainersMIAuth.Add(containerConfig);
                 }
             }
@@ -252,7 +256,7 @@ namespace CromwellOnAzureDeployer
                 deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
                 deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
                 
-                if (deployment == null || deployment.Status == null || deployment.Status.ReadyReplicas == null || deployment.Status.ReadyReplicas < 1)
+                if ((deployment?.Status?.ReadyReplicas ?? 0) < 1)
                 {
                     throw new Exception("Workload not ready.");
                 }
