@@ -34,8 +34,10 @@ spec:
             - containerPort: {{ .Values.service.cromwellPort }}
           resources:
             requests:
+              cpu: "1.0"
               memory: "1024Mi"
             limits:
+              cpu: "8.0"
               memory: "4096Mi"
           securityContext:
             allowPrivilegeEscalation: false
