@@ -408,7 +408,7 @@ VM price data is used to select the cheapest per hour VM for a task's runtime re
 
 By default, all VM sizes supported by Azure Batch are considered for task execution. 
 
-You can constraint the Azure VM sizes considered for task execution by modifying file "allowed-vm-sizes" in the "configuration" storage container and restarting the host VM. For the full list of VM sizes and their features, see file "supported-vm-sizes" in the same container. Note that over-constraining the allowed VM sizes may result in task failures when no suitable VM is found, as well as higher execution costs. Any errors in the "allowed-vm-sizes" will be surfaced in the same file upon host VM restart.
+You can constraint the Azure VM sizes or families considered for task execution by modifying file "allowed-vm-sizes" in the "configuration" storage container and restarting the host VM. For the full list of VM sizes and their features, see file "supported-vm-sizes" in the same container. Note that over-constraining the allowed VM sizes may result in task failures when no suitable VM is found, as well as higher execution costs. Any errors in the "allowed-vm-sizes" will be surfaced in the same file upon host VM restart.
 
 ### Optimize my WDLs
 This section is COMING SOON.

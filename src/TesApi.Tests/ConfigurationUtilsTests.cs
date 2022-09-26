@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -51,13 +51,14 @@ namespace TesApi.Tests
 
             await configurationUtils.ProcessAllowedVmSizesConfigurationFileAsync();
 
-            Assert.AreEqual("VmSize1,VmSize2", configuration["AllowedVmSizes"]);
+            Assert.AreEqual("VmSize1,VmSize2,VmFamily3", configuration["AllowedVmSizes"]);
 
             var expectedAllowedVmSizesFileContent =
                 "VmSize1\n" +
                 "#SomeComment\n" +
                 "VmSize2\n" +
-                "VmSizeNonExistent <-- WARNING: This VM size is either misspelled or not supported in your region. It will be ignored.";
+                "VmSizeNonExistent <-- WARNING: This VM size or family is either misspelled or not supported in your region. It will be ignored.\n" +
+                "VmFamily3";
 
             mockAzureProxy.Verify(m => m.UploadBlobAsync(It.Is<Uri>(x => x.AbsoluteUri.Contains("allowed-vm-sizes")), It.Is<string>(s => s.Equals(expectedAllowedVmSizesFileContent))), Times.Exactly(1));
         }
@@ -90,7 +91,7 @@ namespace TesApi.Tests
                 DedicatedCoreQuotaPerVMFamilyEnforced = true, 
                 DedicatedCoreQuotaPerVMFamily = dedicatedCoreQuotaPerVMFamily };
 
-            var allowedVmSizesFileContent = "VmSize1\n#SomeComment\nVmSize2\nVmSizeNonExistent";
+            var allowedVmSizesFileContent = "VmSize1\n#SomeComment\nVmSize2\nVmSizeNonExistent\nVmFamily3";
 
             var storageAccountInfos = new Dictionary<string, StorageAccountInfo> {
                 { 
