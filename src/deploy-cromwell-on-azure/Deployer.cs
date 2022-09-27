@@ -161,7 +161,7 @@ namespace CromwellOnAzureDeployer
                 FlexibleServerModel.Server postgreSqlFlexServer = null;
                 SingleServerModel.Server postgreSqlSingleServer = null;
                 IStorageAccount storageAccount = null;
-                Vault keyVault = null;
+                string keyVaultUri = string.Empty;
                 IVirtualMachine linuxVm = null;
                 INetworkSecurityGroup networkSecurityGroup = null;
                 IIdentity managedIdentity = null;
@@ -302,12 +302,11 @@ namespace CromwellOnAzureDeployer
 
                         if (existingAksCluster is not null)
                         {
-                            if (!accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
+                            if (accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
                             {
-                                throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
+                                var keyVault = await GetKeyVaultAsync(keyVaultName);
+                                keyVaultUri = keyVault.Properties.VaultUri;
                             }
-
-                            keyVault = await GetKeyVaultAsync(keyVaultName);
 
                             if (!accountNames.TryGetValue("ManagedIdentityClientId", out var managedIdentityClientId))
                             {
@@ -317,7 +316,7 @@ namespace CromwellOnAzureDeployer
                             managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
-                            await kubernetesManager.UpgradeAKSDeployment(accountNames, resourceGroup, storageAccount, managedIdentity, keyVault.Properties.VaultUri);
+                            await kubernetesManager.UpgradeAKSDeployment(accountNames, resourceGroup, storageAccount, managedIdentity, keyVaultUri);
                         }
                         else
                         {
@@ -333,7 +332,7 @@ namespace CromwellOnAzureDeployer
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
                         aksCluster = await ValidateAndGetExistingAKSClusterAsync();
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
-                        keyVault = await ValidateAndGetExistingKeyVault();
+                        var keyVault = await ValidateAndGetExistingKeyVault();
 
                         // Configuration preferences not currently settable by user.
                         if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName) && configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
@@ -454,13 +453,14 @@ namespace CromwellOnAzureDeployer
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                         });
 
-                        if (configuration.UseAks)
+                        if (configuration.UseAks && configuration.CrossSubscriptionAKSDeployment)
                         {
                             await Task.Run(async () =>
                             {
                                 keyVault ??= await CreateKeyVaultAsync(configuration.KeyVaultName, managedIdentity, vnetAndSubnet.Value.vmSubnet);
+                                keyVaultUri = keyVault.Properties.VaultUri;
                                 var keys = await storageAccount.GetKeysAsync();
-                                await SetStorageKeySecret(keyVault.Properties.VaultUri, StorageAccountKeySecretName, keys.First().Value);
+                                await SetStorageKeySecret(keyVaultUri, StorageAccountKeySecretName, keys.First().Value);
                             });
                         }
 
@@ -488,7 +488,7 @@ namespace CromwellOnAzureDeployer
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
-                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount.Name, keyVault.Properties.VaultUri, resourceGroup.Name, settings, managedIdentity);
+                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount.Name, keyVaultUri, resourceGroup.Name, settings, managedIdentity);
 
                                 if (configuration.ManualHelmDeployment)
                                 {
