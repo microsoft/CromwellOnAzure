@@ -1589,7 +1589,7 @@ namespace CromwellOnAzureDeployer
             FlexibleServerModel.Server server = null;
 
             await Execute(
-                $"Creating Azure Flexible Server for PostgreSQL: {configuration.PostgreSqlServerName} ...",
+                $"Creating Azure Flexible Server for PostgreSQL: {configuration.PostgreSqlServerName}...",
                 async () =>
                 {
                     server = await postgresManagementClient.Servers.CreateAsync(
@@ -1625,7 +1625,7 @@ namespace CromwellOnAzureDeployer
             SingleServerModel.Server server = null;
 
             await Execute(
-                $"Creating Azure Single Server for PostgreSQL: {configuration.PostgreSqlServerName} ...",
+                $"Creating Azure Single Server for PostgreSQL: {configuration.PostgreSqlServerName}...",
                 async () =>
                 {
                     server = await postgresManagementClient.Servers.CreateAsync(
@@ -1731,7 +1731,7 @@ namespace CromwellOnAzureDeployer
 
         private Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet)> CreateVnetAndSubnetsAsync(IResourceGroup resourceGroup)
           => Execute(
-                $"Creating virtual network and subnets: {configuration.VnetName} ...",
+                $"Creating virtual network and subnets: {configuration.VnetName}...",
             async () =>
             {
                 var vnetDefinition = azureSubscriptionClient.Networks
@@ -1856,7 +1856,7 @@ namespace CromwellOnAzureDeployer
 
         private Task<IPrivateDnsZone> CreatePrivateDnsZoneAsync(INetwork virtualNetwork, string name, string title)
             => Execute(
-                $"Creating private DNS Zone for {title}",
+                $"Creating private DNS Zone for {title}...",
                 async () =>
                 {
                     // Note: for a potential future implementation of this method without Fluent,
@@ -1874,7 +1874,7 @@ namespace CromwellOnAzureDeployer
 
         private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8()
             => Execute(
-                $"Executing scripts on cromwell_db.",
+                $"Executing scripts on cromwell_db...",
                 async () =>
                 {
                     var initScript = GetInitSqlString();
@@ -2167,7 +2167,7 @@ namespace CromwellOnAzureDeployer
 
         private Task PatchContainersToMountFileV220Async(IStorageAccount storageAccount)
             => Execute(
-                $"Commenting out msgenpublicdata/inputs in '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container. It will be removed in v2.3",
+                $"Commenting out msgenpublicdata/inputs in '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container. It will be removed in v2.3...",
                 async () =>
                 {
                     var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
@@ -2182,7 +2182,7 @@ namespace CromwellOnAzureDeployer
 
         private Task PatchContainersToMountFileV240Async(IStorageAccount storageAccount)
             => Execute(
-                $"Removing reference to msgenpublicdata/inputs in '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container.",
+                $"Removing reference to msgenpublicdata/inputs in '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
                     var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
@@ -2208,7 +2208,7 @@ namespace CromwellOnAzureDeployer
                 });
 
         private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
-            => await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)",
+            => await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)...",
                 () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
 
         private Task PatchCromwellConfigurationFileV300Async(IStorageAccount storageAccount)
