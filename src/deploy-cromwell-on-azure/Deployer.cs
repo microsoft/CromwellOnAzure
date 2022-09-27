@@ -288,9 +288,8 @@ namespace CromwellOnAzureDeployer
                             throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
                         }
 
-                        cosmosDb = (await azureSubscriptionClient.CosmosDBAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName))
-                            .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase))
-                                ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
+                        cosmosDb = await GetExistingCosmosDbAccountAsync(cosmosDbAccountName)
+                            ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName}");
 
                         configuration.CosmosDbAccountName = cosmosDbAccountName;
 
