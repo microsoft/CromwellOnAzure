@@ -70,6 +70,7 @@ namespace CromwellOnAzureDeployer
         public bool ManualHelmDeployment { get; set; }
         public string HelmBinaryPath { get; set; } = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
         public int AksPoolSize { get; set; } = 2;
+        public bool CrossSubscriptionAKSDeployment { get; set; } = false;
         public bool Silent { get; set; }
         public bool DeleteResourceGroupOnFailure { get; set; }
         public string CromwellVersion { get; set; }

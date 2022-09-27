@@ -40,6 +40,17 @@ defaultContainers:
   - inputs
   - outputs
 
+internalContainersMIAuth:
+#  - accountName: storageAccount
+#    containerName: dataset1
+#    resourceGroup: resourceGroup1
+
+internalContainersKeyVaultAuth:
+#  - accountName: storageAccount
+#    containerName: dataset1
+#    keyVaultURL:
+#    keyVaultSecretName:
+
 externalContainers:
 #  - accountName: storageAccount
 #    accountKey: <key>
@@ -56,8 +67,6 @@ persistence:
   blobPvcSize: 32Gi
   cromwellTmpSize: 32Gi
   storageAccount: RUNTIME_PARAMETER
-  keyVaultUrl: RUNTIME_PARAMETER
-  keyVaultSecretName: RUNTIME_PARAMETER
 
 identity:
   name: RUNTIME_PARAMETER
