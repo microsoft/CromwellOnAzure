@@ -108,6 +108,7 @@ namespace CromwellOnAzureDeployer
             values.Config["marthaUrl"] = settings["MarthaUrl"];
             values.Config["marthaKeyVaultName"] = settings["MarthaKeyVaultName"];
             values.Config["marthaSecretName"] = settings["MarthaSecretName"];
+            values.Config["name"] = settings["Name"];
             values.Identity["name"] = managedId.Name;
             values.Identity["resourceId"] = managedId.Id;
             values.Identity["clientId"] = managedId.ClientId;

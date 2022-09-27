@@ -317,6 +317,11 @@ namespace CromwellOnAzureDeployer
                             managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
+                            if (accountNames.TryGetValue("Name", out var name))
+                            {
+                                configuration.Name = name;
+                            }
+
                             await kubernetesManager.UpgradeAKSDeployment(accountNames, resourceGroup, storageAccount, managedIdentity, keyVault.Properties.VaultUri);
                         }
                         else
@@ -967,7 +972,7 @@ namespace CromwellOnAzureDeployer
             // Get settings from env files numbered 05-12
             UpdateImageVersions(settings, configuration);
 
-            settings["Name"] = configuration.Name;
+            settings["Name"] = $"'{configuration.Name}'"; // Ensure this is not ever interpreted as a number
             settings["DefaultStorageAccountName"] = configuration.StorageAccountName;
             settings["CosmosDbAccountName"] = configuration.CosmosDbAccountName;
             settings["BatchAccountName"] = configuration.BatchAccountName;
