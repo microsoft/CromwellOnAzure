@@ -1487,9 +1487,7 @@ namespace CromwellOnAzureDeployer
             {
                 try
                 {
-                    var list = await azureClient.WithSubscription(s).CosmosDBAccounts.ListAsync();
-                    var l = list.ToList();
-                    return l;
+                    return await azureClient.WithSubscription(s).CosmosDBAccounts.ListAsync();
                 }
                 catch (Exception e)
                 {
