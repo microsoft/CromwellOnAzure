@@ -43,7 +43,7 @@ spec:
             - name: DockerInDockerImageName
               value: {{ .Values.config.dockerInDockerImageName }}
             - name: UseLegacyBatchImplementationWithAutopools
-              value: {{ .Values.config.useLegacyBatchImplementationWithAutopools }}
+              value: {{ .Values.config.useLegacyBatchImplementationWithAutopools | quote }}
             - name: BatchImageOffer
               value: {{ .Values.config.batchImageOffer }}
             - name: BatchImagePublisher
@@ -55,10 +55,10 @@ spec:
             - name: BatchNodeAgentSkuId
               value: {{ .Values.config.batchNodeAgentSkuId }}
             - name: BatchPoolRotationForcedDays
-              value: {{ .Values.config.batchPoolRotationForcedDays }}
-            - name: MarthaUrl
-              value: {{ .Values.config.name }}
+              value: {{ .Values.config.batchPoolRotationForcedDays | quote }}
             - name: Name
+              value: {{ .Values.config.name }}
+            - name: MarthaUrl
               value: {{ .Values.config.marthaUrl }}
             - name: MarthaKeyVaultName
               value: {{ .Values.config.marthaKeyVaultName }}
