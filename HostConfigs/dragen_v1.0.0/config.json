@@ -8,8 +8,13 @@
     },
     "nodeAgentSKUId": "batch.node.centos 7"
   },
-  "virtualMachineSizes": [{
+  "virtualMachineSizes": [
+    {
     "container": "dragenpublicwestus.azurecr.io/dragen-xrt/el7/x86_64:3.10.8-11-g90bb18a0",
+    "minVmSize": "Standard_NP20s"
+  },
+    {
+    "container": "dragenpublicwestus.azurecr.io/dragen-xrt/el7/x86_64:4.0.3",
     "minVmSize": "Standard_NP20s"
   }],
   "dockerRun": {
