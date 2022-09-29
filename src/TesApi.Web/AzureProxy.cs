@@ -17,9 +17,11 @@ using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
+using Microsoft.Azure.Management.Compute.Fluent;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
@@ -743,13 +745,13 @@ namespace TesApi.Web
         {
             static double ConvertMiBToGiB(int value) => Math.Round(value / 1024.0, 2);
 
-            var batchManagementClient = new BatchManagementClient(new TokenCredentials(await GetAzureAccessTokenAsync())) { SubscriptionId = subscriptionId };
+            var azureClient = await GetAzureManagementClientAsync();
 
-            var vmSizesAvailableAtLocation = (await batchManagementClient.Location.ListSupportedVirtualMachineSkusAsync(location))
-                .Select(vm => new { vm.Name, vm.FamilyName, Capabilities = vm.Capabilities.ToDictionary(c => c.Name, c => c.Value) })
+            var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).ComputeSkus.ListbyRegionAndResourceTypeAsync(Region.Create(location), ComputeResourceType.VirtualMachines))
+                .Select(vm => new { VmSize = vm.Name.Value, VmFamily = vm.Inner.Family, Capabilities = vm.Capabilities.ToDictionary(c => c.Name, c => c.Value) })
                 .Select(vm => new {
-                    VmSize = vm.Name,
-                    VmFamily = vm.FamilyName,
+                    VmSize = vm.VmSize,
+                    VmFamily = vm.VmFamily,
                     NumberOfCores = int.Parse(vm.Capabilities.GetValueOrDefault("vCPUsAvailable", vm.Capabilities["vCPUs"])),
                     MemoryGiB = double.Parse(vm.Capabilities["MemoryGB"]),
                     DiskGiB = ConvertMiBToGiB(int.Parse(vm.Capabilities["MaxResourceVolumeMB"])),
