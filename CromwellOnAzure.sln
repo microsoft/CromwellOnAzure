@@ -31,6 +31,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "src\Common\Common
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tests", "src\Common.Tests\Common.Tests.csproj", "{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HostConfigCompilerTmp", "src\HostConfigCompilerTmp\HostConfigCompilerTmp.csproj", "{29AAC126-EB21-453C-B7F4-96D796621A0D}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "HostConfigs", "HostConfigs", "{107966C0-1F15-4CC3-B9A8-9CBB0B1BB668}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dragen_v1.0.0", "dragen_v1.0.0", "{DC47F3B7-A1E5-4619-80EF-372F1B7FB1BB}"
@@ -85,6 +87,10 @@ Global
 		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{29AAC126-EB21-453C-B7F4-96D796621A0D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{29AAC126-EB21-453C-B7F4-96D796621A0D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{29AAC126-EB21-453C-B7F4-96D796621A0D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{29AAC126-EB21-453C-B7F4-96D796621A0D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -122,7 +122,7 @@ namespace CromwellOnAzureDeployer
             return reader.ReadToEnd().Replace("\r\n", "\n");
         }
 
-        private static Stream GetBinaryFileContent(params string[] pathComponentsRelativeToAppBase)
+        public static Stream GetBinaryFileContent(params string[] pathComponentsRelativeToAppBase)
             => typeof(Deployer).Assembly.GetManifestResourceStream($"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}");
 
         public struct EmbeddedResourceName

@@ -65,6 +65,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
+    <ProjectReference Include="..\HostConfigCompilerTmp\HostConfigCompilerTmp.csproj">
+      <ReferenceOutputAssembly>False</ReferenceOutputAssembly>
+      <OutputItemType>HostConfigCompiler</OutputItemType>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -130,5 +134,16 @@
   <ItemGroup>
     <Folder Include="Properties\PublishProfiles\" />
   </ItemGroup>
+
+  <Target Name="HostConfigCompiler" AfterTargets="ResolveProjectReferences">
+    <Exec Command="&quot;@(HostConfigCompiler->'%(RootDir)%(Directory)%(Filename).exe')&quot; build --host-configurations=$(IntermediateOutputPath)HostConfigs/host-configurations.json --host-configs-directory=../../HostConfigs --zip-directory=$(IntermediateOutputPath)HostConfigs/resources" />
+    <ZipDirectory SourceDirectory="$(IntermediateOutputPath)HostConfigs/resources" DestinationFile="$(IntermediateOutputPath)HostConfigs/resources.zip" Overwrite="true"/>
+    <ItemGroup>
+      <_InjectedResource Include="$(IntermediateOutputPath)HostConfigs/*" />
+      <EmbeddedResource Include="@(_InjectedResource)">
+        <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
 
 </Project>
