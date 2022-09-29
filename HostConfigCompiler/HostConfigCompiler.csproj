@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--https://learn.microsoft.com/en-us/visualstudio/msbuild/tutorial-custom-task-code-generation?view=vs-2022#optional-support-multitargeting-->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\src\Common\HostConfigs\**\*.cs" Link="%(Filename).cs" />
+    <Compile Include="..\src\Common\Utilities.cs" Link="Utilities.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IndexRange" Version="1.0.2" />
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.3.1" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.3.1" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="7.0.0-rc.1.22426.10" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
+  </ItemGroup>
+
+  <Target Name="BuildHostConfigCompiler" BeforeTargets="BeforeBuild" Condition=" !Exists('$(HostConfigCompilerImport)') Or '$(HostConfigCompilerTask)' != '$(TargetPath)' ">
+    <ItemGroup>
+      <HostConfigCompilerImport Include="&lt;Project&gt;&lt;PropertyGroup&gt;" />
+      <HostConfigCompilerImport Include="&lt;HostConfigCompilerTask&gt;$(TargetPath)&lt;/HostConfigCompilerTask&gt;" />
+      <HostConfigCompilerImport Include="&lt;/PropertyGroup&gt;&lt;/Project&gt;"/>
+    </ItemGroup>
+    <WriteLinesToFile File="$(HostConfigCompilerImport)" Lines="@(HostConfigCompilerImport)" Overwrite="true" />
+  </Target>
+
+  <Target Name="CleanHostConfigCompilerImport" BeforeTargets="BeforeClean" Condition="Exists('$(HostConfigCompilerImport)')">
+    <Delete Files="$(HostConfigCompilerImport)"/>
+  </Target>
+</Project>

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
@@ -1522,13 +1523,27 @@ namespace CromwellOnAzureDeployer
         }
 
         private Task WriteNonPersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount)
-            => Execute(
-                $"Writing readme.txt files to '{WorkflowsContainerName}' storage container...",
-                async () =>
+            => Task.WhenAll(new Task[]
                 {
-                    await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
-                    await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
-                    await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/job-prep.sh", Utility.GetFileContent("scripts", "job-prep.sh"));
+                    Execute(
+                        $"Writing readme.txt files to '{WorkflowsContainerName}' storage container...",
+                        async () =>
+                        {
+                            await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
+                            await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
+                            await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/job-prep.sh", Utility.GetFileContent("scripts", "job-prep.sh"));
+                        }),
+                    Execute(
+                        $"Writing host configuration files to '{"host-config-blobs"}' storage container...",
+                        async () =>
+                        {
+                            await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "host-configurations.json", Utility.GetFileContent("host-configurations.json"));
+                            using var zip = new ZipArchive(Utility.GetBinaryFileContent("resources.zip"));
+                            foreach (var entry in zip.Entries)
+                            {
+                                await UploadBinaryToStorageAccountAsync(storageAccount, "host-config-blobs", entry.FullName, BinaryData.FromStream(entry.Open()));
+                            }
+                        }),
                 });
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)

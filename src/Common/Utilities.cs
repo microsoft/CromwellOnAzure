@@ -98,7 +98,7 @@ namespace Common
             }
 
             // If path doesn't contain repository, add the default
-            if (builder.Path.Split('/', StringSplitOptions.RemoveEmptyEntries).Length < 2)
+            if (builder.Path.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries).Length < 2)
             {
                 builder.Path = "/library" + builder.Path;
             }

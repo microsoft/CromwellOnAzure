@@ -8,10 +8,16 @@
     },
     "nodeAgentSKUId": "batch.node.centos 7"
   },
-  "virtualMachineSizes": [{
-    "container": "dragenpublicwestus.azurecr.io/dragen-xrt/el7/x86_64:3.10.8-11-g90bb18a0",
-    "minVmSize": "Standard_NP20s"
-  }],
+  "virtualMachineSizes": [
+    {
+      "container": "dragenpublicwestus.azurecr.io/dragen-xrt/el7/x86_64:3.10.8-11-g90bb18a0",
+      "minVmSize": "Standard_NP20s"
+    },
+    {
+      "container": "dragenpublicwestus.azurecr.io/dragen-xrt/el7/x86_64@sha256:5ba8881057245756ae61ae49ef54f89a44e60815b40c84a70964842a649d5c04",
+      "minVmSize": "Standard_NP20s"
+    }
+  ],
   "dockerRun": {
     "parameters": "--device /dev/dri",
     "pretaskCommand": ["/opt/edico/bin/dragen_reset"]
