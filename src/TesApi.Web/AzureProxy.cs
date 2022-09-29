@@ -864,16 +864,15 @@ namespace TesApi.Web
 
                 Microsoft.Azure.Management.Batch.Models.StartTask startTask = null;
 
-                //if (useStartTask)
-                //{
-                //    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
-                //    {
-                //        // Pool StartTask: install Docker as start task if it's not already
-                //        CommandLine = $"/bin/sh {startTaskPath}",
-                //        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
-                //        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
-                //    };
-                //}
+                if (!string.IsNullOrWhiteSpace(startTaskSasUrl) && !string.IsNullOrWhiteSpace(startTaskPath))
+                {
+                    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
+                    {
+                        CommandLine = $"/bin/sh {startTaskPath}",
+                        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
+                        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
+                    };
+                }
 
                 var containerRegistryInfo = await GetContainerRegistryInfoAsync(executorImage);
 

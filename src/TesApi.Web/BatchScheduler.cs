@@ -52,6 +52,7 @@ namespace TesApi.Web
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
         private readonly string defaultStorageAccountName;
+        private readonly string globalStartTaskPath;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -80,7 +81,8 @@ namespace TesApi.Web
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
-            
+            this.globalStartTaskPath = StandardizeStartTaskPath(GetStringValue(configuration, "GlobalStartTaskPath", string.Empty), this.defaultStorageAccountName);
+
             this.batchNodeInfo = new BatchNodeInfo
             {
                 BatchImageOffer = GetStringValue(configuration, "BatchImageOffer"),
@@ -255,6 +257,18 @@ namespace TesApi.Web
             return string.Join('/', pathComponents.Take(pathComponents.Length - 1));
         }
 
+        private static string StandardizeStartTaskPath(string startTaskPath, string defaultStorageAccount)
+        {
+            if (string.IsNullOrWhiteSpace(startTaskPath) || startTaskPath.StartsWith($"/{defaultStorageAccount}"))
+            {
+                return startTaskPath;
+            }
+            else
+            {
+                return $"/{defaultStorageAccount}{startTaskPath}";
+            }
+        }
+
         /// <summary>
         /// Determines if the <see cref="TesInput"/> file is a Cromwell command script
         /// </summary>
@@ -308,12 +322,10 @@ namespace TesApi.Web
                     var identityResourceId = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
                     string startTaskSasUrl = null;
 
-                    //if (useStartTask)
-                    //{
-                    //    var scriptPath = $"{batchExecutionPath}/start-task.sh";
-                    //    await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.StartTaskScript);
-                    //    startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
-                    //}
+                    if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
+                    {
+                        startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
+                    }
 
                     await azureProxy.CreateManualBatchPoolAsync(
                         poolName: poolName,
@@ -834,17 +846,13 @@ namespace TesApi.Web
                 nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
 
             StartTask startTask = null;
-            var useStartTask = true;
-            if (useStartTask)
+
+            if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
             {
-                //var scriptPath = $"{batchExecutionDirectoryPath}/{startTaskScriptFilename}";
-                var scriptPath = $"/{defaultStorageAccountName}/configuration/{startTaskScriptFilename}";
-                //await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.StartTaskScript);
-                var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
+                var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
 
                 startTask = new Microsoft.Azure.Batch.StartTask
                 {
-                    // Pool StartTask: install Docker as start task if it's not already
                     CommandLine = $"sudo /bin/sh {batchStartTaskLocalPathOnBatchNode}",
                     UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                     ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchStartTaskLocalPathOnBatchNode) }
