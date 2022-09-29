@@ -3,6 +3,7 @@
   <PropertyGroup>
     <!--https://learn.microsoft.com/en-us/visualstudio/msbuild/tutorial-custom-task-code-generation?view=vs-2022#optional-support-multitargeting-->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <SkipCopyUnchangedFiles>true</SkipCopyUnchangedFiles>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <Nullable>enable</Nullable>
@@ -35,5 +36,13 @@
 
   <Target Name="CleanHostConfigCompilerImport" BeforeTargets="BeforeClean" Condition="Exists('$(HostConfigCompilerImport)')">
     <Delete Files="$(HostConfigCompilerImport)" />
+  </Target>
+
+  <Target Name="SkipExistingCopyLocalFiles" BeforeTargets="_CopyFilesMarkedCopyLocal">
+    <ItemGroup>
+      <___RetainedFileWrites Include="@(ReferenceCopyLocalPaths->'$(OutDir)%(DestinationSubDirectory)%(Filename)%(Extension)')"/>
+      <ReferenceCopyLocalPaths Remove="@(___RetainedFileWrites)"/>
+      <FileWritesShareable Include="@(___RetainedFileWrites)"/>
+    </ItemGroup>
   </Target>
 </Project>
