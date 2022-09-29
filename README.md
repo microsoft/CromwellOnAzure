@@ -180,10 +180,10 @@ task hello {
     echo 'Hello ${name}!'
   }
   output {
-	File response = stdout()
+    File response = stdout()
   }
   runtime {
-	docker: 'ubuntu:16.04'
+    docker: 'ubuntu:16.04'
   }
 }
 

@@ -23,7 +23,7 @@ namespace Common.HostConfigs
     public class VirtualMachineSize
     {
         /// <summary>
-        /// Name of the container image, for example: ubuntu quay.io/aptible/ubuntu gcr.io/my-org/my-image etc...
+        /// Name of the container image, for example: ubuntu quay.io/aptible/ubuntu gcr.io/my-org/my-image etc.
         /// </summary>
         /// <remarks>TODO</remarks>
         [DataMember(Name = "container")]
