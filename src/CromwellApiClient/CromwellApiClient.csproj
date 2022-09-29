@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <Configurations>Debug;Release;win;osx;linux</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
