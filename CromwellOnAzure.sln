@@ -39,8 +39,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dragen_v1.0.0", "dragen_v1.
 		HostConfigs\dragen_v1.0.0\start.zip = HostConfigs\dragen_v1.0.0\start.zip
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HostConfigCompiler", "HostConfigCompiler\HostConfigCompiler.csproj", "{A892790A-2515-4912-9DED-515C09E69B7E}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -148,18 +146,6 @@ Global
 		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.osx|Any CPU.Build.0 = osx|Any CPU
 		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.win|Any CPU.ActiveCfg = win|Any CPU
-		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.win|Any CPU.Build.0 = win|Any CPU
-		{A892790A-2515-4912-9DED-515C09E69B7E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A892790A-2515-4912-9DED-515C09E69B7E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A892790A-2515-4912-9DED-515C09E69B7E}.linux|Any CPU.ActiveCfg = linux|Any CPU
-		{A892790A-2515-4912-9DED-515C09E69B7E}.linux|Any CPU.Build.0 = linux|Any CPU
-		{A892790A-2515-4912-9DED-515C09E69B7E}.osx|Any CPU.ActiveCfg = osx|Any CPU
-		{A892790A-2515-4912-9DED-515C09E69B7E}.osx|Any CPU.Build.0 = osx|Any CPU
-		{A892790A-2515-4912-9DED-515C09E69B7E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A892790A-2515-4912-9DED-515C09E69B7E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A892790A-2515-4912-9DED-515C09E69B7E}.win|Any CPU.ActiveCfg = win|Any CPU
-		{A892790A-2515-4912-9DED-515C09E69B7E}.win|Any CPU.Build.0 = win|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

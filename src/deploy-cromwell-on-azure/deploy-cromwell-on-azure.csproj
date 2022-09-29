@@ -68,19 +68,6 @@
     <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>
 
-  <UsingTask TaskName="HostConfigCompiler.Compiler" TaskFactory="TaskHostFactory" AssemblyFile="$(HostConfigCompilerTask)" Condition="Exists('$(HostConfigCompilerTask)')" />
-
-  <Target Name="HostConfigCompiler" AfterTargets="ResolveProjectReferences">
-    <HostConfigCompiler.Compiler HostConfigsDirectory="..\..\HostConfigs" WorkDirectory="$(IntermediateOutputPath)HostConfigs">
-      <Output TaskParameter="Resources" ItemName="_InjectedResource" />
-    </HostConfigCompiler.Compiler>
-      <ItemGroup>
-          <EmbeddedResource Include="@(_InjectedResource)">
-              <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
-          </EmbeddedResource>
-      </ItemGroup>
-  </Target>
-
   <ItemGroup>
     <None Update="samples\config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
