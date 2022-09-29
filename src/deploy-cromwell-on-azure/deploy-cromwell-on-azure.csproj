@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
     <!-- Avoids "Couldn't find a valid ICU package installed on the system." error. -->
     <InvariantGlobalization Condition="'$(Configuration)' == 'linux'">true</InvariantGlobalization>
   </PropertyGroup>
