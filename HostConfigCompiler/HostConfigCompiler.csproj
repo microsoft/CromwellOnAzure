@@ -6,6 +6,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <Nullable>enable</Nullable>
+    <Configurations>Debug;Release;win;osx;linux</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,12 +28,12 @@
     <ItemGroup>
       <HostConfigCompilerImport Include="&lt;Project&gt;&lt;PropertyGroup&gt;" />
       <HostConfigCompilerImport Include="&lt;HostConfigCompilerTask&gt;$(TargetPath)&lt;/HostConfigCompilerTask&gt;" />
-      <HostConfigCompilerImport Include="&lt;/PropertyGroup&gt;&lt;/Project&gt;"/>
+      <HostConfigCompilerImport Include="&lt;/PropertyGroup&gt;&lt;/Project&gt;" />
     </ItemGroup>
     <WriteLinesToFile File="$(HostConfigCompilerImport)" Lines="@(HostConfigCompilerImport)" Overwrite="true" />
   </Target>
 
   <Target Name="CleanHostConfigCompilerImport" BeforeTargets="BeforeClean" Condition="Exists('$(HostConfigCompilerImport)')">
-    <Delete Files="$(HostConfigCompilerImport)"/>
+    <Delete Files="$(HostConfigCompilerImport)" />
   </Target>
 </Project>

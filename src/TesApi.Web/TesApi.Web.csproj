@@ -6,6 +6,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PreserveCompilationContext>true</PreserveCompilationContext>
     <AssemblyName>tesapi</AssemblyName>
+    <Configurations>Debug;Release;win;osx;linux</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
