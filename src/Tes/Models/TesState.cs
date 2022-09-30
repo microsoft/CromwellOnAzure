@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 /*
@@ -76,6 +76,12 @@ namespace Tes.Models
         /// Enum CANCELEDEnum for CANCELED
         /// </summary>
         [EnumMember(Value = "CANCELED")]
-        CANCELEDEnum = 9
+        CANCELEDEnum = 9,
+
+        /// <summary>
+        /// TES has started, but is still waiting on, deletion of downstream cloud resources (jobs/pools)
+        /// </summary>
+        [EnumMember(Value = "CANCELLATION_REQUESTED")] 
+        CANCELLATIONREQUESTEDnum = 10
     }
 }

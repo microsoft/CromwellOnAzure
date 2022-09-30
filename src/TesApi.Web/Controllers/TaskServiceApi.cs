@@ -81,11 +81,10 @@ namespace TesApi.Controllers
                 {
                     logger.LogInformation($"Task {id} cannot be canceled because it is in {tesTask.State} state.");
                 }
-                else if (tesTask.State != TesState.CANCELEDEnum)
+                else if (tesTask.State != TesState.CANCELLATIONREQUESTEDnum)
                 {
                     logger.LogInformation("Canceling task");
-                    tesTask.IsCancelRequested = true;
-                    tesTask.State = TesState.CANCELEDEnum;
+                    tesTask.State = TesState.CANCELLATIONREQUESTEDnum;
                     await repository.UpdateItemAsync(tesTask);
                 }
             }

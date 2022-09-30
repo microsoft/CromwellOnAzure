@@ -28,7 +28,6 @@ namespace TesApi.Web
                 Tuple.Create(typeof(TesExecutorLog), nameof(TesExecutorLog.Stderr)),
                 Tuple.Create(typeof(TesInput), nameof(TesInput.Content)),
                 Tuple.Create(typeof(TesTaskLog), nameof(TesTaskLog.SystemLogs)),
-                Tuple.Create(typeof(TesTask), nameof(TesTask.IsCancelRequested)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.ErrorCount)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.EndTime)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.WorkflowId)),

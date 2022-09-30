@@ -96,7 +96,7 @@ namespace TesApi.Web
             static bool tesTaskIsInitializingOrRunning(TesTask tesTask) => tesTask.State == TesState.INITIALIZINGEnum || tesTask.State == TesState.RUNNINGEnum;
             static bool tesTaskIsQueuedOrInitializing(TesTask tesTask) => tesTask.State == TesState.QUEUEDEnum || tesTask.State == TesState.INITIALIZINGEnum;
             static bool tesTaskIsQueued(TesTask tesTask) => tesTask.State == TesState.QUEUEDEnum;
-            static bool tesTaskCancellationRequested(TesTask tesTask) => tesTask.State == TesState.CANCELEDEnum && tesTask.IsCancelRequested;
+            static bool tesTaskCancellationRequested(TesTask tesTask) => tesTask.State == TesState.CANCELLATIONREQUESTEDnum;
 
             static void SetTaskStateAndLog(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
             {
@@ -159,7 +159,7 @@ namespace TesApi.Web
             { 
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 await DeleteManualBatchPoolIfExistsAsync(tesTask);
-                tesTask.IsCancelRequested = false; 
+                tesTask.State = TesState.CANCELEDEnum;
             }
 
             tesTaskStateTransitions = new List<TesTaskStateTransition>()

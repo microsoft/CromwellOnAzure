@@ -110,7 +110,7 @@ namespace TesApi.Web
                     predicate: t => t.State == TesState.QUEUEDEnum
                         || t.State == TesState.INITIALIZINGEnum
                         || t.State == TesState.RUNNINGEnum
-                        || (t.State == TesState.CANCELEDEnum && t.IsCancelRequested)))
+                        || (t.State == TesState.CANCELLATIONREQUESTEDnum)))
                 .ToList();
 
             if (!tesTasks.Any())
