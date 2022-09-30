@@ -943,6 +943,11 @@ namespace CromwellOnAzureDeployer
             {
                 await PatchCromwellConfigurationFileV310Async(storageAccount);
             }
+
+            if (installedVersion is null || installedVersion < new Version(3, 2))
+            {
+                await PatchAllowedVmSizesFileV320Async(storageAccount);
+            }
         }
 
         private static Dictionary<string, string> GetDefaultValues(string[] files)
@@ -2339,6 +2344,20 @@ namespace CromwellOnAzureDeployer
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
                 });
 
+        private Task PatchAllowedVmSizesFileV320Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Patching '{AllowedVmSizesFileName}' in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var allowedVmSizesText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, cts);
+
+                    allowedVmSizesText = allowedVmSizesText
+                        .Replace("Azure VM sizes used", "Azure VM sizes/families used")
+                        .Replace("VM size names", "VM size or family names")
+                        .Replace("# Standard_D3_v2", "# standardDv2Family");
+
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, allowedVmSizesText);
+                });
         private Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Adding new settings to 'env-04-settings.txt' file on the VM...",
