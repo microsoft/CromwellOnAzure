@@ -1699,7 +1699,7 @@ namespace CromwellOnAzureDeployer
                 await Execute(
                     $"Assigning {BuiltInRole.BillingReader} role for VM to Subscription scope...",
                     () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                        async () => await azureSubscriptionClient.AccessManagement.RoleAssignments
+                        () => azureSubscriptionClient.AccessManagement.RoleAssignments
                             .Define(Guid.NewGuid().ToString())
                             .ForObjectId(managedIdentity.PrincipalId)
                             .WithBuiltInRole(BuiltInRole.BillingReader)
