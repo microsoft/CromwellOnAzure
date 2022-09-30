@@ -2539,9 +2539,10 @@ namespace CromwellOnAzureDeployer
 
         private async Task ValidateVmAsync()
         {
-            var computeSkusRaw = await generalRetryPolicy.ExecuteAsync(() => azureSubscriptionClient.ComputeSkus.ListbyRegionAndResourceTypeAsync(Region.Create(configuration.RegionName), ComputeResourceType.VirtualMachines));
-            
-            var computeSkus = computeSkusRaw
+            var computeSkus = (await generalRetryPolicy.ExecuteAsync(() => 
+                azureSubscriptionClient.ComputeSkus.ListbyRegionAndResourceTypeAsync(
+                    Region.Create(configuration.RegionName), 
+                    ComputeResourceType.VirtualMachines)))
                 .Where(s => !s.Restrictions.Any())
                 .Select(s => s.Name.Value)
                 .ToList();
