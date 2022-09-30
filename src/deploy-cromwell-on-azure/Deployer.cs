@@ -290,9 +290,8 @@ namespace CromwellOnAzureDeployer
                             throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
                         }
 
-                        cosmosDb = (await azureSubscriptionClient.CosmosDBAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName))
-                            .FirstOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase))
-                                ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName} does not exist in resource group {configuration.ResourceGroupName}.");
+                        cosmosDb = await GetExistingCosmosDbAccountAsync(cosmosDbAccountName)
+                            ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName}");
 
                         configuration.CosmosDbAccountName = cosmosDbAccountName;
 
@@ -348,6 +347,7 @@ namespace CromwellOnAzureDeployer
                         ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
+                        cosmosDb = await ValidateAndGetExistingCosmosDbAccountAsync();
                         aksCluster = await ValidateAndGetExistingAKSClusterAsync();
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
                         var keyVault = await ValidateAndGetExistingKeyVault();
@@ -576,7 +576,7 @@ namespace CromwellOnAzureDeployer
                             }),
                             Task.Run(async () => 
                             {
-                                cosmosDb = await CreateCosmosDbAsync();
+                                cosmosDb ??= await CreateCosmosDbAsync();
                                 await AssignVmAsContributorToCosmosDb(managedIdentity, cosmosDb);
                             }),
                             Task.Run(async () => {
@@ -1566,6 +1566,23 @@ namespace CromwellOnAzureDeployer
                 .SelectMany(a => a)
                 .SingleOrDefault(a => a.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase) && a.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
 
+        private async Task<ICosmosDBAccount> GetExistingCosmosDbAccountAsync(string cosmosDbAccountName)
+            => (await Task.WhenAll(subscriptionIds.Select(async s =>
+            {
+                try
+                {
+                    return await azureClient.WithSubscription(s).CosmosDBAccounts.ListAsync();
+                }
+                catch (Exception e)
+                {
+                    ConsoleEx.WriteLine(e.Message);
+                    return null;
+                }
+            })))
+                .Where(a => a is not null)
+                .SelectMany(a => a)
+                .SingleOrDefault(a => a.Name.Equals(cosmosDbAccountName, StringComparison.OrdinalIgnoreCase) && a.Region.Name.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
+
         private async Task CreateDefaultStorageContainersAsync(IStorageAccount storageAccount)
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
@@ -2488,6 +2505,17 @@ namespace CromwellOnAzureDeployer
 
             return (await GetExistingBatchAccountAsync(configuration.BatchAccountName))
                 ?? throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+        }
+
+        private async Task<ICosmosDBAccount> ValidateAndGetExistingCosmosDbAccountAsync()
+        {
+            if (configuration.CosmosDbAccountName is null)
+            {
+                return null;
+            }
+
+            return (await GetExistingCosmosDbAccountAsync(configuration.CosmosDbAccountName))
+                ?? throw new ValidationException($"If CosmosDbAccountName is provided, the account must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
         }
 
         private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
