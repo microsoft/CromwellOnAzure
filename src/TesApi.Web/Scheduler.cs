@@ -27,7 +27,6 @@ namespace TesApi.Web
         private readonly ILogger<Scheduler> logger;
         private readonly bool isDisabled;
         private readonly bool usingBatchAutopools;
-        private IEnumerable<Task> shutdownCandidates = Enumerable.Empty<Task>();
         private readonly TimeSpan runInterval = TimeSpan.FromSeconds(5);
 
         /// <summary>
@@ -78,18 +77,9 @@ namespace TesApi.Web
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                shutdownCandidates = Enumerable.Empty<Task>();
-
                 try
                 {
                     await OrchestrateTesTasksOnBatch(stoppingToken);
-
-                    if (!usingBatchAutopools)
-                    {
-                        shutdownCandidates = await batchScheduler.GetShutdownCandidatePools(stoppingToken);
-                    }
-
-                    await Task.Delay(runInterval, stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -99,15 +89,20 @@ namespace TesApi.Web
                 {
                     logger.LogError(exc, exc.Message);
                 }
+
+                await Task.Delay(runInterval, stoppingToken);
             }
 
-            try
+            if (!usingBatchAutopools)
             {
-                await Task.WhenAll(shutdownCandidates);
-            }
-            catch (AggregateException exc)
-            {
-                logger.LogError(exc, exc.Message);
+                try
+                {
+                    await Task.WhenAll(await batchScheduler.GetShutdownCandidatePools(stoppingToken));
+                }
+                catch (AggregateException exc)
+                {
+                    logger.LogError(exc, exc.Message);
+                }
             }
 
             logger.LogInformation("Scheduler gracefully stopped.");
