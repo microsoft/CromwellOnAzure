@@ -593,6 +593,7 @@ namespace TesApi.Tests
             await RunTest("VmSizeLowPri2", TesState.INITIALIZINGEnum, "VmSizeLowPri2");
             await RunTest("VmSizeLowPriNonExistent", TesState.SYSTEMERROREnum);
             await RunTest("VmSizeLowPriNonExistent,VmSizeLowPri1", TesState.INITIALIZINGEnum, "VmSizeLowPri1");
+            await RunTest("VmFamily2", TesState.INITIALIZINGEnum, "VmSizeLowPri2");
         }
 
         [TestMethod]

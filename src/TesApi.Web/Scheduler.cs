@@ -90,8 +90,6 @@ namespace TesApi.Web
                     {
                         shutdownCandidates = await batchScheduler.GetShutdownCandidatePools(stoppingToken);
                     }
-
-                    await Task.Delay(runInterval, stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -101,10 +99,22 @@ namespace TesApi.Web
                 {
                     logger.LogError(exc, exc.Message);
                 }
+
+                try
+                {
+                    await Task.Delay(runInterval, stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
             }
 
             try
             {
+                // Quickly delete pools since TES is shutting down,
+                // instead of getting them all again (which might result in no pools being deleted).
+                // The trade-off is that some pools might not be deleted
                 await Task.WhenAll(shutdownCandidates);
             }
             catch (AggregateException exc)
