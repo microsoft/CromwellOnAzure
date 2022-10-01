@@ -68,7 +68,7 @@ namespace TesApi.Web
                 return;
             }
 
-            // Read the allowed-vm-sizes configuration file and remove any previous warnings (those start with "<" following the VM size name)
+            // Read the allowed-vm-sizes configuration file and remove any previous warnings (those start with "<" following the VM size or family name)
             var allowedVmSizesLines = allowedVmSizesFileContent
                 .Split(new[] { '\r', '\n' })
                 .Select(line => line.Split('<', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? string.Empty)
@@ -79,16 +79,20 @@ namespace TesApi.Web
                 .Where(line => !string.IsNullOrWhiteSpace(line) && !line.StartsWith("#"))
                 .ToList();
 
-            var allowedAndSupportedVmSizes = allowedVmSizesWithoutComments.Intersect(supportedVmSizes.Select(v => v.VmSize), StringComparer.OrdinalIgnoreCase).Distinct().ToList();
+            var allowedAndSupportedVmSizes = allowedVmSizesWithoutComments.Intersect(supportedVmSizes.Select(v => v.VmSize), StringComparer.OrdinalIgnoreCase)
+                .Union(allowedVmSizesWithoutComments.Intersect(supportedVmSizes.Select(v => v.VmFamily), StringComparer.OrdinalIgnoreCase))
+                .Distinct()
+                .ToList();
+
             var allowedVmSizesButNotSupported = allowedVmSizesWithoutComments.Except(allowedAndSupportedVmSizes).Distinct().ToList();
 
             if (allowedVmSizesButNotSupported.Any())
             {
-                logger.LogWarning($"The following VM sizes are listed in {allowedVmSizesFilePath}, but are either misspelled or not supported in your region: {string.Join(", ", allowedVmSizesButNotSupported)}. These will be ignored.");
+                logger.LogWarning($"The following VM sizes or families are listed in {allowedVmSizesFilePath}, but are either misspelled or not supported in your region: {string.Join(", ", allowedVmSizesButNotSupported)}. These will be ignored.");
 
                 var linesWithWarningsAdded = allowedVmSizesLines.ConvertAll(line =>
                     allowedVmSizesButNotSupported.Contains(line, StringComparer.OrdinalIgnoreCase)
-                        ? $"{line} <-- WARNING: This VM size is either misspelled or not supported in your region. It will be ignored."
+                        ? $"{line} <-- WARNING: This VM size or family is either misspelled or not supported in your region. It will be ignored."
                         : line
                 );
 

@@ -16,9 +16,11 @@ using Microsoft.Azure.Batch.Auth;
 using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.Batch;
+using Microsoft.Azure.Management.Compute.Fluent;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
@@ -658,7 +660,7 @@ namespace TesApi.Web
             }
         }
 
-        private IEnumerable<VmPrice> ExtractVmPricesFromRateCardResponse(List<(string VmSize, string FamilyName, string MeterName, string MeterSubCategory)> supportedVmSizes, string pricingContent)
+        private IEnumerable<VmPrice> ExtractVmPricesFromRateCardResponse(List<(string VmSize, string MeterName, string MeterSubCategory)> supportedVmSizes, string pricingContent)
         {
             var rateCardMeters = JObject.Parse(pricingContent)["Meters"]
                 .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
@@ -697,7 +699,16 @@ namespace TesApi.Web
             static double ConvertMiBToGiB(int value) => Math.Round(value / 1024.0, 2);
 
             var azureClient = await GetAzureManagementClientAsync();
-            var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).VirtualMachines.Sizes.ListByRegionAsync(location)).ToList();
+
+            var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).ComputeSkus.ListbyRegionAndResourceTypeAsync(Region.Create(location), ComputeResourceType.VirtualMachines))
+                .Select(vm => new { VmSize = vm.Name.Value, VmFamily = vm.Inner.Family, Capabilities = vm.Capabilities.ToDictionary(c => c.Name, c => c.Value) })
+                .Select(vm => new {
+                    VmSize = vm.VmSize,
+                    VmFamily = vm.VmFamily,
+                    NumberOfCores = int.Parse(vm.Capabilities.GetValueOrDefault("vCPUsAvailable", vm.Capabilities["vCPUs"])),
+                    MemoryGiB = double.Parse(vm.Capabilities["MemoryGB"]),
+                    DiskGiB = ConvertMiBToGiB(int.Parse(vm.Capabilities["MaxResourceVolumeMB"])),
+                    MaxDataDiskCount = int.Parse(vm.Capabilities.GetValueOrDefault("MaxDataDiskCount", "0")) });
 
             IEnumerable<VmPrice> vmPrices;
 
@@ -716,21 +727,21 @@ namespace TesApi.Web
 
             var vmInfos = new List<VirtualMachineInformation>();
 
-            foreach (var (VmSize, FamilyName, _, _) in supportedVmSizes)
+            foreach (var (vmSize, _, _) in supportedVmSizes)
             {
-                var vmSpecification = vmSizesAvailableAtLocation.SingleOrDefault(x => x.Name.Equals(VmSize, StringComparison.OrdinalIgnoreCase));
-                var vmPrice = vmPrices.SingleOrDefault(x => x.VmSize.Equals(VmSize, StringComparison.OrdinalIgnoreCase));
+                var vmSpecification = vmSizesAvailableAtLocation.SingleOrDefault(vm => vm.VmSize.Equals(vmSize, StringComparison.OrdinalIgnoreCase));
+                var vmPrice = vmPrices.SingleOrDefault(vm => vm.VmSize.Equals(vmSize, StringComparison.OrdinalIgnoreCase));
 
                 if (vmSpecification is not null && vmPrice is not null)
                 {
                     vmInfos.Add(new VirtualMachineInformation
                     {
-                        VmSize = VmSize,
-                        MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
+                        VmSize = vmSize,
+                        MemoryInGB = vmSpecification.MemoryGiB,
                         NumberOfCores = vmSpecification.NumberOfCores,
-                        ResourceDiskSizeInGB = ConvertMiBToGiB(vmSpecification.ResourceDiskSizeInMB),
+                        ResourceDiskSizeInGB = vmSpecification.DiskGiB,
                         MaxDataDiskCount = vmSpecification.MaxDataDiskCount,
-                        VmFamily = FamilyName,
+                        VmFamily = vmSpecification.VmFamily,
                         LowPriority = false,
                         PricePerHour = vmPrice.PricePerHourDedicated
                     });
@@ -739,12 +750,12 @@ namespace TesApi.Web
                     {
                         vmInfos.Add(new VirtualMachineInformation
                         {
-                            VmSize = VmSize,
-                            MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
+                            VmSize = vmSize,
+                            MemoryInGB = vmSpecification.MemoryGiB,
                             NumberOfCores = vmSpecification.NumberOfCores,
-                            ResourceDiskSizeInGB = ConvertMiBToGiB(vmSpecification.ResourceDiskSizeInMB),
+                            ResourceDiskSizeInGB = vmSpecification.DiskGiB,
                             MaxDataDiskCount = vmSpecification.MaxDataDiskCount,
-                            VmFamily = FamilyName,
+                            VmFamily = vmSpecification.VmFamily,
                             LowPriority = true,
                             PricePerHour = vmPrice.PricePerHourLowPriority
                         });

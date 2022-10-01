@@ -70,7 +70,7 @@ namespace CromwellOnAzureDeployer
         public bool ManualHelmDeployment { get; set; }
         public string HelmBinaryPath { get; set; } = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
         public int AksPoolSize { get; set; } = 2;
-        public bool CrossSubscriptionAKSDeployment { get; set; } = false;
+        public bool? CrossSubscriptionAKSDeployment { get; set; } = null;
         public bool Silent { get; set; }
         public bool DeleteResourceGroupOnFailure { get; set; }
         public string CromwellVersion { get; set; }
@@ -98,8 +98,6 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlServerName { get; set; }
         public bool UsePostgreSqlSingleServer { get; set; } = false;
         public string KeyVaultName { get; set; }
-        // Temporary workaround until I can get Azure Graph RBAC client working. 
-        public string UserObjectId { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {
