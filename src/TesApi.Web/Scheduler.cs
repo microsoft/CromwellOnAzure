@@ -89,7 +89,14 @@ namespace TesApi.Web
                         shutdownCandidates = await batchScheduler.GetShutdownCandidatePools(stoppingToken);
                     }
 
-                    await Task.Delay(runInterval, stoppingToken);
+                    try
+                    {
+                        await Task.Delay(runInterval, stoppingToken);
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        break;
+                    }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
