@@ -90,7 +90,14 @@ namespace TesApi.Web
                     logger.LogError(exc, exc.Message);
                 }
 
-                await Task.Delay(runInterval, stoppingToken);
+                try
+                {
+                    await Task.Delay(runInterval, stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
             }
 
             if (!usingBatchAutopools)
