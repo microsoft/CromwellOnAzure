@@ -34,11 +34,11 @@ This article answers FAQs, describes advanced features that allow customization 
 
 5. Miscellaneous
    * I cannot find my issue in this document and [want more information](#Get-container-logs-to-debug-issues) from Cromwell, MySQL, or TES Docker container logs.
-   * I am running a large amount of workflows and [MySQL storage disk is full](#I-am-running-a-large-amount-of-workflows-and-MySQL-storage-disk-is-full)
+   * I am running a large number of workflows and [MySQL storage disk is full](#I-am-running-a-large-number-of-workflows-and-MySQL-storage-disk-is-full)
    * How can I run [CWL](#Running-CWL-Workflows-on-Cromwell-on-Azure) files on Cromwell on Azure?
 
 
-## Known Issues And Mitigation
+## Known Issues and Mitigation
 ### I am trying to use files with SAS tokens but run into file access issues
 There is currently a bug (which we are tracking) in a dependency tool we use to get files from Azure Storage to the VM to perform a task. For now, follow these steps as a workaround if you are running into errors getting access to your files using SAS tokens on Cromwell on Azure.
 If you followed [these](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview#get-started-with-sas) instructions to create a SAS URL, you’ll get something similar to
@@ -85,13 +85,13 @@ sudo docker exec -it cromwellazure_mysqldb_1 bash -c 'mysql -ucromwell -Dcromwel
 
 ## Setup
 ### Setup Cromwell on Azure for multiple users in the same Azure subscription
-Cromwell on Azure is designed to be flexible for single and multiple user scenarios. Here we have envisioned 4 general scenarios and demonstrated how they relate to your Azure account, Azure Batch service, Subscription ID, and Resource Groups, each depicted below.
+Cromwell on Azure is designed to be flexible for single and multiple user scenarios. Here we have envisioned four general scenarios and demonstrated how they relate to your Azure account, Azure Batch service, Subscription ID, and Resource Groups, each depicted below.
 
 ![Multiple Users FAQ](/docs/screenshots/multiple-users-configs.png)
 
 1) **The Individual User**: This is the current standard deployment configuration for Cromwell on Azure. No extra steps beyond the [deployment guide](../README.md/#deploy-your-instance-of-cromwell-on-azure) are necessary.
 
-2) **The Lab**: This scenario is envisioned for small lab groups and teams sharing a common Azure resource (ie. a common bioinformatician(s), data scientist(s), or computational biologist(s) collaborating on projects from the same lab). Functionally, this setup does not differ from the "Individual User" configuration. We recommend a single "Cromwell Administrator" perform the initial Cromwell on Azure  setup for the group. Ensure that this user has the appropriate role(s) on the Subscription ID as outlined [here](../README.md/#Prerequisites). Once deployed, this "Cromwell Administrator" can [grant "Contributor" access to the created Cromwell storage account via the Azure Portal](https://docs.microsoft.com/en-us/azure/storage/common/storage-auth-aad-rbac-portal#assign-an-azure-built-in-role). This would allow granted users the ability to submit analysis jobs and retrieve results. It would also allow them the ability to view *any analysis* that has been run by the lab. As Cromwell submits all jobs to Azure Batch as one user, the billing for Cromwell on Azure usage would be collective for the entire lab, not broken down by individual users who submitted the jobs.
+2) **The Lab**: This scenario is envisioned for small lab groups and teams sharing a common Azure resource (i.e. a common bioinformatician(s), data scientist(s), or computational biologist(s) collaborating on projects from the same lab). Functionally, this setup does not differ from the "Individual User" configuration. We recommend a single "Cromwell Administrator" perform the initial Cromwell on Azure  setup for the group. Ensure that this user has the appropriate role(s) on the Subscription ID as outlined [here](../README.md/#Prerequisites). Once deployed, this "Cromwell Administrator" can [grant "Contributor" access to the created Cromwell storage account via the Azure Portal](https://docs.microsoft.com/en-us/azure/storage/common/storage-auth-aad-rbac-portal#assign-an-azure-built-in-role). This would allow granted users the ability to submit analysis jobs and retrieve results. It would also allow them the ability to view *any analysis* that has been run by the lab. As Cromwell submits all jobs to Azure Batch as one user, the billing for Cromwell on Azure usage would be collective for the entire lab, not broken down by individual users who submitted the jobs.
 
 3) **The Research Group**: This scenario is envisioned for larger research groups where a common Azure subscription is shared, but users want/require their own instance of Cromwell on Azure. The initial Cromwell on Azure deployment is done as described in the [deployment guide](../README.md/#deploy-your-instance-of-cromwell-on-azure). After the first deployment of Cromwell on Azure is done on the Subscription, subsequent users will need to specify a *separate Resource Group* **AND** *preexisting Azure Batch account name* that is currently being utilized by the pre-existing deployment(s) of Cromwell on Azure. The Azure Batch account must exist in the same region as defined in the "--RegionName" configuration of the new Cromwell on Azure deployment. You can check all the [configuration options here](#Customize-your-Cromwell-on-Azure-deployment). See the invocation of the Linux deployment script for an example:
 
@@ -119,13 +119,13 @@ Deleting all the resources in the Resource Group may take a while but as soon as
 If you see an issue that is unrelated to your permissions, and re-trying the installer does not fix it, please file a bug on our GitHub issues.
 
 ### Upgrade my Cromwell on Azure instance
-Starting in version 1.x, for convenience, some configuration files are hosted in your Cromwell on Azure storage account, in the "configuration" container - `containers-to-mount`, and `cromwell-application.conf`. You can modify and save these file using Azure Portal UI "Edit Blob" option or simply upload a new file to replace the existing one. Follow the instructions in the latest release to upgrade your Cromwell on Azure instance.
+Starting in version 1.x, for convenience, some configuration files are hosted in your Cromwell on Azure storage account, in the "configuration" container, for example `containers-to-mount`, `cromwell-application.conf`, and `allowed-vm-sizes`. You can modify and save these files using Azure Portal UI "Edit Blob" option or simply upload a new file to replace the existing one. Follow the instructions in the latest release to upgrade your Cromwell on Azure instance.
 
 ## Analysis
 ### Job failed immediately
 If a workflow you start has a task that failed immediately and lead to workflow failure be sure to check your input JSON files. Follow the instructions [here](managing-your-workflow.md/#Configure-your-Cromwell-on-Azure-workflow-files) and check out an example WDL and inputs JSON file [here](example-fastq-to-ubam.md/#Configure-your-Cromwell-on-Azure-trigger-JSON,-inputs-JSON-and-WDL-files) to ensure there are no errors in defining your input files.
 
-> For files hosted on an Azure Storage account that is connected to your Cromwell on Azure instance, the input path consists of 3 parts - the storage account name, the blob container name, file path with extension, following this format:
+> For files hosted on an Azure Storage account that is connected to your Cromwell on Azure instance, the input path consists of three parts - the storage account name, the blob container name, file path with extension, following this format:
 ```
 /<storageaccountname>/<containername>/<blobName>
 ```
@@ -135,7 +135,7 @@ If a workflow you start has a task that failed immediately and lead to workflow 
 
 Another possibility is that you are trying to use a storage account that hasn't been mounted to your Cromwell on Azure instance - either by [default during setup](../README.md/#Cromwell-on-Azure-deployed-resources) or by following these steps to [mount a different storage account](#use-input-data-files-from-an-existing-azure-storage-account-that-my-lab-or-team-is-currently-using). <br/>
 
-Check out these [known issues and mitigation](#Known-Issues-And-Mitigation) for more commonly seen issues caused by bugs we are actively tracking.
+Check out these [known issues and mitigation](#Known-Issues-and-Mitigation) for more commonly seen issues caused by bugs we are actively tracking.
 
 ### Check Azure Batch account quotas
 If you are running a task in a workflow with a large cpu cores requirement, check if your [Batch account has enough resource quotas](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas). You can request more quotas by following [these instructions](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#increase-a-quota).
@@ -157,7 +157,7 @@ Each task in a workflow starts an Azure Batch VM. To see currently active tasks,
 ### Find which tasks failed in a workflow
 [Cosmos DB](https://azure.microsoft.com/en-us/services/cosmos-db/) stores information about all tasks in a workflow. For monitoring or debugging any workflow you may choose to query the database.<br/>
 
-Navigate to your Cosmos DB instance on Azure Portal. Click on the "Data Explorer" menu item, Click on the "TES" container and select "Items". <br/>
+Navigate to your Cosmos DB instance on Azure Portal. Click on the "Data Explorer" menu item, click on the "TES" container, and select "Items". <br/>
 
 ![Cosmos DB SQL query](screenshots/cosmosdb.PNG)
 
@@ -172,16 +172,16 @@ SELECT * FROM c where startswith(c.id,"<first 9 character of the workflowId>") A
 ```
 
 ### Make sure there are no Azure infrastructure errors
-When working with Cromwell on Azure, you may run into issues with Azure Batch or Storage accounts. For instance, if a file path cannot be found or if the WDL workflow failed with an unknown reason. For these scenarios, consider debugging or collecting more information using [Application Insights](https://docs.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview).<br/>
+When working with Cromwell on Azure, you may run into issues with Azure Batch or Storage accounts. For instance, if a file path cannot be found or if the WDL workflow failed for an unknown reason. For these scenarios, consider debugging or collecting more information using [Application Insights](https://docs.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview).<br/>
 
 Navigate to your Application Insights instance on Azure Portal. Click on the "Logs (Analytics)" menu item under the "Monitoring" section to get all logs from Cromwell on Azure's TES backend.<br/>
 
 ![App insights](screenshots/appinsights.PNG)
 
-You can explore exceptions or logs to find the reason for failure, and use time ranges or [Kusto Query Language](https://docs.microsoft.com/en-us/azure/kusto/query/) to narrow your search.<br/>
+You can explore exceptions or logs to find the reason for failure and use time ranges or [Kusto Query Language](https://docs.microsoft.com/en-us/azure/kusto/query/) to narrow your search.<br/>
 
 ### Check Azure Storage Tier
-Cromwell utilizes Blob storage containers and Blobfuse to allow your data to be accessed and processed. The [Blob Storage Access Tier](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-storage-tiers?tabs=azure-portal) can have a demonstrable effect on your analysis time, particularly on your initial VM preparation. If you experience this, we would recommend setting your access tier to "Hot" instead of "Cool". You can do this under the "Access Tier" settings in the "Configuration" menu on Azure Portal. NOTE: this only affects users utilizing Gen2 Storage Accounts. All Gen 1 "Standard" blobs are access tier "Hot" by default.
+Cromwell utilizes Blob storage containers and Blobfuse to allow your data to be accessed and processed. The [Blob Storage Access Tier](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-storage-tiers?tabs=azure-portal) can have a demonstrable effect on your analysis time, particularly on your initial VM preparation. If you experience this, we recommend setting your access tier to "Hot" instead of "Cool". You can do this under the "Access Tier" settings in the "Configuration" menu on Azure Portal. NOTE: this only affects users utilizing Gen2 Storage Accounts. All Gen 1 "Standard" blobs are access tier "Hot" by default.
 
 ## Customizing your Cromwell on Azure instance
 ### Connect to the host VM that runs all the Docker containers
@@ -197,7 +197,7 @@ To connect to your host VM, you can either
 1. Construct your ssh connection string if you have the VM name `ssh vmadmin@<hostname>` OR
 2. Navigate to the Connect button on the Overview blade of your Azure VM instance, then copy the ssh connection string.
 
-Paste the ssh connection string in a command line, PowerShell or terminal application to log in.
+Paste the ssh connection string in a command line, PowerShell, or terminal application to log in.
 
 ![Connect with SSH](/docs/screenshots/connectssh.PNG)
 
@@ -250,7 +250,6 @@ bool DebugLogging = false | Y | N | N | Prints all log information.
 string PostgreSqlServerName | Y | Y | N | Name of existing postgresql server.
 bool UsePostgreSqlSingleServer = false | Y | N | N | Use Postgresql single server rather than flexi servers, only recommended if you need to use private endpoints.
 string KeyVaultName | Y | Y | N | Name of an existing key vault
-string UserObjectId | Y | N | N | ObjectId of the user running the deployer, can be found in AAD. Required to assign proper permissions to KeyVault when using AKS.
 bool CrossSubscriptionAKSDeployment | Y | N | N | AKS cluster is in a different subscription than the storage account, so a keyvault and storage key will be used for storage auth for AKS.
 
 The following are more advanced configuration parameters:
@@ -316,7 +315,7 @@ For these changes to take effect, be sure to restart your Cromwell on Azure VM t
 ##### If the VM cannot be granted Contributor access to the storage account:
 This is applicable if the VM and storage account are in different Azure tenants, or if you want to use SAS token anyway for security reasons
 
-1. Add a [SAS url for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file. The SAS token can be at the account or container level and may be read-only or read-write depending on the usage.
+1. Add a [SAS URL for your desired container](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview) to the end of the `containers-to-mount` file. The SAS token can be at the account or container level and may be read-only or read-write depending on the usage.
     ```
     https://<yourstorageaccountname>.blob.core.windows.net/<yourcontainername>?<sastoken>
     ```
@@ -404,11 +403,11 @@ To learn more about your Cromwell on Azure Resource Group's cost, navigate to th
 You can also use the [Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/) to estimate your monthly cost.
 
 ### How Cromwell on Azure selects batch VMs to run tasks in a workflow
-VM price data is used to select the cheapest per hour VM for a task's runtime requirements, and is also stored in the TES database to allow calculation of total workflow cost.  VM price data is obtained from the [Azure RateCard API](https://docs.microsoft.com/en-us/previous-versions/azure/reference/mt219005(v=azure.100)).  Accessing the Azure RateCard API requires the VM's [Billing Reader](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#billing-reader) role to be assigned to your Azure subscription scope.  If you don't have [Owner](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#owner), or both [Contributor](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#contributor) and [User Access Administrator](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#user-access-administrator) roles assigned to your Azure subscription, the deployer will not be able to complete this on your behalf - you will need to contact your Azure subscription administrator(s) to complete this for you.  You will see a warning in the TES logs indicating that default VM prices are being used until this is resolved.
+VM price data is used to select the cheapest per hour VM for a task's runtime requirements and is also stored in the TES database to allow calculation of total workflow cost.  VM price data is obtained from the [Azure RateCard API](https://docs.microsoft.com/en-us/previous-versions/azure/reference/mt219005(v=azure.100)).  Accessing the Azure RateCard API requires the VM's [Billing Reader](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#billing-reader) role to be assigned to your Azure subscription scope.  If you don't have [Owner](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#owner), or both [Contributor](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#contributor) and [User Access Administrator](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#user-access-administrator) roles assigned to your Azure subscription, the deployer will not be able to complete this on your behalf - you will need to contact your Azure subscription administrator(s) to complete this for you.  You will see a warning in the TES logs indicating that default VM prices are being used until this is resolved.
 
 By default, all VM sizes supported by Azure Batch are considered for task execution. 
 
-You can constraint the Azure VM sizes considered for task execution by modifying file "allowed-vm-sizes" in the "configuration" storage container and restarting the host VM. For the full list of VM sizes and their features, see file "supported-vm-sizes" in the same container. Note that over-constraining the allowed VM sizes may result in task failures when no suitable VM is found, as well as higher execution costs. Any errors in the "allowed-vm-sizes" will be surfaced in the same file upon host VM restart.
+You can constrain the Azure VM sizes or families considered for task execution by modifying the file "allowed-vm-sizes" in the "configuration" storage container and restarting the host VM. For the full list of VM sizes and their features, see file "supported-vm-sizes" in the same container. Note that over-constraining the allowed VM sizes may result in task failures when no suitable VM is found, as well as higher execution costs. Any errors in the "allowed-vm-sizes" will be surfaced in the same file upon host VM restart.
 
 ### Optimize my WDLs
 This section is COMING SOON.
@@ -426,7 +425,7 @@ This command will list the names of all the Docker containers currently running.
 sudo docker logs 'containerName'
 ```
 
-### I am running a large amount of workflows and MySQL storage disk is full
+### I am running a large number of workflows and MySQL storage disk is full
 To ensure that no data is corrupted for MySQL backed storage for Cromwell, Cromwell on Azure mounts MySQL files on to an Azure Managed Data Disk of size 32G. In case there is a need to increase the size of this data disk, follow instructions [here](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/expand-disks#expand-an-azure-managed-disk).
 
 ### Running CWL Workflows on Cromwell on Azure

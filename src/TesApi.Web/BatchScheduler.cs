@@ -1184,6 +1184,8 @@ namespace TesApi.Web
         /// <returns>The virtual machine info</returns>
         public async Task<VirtualMachineInformation> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
         {
+            bool allowedVmSizesFilter(VirtualMachineInformation vm) => allowedVmSizes is null || ! allowedVmSizes.Any() || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) || allowedVmSizes.Contains(vm.VmFamily, StringComparer.OrdinalIgnoreCase);
+
             var tesResources = tesTask.Resources;
 
             var previouslyFailedVmSizes = tesTask.Logs?
@@ -1230,7 +1232,7 @@ namespace TesApi.Web
             var batchQuotas = await azureProxy.GetBatchAccountQuotasAsync();
 
             var selectedVm = eligibleVms
-                .Where(vm => !(allowedVmSizes?.Any() ?? false) || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
+                .Where(allowedVmSizesFilter)
                 .Where(vm => !(previouslyFailedVmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? false))
                 .Where(vm => preemptible
                     ? batchQuotas.LowPriorityCoreQuota >= vm.NumberOfCores
@@ -1242,7 +1244,7 @@ namespace TesApi.Web
             if (!preemptible && selectedVm is not null)
             {
                 var idealVm = eligibleVms
-                    .Where(vm => !(allowedVmSizes?.Any() ?? false) || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase))
+                    .Where(allowedVmSizesFilter)
                     .Where(vm => !(previouslyFailedVmSizes?.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) ?? false))
                     .OrderBy(x => x.PricePerHour)
                     .FirstOrDefault();
@@ -1272,14 +1274,11 @@ namespace TesApi.Web
                 noVmFoundMessage += $" The following VM sizes were excluded from consideration because of {BatchTaskState.NodeAllocationFailed} error(s) on previous attempts: {string.Join(", ", previouslyFailedVmSizes)}.";
             }
 
-            if (allowedVmSizes?.Any() ?? false)
-            {
-                var vmsExcludedByTheAllowedVmsConfiguration = eligibleVms.Where(vm => allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase));
+            var vmsExcludedByTheAllowedVmsConfiguration = eligibleVms.Except(eligibleVms.Where(allowedVmSizesFilter)).Count();
 
-                if (vmsExcludedByTheAllowedVmsConfiguration.Any())
-                {
-                    noVmFoundMessage += $" {vmsExcludedByTheAllowedVmsConfiguration.Count()} VM(s) were excluded by the allowed-vm-sizes configuration. Consider expanding the list of allowed VM sizes.";
-                }
+            if (vmsExcludedByTheAllowedVmsConfiguration > 0)
+            {
+                noVmFoundMessage += $" Note that {vmsExcludedByTheAllowedVmsConfiguration} VM(s), suitable for this task, were excluded by the allowed-vm-sizes configuration. Consider expanding the list of allowed VM sizes.";
             }
 
             throw new AzureBatchVirtualMachineAvailabilityException(noVmFoundMessage.Trim());
