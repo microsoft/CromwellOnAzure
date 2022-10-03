@@ -45,7 +45,7 @@ All trigger JSON files include the following information:
 - The "WorkflowInputsUrl" is the url for your input JSON file. You can use this file to customize inputs to any workflow file.
 - The "WorkflowOptionsUrl" is only used with some workflow files. If you are not using it set this to `null`.
 - The "WorkflowDependenciesUrl" is only used with some workflow files. If you are not using it set this to `null`.
-- The "WorkflowLabelsUrl" is only used with some workflow files. If you are not using it set this to `null`.
+- The "WorkflowLabelsUrl" is only used with some workflow files. If you are not using it set this to `null`.  [Learn more about labels](https://cromwell.readthedocs.io/en/stable/cromwell_features/Labels/).
 
 Your trigger file should be configured as follows:
 ```

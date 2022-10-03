@@ -205,7 +205,8 @@ Hello World trigger JSON file as seen in your storage account's `workflows` cont
   "WorkflowUrl": "/<storageaccountname>/inputs/test/test.wdl",
   "WorkflowInputsUrl": "/<storageaccountname>/inputs/test/test.json",
   "WorkflowOptionsUrl": null,
-  "WorkflowDependenciesUrl": null
+  "WorkflowDependenciesUrl": null,
+  "WorkflowLabelsUrl": null
 }
 ```
 

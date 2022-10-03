@@ -63,6 +63,7 @@ Alternatively, you can use http or https paths for your input files [using share
   "WorkflowUrl": "https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/az3.0.0/paired-fastq-to-unmapped-bam.wdl",
   "WorkflowInputsUrl": "https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/az3.0.0/paired-fastq-to-unmapped-bam.inputs.json",
   "WorkflowOptionsUrl": null,
-  "WorkflowDependenciesUrl": null
+  "WorkflowDependenciesUrl": null,
+  "WorkflowLabelsUrl": null
 }
 ```
