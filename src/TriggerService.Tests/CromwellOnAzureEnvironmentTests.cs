@@ -222,6 +222,29 @@ namespace TriggerService.Tests
             );
 
         [TestMethod]
+        public async Task ProcessBlobTrigger_OnlyWorkflowUrlSpecified()
+        {
+            var triggerFileContent =
+                @"{
+                    ""WorkflowUrl"":""" + fakeAzureWdl + @"""
+                }";
+
+            await ExecuteTriggerFileTest(triggerFileContent, 0);
+        }
+
+        [TestMethod]
+        public async Task ProcessBlobTrigger_OnlyWorkflowUrlAndInputsUrlSpecified()
+        {
+            var triggerFileContent =
+                @"{
+                    ""WorkflowUrl"":""" + fakeAzureWdl + @""",
+                    ""WorkflowInputsUrl"":""" + fakeAzureInput + @"""
+                }";
+
+            await ExecuteTriggerFileTest(triggerFileContent, 1);
+        }
+
+        [TestMethod]
         public async Task ProcessBlobTrigger_NoInput()
         {
             var triggerFileContent = 
@@ -229,7 +252,8 @@ namespace TriggerService.Tests
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
                     ""WorkflowOptionsUrl"":null,
-                    ""WorkflowDependenciesUrl"":null
+                    ""WorkflowDependenciesUrl"":null,
+                    ""WorkflowLabelsUrl"":null
                 }";
 
             await ExecuteTriggerFileTest(triggerFileContent, 0);
@@ -243,7 +267,8 @@ namespace TriggerService.Tests
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
                     ""WorkflowOptionsUrl"":null,
-                    ""WorkflowDependenciesUrl"":null
+                    ""WorkflowDependenciesUrl"":null,
+                    ""WorkflowLabelsUrl"":null
                 }";
 
             await ExecuteTriggerFileTest(triggerFileContent, 1);
@@ -257,7 +282,8 @@ namespace TriggerService.Tests
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
-                    ""WorkflowDependenciesUrl"":null
+                    ""WorkflowDependenciesUrl"":null,
+                    ""WorkflowLabelsUrl"":null
                 }";
 
             await ExecuteTriggerFileTest(triggerFileContent, fakeAzureInputs.Count);
@@ -272,7 +298,8 @@ namespace TriggerService.Tests
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
-                    ""WorkflowDependenciesUrl"":null
+                    ""WorkflowDependenciesUrl"":null,
+                    ""WorkflowLabelsUrl"":null
                 }";
 
             await ExecuteTriggerFileTest(triggerFileContent, fakeAzureInputs.Count + 1);
@@ -287,7 +314,8 @@ namespace TriggerService.Tests
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
                     ""WorkflowInputsUrls"":null,
                     ""WorkflowOptionsUrl"":null,
-                    ""WorkflowDependenciesUrl"":null
+                    ""WorkflowDependenciesUrl"":null,
+                    ""WorkflowLabelsUrl"":null
                 }";
 
             await ExecuteTriggerFileTest(triggerFileContent, 1);
@@ -302,7 +330,8 @@ namespace TriggerService.Tests
                     ""WorkflowInputsUrl"":null,
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
                     ""WorkflowOptionsUrl"":null,
-                    ""WorkflowDependenciesUrl"":null
+                    ""WorkflowDependenciesUrl"":null,
+                    ""WorkflowLabelsUrl"":null
                 }";
 
             await ExecuteTriggerFileTest(triggerFileContent, fakeAzureInputs.Count);
@@ -317,7 +346,8 @@ namespace TriggerService.Tests
                     ""WorkflowInputsUrl"":null,
                     ""WorkflowInputsUrls"":null,
                     ""WorkflowOptionsUrl"":null,
-                    ""WorkflowDependenciesUrl"":null
+                    ""WorkflowDependenciesUrl"":null,
+                    ""WorkflowLabelsUrl"":null
                 }";
 
             await ExecuteTriggerFileTest(triggerFileContent, 0);
