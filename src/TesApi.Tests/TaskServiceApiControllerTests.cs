@@ -272,7 +272,7 @@ namespace TesApi.Tests
 
             Assert.IsNotNull(result);
             Assert.AreEqual(200, result.StatusCode);
-            Assert.AreEqual(TesState.CANCELLATIONREQUESTEDnum, tesTask.State);
+            Assert.AreEqual(TesState.CANCELINGnum, tesTask.State);
             mockRepo.Verify(x => x.UpdateItemAsync(tesTask));
         }
 

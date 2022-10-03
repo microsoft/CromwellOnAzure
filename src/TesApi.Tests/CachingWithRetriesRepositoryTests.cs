@@ -28,7 +28,7 @@ namespace TesApi.Tests
             Expression<Func<TesTask, bool>> predicate = t => t.State == TesState.QUEUEDEnum
                        || t.State == TesState.INITIALIZINGEnum
                        || t.State == TesState.RUNNINGEnum
-                       || (t.State == TesState.CANCELLATIONREQUESTEDnum);
+                       || t.State == TesState.CANCELINGnum;
 
             var items = await cachingRepository.GetItemsAsync(predicate);
             await cachingRepository.CreateItemAsync(tesTask);
@@ -48,7 +48,7 @@ namespace TesApi.Tests
             Expression<Func<TesTask, bool>> predicate = t => t.State == TesState.QUEUEDEnum
                        || t.State == TesState.INITIALIZINGEnum
                        || t.State == TesState.RUNNINGEnum
-                       || (t.State == TesState.CANCELLATIONREQUESTEDnum);
+                       || (t.State == TesState.CANCELINGnum);
 
             var items = await cachingRepository.GetItemsAsync(predicate);
             await cachingRepository.DeleteItemAsync("deleteItem");
@@ -86,7 +86,7 @@ namespace TesApi.Tests
             Expression <Func<TesTask, bool>> predicate = t => t.State == TesState.QUEUEDEnum
                        || t.State == TesState.INITIALIZINGEnum
                        || t.State == TesState.RUNNINGEnum
-                       || (t.State == TesState.CANCELLATIONREQUESTEDnum);
+                       || t.State == TesState.CANCELINGnum;
 
             var items = await cachingRepository.GetItemsAsync(predicate);
             await cachingRepository.UpdateItemAsync(tesTask);
@@ -123,7 +123,7 @@ namespace TesApi.Tests
             Expression<Func<TesTask, bool>> predicate = t => t.State == TesState.QUEUEDEnum
                        || t.State == TesState.INITIALIZINGEnum
                        || t.State == TesState.RUNNINGEnum
-                       || (t.State == TesState.CANCELLATIONREQUESTEDnum);
+                       || t.State == TesState.CANCELINGnum;
 
             var items = await cachingRepository.GetItemsAsync(predicate);
             var items2 = await cachingRepository.GetItemsAsync(predicate);

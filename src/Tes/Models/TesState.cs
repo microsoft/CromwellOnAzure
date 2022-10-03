@@ -81,7 +81,7 @@ namespace Tes.Models
         /// <summary>
         /// TES has started, but is still waiting on, deletion of downstream cloud resources (jobs/pools)
         /// </summary>
-        [EnumMember(Value = "CANCELLATION_REQUESTED")] 
-        CANCELLATIONREQUESTEDnum = 10
+        [EnumMember(Value = "CANCELING")] 
+        CANCELINGnum = 10
     }
 }

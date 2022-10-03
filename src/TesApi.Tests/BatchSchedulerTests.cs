@@ -428,7 +428,7 @@ namespace TesApi.Tests
         [TestMethod]
         public async Task TaskGetsCancelled()
         {
-            var tesTask = new TesTask { Id = "test", State = TesState.CANCELLATIONREQUESTEDnum };
+            var tesTask = new TesTask { Id = "test", State = TesState.CANCELINGnum };
 
             var azureProxyReturnValues = AzureProxyReturnValues.Defaults;
             azureProxyReturnValues.BatchJobAndTaskState = BatchJobAndTaskStates.TaskActive;

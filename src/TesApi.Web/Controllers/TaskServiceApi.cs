@@ -82,10 +82,10 @@ namespace TesApi.Controllers
                 {
                     logger.LogInformation($"Task {id} cannot be canceled because it's already reached a terminal state: {tesTask.State}");
                 }
-                else if (tesTask.State != TesState.CANCELLATIONREQUESTEDnum)
+                else if (tesTask.State != TesState.CANCELINGnum)
                 {
-                    logger.LogInformation("Cancellation of task has been requested");
-                    tesTask.State = TesState.CANCELLATIONREQUESTEDnum;
+                    logger.LogInformation($"Task {id} is being set to the CANCELING state");
+                    tesTask.State = TesState.CANCELINGnum;
                     await repository.UpdateItemAsync(tesTask);
                 }
             }
