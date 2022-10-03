@@ -112,9 +112,13 @@ namespace TesApi.Web
 
             try
             {
-                // Quickly delete pools since TES is shutting down,
-                // instead of getting them all again (which might result in no pools being deleted).
-                // The trade-off is that some pools might not be deleted
+                // Quickly delete pools without jobs on a best-effort basis since TES is shutting down. This was first
+                // implemented for integration tests sharing a batch account that is not created anew for testing.
+                //
+                // We don't generate the pool list here because of possible delays in communicating with the Batch API
+                // coupled with the fact that very little change of state is likely to have occured since the end of
+                // the last call to OrchestrateTesTasksOnBatch().
+                // The trade-off is that some newly job-emptied pools may not be included in this pool clean-out.
                 await Task.WhenAll(shutdownCandidates);
             }
             catch (AggregateException exc)
