@@ -829,7 +829,7 @@ namespace TesApi.Web
         /// <param name="nodeInfo">Information about the pool to be created</param>
         /// <param name="dockerInDockerImageName">Image that contains Docker to download private images</param>
         /// <param name="blobxferImageName">Image name for blobxfer, the Azure storage transfer tool</param>
-        /// <param name="identityResourceId">The resource ID of a user-assigned managed identity to assign to the pool</param>
+        /// <param name="identityResourceIds">The resource IDs of user-assigned managed identities to assign to the pool</param>
         /// <param name="disableBatchNodesPublicIpAddress">True to remove the public IP address of the Batch node</param>
         /// <param name="batchNodesSubnetId">The subnet ID of the Batch VM in the pool</param>
         /// <param name="startTaskSasUrl">SAS URL for the start task</param>
@@ -843,7 +843,7 @@ namespace TesApi.Web
             BatchNodeInfo nodeInfo,
             string dockerInDockerImageName, 
             string blobxferImageName, 
-            string identityResourceId, 
+            IEnumerable<string> identityResourceIds, 
             bool disableBatchNodesPublicIpAddress, 
             string batchNodesSubnetId,
             string startTaskSasUrl,
@@ -937,10 +937,7 @@ namespace TesApi.Web
                     Identity = new Microsoft.Azure.Management.Batch.Models.BatchPoolIdentity
                     {
                         Type = Microsoft.Azure.Management.Batch.Models.PoolIdentityType.UserAssigned,
-                        UserAssignedIdentities = new Dictionary<string, Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities>
-                        {
-                            [identityResourceId] = new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities()
-                        }
+                        UserAssignedIdentities = identityResourceIds.ToDictionary(x => x, x => new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities())
                     },
                     StartTask = startTask
                 };

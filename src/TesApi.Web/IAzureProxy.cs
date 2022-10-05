@@ -62,7 +62,7 @@ namespace TesApi.Web
             BatchNodeInfo nodeInfo,
             string dockerInDockerImageName,
             string blobxferImageName,
-            string identityResourceId,
+            IEnumerable<string> identityResourceId,
             bool disableBatchNodesPublicIpAddress,
             string batchNodesSubnetId,
             string startTaskSasUrl,

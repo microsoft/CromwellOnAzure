@@ -53,6 +53,7 @@ namespace TesApi.Web
         private readonly string marthaSecretName;
         private readonly string defaultStorageAccountName;
         private readonly string globalStartTaskPath;
+        private readonly string globalManagedIdentity;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -82,6 +83,7 @@ namespace TesApi.Web
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
             this.globalStartTaskPath = StandardizeStartTaskPath(GetStringValue(configuration, "GlobalStartTaskPath", string.Empty), this.defaultStorageAccountName);
+            this.globalManagedIdentity = GetStringValue(configuration, "GlobalManagedIdentity", string.Empty);
 
             this.batchNodeInfo = new BatchNodeInfo
             {
@@ -313,13 +315,24 @@ namespace TesApi.Web
 
                 PoolInformation poolInformation = null;
 
+                var identities = new List<string>();
+                
+                if (!string.IsNullOrWhiteSpace(globalManagedIdentity))
+                {
+                    identities.Add(globalManagedIdentity);
+                }
+
                 if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+                {
+                    identities.Add(tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity));
+                }
+
+                if (identities.Count > 0)
                 {
                     // Only create manual pool if an identity was specified
                     
                     // By default, the pool will have the same name/ID as the job
                     var poolName = jobId;
-                    var identityResourceId = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
                     string startTaskSasUrl = null;
 
                     if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
@@ -335,7 +348,7 @@ namespace TesApi.Web
                         nodeInfo: batchNodeInfo,
                         dockerInDockerImageName: dockerInDockerImageName,
                         blobxferImageName: blobxferImageName,
-                        identityResourceId: identityResourceId,
+                        identityResourceId: identities,
                         disableBatchNodesPublicIpAddress: disableBatchNodesPublicIpAddress,
                         batchNodesSubnetId: batchNodesSubnetId,
                         startTaskSasUrl: startTaskSasUrl,
