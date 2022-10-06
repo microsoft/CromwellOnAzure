@@ -1,2 +1,2 @@
-CromwellImageName=broadinstitute/cromwell:73
+CromwellImageName=broadinstitute/cromwell:84
 CromwellDrsLocalizerImageName=broadinstitute/cromwell-drs-localizer:develop

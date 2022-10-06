@@ -65,6 +65,8 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Net.WebSockets;
+using Microsoft.Rest.Azure;
+using static Microsoft.Azure.Management.ResourceManager.Fluent.Core.RestClient;
 
 namespace CromwellOnAzureDeployer
 {
@@ -77,6 +79,10 @@ namespace CromwellOnAzureDeployer
         private static readonly AsyncRetryPolicy sshCommandRetryPolicy = Policy
             .Handle<Exception>(ex => !(ex is SshAuthenticationException && ex.Message.StartsWith("Permission")))
             .WaitAndRetryAsync(5, retryAttempt => System.TimeSpan.FromSeconds(5));
+
+        private static readonly AsyncRetryPolicy generalRetryPolicy = Policy
+            .Handle<Exception>()
+            .WaitAndRetryAsync(3, retryAttempt => System.TimeSpan.FromSeconds(1));
 
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
@@ -160,7 +166,7 @@ namespace CromwellOnAzureDeployer
                 FlexibleServerModel.Server postgreSqlFlexServer = null;
                 SingleServerModel.Server postgreSqlSingleServer = null;
                 IStorageAccount storageAccount = null;
-                string keyVaultUri = string.Empty;
+                var keyVaultUri = string.Empty;
                 IVirtualMachine linuxVm = null;
                 INetworkSecurityGroup networkSecurityGroup = null;
                 IIdentity managedIdentity = null;
@@ -300,6 +306,11 @@ namespace CromwellOnAzureDeployer
 
                         if (existingAksCluster is not null)
                         {
+                            if (accountNames.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
+                            {
+                                configuration.CrossSubscriptionAKSDeployment = bool.Parse(crossSubscriptionAKSDeployment);
+                            }
+
                             if (accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
                             {
                                 var keyVault = await GetKeyVaultAsync(keyVaultName);
@@ -314,7 +325,19 @@ namespace CromwellOnAzureDeployer
                             managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
-                            await kubernetesManager.UpgradeAKSDeployment(accountNames, resourceGroup, storageAccount, managedIdentity, keyVaultUri);
+                            // Override any configuration that is used by the update.
+                            var systemSettings = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, cts), SettingsDelimiter);
+                            var versionString = systemSettings["CromwellOnAzureVersion"];
+                            var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
+
+                            await kubernetesManager.UpgradeAKSDeployment(
+                                GetPersonalizedSettings(managedIdentity, accountNames, installedVersion).Union(GetSystemSettings(systemSettings)).ToDictionary(kv => kv.Key, kv => kv.Value),
+                                resourceGroup,
+                                storageAccount,
+                                managedIdentity,
+                                keyVaultUri);
+
+                            await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(systemSettings, SettingsDelimiter));
                         }
                         else
                         {
@@ -452,7 +475,7 @@ namespace CromwellOnAzureDeployer
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                         });
 
-                        if (configuration.UseAks && configuration.CrossSubscriptionAKSDeployment)
+                        if (configuration.UseAks && configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
                         {
                             await Task.Run(async () =>
                             {
@@ -476,18 +499,22 @@ namespace CromwellOnAzureDeployer
                         Task compute = null;
                         if (configuration.UseAks)
                         {
+                            ConsoleEx.WriteLine();
+                            ConsoleEx.WriteLine($"Resource group: {resourceGroup.Name}");
+                            ConsoleEx.WriteLine($"K8S cluster: {configuration.AksClusterName}");
+                            ConsoleEx.WriteLine($"K8S CoA namespace: {configuration.AksCoANamespace}");
+                            ConsoleEx.WriteLine();
                             compute = Task.Run(async () =>
                             {
-                                var personalizedSettings = GetPersonalizedSettings(managedIdentity);
-                                var systemSettings = GetSystemSettings();
-                                var settings = personalizedSettings.Union(systemSettings).ToDictionary(kv => kv.Key, kv => kv.Value);
+                                var personalizedSettings = GetPersonalizedSettings(managedIdentity, default, default);
+                                var systemSettings = GetSystemSettings(default);
 
                                 if (aksCluster == null && !configuration.ManualHelmDeployment)
                                 {
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
-                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount.Name, keyVaultUri, resourceGroup.Name, settings, managedIdentity);
+                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount.Name, keyVaultUri, resourceGroup.Name, personalizedSettings.Union(systemSettings).ToDictionary(kv => kv.Key, kv => kv.Value), managedIdentity);
 
                                 if (configuration.ManualHelmDeployment)
                                 {
@@ -502,13 +529,14 @@ namespace CromwellOnAzureDeployer
                                     await kubernetesManager.DeployHelmChartToClusterAsync();
                                 }
 
-                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
-                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(settings, SettingsDelimiter));
+                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(personalizedSettings, SettingsDelimiter));
+                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(systemSettings, SettingsDelimiter));
                             });
                         }
                         else
                         {
                             ConsoleEx.WriteLine();
+                            ConsoleEx.WriteLine($"Resource group: {resourceGroup.Name}");
                             ConsoleEx.WriteLine($"VM host: {configuration.VmName}.{configuration.RegionName}.cloudapp.azure.com");
                             ConsoleEx.WriteLine($"VM username: {configuration.VmUsername}");
                             ConsoleEx.WriteLine($"VM password: {configuration.VmPassword}");
@@ -919,25 +947,15 @@ namespace CromwellOnAzureDeployer
             {
                 await PatchCromwellConfigurationFileV310Async(storageAccount);
             }
-        }
 
-        private Dictionary<string, string> GetSystemSettings()
-        {
-            var settings = new Dictionary<string, string>
+            if (installedVersion is null || installedVersion < new Version(3, 2))
             {
-                ["BatchNodesSubnetId"] = configuration.BatchNodesSubnetId,
-                ["DockerInDockerImageName"] = configuration.DockerInDockerImageName,
-                ["BlobxferImageName"] = configuration.BlobxferImageName,
-                ["DisableBatchNodesPublicIpAddress"] = configuration.DisableBatchNodesPublicIpAddress.GetValueOrDefault().ToString(),
-                ["KeepSshPortOpen"] = configuration.KeepSshPortOpen.GetValueOrDefault().ToString()
-            };
-
-            return settings;
+                await PatchAllowedVmSizesFileV320Async(storageAccount);
+            }
         }
 
-        private Dictionary<string, string> GetPersonalizedSettings(IIdentity managedIdentity)
+        private static Dictionary<string, string> GetDefaultValues(string[] files)
         {
-            var files = new string[] { "env-00-coa-version.txt", "env-01-account-names.txt", "env-02-internal-images.txt", "env-03-external-images.txt", "env-04-settings.txt" };
             var settings = new Dictionary<string, string>();
 
             foreach (var file in files)
@@ -945,45 +963,121 @@ namespace CromwellOnAzureDeployer
                 settings = settings.Union(Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", file))).ToDictionary(kv => kv.Key, kv => kv.Value);
             }
 
-            // Get settings from env files numbered 05-12
-            UpdateImageVersions(settings, configuration);
-
-            settings["DefaultStorageAccountName"] = configuration.StorageAccountName;
-            settings["CosmosDbAccountName"] = configuration.CosmosDbAccountName;
-            settings["BatchAccountName"] = configuration.BatchAccountName;
-            settings["ApplicationInsightsAccountName"] = configuration.ApplicationInsightsAccountName;
-            settings["ManagedIdentityClientId"] = managedIdentity.ClientId;
-            settings["AzureServicesAuthConnectionString"] = $"RunAs=App;AppId={managedIdentity.ClientId}";
-            settings["KeyVaultName"] = configuration.KeyVaultName;
-            settings["AksCoANamespace"] = configuration.AksCoANamespace;
-            
-            if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
-            {
-                settings["PostgreSqlServerName"] = configuration.PostgreSqlServerName;
-                settings["PostgreSqlDatabaseName"] = configuration.PostgreSqlCromwellDatabaseName;
-                settings["PostgreSqlUserLogin"] = configuration.PostgreSqlCromwellUserLogin;
-                settings["PostgreSqlUserPassword"] = configuration.PostgreSqlCromwellUserPassword;
-                settings["UsePostgreSqlSingleServer"] = configuration.UsePostgreSqlSingleServer.ToString();
-            }
             return settings;
         }
 
-        public static void UpdateImageVersions(Dictionary<string, string> settings, Configuration configuration)
+        private Dictionary<string, string> GetSystemSettings(Dictionary<string, string> settings)
         {
-            if (!string.IsNullOrWhiteSpace(configuration.CromwellVersion))
+            settings ??= new();
+            var defaults = GetDefaultValues(new[] { "env-00-coa-version.txt", "env-02-internal-images.txt", "env-03-external-images.txt", });
+
+            // We always overwrite the CoA version
+            UpdateSetting(settings, defaults, "CromwellOnAzureVersion", default(string), ignoreDefaults: false);
+
+            // Process images
+            UpdateSetting(settings, defaults, "CromwellImageName", configuration.CromwellVersion, v => $"broadinstitute/cromwell:{v}");
+            UpdateSetting(settings, defaults, "TesImageName", configuration.TesImageName);
+            UpdateSetting(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName);
+
+            // Additional non-personalized settings
+            UpdateSetting(settings, defaults, "BatchNodesSubnetId", configuration.BatchNodesSubnetId);
+            UpdateSetting(settings, defaults, "DockerInDockerImageName", configuration.DockerInDockerImageName);
+            UpdateSetting(settings, defaults, "BlobxferImageName", configuration.BlobxferImageName);
+            UpdateSetting(settings, defaults, "DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress, b => b.GetValueOrDefault().ToString(), configuration.DisableBatchNodesPublicIpAddress.GetValueOrDefault().ToString());
+
+            BackFillSettings(settings, defaults);
+            return settings;
+        }
+
+        private Dictionary<string, string> GetPersonalizedSettings(IIdentity managedIdentity, Dictionary<string, string> settings, Version installedVersion)
+        {
+            settings ??= new();
+            var defaults = GetDefaultValues(new [] { "env-01-account-names.txt", "env-04-settings.txt" });
+
+            if (installedVersion is null)
             {
-                settings["CromwellImageName"] = $"broadinstitute/cromwell:{configuration.CromwellVersion}";
+                UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "CosmosDbAccountName", configuration.CosmosDbAccountName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "ManagedIdentityClientId", managedIdentity.ClientId, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "AzureServicesAuthConnectionString", managedIdentity.ClientId, s => $"RunAs=App;AppId={s}", ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "KeyVaultName", configuration.KeyVaultName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "AksCoANamespace", configuration.AksCoANamespace, ignoreDefaults: true);
+
+                var provisionPostgreSqlOnAzure = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault();
+                UpdateSetting(settings, defaults, "ProvisionPostgreSqlOnAzure", configuration.ProvisionPostgreSqlOnAzure);
+                UpdateSetting(settings, defaults, "CrossSubscriptionAKSDeployment", configuration.CrossSubscriptionAKSDeployment);
+                UpdateSetting(settings, defaults, "PostgreSqlServerName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlServerName : string.Empty, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlDatabaseName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellDatabaseName : string.Empty, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlUserLogin", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellUserLogin : string.Empty, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlUserPassword", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellUserPassword : string.Empty, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "UsePostgreSqlSingleServer", provisionPostgreSqlOnAzure ? configuration.UsePostgreSqlSingleServer.ToString() : string.Empty, ignoreDefaults: true);
             }
 
-            if (!string.IsNullOrWhiteSpace(configuration.TesImageName))
+            //if (installedVersion < new Version(3, 3))
+            //{ }
+
+            BackFillSettings(settings, defaults);
+            return settings;
+        }
+
+        /// <summary>
+        /// Pupulates <paramref name="settings"/> with missing values.
+        /// </summary>
+        /// <param name="settings">Property bag being updated.</param>
+        /// <param name="defaults">Property bag containing default values.</param>
+        /// <remarks>Copy to settings any missing values found in defaults</remarks>
+        private static void BackFillSettings(Dictionary<string, string> settings, Dictionary<string, string> defaults)
+        {
+            foreach (var key in defaults.Keys.Except(settings.Keys))
             {
-                settings["TesImageName"] = configuration.TesImageName;
+                settings[key] = defaults[key];
+            }
+        }
+
+        /// <summary>
+        /// Updates <paramref name="settings"/>.
+        /// </summary>
+        /// <typeparam name="T">Type of <paramref name="value"/>.</typeparam>
+        /// <param name="settings">Property bag being updated.</param>
+        /// <param name="defaults">Property bag containing default values.</param>
+        /// <param name="key">Key of value in both <paramref name="settings"/> and <paramref name="defaults"/></param>
+        /// <param name="value">Configuration value to set. Nullable. See remarks.</param>
+        /// <param name="ConvertValue">Function that converts <paramref name="value"/> to a string. Can be used for formatting. Defaults to returning the value's string.</param>
+        /// <param name="defaultValue">Value to use if <paramref name="defaults"/> does not contain a record for <paramref name="key"/> when <paramref name="value"/> is null.</param>
+        /// <param name="ignoreDefaults">True to never use value from <paramref name="defaults"/>, False to never keep the value from <paramref name="settings"/>, null to follow remarks.</param>
+        /// <remarks>
+        /// If value is null, keep the value already in settings. If the key is not in settings, set the corresponding value from defaults. If key is not found in defaults, use defaultValue.
+        /// Otherwise, convert value to a string using convertValue().
+        /// </remarks>
+        private static void UpdateSetting<T>(Dictionary<string, string> settings, Dictionary<string, string> defaults, string key, T value, Func<T, string> ConvertValue = default, string defaultValue = "", bool? ignoreDefaults = null)
+        {
+            ConvertValue ??= new(v => v switch
+            {
+                string s => s,
+                _ => v?.ToString(),
+            });
+
+            var valueIsNull = value is null;
+            var valueIsEmpty = !valueIsNull && value switch
+            {
+                string s => string.IsNullOrWhiteSpace(s),
+                _ => string.IsNullOrWhiteSpace(value?.ToString()),
+            };
+
+            if (valueIsNull && settings.ContainsKey(key) && ignoreDefaults != false)
+            {
+                return; // No changes to this setting, no need to rewrite it.
             }
 
-            if (!string.IsNullOrWhiteSpace(configuration.TriggerServiceImageName))
+            var GetDefault = new Func<string>(() => ignoreDefaults switch
             {
-                settings["TriggerServiceImageName"] = configuration.TriggerServiceImageName;
-            }
+                true => defaultValue,
+                _ => defaults.TryGetValue(key, out var @default) ? @default : defaultValue,
+            });
+
+            settings[key] = valueIsEmpty || valueIsNull ? GetDefault() : ConvertValue(value);
         }
 
         private Task WaitForSshConnectivityAsync(ConnectionInfo sshConnectionInfo)
@@ -1683,11 +1777,11 @@ namespace CromwellOnAzureDeployer
             return server;
         }
 
-        private Task AssignVmAsBillingReaderToSubscriptionAsync(IIdentity managedIdentity)
+        private async Task AssignVmAsBillingReaderToSubscriptionAsync(IIdentity managedIdentity)
         {
             try
             {
-                return Execute(
+                await Execute(
                     $"Assigning {BuiltInRole.BillingReader} role for VM to Subscription scope...",
                     () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                         () => azureSubscriptionClient.AccessManagement.RoleAssignments
@@ -1700,7 +1794,6 @@ namespace CromwellOnAzureDeployer
             catch (Microsoft.Rest.Azure.CloudException)
             {
                 DisplayBillingReaderInsufficientAccessLevelWarning();
-                return Task.CompletedTask;
             }
         }
 
@@ -1955,7 +2048,7 @@ namespace CromwellOnAzureDeployer
                                 new AccessPolicyEntry()
                                 {
                                     TenantId = new Guid(tenantId),
-                                    ObjectId = configuration.UserObjectId,
+                                    ObjectId = await GetUserObjectId(),
                                     Permissions = new Permissions()
                                     {
                                         Secrets = secrets
@@ -1999,6 +2092,15 @@ namespace CromwellOnAzureDeployer
                     }
 
                     return vault;
+
+                    async ValueTask<string> GetUserObjectId()
+                    {
+                        const string graphUri = "https://graph.windows.net";
+                        var credentials = new AzureCredentials(default, new TokenCredentials(new RefreshableAzureServiceTokenProvider(graphUri)), tenantId, AzureEnvironment.AzureGlobalCloud);
+                        using GraphRbacManagementClient rbacClient = new(Configure().WithEnvironment(AzureEnvironment.AzureGlobalCloud).WithCredentials(credentials).WithBaseUri(graphUri).Build()) { TenantID = tenantId };
+                        credentials.InitializeServiceClient(rbacClient);
+                        return (await rbacClient.SignedInUser.GetAsync()).ObjectId;
+                    }
                 });
 
         private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
@@ -2245,6 +2347,20 @@ namespace CromwellOnAzureDeployer
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
                 });
 
+        private Task PatchAllowedVmSizesFileV320Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Patching '{AllowedVmSizesFileName}' in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var allowedVmSizesText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, cts);
+
+                    allowedVmSizesText = allowedVmSizesText
+                        .Replace("Azure VM sizes used", "Azure VM sizes/families used")
+                        .Replace("VM size names", "VM size or family names")
+                        .Replace("# Standard_D3_v2", "# standardDv2Family");
+
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, allowedVmSizesText);
+                });
         private Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Adding new settings to 'env-04-settings.txt' file on the VM...",
@@ -2517,9 +2633,12 @@ namespace CromwellOnAzureDeployer
 
         private async Task ValidateVmAsync()
         {
-            var computeSkus = (await azureSubscriptionClient.ComputeSkus.ListByRegionAsync(configuration.RegionName))
-                .Where(s => s.ResourceType == ComputeResourceType.VirtualMachines && !s.Restrictions.Any())
-                .Select(s => s.Name.ToString())
+            var computeSkus = (await generalRetryPolicy.ExecuteAsync(() => 
+                azureSubscriptionClient.ComputeSkus.ListbyRegionAndResourceTypeAsync(
+                    Region.Create(configuration.RegionName), 
+                    ComputeResourceType.VirtualMachines)))
+                .Where(s => !s.Restrictions.Any())
+                .Select(s => s.Name.Value)
                 .ToList();
 
             if (!computeSkus.Any())
@@ -2647,6 +2766,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
             ThrowIfProvidedForUpdate(configuration.CosmosDbAccountName, nameof(configuration.CosmosDbAccountName));
+            ThrowIfProvidedForUpdate(configuration.CrossSubscriptionAKSDeployment, nameof(configuration.CrossSubscriptionAKSDeployment));
             ThrowIfProvidedForUpdate(configuration.ProvisionPostgreSqlOnAzure, nameof(configuration.ProvisionPostgreSqlOnAzure));
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
@@ -2655,13 +2775,21 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
-            ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
+
+            if (!configuration.Update)
+            {
+                ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
+                ValidateDependantFeature(configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault(), nameof(configuration.CrossSubscriptionAKSDeployment), configuration.UseAks, nameof(configuration.UseAks));
+            }
+
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTesImagePath != null, nameof(configuration.CustomTesImagePath));
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTriggerServiceImagePath != null, nameof(configuration.CustomTriggerServiceImagePath));
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomCromwellImagePath != null, nameof(configuration.CustomCromwellImagePath));
-            
+            ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), !string.IsNullOrWhiteSpace(configuration.HelmBinaryPath), nameof(configuration.HelmBinaryPath));
+
             if (configuration.UseAks)
             {
+                ThrowIfNotProvidedForUpdate(configuration.AksClusterName, nameof(configuration.AksClusterName));
                 ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
             }
         }
