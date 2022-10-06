@@ -2778,7 +2778,6 @@ namespace CromwellOnAzureDeployer
 
             if (!configuration.Update)
             {
-                ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
                 ValidateDependantFeature(configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault(), nameof(configuration.CrossSubscriptionAKSDeployment), configuration.UseAks, nameof(configuration.UseAks));
             }
 
@@ -2794,6 +2793,15 @@ namespace CromwellOnAzureDeployer
                 {
                     ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), !string.IsNullOrWhiteSpace(configuration.HelmBinaryPath), nameof(configuration.HelmBinaryPath));
                     ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
+                }
+
+                if (configuration.ProvisionPostgreSqlOnAzure is null)
+                {
+                    configuration.ProvisionPostgreSqlOnAzure = true;
+                }
+                else if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                {
+                    ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
                 }
             }
         }
