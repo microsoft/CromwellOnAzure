@@ -2785,12 +2785,16 @@ namespace CromwellOnAzureDeployer
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTesImagePath != null, nameof(configuration.CustomTesImagePath));
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTriggerServiceImagePath != null, nameof(configuration.CustomTriggerServiceImagePath));
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomCromwellImagePath != null, nameof(configuration.CustomCromwellImagePath));
-            ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), !string.IsNullOrWhiteSpace(configuration.HelmBinaryPath), nameof(configuration.HelmBinaryPath));
-
+            
             if (configuration.UseAks)
             {
                 ThrowIfNotProvidedForUpdate(configuration.AksClusterName, nameof(configuration.AksClusterName));
-                ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
+                
+                if (!configuration.ManualHelmDeployment)
+                {
+                    ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), !string.IsNullOrWhiteSpace(configuration.HelmBinaryPath), nameof(configuration.HelmBinaryPath));
+                    ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
+                }
             }
         }
 
