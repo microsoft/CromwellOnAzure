@@ -341,7 +341,7 @@ namespace CromwellOnAzureDeployer
                         }
                         else
                         {
-                            await UpgradeVMDeployment(resourceGroup, accountNames, sshConnectionInfo, storageAccount, cosmosDb);
+                            await UpgradeVMDeployment(resourceGroup, accountNames, sshConnectionInfo, storageAccount, cosmosDb, linuxVm);
                         }
                     }
 
@@ -862,9 +862,8 @@ namespace CromwellOnAzureDeployer
                 () => containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksClusterName, cluster));
         }
 
-        private async Task UpgradeVMDeployment(IResourceGroup resourceGroup, Dictionary<string, string> accountNames, ConnectionInfo sshConnectionInfo, IStorageAccount storageAccount, ICosmosDBAccount cosmosDb)
+        private async Task UpgradeVMDeployment(IResourceGroup resourceGroup, Dictionary<string, string> accountNames, ConnectionInfo sshConnectionInfo, IStorageAccount storageAccount, ICosmosDBAccount cosmosDb, IVirtualMachine linuxVm)
         {
-            IVirtualMachine linuxVm = null;
             IIdentity managedIdentity = null;
 
             await ConfigureVmAsync(sshConnectionInfo, null);
