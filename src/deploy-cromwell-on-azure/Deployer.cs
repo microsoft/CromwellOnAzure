@@ -83,6 +83,10 @@ namespace CromwellOnAzureDeployer
             .Handle<Exception>(ex => !(ex is SshAuthenticationException && ex.Message.StartsWith("Permission")))
             .WaitAndRetryAsync(5, retryAttempt => System.TimeSpan.FromSeconds(5));
 
+        private static readonly AsyncRetryPolicy generalRetryPolicy = Policy
+            .Handle<Exception>()
+            .WaitAndRetryAsync(3, retryAttempt => System.TimeSpan.FromSeconds(1));
+
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
         public const string CromwellConfigurationFileName = "cromwell-application.conf";
@@ -345,7 +349,7 @@ namespace CromwellOnAzureDeployer
                         }
                         else
                         {
-                            await UpgradeVMDeployment(resourceGroup, accountNames, sshConnectionInfo, storageAccount, cosmosDb);
+                            await UpgradeVMDeployment(resourceGroup, accountNames, sshConnectionInfo, storageAccount, cosmosDb, linuxVm);
                         }
                     }
 
@@ -866,9 +870,8 @@ namespace CromwellOnAzureDeployer
                 () => containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksClusterName, cluster));
         }
 
-        private async Task UpgradeVMDeployment(IResourceGroup resourceGroup, Dictionary<string, string> accountNames, ConnectionInfo sshConnectionInfo, IStorageAccount storageAccount, ICosmosDBAccount cosmosDb)
+        private async Task UpgradeVMDeployment(IResourceGroup resourceGroup, Dictionary<string, string> accountNames, ConnectionInfo sshConnectionInfo, IStorageAccount storageAccount, ICosmosDBAccount cosmosDb, IVirtualMachine linuxVm)
         {
-            IVirtualMachine linuxVm = null;
             IIdentity managedIdentity = null;
 
             await ConfigureVmAsync(sshConnectionInfo, null);
@@ -1818,11 +1821,11 @@ namespace CromwellOnAzureDeployer
             return server;
         }
 
-        private Task AssignVmAsBillingReaderToSubscriptionAsync(IIdentity managedIdentity)
+        private async Task AssignVmAsBillingReaderToSubscriptionAsync(IIdentity managedIdentity)
         {
             try
             {
-                return Execute(
+                await Execute(
                     $"Assigning {BuiltInRole.BillingReader} role for VM to Subscription scope...",
                     () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                         () => azureSubscriptionClient.AccessManagement.RoleAssignments
@@ -1835,7 +1838,6 @@ namespace CromwellOnAzureDeployer
             catch (Microsoft.Rest.Azure.CloudException)
             {
                 DisplayBillingReaderInsufficientAccessLevelWarning();
-                return Task.CompletedTask;
             }
         }
 
@@ -2688,9 +2690,12 @@ namespace CromwellOnAzureDeployer
 
         private async Task ValidateVmAsync()
         {
-            var computeSkus = (await azureSubscriptionClient.ComputeSkus.ListByRegionAsync(configuration.RegionName))
-                .Where(s => s.ResourceType == ComputeResourceType.VirtualMachines && !s.Restrictions.Any())
-                .Select(s => s.Name.ToString())
+            var computeSkus = (await generalRetryPolicy.ExecuteAsync(() => 
+                azureSubscriptionClient.ComputeSkus.ListbyRegionAndResourceTypeAsync(
+                    Region.Create(configuration.RegionName), 
+                    ComputeResourceType.VirtualMachines)))
+                .Where(s => !s.Restrictions.Any())
+                .Select(s => s.Name.Value)
                 .ToList();
 
             if (!computeSkus.Any())
