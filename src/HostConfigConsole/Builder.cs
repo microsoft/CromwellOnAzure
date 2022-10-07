@@ -8,24 +8,24 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
+using Common.HostConfigs;
+using HostConfigConsole.HostConfigs;
 
-#nullable enable
-
-namespace Common.HostConfigs
+namespace HostConfigConsole
 {
     /// <summary>
     /// Reads a file system and generates <see cref="HostConfigurations"/>
     /// </summary>
-    public sealed class Parser : Base
+    public sealed class Builder : Base
     {
-        private readonly DirectoryInfo _hostConfigs;
+        private readonly IDirectory _hostConfigs;
 
         /// <summary>
-        /// Creates a <see cref="Parser"/>
+        /// Creates a <see cref="Builder"/>
         /// </summary>
         /// <param name="hostConfigs">Directory containing the host configuration data.</param>
         /// <exception cref="ArgumentException">Directory was not found or is not accessible.</exception>
-        public Parser(DirectoryInfo hostConfigs)
+        public Builder(IDirectory hostConfigs)
         {
             _hostConfigs = hostConfigs ?? throw new ArgumentNullException(nameof(hostConfigs));
 
@@ -35,7 +35,7 @@ namespace Common.HostConfigs
             }
         }
 
-        public IEnumerable<(string Name, IEnumerable<FileInfo> AdditionalFiles)> GetHostConfigs()
+        public IEnumerable<(string Name, IEnumerable<IFile> AdditionalFiles)> GetHostConfigs()
         {
             foreach(var dir in _hostConfigs.EnumerateDirectories())
             {
@@ -46,7 +46,7 @@ namespace Common.HostConfigs
             }
         }
 
-        public (HostConfig HostConfig, IEnumerable<(string Version, Lazy<Stream> Stream)> ApplicationVersions) Parse(Action<string> writeLine, ZipArchive hostConfigBlobs, params string[] selected)
+        public (HostConfig HostConfig, IEnumerable<(string Version, Lazy<Stream> Stream)> ApplicationVersions) Build(Action<string> writeLine, ZipArchive hostConfigBlobs, params string[] selected)
         {
             if ((hostConfigBlobs ?? throw new ArgumentNullException(nameof(hostConfigBlobs))).Mode != ZipArchiveMode.Create)
             {
@@ -55,11 +55,11 @@ namespace Common.HostConfigs
 
             var filter = !(selected is null || 0 == selected.Length);
             var lazySelected = new Lazy<List<string>>(() => selected?.Select(s => s.ToUpperInvariant()).ToList() ?? new List<string>());
-            var Filter = new Func<DirectoryInfo, bool>(dir => !filter || lazySelected.Value.Contains(dir.Name.ToUpperInvariant()));
+            var Filter = new Func<IDirectory, bool>(dir => !filter || lazySelected.Value.Contains(dir.Name.ToUpperInvariant()));
 
             if (filter)
             {
-                var dirList = _hostConfigs.EnumerateDirectories().Select(d => d.Name.ToUpperInvariant()).ToList(); //selected?.ToList() ?? new List<string>();
+                var dirList = _hostConfigs.EnumerateDirectories().Select(d => d.Name.ToUpperInvariant()).ToList();
                 foreach (var dir in selected ?? Array.Empty<string>())
                 {
                     if (!dirList.Contains(dir.ToUpperInvariant()))
@@ -73,20 +73,20 @@ namespace Common.HostConfigs
             var storedVersions = ApplicationVersions.Empty;
             var hashes = PackageHashes.Empty;
             var configs = HostConfigurations.Empty;
-            var startTasks = new Dictionary<string, FileInfo>();
+            var startTasks = new Dictionary<string, IFile>();
             var versions = Enumerable.Empty<(string, Lazy<Stream>)>();
 
-            foreach (var (hostConfig, directory) in _hostConfigs.EnumerateDirectories().Where(Filter).Select(ParseHostConfigDir).Select(d => (d.FirstOrDefault()?.Directory?.Name, d.ToList())))
+            foreach (var (hostConfig, hcFiles) in _hostConfigs.EnumerateDirectories().Where(Filter).Select(ParseHostConfigDir).Select(hcFiles => (hcFiles.FirstOrDefault()?.Directory?.Name, hcFiles.ToList())))
             {
                 if (hostConfig is null) continue;
                 writeLine($"Processing {hostConfig}");
 
-                var configFile = directory.FirstOrDefault(f => "config.json".Equals(f.Name, StringComparison.OrdinalIgnoreCase));
-                var startTask = directory.FirstOrDefault(f => Constants.StartTask.Equals(f.Name, StringComparison.OrdinalIgnoreCase));
-                var nonZipFiles = Enumerable.Empty<FileInfo>();
+                var configFile = hcFiles.FirstOrDefault(f => "config.json".Equals(f.Name, StringComparison.OrdinalIgnoreCase));
+                var startTask = hcFiles.FirstOrDefault(f => Constants.StartTask.Equals(f.Name, StringComparison.OrdinalIgnoreCase));
+                var nonZipFiles = Enumerable.Empty<IFile>();
                 nonZipFiles = configFile is null ? nonZipFiles : nonZipFiles.Append(configFile);
                 nonZipFiles = startTask is null ? nonZipFiles : nonZipFiles.Append(startTask);
-                var zipFiles = directory.Except(nonZipFiles).ToList();
+                var zipFiles = hcFiles.Except(nonZipFiles).ToList();
 
                 if (configFile is not null)
                 {
@@ -98,27 +98,38 @@ namespace Common.HostConfigs
                     {
                         startTasks.Add(configuration.StartTask?.StartTaskHash ?? throw new InvalidOperationException(), startTask);
                     }
+
+                    foreach (var (name, hash, package) in
+                        zipFiles.Select(GetApplicationName).Zip(
+                        zipFiles.Select(GetFileHash),
+                        zipFiles.Select(ExtractPackage)))
+                    {
+                        versions = versions.Append((hash, new(package.FileInfo.OpenRead)));
+                        hashes.Add(name, hash);
+
+                        if (storedVersions.TryGetValue(name, out var keyMetadata))
+                        {
+                            keyMetadata.Packages ??= Packages.Empty;
+                            keyMetadata.Packages.Add(hash, package.Package);
+                        }
+                        else
+                        {
+                            var packages = Packages.Empty;
+                            packages.Add(hash, package.Package ?? new());
+                            storedVersions.Add(name, new() { ApplicationId = BatchAppFromHostConfigName(name), Packages = packages });
+                        }
+                    }
                 }
-
-                foreach (var (name, hash, package) in
-                    zipFiles.Select(GetApplicationName).Zip(
-                    zipFiles.Select(GetFileHash),
-                    zipFiles.Select(ExtractPackage)))
+                else if (startTask is not null || zipFiles.Any())
                 {
-                    versions = versions.Append((hash, new(package.FileInfo.OpenRead)));
-                    hashes.Add(name, hash);
+                    IEnumerable<IFile> list = zipFiles;
 
-                    if (storedVersions.TryGetValue(name, out var keyMetadata))
+                    if (startTask is not null)
                     {
-                        keyMetadata.Packages ??= Packages.Empty;
-                        keyMetadata.Packages.Add(hash, package.Package);
+                        list = list.Prepend(startTask);
                     }
-                    else
-                    {
-                        var packages = Packages.Empty;
-                        packages.Add(hash, package.Package ?? new());
-                        storedVersions.Add(name, new() { ApplicationId = BatchAppFromHostConfigName(name), Packages = packages });
-                    }
+
+                    writeLine($"Warning: files {string.Join(", ", list.Select(s => $"'{s.Name}'"))} are ignored because '{Constants.Config}' is missing.");
                 }
             }
 
@@ -139,6 +150,22 @@ namespace Common.HostConfigs
             return (config, versions);
         }
 
+        public static TextReader? OpenConfiguration(FileInfo config)
+        {
+            try
+            {
+                return Base.OpenConfiguration(config.OpenRead());
+            }
+            catch (IOException)
+            {
+                return default;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return default;
+            }
+        }
+
         private static void MungeVirtualMachineSizes(VirtualMachineSizes vmSizes)
         {
             if (vmSizes is not null)
@@ -147,15 +174,15 @@ namespace Common.HostConfigs
                 {
                     if (size.Container is not null)
                     {
-                        size.Container = Utilities.NormalizeContainerImageName(size.Container).AbsoluteUri;
+                        size.Container = Common.Utilities.NormalizeContainerImageName(size.Container).AbsoluteUri;
                     }
                 }
             }
         }
 
-        private static bool IsDirViable(DirectoryInfo dir, out IEnumerable<FileInfo> additionalFiles)
+        private static bool IsDirViable(IDirectory dir, out IEnumerable<IFile> additionalFiles)
         {
-            var extraFiles = Enumerable.Empty<FileInfo>();
+            var extraFiles = Enumerable.Empty<IFile>();
             var viable = false;
             var fileList = Constants.HostConfigFiles().Select(s => s.ToUpperInvariant()).ToList();
 
@@ -171,14 +198,14 @@ namespace Common.HostConfigs
                 }
             }
 
-            additionalFiles = viable ? extraFiles : Enumerable.Empty<FileInfo>();
+            additionalFiles = viable ? extraFiles : Enumerable.Empty<IFile>();
             return viable;
         }
 
-        private static string GetApplicationName(FileInfo file)
+        private static string GetApplicationName(IFile file)
             => $"{file.Directory?.Name}_{Path.GetFileNameWithoutExtension(file.Name)}";
 
-        private static (FileInfo FileInfo, Package Package) ExtractPackage(FileInfo file)
+        private static (IFile FileInfo, Package Package) ExtractPackage(IFile file)
         {
             using var zip = new ZipArchive(file.OpenRead());
             return (file, new()
@@ -192,7 +219,7 @@ namespace Common.HostConfigs
             });
         }
 
-        private static IEnumerable<FileInfo> ParseHostConfigDir(DirectoryInfo dir)
+        private static IEnumerable<IFile> ParseHostConfigDir(IDirectory dir)
         {
             var fileList = Constants.HostConfigFiles().Select(s => s.ToUpperInvariant()).ToList();
             foreach (var file in dir.EnumerateFiles())
@@ -237,7 +264,7 @@ namespace Common.HostConfigs
                 };
         }
 
-        private static HostConfiguration ParseConfig(FileInfo configFile)
+        private static HostConfiguration ParseConfig(IFile configFile)
             => ConvertUserConfig(ParseUserConfig(configFile.OpenText()), configFile.Directory?.EnumerateFiles(Constants.StartTask).Select(GetFileHash).FirstOrDefault());
 
         private static UserHostConfig ParseUserConfig(TextReader textReader)
@@ -246,10 +273,35 @@ namespace Common.HostConfigs
         private static HostConfiguration ConvertUserConfig(UserHostConfig? userConfig, string? startTaskHash)
             => new() { BatchImage = userConfig?.BatchImage ?? new(), VmSizes = userConfig?.VirtualMachineSizes ?? new(), DockerRun = userConfig?.DockerRun ?? new(), StartTask = ConvertStartTask(userConfig?.StartTask, startTaskHash) };
 
-        private static StartTask ConvertStartTask(UserHostConfig.UserStartTask? userStartTask, string? startTaskHash)
+        private static StartTask ConvertStartTask(UserStartTask? userStartTask, string? startTaskHash)
             => new() { ResourceFiles = userStartTask?.ResourceFiles ?? Array.Empty<ResourceFile>(), StartTaskHash = startTaskHash };
 
-        private static string GetFileHash(FileInfo file)
-            => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file.FullName)));
+        private static string GetFileHash(IFile file)
+            => Convert.ToHexString(SHA256.HashData(file.ReadAllBytes()));
+
+        public interface IDirectory
+        {
+            string Name { get; }
+            string FullName { get; }
+            bool Exists { get; }
+
+            DirectoryInfo? DirectoryInfo { get; }
+
+            IEnumerable<IDirectory> EnumerateDirectories();
+            IEnumerable<IFile> EnumerateFiles();
+            IEnumerable<IFile> EnumerateFiles(string searchPattern);
+        }
+
+        public interface IFile
+        {
+            string Name { get; }
+            IDirectory? Directory { get; }
+
+            FileInfo? FileInfo { get; }
+
+            Stream OpenRead();
+            StreamReader OpenText();
+            byte[] ReadAllBytes();
+        }
     }
 }

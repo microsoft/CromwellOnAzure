@@ -17,10 +17,11 @@ namespace Common.HostConfigs
         public const string StartTask = "start-task.sh";
         public const string StartApp = "start.zip";
         /*
-    matcher.AddInclude("config.json");
-    matcher.AddInclude("start.zip");
-    matcher.AddInclude("task.zip");
-    matcher.AddInclude("start-task.sh");
+        matcher.AddInclude("config.json");
+        matcher.AddInclude("start.zip");
+        matcher.AddInclude("job.zip");
+        matcher.AddInclude("start-task.sh");
+        matcher.AddInclude("job-task.sh");
          */
 
         public static IEnumerable<string> HostConfigFiles()

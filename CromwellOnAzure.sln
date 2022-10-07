@@ -31,7 +31,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "src\Common\Common
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tests", "src\Common.Tests\Common.Tests.csproj", "{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HostConfigCompilerTmp", "src\HostConfigCompilerTmp\HostConfigCompilerTmp.csproj", "{29AAC126-EB21-453C-B7F4-96D796621A0D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HostConfigConsole", "src\HostConfigConsole\HostConfigConsole.csproj", "{29AAC126-EB21-453C-B7F4-96D796621A0D}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "HostConfigs", "HostConfigs", "{107966C0-1F15-4CC3-B9A8-9CBB0B1BB668}"
 	ProjectSection(SolutionItems) = preProject

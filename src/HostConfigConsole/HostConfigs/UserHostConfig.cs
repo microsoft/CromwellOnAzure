@@ -3,10 +3,9 @@
 
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using Common.HostConfigs;
 
-#nullable enable
-
-namespace Common.HostConfigs
+namespace HostConfigConsole.HostConfigs
 {
     /// <summary>
     /// All HostConfigs as stored in the CoA project's source repository.
@@ -43,22 +42,6 @@ namespace Common.HostConfigs
         /// </summary>
         [DataMember(Name = "startTask")]
         public UserStartTask? StartTask { get; set; }
-
-        /// <summary>
-        /// Configures <seealso cref="Microsoft.Azure.Batch.StartTask"/> via <see cref="StartTask"/>.
-        /// </summary>
-        [DataContract]
-        public class UserStartTask
-        {
-            /// <summary>
-            /// A list of files that the Batch service will download to the Compute Node before running the command line.
-            /// </summary>
-            /// <remarks>
-            /// There is a maximum size for the list of resource files. See the API docs for details.
-            /// </remarks>
-            [DataMember(Name = "resourceFiles")]
-            public ResourceFile[]? ResourceFiles { get; set; }
-        }
 
         /// <summary>
         /// Configures the built-in task command builder for each task in the pool.
