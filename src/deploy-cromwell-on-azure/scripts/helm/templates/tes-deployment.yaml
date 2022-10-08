@@ -27,6 +27,8 @@ spec:
         supplementalGroups: [1000]
       containers:
         - env:
+            - name: ASPNETCORE_URLS
+              value: http://0.0.0.0:{{ .Values.service.tesPort }}/
             - name: DefaultStorageAccountName
               value: {{ .Values.persistence.storageAccount }}
             - name: AzureServicesAuthConnectionString

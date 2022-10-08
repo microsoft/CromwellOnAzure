@@ -85,16 +85,14 @@ namespace CromwellOnAzureDeployer
         public async Task UpdateHelmValuesAsync(string storageAccountName, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
-            values.Persistence["storageAccount"] = storageAccountName;
-            values.Persistence["keyVaultUrl"] = keyVaultUrl;
-            values.Persistence["keyVaultSecretName"] = Deployer.StorageAccountKeySecretName;
+            values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
             values.Config["resourceGroup"] = resourceGroupName;
             values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
             values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
             values.Config["cosmosDbAccountName"] = settings["CosmosDbAccountName"];
             values.Config["batchAccountName"] = settings["BatchAccountName"];
             values.Config["batchNodesSubnetId"] = settings["BatchNodesSubnetId"];
-            values.Config["coaNamespace"] = configuration.AksCoANamespace;
+            values.Config["coaNamespace"] = settings["AksCoANamespace"];
             values.Config["disableBatchNodesPublicIpAddress"] = settings["DisableBatchNodesPublicIpAddress"];
             values.Config["disableBatchScheduling"] = settings["DisableBatchScheduling"];
             values.Config["usePreemptibleVmsOnly"] = settings["UsePreemptibleVmsOnly"];
@@ -113,14 +111,40 @@ namespace CromwellOnAzureDeployer
             values.Identity["clientId"] = managedId.ClientId;
             values.Images["tes"] = settings["TesImageName"];
             values.Images["triggerservice"] = settings["TriggerServiceImageName"];
+            values.Images["cromwell"] = settings["CromwellImageName"];
 
-            if (!string.IsNullOrWhiteSpace(configuration.CromwellVersion))
+            if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
             {
-                values.Images["cromwell"] = $"broadinstitute/cromwell:{configuration.CromwellVersion}";
-            } 
+                values.InternalContainersKeyVaultAuth = new List<Dictionary<string, string>>();
+
+                foreach (var container in values.DefaultContainers)
+                {
+                    var containerConfig = new Dictionary<string, string>()
+                    {
+                        { "accountName",  storageAccountName },
+                        { "containerName", container },
+                        { "keyVaultURL", keyVaultUrl },
+                        { "keyVaultSecretName", Deployer.StorageAccountKeySecretName}
+                    };
+
+                    values.InternalContainersKeyVaultAuth.Add(containerConfig);
+                }
+            }
             else
             {
-                values.Images["cromwell"] = settings["CromwellImageName"];
+                values.InternalContainersMIAuth = new List<Dictionary<string, string>>();
+
+                foreach (var container in values.DefaultContainers)
+                {
+                    var containerConfig = new Dictionary<string, string>()
+                    {
+                        { "accountName",  storageAccountName },
+                        { "containerName", container },
+                        { "resourceGroup", resourceGroupName },
+                    };
+
+                    values.InternalContainersMIAuth.Add(containerConfig);
+                }
             }
 
             await File.WriteAllTextAsync(Path.Join("scripts", "helm", "values.yaml"), KubernetesYaml.Serialize(values));
@@ -224,7 +248,7 @@ namespace CromwellOnAzureDeployer
                 deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
                 deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
                 
-                if (deployment.Status.ReadyReplicas == null || deployment.Status.ReadyReplicas < 1)
+                if ((deployment?.Status?.ReadyReplicas ?? 0) < 1)
                 {
                     throw new Exception("Workload not ready.");
                 }
@@ -235,8 +259,6 @@ namespace CromwellOnAzureDeployer
 
         public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId, string keyVaultUrl)
         {
-            // Override any configuration that is used by the update.
-            Deployer.UpdateImageVersions(settings, configuration);
             await UpdateHelmValuesAsync(storageAccount.Name, keyVaultUrl, resourceGroup.Name, settings, managedId);
             await DeployHelmChartToClusterAsync();
         }
@@ -247,6 +269,8 @@ namespace CromwellOnAzureDeployer
             public Dictionary<string, string> Config { get; set; }
             public Dictionary<string, string> Images { get; set; }
             public List<string> DefaultContainers { get; set; }
+            public List<Dictionary<string, string>> InternalContainersMIAuth { get; set; }
+            public List<Dictionary<string, string>> InternalContainersKeyVaultAuth { get; set; }
             public List<Dictionary<string, string>> ExternalContainers { get; set; }
             public List<Dictionary<string, string>> ExternalSasContainers { get; set; }
             public Dictionary<string, string> Persistence { get; set; }

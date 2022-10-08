@@ -37,14 +37,56 @@ mountOptions:
 {{- $rg  := .Values.config.resourceGroup -}}
 {{- $namespace := .Values.config.coaNamespace -}}
 {{- $storageAccount  := .Values.persistence.storageAccount -}}
-{{- $keyVaultUrl  := .Values.persistence.keyVaultUrl -}}
-{{- $keyVaultSecretName  := .Values.persistence.keyVaultSecretName -}}
 {{- $size  := .Values.persistence.blobPvcSize -}}
-{{- range .Values.defaultContainers }}
+
+{{- range .Values.internalContainersMIAuth }}
+{{- $storageClassName := printf "blob-%s-%s" .accountName .containerName }}
+{{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
+{{- if eq $storageAccount .accountName }}
+  {{- $storageClassName = printf "blob-%s" .containerName}}
+  {{- $claimName = printf "%s-claim1" .containerName }}
+{{- end}}
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ $storageClassName }}
+provisioner: blob.csi.azure.com
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  resourceGroup: {{ .resourceGroup }}
+  storageAccount: {{ .accountName }}
+  containerName: {{ .containerName }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $claimName }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ $size }}
+  storageClassName: {{ $storageClassName }}
+---
+{{- end }}
+
+{{- range .Values.internalContainersKeyVaultAuth }}
+{{- $pvName := printf "pv-blob-%s-%s" .accountName .containerName }}
+{{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
+{{- $handleName := printf "pv-handle-%s-%s" .accountName .containerName }}
+{{- if eq $storageAccount .accountName }}
+  {{- $pvName = printf "pv-blob-%s" .containerName}}
+  {{- $claimName = printf "%s-claim1" .containerName }}
+  {{- $handleName = printf "pv-handle-%s" .containerName }}
+{{- end}}
+
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-blob-{{ . }}
+  name: {{ $pvName }}
 spec:
   capacity:
     storage: {{ $size }}
@@ -60,27 +102,28 @@ spec:
     readOnly: false
     # make sure this volumeid is unique in the cluster
     # `#` is not allowed in self defined volumeHandle
-    volumeHandle: pv-handle-{{ . }}
+    volumeHandle: {{ $handleName }}
     volumeAttributes:
-      storageAccountName: {{ $storageAccount }}
-      containerName: {{ . }}
-      keyVaultURL: {{ $keyVaultUrl | quote }}
-      keyVaultSecretName: {{ $keyVaultSecretName }}
+      storageAccountName: {{ .accountName }}
+      containerName: {{ .containerName }}
+      keyVaultURL: {{ .keyVaultURL | quote }}
+      keyVaultSecretName: {{ .keyVaultSecretName }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ . }}-claim1
+  name: {{ $claimName }}
 spec:
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: {{ $size }}
-  volumeName: pv-blob-{{ . }}
+  volumeName: {{ $pvName }}
   storageClassName: blob-fuse
 ---
 {{- end }}
+
 {{- range .Values.externalContainers }}
 apiVersion: v1
 data:
@@ -116,6 +159,7 @@ spec:
   storageClassName: blob-{{ .accountName }}-{{.containerName}}
 ---
 {{- end }}
+
 {{- range .Values.externalSasContainers }}
 apiVersion: v1
 data:
