@@ -82,7 +82,7 @@ namespace CromwellOnAzureDeployer
            await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace");
         }
 
-        public async Task UpdateHelmValuesAsync(string storageAccountName, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
+        public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
             values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
@@ -121,7 +121,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var containerConfig = new Dictionary<string, string>()
                     {
-                        { "accountName",  storageAccountName },
+                        { "accountName",  storageAccount.Name },
                         { "containerName", container },
                         { "keyVaultURL", keyVaultUrl },
                         { "keyVaultSecretName", Deployer.StorageAccountKeySecretName}
@@ -138,7 +138,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var containerConfig = new Dictionary<string, string>()
                     {
-                        { "accountName",  storageAccountName },
+                        { "accountName",  storageAccount.Name },
                         { "containerName", container },
                         { "resourceGroup", resourceGroupName },
                     };
@@ -147,7 +147,9 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-            await File.WriteAllTextAsync(Path.Join("scripts", "helm", "values.yaml"), KubernetesYaml.Serialize(values));
+            var valuesString = KubernetesYaml.Serialize(values);
+            await File.WriteAllTextAsync(Path.Join("scripts", "helm", "values.yaml"), valuesString);
+            await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "values.yaml", valuesString, cts.Token);
         }
 
         private async Task ExecHelmProcess(string command)
@@ -259,7 +261,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId, string keyVaultUrl)
         {
-            await UpdateHelmValuesAsync(storageAccount.Name, keyVaultUrl, resourceGroup.Name, settings, managedId);
+            await UpdateHelmValuesAsync(storageAccount, keyVaultUrl, resourceGroup.Name, settings, managedId);
             await DeployHelmChartToClusterAsync();
         }
 

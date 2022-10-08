@@ -514,7 +514,7 @@ namespace CromwellOnAzureDeployer
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
-                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount.Name, keyVaultUri, resourceGroup.Name, personalizedSettings.Union(systemSettings).ToDictionary(kv => kv.Key, kv => kv.Value), managedIdentity);
+                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, personalizedSettings.Union(systemSettings).ToDictionary(kv => kv.Key, kv => kv.Value), managedIdentity);
 
                                 if (configuration.ManualHelmDeployment)
                                 {
@@ -3064,12 +3064,15 @@ namespace CromwellOnAzureDeployer
         }
 
         private async Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
+            => await UploadTextToStorageAccountAsync(storageAccount, containerName, blobName, content, cts.Token);
+
+        public static async Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content, CancellationToken token)
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
             await container.CreateIfNotExistsAsync();
-            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, cts.Token);
+            await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, token);
         }
 
         private static string GetLinuxParentPath(string path)
