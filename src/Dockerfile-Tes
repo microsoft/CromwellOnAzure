@@ -18,5 +18,10 @@ RUN dotnet publish -c Release -o out --no-restore TesApi.Web/TesApi.Web.csproj
 FROM mcr.microsoft.com/dotnet/aspnet:6.0
 WORKDIR /app
 COPY --from=build-env /app/out .
-RUN apt update && apt full-upgrade -y && apt autoremove -y
+
+RUN apt-get -o Acquire::Check-Valid-Until=false -o Acquire::Check-Date=false update
+RUN apt full-upgrade -y && apt autoremove -y
+RUN apt-get install -y postgresql-client 
+RUN adduser --home /home/tes -u 1000 tes
+
 ENTRYPOINT ["dotnet", "tesapi.dll"]
