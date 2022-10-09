@@ -58,6 +58,9 @@ parameters:
   resourceGroup: {{ .resourceGroup }}
   storageAccount: {{ .accountName }}
   containerName: {{ .containerName }}
+mountOptions:
+  - -o allow_other
+  - --file-cache-timeout-in-seconds=120
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -145,6 +148,9 @@ parameters:
   resourceGroup: {{ .resourceGroup }}
   storageAccount: {{ .accountName }}
   containerName: {{ .containerName }}
+mountOptions:
+  - -o allow_other
+  - --file-cache-timeout-in-seconds=120
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
