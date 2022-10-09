@@ -23,5 +23,7 @@ RUN apt-get -o Acquire::Check-Valid-Until=false -o Acquire::Check-Date=false upd
 RUN apt full-upgrade -y && apt autoremove -y
 RUN apt-get install -y postgresql-client 
 RUN adduser --home /home/tes -u 1000 tes
+RUN apt-get install -y libcap2-bin
+RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/share/dotnet/dotnet
 
 ENTRYPOINT ["dotnet", "tesapi.dll"]
