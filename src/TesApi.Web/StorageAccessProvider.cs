@@ -174,7 +174,12 @@ namespace TesApi.Web
                     else
                     {
                         var policy = new SharedAccessBlobPolicy() { Permissions = SharedAccessBlobPermissions.Read, SharedAccessExpiryTime = DateTime.Now.Add(sasTokenDuration) };
-                        resultPathSegments.SasToken = new CloudBlob(resultPathSegments.ToUri(), new StorageCredentials(storageAccountInfo.Name, accountKey)).GetSharedAccessSignature(policy, null, null, SharedAccessProtocol.HttpsOnly, null);
+                        var blob = new CloudBlob(resultPathSegments.ToUri(), new StorageCredentials(storageAccountInfo.Name, accountKey));
+                        if (!await blob.ExistsAsync())
+                        {
+                            return null;
+                        }
+                        resultPathSegments.SasToken = blob.GetSharedAccessSignature(policy, null, null, SharedAccessProtocol.HttpsOnly, null);
                     }
 
                     return resultPathSegments.ToUriString();

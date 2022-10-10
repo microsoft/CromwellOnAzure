@@ -859,11 +859,15 @@ namespace TesApi.Web
                 nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
 
             StartTask startTask = null;
-
+            string scriptSasUrl = null;
+            
             if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
             {
-                var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
+                scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
+            }
 
+            if (!string.IsNullOrWhiteSpace(scriptSasUrl))
+            {
                 startTask = new Microsoft.Azure.Batch.StartTask
                 {
                     CommandLine = $"sudo /bin/sh {batchStartTaskLocalPathOnBatchNode}",
