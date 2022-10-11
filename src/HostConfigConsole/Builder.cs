@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -37,7 +38,7 @@ namespace HostConfigConsole
 
         public IEnumerable<(string Name, IEnumerable<IFile> AdditionalFiles)> GetHostConfigs()
         {
-            foreach(var dir in _hostConfigs.EnumerateDirectories())
+            foreach (var dir in _hostConfigs.EnumerateDirectories())
             {
                 if (IsDirViable(dir, out var files))
                 {
@@ -46,12 +47,10 @@ namespace HostConfigConsole
             }
         }
 
-        public (HostConfig HostConfig, IEnumerable<(string Version, Lazy<Stream> Stream)> ApplicationVersions) Build(Action<string> writeLine, ZipArchive hostConfigBlobs, params string[] selected)
+        public (HostConfig HostConfig, IEnumerable<(string Name, Lazy<Stream> Stream)>, IEnumerable<(string Version, Lazy<Stream> Stream)> ApplicationVersions) Build(Action<string> writeLine, params string[] selected)
         {
-            if ((hostConfigBlobs ?? throw new ArgumentNullException(nameof(hostConfigBlobs))).Mode != ZipArchiveMode.Create)
-            {
-                throw new ArgumentException("Zip archive must be in create mode.", nameof(hostConfigBlobs));
-            }
+            ArgumentNullException.ThrowIfNull(writeLine);
+            ArgumentNullException.ThrowIfNull(selected);
 
             var filter = !(selected is null || 0 == selected.Length);
             var lazySelected = new Lazy<List<string>>(() => selected?.Select(s => s.ToUpperInvariant()).ToList() ?? new List<string>());
@@ -60,13 +59,9 @@ namespace HostConfigConsole
             if (filter)
             {
                 var dirList = _hostConfigs.EnumerateDirectories().Select(d => d.Name.ToUpperInvariant()).ToList();
-                foreach (var dir in selected ?? Array.Empty<string>())
-                {
-                    if (!dirList.Contains(dir.ToUpperInvariant()))
-                    {
-                        throw new ArgumentException($"HostConfig '{dir}' was not found in '{_hostConfigs.FullName}'.", nameof(selected));
-                    }
-                }
+                (selected ?? Array.Empty<string>())
+                    .Where(dir => !dirList.Contains(dir.ToUpperInvariant()))
+                    .ForEach(dir => throw new ArgumentException($"HostConfig '{dir}' was not found in '{_hostConfigs.FullName}'.", nameof(selected)));
             }
 
             writeLine("Collecting CoA host configurations");
@@ -140,45 +135,12 @@ namespace HostConfigConsole
                 HostConfigurations = configs
             };
 
-            foreach (var startTask in startTasks)
-            {
-                using var entry = hostConfigBlobs.CreateEntry(startTask.Key).Open();
-                using var file = startTask.Value.OpenRead();
-                file.CopyTo(entry);
-            }
-
-            return (config, versions);
-        }
-
-        public static TextReader? OpenConfiguration(FileInfo config)
-        {
-            try
-            {
-                return Base.OpenConfiguration(config.OpenRead());
-            }
-            catch (IOException)
-            {
-                return default;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return default;
-            }
+            return (config, startTasks.Select<KeyValuePair<string, IFile>, (string Name, Lazy<Stream> Stream)>(p => (p.Key, new(p.Value.OpenRead))), versions);
         }
 
         private static void MungeVirtualMachineSizes(VirtualMachineSizes vmSizes)
-        {
-            if (vmSizes is not null)
-            {
-                foreach (var size in vmSizes)
-                {
-                    if (size.Container is not null)
-                    {
-                        size.Container = Common.Utilities.NormalizeContainerImageName(size.Container).AbsoluteUri;
-                    }
-                }
-            }
-        }
+            => vmSizes?.Where(size => size.Container is not null)
+                .ForEach(size => size.Container = Common.Utilities.NormalizeContainerImageName(size.Container).AbsoluteUri);
 
         private static bool IsDirViable(IDirectory dir, out IEnumerable<IFile> additionalFiles)
         {
@@ -265,9 +227,9 @@ namespace HostConfigConsole
         }
 
         private static HostConfiguration ParseConfig(IFile configFile)
-            => ConvertUserConfig(ParseUserConfig(configFile.OpenText()), configFile.Directory?.EnumerateFiles(Constants.StartTask).Select(GetFileHash).FirstOrDefault());
+            => ConvertUserConfig(ParseUserConfig(OpenConfiguration(configFile.OpenRead())), configFile.Directory?.EnumerateFiles(Constants.StartTask).Select(GetFileHash).FirstOrDefault());
 
-        private static UserHostConfig ParseUserConfig(TextReader textReader)
+        private static UserHostConfig ParseUserConfig(TextReader? textReader)
             => ReadJson<UserHostConfig>(textReader, () => throw new ArgumentException("File is not a HostConfig configuration.", nameof(textReader)));
 
         private static HostConfiguration ConvertUserConfig(UserHostConfig? userConfig, string? startTaskHash)
@@ -285,8 +247,6 @@ namespace HostConfigConsole
             string FullName { get; }
             bool Exists { get; }
 
-            DirectoryInfo? DirectoryInfo { get; }
-
             IEnumerable<IDirectory> EnumerateDirectories();
             IEnumerable<IFile> EnumerateFiles();
             IEnumerable<IFile> EnumerateFiles(string searchPattern);
@@ -297,10 +257,7 @@ namespace HostConfigConsole
             string Name { get; }
             IDirectory? Directory { get; }
 
-            FileInfo? FileInfo { get; }
-
             Stream OpenRead();
-            StreamReader OpenText();
             byte[] ReadAllBytes();
         }
     }

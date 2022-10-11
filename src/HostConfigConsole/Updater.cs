@@ -15,7 +15,7 @@ namespace HostConfigConsole
     /// <summary>
     /// Compares two <see cref="HostConfigurations"/> and updates deployments
     /// </summary>
-    public sealed class Updater : Base, IDisposable
+    public sealed class Updater : Base
     {
         private readonly ReadOnlyHostConfig _existing;
         private readonly ReadOnlyHostConfig _target;
@@ -37,38 +37,32 @@ namespace HostConfigConsole
             => _target.StartTaskHashes.Except(_existing.StartTaskHashes)
                 .Select<string, (string Hash, Func<Stream> Open)>(h =>
                     (h,
-                    () => _target.HostConfigBlobs.Value.GetEntry(h)?.Open() ?? throw new InvalidOperationException("Start task not found in new HostConfigBlobs")));
+                    () => _target.HostConfigBlobs.Value[h].Value));
 
         public IEnumerable<string> GetStartTasksToRemove()
             => _existing.StartTaskHashes.Except(_target.StartTaskHashes);
 
-        public Updater(HostConfig target, ZipArchive hostConfigBlobs, IReadOnlyDictionary<string, Lazy<Stream>> packageVersions, HostConfig? existing = default)
+        public Updater(HostConfig target, IReadOnlyDictionary<string, Lazy<Stream>> resources, IReadOnlyDictionary<string, Lazy<Stream>> packageVersions, HostConfig? existing = default)
         {
             ArgumentNullException.ThrowIfNull(target);
-            ArgumentNullException.ThrowIfNull(hostConfigBlobs);
+            ArgumentNullException.ThrowIfNull(resources);
             ArgumentNullException.ThrowIfNull(packageVersions);
 
             _existing = new(existing ?? new());
-            _target = new(target, hostConfigBlobs, packageVersions);
+            _target = new(target, resources, packageVersions);
         }
 
-        public void Dispose()
-        {
-            _existing?.Dispose();
-            _target?.Dispose();
-        }
-
-        private sealed class ReadOnlyHostConfig : IDisposable
+        private sealed class ReadOnlyHostConfig
         {
             public ReadOnlyDictionary<string, ApplicationVersion> ApplicationVersions { get; }
             public ReadOnlyDictionary<string, string> PackageHashes { get; }
             public ReadOnlyDictionary<string, HostConfiguration> HostConfigurations { get; }
             public ReadOnlyCollection<string> StartTaskHashes { get; }
 
-            public Lazy<ZipArchive> HostConfigBlobs { get; }
+            public Lazy<IReadOnlyDictionary<string, Lazy<Stream>>> HostConfigBlobs { get; }
             public Lazy<IReadOnlyDictionary<string, Lazy<Stream>>> PackageVersions { get; }
 
-            public ReadOnlyHostConfig(HostConfig hostConfig, ZipArchive? hostConfigBlobs = default, IReadOnlyDictionary<string, Lazy<Stream>>? packageVersions = default)
+            public ReadOnlyHostConfig(HostConfig hostConfig, IReadOnlyDictionary<string, Lazy<Stream>>? hostConfigBlobs = default, IReadOnlyDictionary<string, Lazy<Stream>>? packageVersions = default)
             {
                 ArgumentNullException.ThrowIfNull(hostConfig, nameof(hostConfig));
                 HostConfigBlobs = hostConfigBlobs is null
@@ -82,9 +76,6 @@ namespace HostConfigConsole
                 HostConfigurations = new(hostConfig.HostConfigurations ?? Common.HostConfigs.HostConfigurations.Empty);
                 StartTaskHashes = new(HostConfigurations.Select(p => p.Value.StartTask?.StartTaskHash).Where(h => h is not null).Cast<string>().ToList());
             }
-
-            public void Dispose()
-                => HostConfigBlobs?.Value?.Dispose();
         }
 
         private sealed class ApplicationVersionsComparer : IEqualityComparer<KeyValuePair<string, ApplicationVersion>>

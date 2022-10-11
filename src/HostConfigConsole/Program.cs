@@ -9,113 +9,183 @@ using System.CommandLine.Binding;
 
 using Common.HostConfigs;
 using HostConfigConsole;
+using System;
+using Newtonsoft.Json.Linq;
 
-(var buildCmd, var buildCmdArgs, var buildCmdHostConfigsOpt, var buildCmdResourcesZipOpt, var buildCmdHostConfigsDirOpt) = new Command("build", "Builds HostConfig metadata into deployment assets.") { TreatUnmatchedTokensAsErrors = true }
+//var tst = GitHub.GetDirectory(new("https://github.com/microsoft/CromwellOnAzure/tree/bmurri/host-config-auto-scale/HostConfigs"));
+
+(var buildCmd, var buildCmdArgs, var buildCmdOutFileOpt, var buildCmdHostConfigsDirOpt) = new Command("build", "Builds HostConfig metadata into deployment assets.") { TreatUnmatchedTokensAsErrors = true }
     .ConfigureCommand(
         new Argument<string[]>("host-config", "Zero or more directory names of host configuration descriptor directories.") { Arity = ArgumentArity.ZeroOrMore },
-        new Option<FileInfo>(new[] { "--host-configurations", "-h" }, "Path to deployed host configuration file (must be named \"host-configurations.json\") (will be created/overwritten).") { IsRequired = true },
-        new Option<FileInfo>(new[] { "--resources-zip", "-r" }, "Path to zip file containing deployed files (will be created/overwritten).") { IsRequired = true },
-        new Option<DirectoryInfo>(new[] { "--host-configs-directory", "-d" }, "Path to directory containing all the host configuration descriptor directories to process.") { IsRequired = true });
-buildCmd.SetHandler(BuildCmdAsync,
-    new BuildHostConfigsBinder(buildCmdHostConfigsDirOpt, buildCmdArgs), buildCmdHostConfigsOpt, buildCmdResourcesZipOpt, buildCmdHostConfigsDirOpt);
+        new Option<FileInfo>(new[] { "--output", "-o"}, "Path to output file (used to stage metadata for the update command)."),
+        new Option<string>(new[] { "--host-configs-directory", "-d" }, "Path to directory containing all the host configuration descriptor directories to process.") { IsRequired = true });
 
-var updateCmd = new Command("update", "Updates CoA deployment with built deployment assets") { TreatUnmatchedTokensAsErrors = true }
-    .ConfigureCommand(UpdateCmdAsync);
+buildCmd.SetHandler(BuildCmdAsync, buildCmdArgs, buildCmdOutFileOpt, buildCmdHostConfigsDirOpt);
+
+buildCmdHostConfigsDirOpt.AddValidator(result =>
+{
+    var value = result.GetValueForOption(buildCmdHostConfigsDirOpt);
+    if (value is null)
+    {
+        result.ErrorMessage = "--host-configs-directory must exist and be accessible.";
+    }
+    else if (Uri.TryCreate(value, UriKind.Absolute, out var uri))
+    {
+        if (uri.Scheme != "https" && uri.Host != "github.com" || uri.Segments.Length < 3)
+        {
+            result.ErrorMessage = "--host-configs-directory must in a GitHub repository.";
+        }
+    }
+    else
+    {
+        var dir = new DirectoryInfo(value);
+        if (!(dir.Exists))
+        {
+            result.ErrorMessage = "--host-configs-directory must exist and be accessible.";
+        }
+    }
+});
+
+buildCmdArgs.AddValidator(result =>
+{
+    var value = result.GetValueForOption(buildCmdHostConfigsDirOpt);
+    if (value is null || Uri.TryCreate(value, UriKind.Absolute, out _))
+    {
+        return;
+    }
+
+    var dir = new DirectoryInfo(value);
+    string? errMsg = default;
+    result
+        .GetValueForArgument(buildCmdArgs)
+        .Where(arg => !Directory.Exists(Path.Combine(dir.FullName, arg)))
+        .ForEach(arg =>
+        {
+            errMsg ??= string.Empty;
+            errMsg += $"Host configuration directory '{arg}' must exist in '{dir.FullName}' and be accessible." + Environment.NewLine;
+        });
+
+    if (errMsg is not null)
+    {
+        result.ErrorMessage = errMsg.TrimEnd(Environment.NewLine.ToCharArray());
+    }
+});
+
+(var updateCmd, var updateCmdInFile, var updateRemoveFilesOpt, var updateRemoveAppsOpt) = new Command("update", "Updates CoA deployment with built deployment assets") { TreatUnmatchedTokensAsErrors = true }
+    .ConfigureCommand<Option<FileInfo>, FileInfo, Option<bool>, bool, Option<bool>, bool>(UpdateCmdAsync,
+        new Option<FileInfo>(new[] { "--input", "-i" }, "Path to output file (used to stage metadata for the update command)."),
+        new Option<bool>("--remove-obsolete-files", "Removes obsolete files. (May be dangerous to use while workflows are running)."),
+        new Option<bool>("--remove-obsolete-apps", "Removes obsolete application packages. (This can be particularly dangerous with shared batch accounts)."));
+
+updateRemoveAppsOpt.AddValidator(results =>
+{
+    if (results.GetValueForOption(updateRemoveAppsOpt) && !results.GetValueForOption(updateRemoveFilesOpt))
+    {
+        Console.WriteLine("WARNING: --remove-obsolete-apps is set while --remove-obsolete-files is not set. This is not a generally expected use cage.");
+        Console.WriteLine();
+    }
+});
+
+updateCmdInFile.AddValidator(result =>
+{
+    if (!(result.GetValueForOption(updateCmdInFile)?.Exists ?? false))
+    {
+        result.ErrorMessage = "--input must exist and be accessible.";
+    }
+});
 
 return await new RootCommand("Host Configuration utility.") { buildCmd, updateCmd }.InvokeAsync(args);
 
-Task UpdateCmdAsync() { return Task.CompletedTask; }
+static FileInfo DefaultHostConfig()
+    => new(Path.Combine(Environment.CurrentDirectory, "HostConfigs"));
 
-Task<int> BuildCmdAsync(DirectoryInfo[] hostConfigs, FileInfo hostConfigurations, FileInfo resourcesZip, DirectoryInfo hostConfigsDirectory)
-    => Task.FromResult(BuildCmd(hostConfigs, hostConfigurations, resourcesZip, hostConfigsDirectory));
-
-int BuildCmd(DirectoryInfo[] hostconfigs, FileInfo hostConfigs, FileInfo resourcesZip, DirectoryInfo hostConfigsDir)
+Task<int> UpdateCmdAsync(FileInfo? inFile, bool removeFiles, bool removeApps)
 {
-#pragma warning disable CA2208 // Instantiate argument exceptions correctly
-    if (!(hostConfigsDir?.Exists ?? false))
+    inFile ??= DefaultHostConfig();
+    if (!inFile.Exists)
     {
-        throw new ArgumentException(null, "host-configs-directory", new DirectoryNotFoundException());
+        Console.Error.WriteLine("--input must exist and be accessible.");
+        return Task.FromResult(2);
     }
 
-    ArgumentNullException.ThrowIfNull(hostConfigs, "host-configurations");
-    ArgumentNullException.ThrowIfNull(resourcesZip, "resources-zip");
-    ArgumentNullException.ThrowIfNull(hostConfigsDir, "host-configs-directory");
-    if (hostConfigs is null || resourcesZip is null || hostConfigsDir is null) throw new InvalidOperationException(); // prevent build warnings (ThrowIfNull isn't recognized by the analyzers)
-    var unknown = hostconfigs.Where(c => !c.Exists).ToList();
+    using var package = ConfigurationPackageReadable.Open(inFile);
+    var coa = new CromwellOnAzure(inFile.DirectoryName ?? string.Empty);
 
-    if (unknown.Any())
+    var config = package.GetHostConfig() ?? throw new InvalidOperationException();
+    var updater = new Updater(config, package.GetResources(), package.GetApplications(), coa.GetHostConfig());
+    coa.AddApplications(updater.GetApplicationsToAdd());
+    coa.AddHostConfigBlobs(updater.GetStartTasksToAdd());
+    coa.WriteHostConfig(config);
+
+    if (removeApps)
     {
-        throw new ArgumentException($"The following requested host configurations were not found: {string.Join(", ", unknown.Select(s => $"'{s.Name}'"))}", "host-config");
+        coa.RemoveApplications(updater.GetApplicationsToRemove());
     }
-#pragma warning restore CA2208 // Instantiate argument exceptions correctly
 
-    resourcesZip.Directory?.Create();
-    hostConfigs.Directory?.Create();
-    var tmpZip = new FileInfo(Path.GetTempFileName());
-
-    try
+    if (removeFiles)
     {
-        HostConfig config;
-        IEnumerable<(string Version, Lazy<Stream> Stream)> applications;
+        coa.RemoveHostConfigBlobs(updater.GetStartTasksToRemove());
+    }
 
-        using (var zip = new ZipArchive(tmpZip.OpenWrite(), ZipArchiveMode.Create))
+    return Task.FromResult(0);
+}
+
+async Task<int> BuildCmdAsync(string[] hostconfigs, FileInfo? outFile, string hostConfigs)
+{
+    outFile ??= DefaultHostConfig();
+    outFile.Directory?.Create();
+
+    var hostConfigsDir = Uri.TryCreate(hostConfigs, UriKind.Absolute, out var uri)
+        ? await GitHub.GetDirectory(uri)
+        : FileSystem.GetDirectory(new DirectoryInfo(hostConfigs));
+
+    var (config, resources, applications) = new Builder(hostConfigsDir)
+        .Build(Console.WriteLine, hostconfigs ?? Array.Empty<string>());
+
+    bool areSame;
+    {
+        if (outFile.Exists)
         {
-            (config, applications) = new Builder(FileSystem.GetDirectory(hostConfigsDir)).Build(Console.WriteLine, zip, hostconfigs?.Select(d => d.Name).ToArray() ?? Array.Empty<string>());
+            try
+            {
+                using var package = ConfigurationPackageReadable.Open(outFile);
+                areSame = Builder.AreSame(config, package.GetHostConfig() ?? new HostConfig());
+            }
+            catch
+            {
+                areSame = false;
+            }
         }
-        tmpZip.Refresh();
-
-        bool areSame;
-        using (var reader = Builder.OpenConfiguration(hostConfigs))
+        else
         {
-            areSame = Builder.AreSame(config, Builder.ReadJson(reader, () => new HostConfig()));
+            areSame = false;
         }
-
-        if (!areSame)
-        {
-            Console.WriteLine("Saving configuration");
-            tmpZip.MoveTo(resourcesZip.FullName, true);
-            tmpZip = default;
-            File.WriteAllText(hostConfigs.FullName, Builder.WriteJson(config));
-        }
-
-        Console.WriteLine("Finished");
     }
-    finally
+
+    if (!areSame)
     {
-        tmpZip?.Refresh();
-        tmpZip?.Delete();
+        Console.WriteLine("Saving configuration");
+        using var package = ConfigurationPackageWritable.Create(outFile);
+        resources.ForEach(resource => package.SetResource(resource.Name, resource.Stream.Value));
+        applications.ForEach(app =>
+        {
+            var name = config.PackageHashes.FirstOrDefault(t => t.Value.Equals(app.Version, StringComparison.OrdinalIgnoreCase)).Key;
+            package.SetApplication(name, app.Version, app.Stream.Value);
+        });
+
+        package.SetHostConfig(config);
     }
+
+    Console.WriteLine("Finished");
 
     return 0;
 }
 
-class BuildHostConfigsBinder : BinderBase<DirectoryInfo[]>
-{
-    private readonly Argument<string[]> argument;
-    private readonly Option<DirectoryInfo> directory;
-
-    public BuildHostConfigsBinder(Option<DirectoryInfo> dir, Argument<string[]> arg)
-    {
-        ArgumentNullException.ThrowIfNull(dir);
-        ArgumentNullException.ThrowIfNull(arg);
-        directory = dir;
-        argument = arg;
-    }
-
-    protected override DirectoryInfo[] GetBoundValue(BindingContext bindingContext)
-    {
-        var dir = bindingContext.ParseResult.GetValueForOption(directory);
-        if (dir is null) throw new InvalidOperationException("--host-configs-directory is required.");
-        if (!dir.Exists) throw new InvalidOperationException("--host-configs-directory does not exist or is not accessible.");
-        return bindingContext.ParseResult.GetValueForArgument(argument).Select(a => new DirectoryInfo(Path.Combine(dir.FullName, a))).ToArray();
-    }
-}
-
-static class Extensions
+static class CommandLineExtensions
 {
     public static Command Add(this Command cmd, Symbol[] symbols)
     {
-        foreach (var symbol in symbols)
+        symbols.ForEach(symbol =>
         {
             switch (symbol)
             {
@@ -129,8 +199,7 @@ static class Extensions
                     cmd.Add(command);
                     break;
             }
-        }
-
+        });
         return cmd;
     }
 

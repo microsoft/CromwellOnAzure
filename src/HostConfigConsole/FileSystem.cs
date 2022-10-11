@@ -1,11 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using static HostConfigConsole.Builder;
 
 namespace HostConfigConsole
@@ -19,7 +14,7 @@ namespace HostConfigConsole
         {
             private readonly DirectoryInfo _info;
 
-            public Directory(DirectoryInfo info)
+            internal Directory(DirectoryInfo info)
             {
                 ArgumentNullException.ThrowIfNull(info);
                 _info = info;
@@ -74,9 +69,6 @@ namespace HostConfigConsole
 
             public Stream OpenRead()
                 => _info.OpenRead();
-
-            public StreamReader OpenText()
-                => _info.OpenText();
 
             public byte[] ReadAllBytes()
                 => System.IO.File.ReadAllBytes(_info.FullName);

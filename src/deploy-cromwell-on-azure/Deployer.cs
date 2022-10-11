@@ -976,6 +976,7 @@ namespace CromwellOnAzureDeployer
                 await PatchContainersAddJobPreparationScriptV320Async(storageAccount);
                 await PatchContainersAddJobPreparationScriptV320Async(storageAccount);
                 await PatchAllowedVmSizesFileV320Async(storageAccount);
+                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "host-configurations.json", Utility.WriteJson(Common.HostConfigs.HostConfigurations.Empty)); // Move to 3.4?
             }
         }
 
@@ -1630,27 +1631,13 @@ namespace CromwellOnAzureDeployer
         }
 
         private Task WriteNonPersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount)
-            => Task.WhenAll(new Task[]
+            => Execute(
+                $"Writing readme.txt files to '{WorkflowsContainerName}' storage container...",
+                async () =>
                 {
-                    Execute(
-                        $"Writing readme.txt files to '{WorkflowsContainerName}' storage container...",
-                        async () =>
-                        {
-                            await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
-                            await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
-                            await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/job-prep.sh", Utility.GetFileContent("scripts", "job-prep.sh"));
-                        }),
-                    Execute(
-                        $"Writing host configuration files to '{"host-config-blobs"}' storage container...",
-                        async () =>
-                        {
-                            await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "host-configurations.json", Utility.GetFileContent("host-configurations.json"));
-                            using var zip = new ZipArchive(Utility.GetBinaryFileContent("resources.zip"));
-                            foreach (var entry in zip.Entries)
-                            {
-                                await UploadBinaryToStorageAccountAsync(storageAccount, "host-config-blobs", entry.FullName, BinaryData.FromStream(entry.Open()));
-                            }
-                        }),
+                    await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
+                    await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
+                    await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/job-prep.sh", Utility.GetFileContent("scripts", "job-prep.sh"));
                 });
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
@@ -1689,6 +1676,7 @@ namespace CromwellOnAzureDeployer
                     }
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "host-configurations.json", Utility.WriteJson(Common.HostConfigs.HostConfigurations.Empty));
                 });
 
         private Task AssignVmAsContributorToBatchAccountAsync(IIdentity managedIdentity, BatchAccount batchAccount)

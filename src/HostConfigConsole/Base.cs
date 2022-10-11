@@ -16,10 +16,6 @@ using Common.HostConfigs;
 
 namespace HostConfigConsole
 {
-    /*
-     * TODO (both Parser && Updater) replace ZipArchive with IDictionary<string, Lazy<Stream>>. Consider creating helpers to convert/create (disposable) Dictionary (to/from ZipArchive).
-     */
-
     public abstract class Base
     {
 
@@ -34,6 +30,7 @@ namespace HostConfigConsole
             }
             catch (ArgumentException)
             {
+                config?.Close();
                 return default;
             }
         }
@@ -57,24 +54,6 @@ namespace HostConfigConsole
             using var writer = new JsonTextWriter(result) { CloseOutput = false };
             JsonSerializer.CreateDefault().Serialize(writer, value);
             return result.ToString();
-        }
-
-        public interface BuilderBlobs
-        {
-            Lazy<Stream> GetResourceBlob(string name);
-            Func<Stream> GetApplicationBlob(string name);
-        }
-
-        public interface ParserBlobs
-        {
-            Lazy<Stream> GetResourceBlob(string name);
-            Lazy<Stream> GetApplicationBlob(string name, string version);
-        }
-
-        public interface UpdaterBlobs
-        {
-            Lazy<Stream> GetResourceBlob(string name);
-            Lazy<Stream> GetApplicationBlob(string name, string version);
         }
     }
 }
