@@ -85,33 +85,11 @@ namespace CromwellOnAzureDeployer
         public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
-            values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
+            UpdateValuesFromSettings(values, settings);
             values.Config["resourceGroup"] = resourceGroupName;
-            values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
-            values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
-            values.Config["cosmosDbAccountName"] = settings["CosmosDbAccountName"];
-            values.Config["batchAccountName"] = settings["BatchAccountName"];
-            values.Config["batchNodesSubnetId"] = settings["BatchNodesSubnetId"];
-            values.Config["coaNamespace"] = settings["AksCoANamespace"];
-            values.Config["disableBatchNodesPublicIpAddress"] = settings["DisableBatchNodesPublicIpAddress"];
-            values.Config["disableBatchScheduling"] = settings["DisableBatchScheduling"];
-            values.Config["usePreemptibleVmsOnly"] = settings["UsePreemptibleVmsOnly"];
-            values.Config["blobxferImageName"] = settings["BlobxferImageName"];
-            values.Config["dockerInDockerImageName"] = settings["DockerInDockerImageName"];
-            values.Config["batchImageOffer"] = settings["BatchImageOffer"];
-            values.Config["batchImagePublisher"] = settings["BatchImagePublisher"];
-            values.Config["batchImageSku"] = settings["BatchImageSku"];
-            values.Config["batchImageVersion"] = settings["BatchImageVersion"];
-            values.Config["batchNodeAgentSkuId"] = settings["BatchNodeAgentSkuId"];
-            values.Config["marthaUrl"] = settings["MarthaUrl"];
-            values.Config["marthaKeyVaultName"] = settings["MarthaKeyVaultName"];
-            values.Config["marthaSecretName"] = settings["MarthaSecretName"];
             values.Identity["name"] = managedId.Name;
             values.Identity["resourceId"] = managedId.Id;
             values.Identity["clientId"] = managedId.ClientId;
-            values.Images["tes"] = settings["TesImageName"];
-            values.Images["triggerservice"] = settings["TriggerServiceImageName"];
-            values.Images["cromwell"] = settings["CromwellImageName"];
 
             if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
             {
@@ -149,7 +127,93 @@ namespace CromwellOnAzureDeployer
 
             var valuesString = KubernetesYaml.Serialize(values);
             await File.WriteAllTextAsync(Path.Join("scripts", "helm", "values.yaml"), valuesString);
-            await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "values.yaml", valuesString, cts.Token);
+            await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
+        }
+
+        public async Task UpgradeValuesYaml(IStorageAccount storageAccount, Dictionary<string, string> settings)
+        {
+            var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
+            UpdateValuesFromSettings(values, settings);
+            var valuesString = KubernetesYaml.Serialize(values);
+            await File.WriteAllTextAsync(Path.Join("scripts", "helm", "values.yaml"), valuesString);
+            await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
+        }
+
+        private static void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)
+        {
+            values.Config["cromwellOnAzureVersion"] = settings["CromwellOnAzureVersion"];
+            values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
+            values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
+            values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
+            values.Config["cosmosDbAccountName"] = settings["CosmosDbAccountName"];
+            values.Config["batchAccountName"] = settings["BatchAccountName"];
+            values.Config["batchNodesSubnetId"] = settings["BatchNodesSubnetId"];
+            values.Config["coaNamespace"] = settings["AksCoANamespace"];
+            values.Config["disableBatchNodesPublicIpAddress"] = settings["DisableBatchNodesPublicIpAddress"];
+            values.Config["disableBatchScheduling"] = settings["DisableBatchScheduling"];
+            values.Config["usePreemptibleVmsOnly"] = settings["UsePreemptibleVmsOnly"];
+            values.Config["blobxferImageName"] = settings["BlobxferImageName"];
+            values.Config["dockerInDockerImageName"] = settings["DockerInDockerImageName"];
+            values.Config["batchImageOffer"] = settings["BatchImageOffer"];
+            values.Config["batchImagePublisher"] = settings["BatchImagePublisher"];
+            values.Config["batchImageSku"] = settings["BatchImageSku"];
+            values.Config["batchImageVersion"] = settings["BatchImageVersion"];
+            values.Config["batchNodeAgentSkuId"] = settings["BatchNodeAgentSkuId"];
+            values.Config["marthaUrl"] = settings["MarthaUrl"];
+            values.Config["marthaKeyVaultName"] = settings["MarthaKeyVaultName"];
+            values.Config["marthaSecretName"] = settings["MarthaSecretName"];
+            values.Images["tes"] = settings["TesImageName"];
+            values.Images["triggerservice"] = settings["TriggerServiceImageName"];
+            values.Images["cromwell"] = settings["CromwellImageName"];
+            values.Config["crossSubscriptionAKSDeployment"] = settings["CrossSubscriptionAKSDeployment"];
+            values.Config["postgreSqlServerName"] = settings["PostgreSqlServerName"];
+            values.Config["postgreSqlDatabaseName"] = settings["PostgreSqlDatabaseName"];
+            values.Config["postgreSqlUserLogin"] = settings["PostgreSqlUserLogin"];
+            values.Config["postgreSqlUserPassword"] = settings["PostgreSqlUserPassword"];
+            values.Config["usePostgreSqlSingleServer"] = settings["UsePostgreSqlSingleServer"];
+        }
+
+        public async Task<Dictionary<string, string>> GetAKSSettings(IStorageAccount storageAccount)
+        {
+            var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
+            return ValuesToSettings(values);
+        }
+
+        private static Dictionary<string, string> ValuesToSettings(HelmValues values)
+        {
+            var settings = new Dictionary<string, string>();
+            settings["CromwellOnAzureVersion"] = values.Config["cromwellOnAzureVersion"];
+            settings["DefaultStorageAccountName"] = values.Persistence["storageAccount"];
+            settings["AzureServicesAuthConnectionString"] = values.Config["azureServicesAuthConnectionString"];
+            settings["ApplicationInsightsAccountName"] = values.Config["applicationInsightsAccountName"];
+            settings["CosmosDbAccountName"] = values.Config["cosmosDbAccountName"];
+            settings["BatchAccountName"] = values.Config["batchAccountName"];
+            settings["BatchNodesSubnetId"] = values.Config["batchNodesSubnetId"];
+            settings["AksCoANamespace"] = values.Config["coaNamespace"];
+            settings["DisableBatchNodesPublicIpAddress"] = values.Config["disableBatchNodesPublicIpAddress"];
+            settings["DisableBatchScheduling"] = values.Config["disableBatchScheduling"];
+            settings["UsePreemptibleVmsOnly"] = values.Config["usePreemptibleVmsOnly"];
+            settings["BlobxferImageName"] = values.Config["blobxferImageName"];
+            settings["DockerInDockerImageName"] = values.Config["dockerInDockerImageName"];
+            settings["BatchImageOffer"] = values.Config["batchImageOffer"];
+            settings["BatchImagePublisher"] = values.Config["batchImagePublisher"];
+            settings["BatchImageSku"] = values.Config["batchImageSku"];
+            settings["BatchImageVersion"] = values.Config["batchImageVersion"];
+            settings["BatchNodeAgentSkuId"] = values.Config["batchNodeAgentSkuId"];
+            settings["MarthaUrl"] = values.Config["marthaUrl"];
+            settings["MarthaKeyVaultName"] = values.Config["marthaKeyVaultName"];
+            settings["MarthaSecretName"] = values.Config["marthaSecretName"];
+            settings["TesImageName"] = values.Images["tes"];
+            settings["TriggerServiceImageName"] = values.Images["triggerservice"];
+            settings["CromwellImageName"] = values.Images["cromwell"];
+            settings["CrossSubscriptionAKSDeployment"] = values.Config["crossSubscriptionAKSDeployment"];
+            settings["PostgreSqlServerName"] = values.Config["postgreSqlServerName"];
+            settings["PostgreSqlDatabaseName"] = values.Config["postgreSqlDatabaseName"];
+            settings["PostgreSqlUserLogin"] = values.Config["postgreSqlUserLogin"];
+            settings["PostgreSqlUserPassword"] = values.Config["postgreSqlUserPassword"];
+            settings["UsePostgreSqlSingleServer"] = values.Config["usePostgreSqlSingleServer"];
+            settings["ManagedIdentityClientId"] = values.Identity["clientId"];
+            return settings;
         }
 
         private async Task ExecHelmProcess(string command)
@@ -261,7 +325,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId, string keyVaultUrl)
         {
-            await UpdateHelmValuesAsync(storageAccount, keyVaultUrl, resourceGroup.Name, settings, managedId);
+            await UpgradeValuesYaml(storageAccount, settings);
             await DeployHelmChartToClusterAsync();
         }
 

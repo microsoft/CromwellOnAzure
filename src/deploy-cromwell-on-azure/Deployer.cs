@@ -211,7 +211,7 @@ namespace CromwellOnAzureDeployer
                                 storageAccount = storageAccounts.First();
                             }
 
-                            accountNames = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, cts), SettingsDelimiter);
+                            accountNames = await kubernetesManager.GetAKSSettings(storageAccount);
                         }   
                         else
                         {
@@ -308,7 +308,8 @@ namespace CromwellOnAzureDeployer
                         {
                             if (accountNames.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
                             {
-                                configuration.CrossSubscriptionAKSDeployment = bool.Parse(crossSubscriptionAKSDeployment);
+                                bool.TryParse(crossSubscriptionAKSDeployment, out var parsed);
+                                configuration.CrossSubscriptionAKSDeployment = parsed;
                             }
 
                             if (accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
@@ -326,18 +327,17 @@ namespace CromwellOnAzureDeployer
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
                             // Override any configuration that is used by the update.
-                            var systemSettings = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, cts), SettingsDelimiter);
-                            var versionString = systemSettings["CromwellOnAzureVersion"];
+                            var aksValues = await kubernetesManager.GetAKSSettings(storageAccount);
+                            var versionString = aksValues["CromwellOnAzureVersion"];
                             var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
+                            var settings = ConfigureSettings(managedIdentity, aksValues, installedVersion);
 
                             await kubernetesManager.UpgradeAKSDeployment(
-                                GetPersonalizedSettings(managedIdentity, accountNames, installedVersion).Union(GetSystemSettings(systemSettings)).ToDictionary(kv => kv.Key, kv => kv.Value),
+                                settings,
                                 resourceGroup,
                                 storageAccount,
                                 managedIdentity,
                                 keyVaultUri);
-
-                            await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(systemSettings, SettingsDelimiter));
                         }
                         else
                         {
@@ -506,15 +506,14 @@ namespace CromwellOnAzureDeployer
                             ConsoleEx.WriteLine();
                             compute = Task.Run(async () =>
                             {
-                                var personalizedSettings = GetPersonalizedSettings(managedIdentity, default, default);
-                                var systemSettings = GetSystemSettings(default);
+                                var settings = ConfigureSettings(managedIdentity, default, default);
 
                                 if (aksCluster == null && !configuration.ManualHelmDeployment)
                                 {
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
-                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, personalizedSettings.Union(systemSettings).ToDictionary(kv => kv.Key, kv => kv.Value), managedIdentity);
+                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity);
 
                                 if (configuration.ManualHelmDeployment)
                                 {
@@ -528,9 +527,6 @@ namespace CromwellOnAzureDeployer
                                     await kubernetesManager.DeployCoADependencies();
                                     await kubernetesManager.DeployHelmChartToClusterAsync();
                                 }
-
-                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(personalizedSettings, SettingsDelimiter));
-                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(systemSettings, SettingsDelimiter));
                             });
                         }
                         else
@@ -966,10 +962,10 @@ namespace CromwellOnAzureDeployer
             return settings;
         }
 
-        private Dictionary<string, string> GetSystemSettings(Dictionary<string, string> settings)
+        private Dictionary<string, string> ConfigureSettings(IIdentity managedIdentity, Dictionary<string, string> settings, Version installedVersion)
         {
             settings ??= new();
-            var defaults = GetDefaultValues(new[] { "env-00-coa-version.txt", "env-02-internal-images.txt", "env-03-external-images.txt", });
+            var defaults = GetDefaultValues(new [] { "env-00-coa-version.txt", "env-01-account-names.txt", "env-02-internal-images.txt", "env-03-external-images.txt", "env-04-settings.txt" });
 
             // We always overwrite the CoA version
             UpdateSetting(settings, defaults, "CromwellOnAzureVersion", default(string), ignoreDefaults: false);
@@ -985,14 +981,6 @@ namespace CromwellOnAzureDeployer
             UpdateSetting(settings, defaults, "BlobxferImageName", configuration.BlobxferImageName);
             UpdateSetting(settings, defaults, "DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress, b => b.GetValueOrDefault().ToString(), configuration.DisableBatchNodesPublicIpAddress.GetValueOrDefault().ToString());
 
-            BackFillSettings(settings, defaults);
-            return settings;
-        }
-
-        private Dictionary<string, string> GetPersonalizedSettings(IIdentity managedIdentity, Dictionary<string, string> settings, Version installedVersion)
-        {
-            settings ??= new();
-            var defaults = GetDefaultValues(new [] { "env-01-account-names.txt", "env-04-settings.txt" });
 
             if (installedVersion is null)
             {
@@ -1006,7 +994,6 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "AksCoANamespace", configuration.AksCoANamespace, ignoreDefaults: true);
 
                 var provisionPostgreSqlOnAzure = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault();
-                UpdateSetting(settings, defaults, "ProvisionPostgreSqlOnAzure", configuration.ProvisionPostgreSqlOnAzure);
                 UpdateSetting(settings, defaults, "CrossSubscriptionAKSDeployment", configuration.CrossSubscriptionAKSDeployment);
                 UpdateSetting(settings, defaults, "PostgreSqlServerName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlServerName : string.Empty, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlDatabaseName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellDatabaseName : string.Empty, ignoreDefaults: true);
