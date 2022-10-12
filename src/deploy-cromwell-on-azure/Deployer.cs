@@ -976,7 +976,7 @@ namespace CromwellOnAzureDeployer
                 await PatchContainersAddJobPreparationScriptV320Async(storageAccount);
                 await PatchContainersAddJobPreparationScriptV320Async(storageAccount);
                 await PatchAllowedVmSizesFileV320Async(storageAccount);
-                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "host-configurations.json", Utility.WriteJson(Common.HostConfigs.HostConfigurations.Empty)); // Move to 3.4?
+                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "host-configurations.json", Utility.WriteJson(new Common.HostConfigs.HostConfig())); // Move to 3.4?
             }
         }
 
@@ -1676,7 +1676,7 @@ namespace CromwellOnAzureDeployer
                     }
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "host-configurations.json", Utility.WriteJson(Common.HostConfigs.HostConfigurations.Empty));
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, "host-configurations.json", Utility.WriteJson(new Common.HostConfigs.HostConfig()));
                 });
 
         private Task AssignVmAsContributorToBatchAccountAsync(IIdentity managedIdentity, BatchAccount batchAccount)
