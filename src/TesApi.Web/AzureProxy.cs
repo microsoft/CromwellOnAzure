@@ -626,6 +626,9 @@ namespace TesApi.Web
         public Task<string> DownloadBlobAsync(Uri blobAbsoluteUri)
             => new CloudBlockBlob(blobAbsoluteUri).DownloadTextAsync();
 
+        public Task<bool> BlobExistsAsync(Uri blobAbsoluteUri)
+            => new CloudBlockBlob(blobAbsoluteUri).ExistsAsync();
+
         /// <summary>
         /// Gets the list of blobs in the given directory
         /// </summary>

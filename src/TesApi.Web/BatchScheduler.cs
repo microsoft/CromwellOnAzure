@@ -338,6 +338,10 @@ namespace TesApi.Web
                     if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
                     {
                         startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
+                        if (!await azureProxy.BlobExistsAsync(new Uri(startTaskSasUrl)))
+                        {
+                            startTaskSasUrl = null;
+                        }
                     }
 
                     await azureProxy.CreateManualBatchPoolAsync(
@@ -859,21 +863,20 @@ namespace TesApi.Web
                 nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
 
             StartTask startTask = null;
-            string scriptSasUrl = null;
             
             if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
             {
-                scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
-            }
+                var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
 
-            if (!string.IsNullOrWhiteSpace(scriptSasUrl))
-            {
-                startTask = new Microsoft.Azure.Batch.StartTask
+                if (await azureProxy.BlobExistsAsync(new Uri(scriptSasUrl)))
                 {
-                    CommandLine = $"sudo /bin/sh {batchStartTaskLocalPathOnBatchNode}",
-                    UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-                    ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchStartTaskLocalPathOnBatchNode) }
-                };
+                    startTask = new Microsoft.Azure.Batch.StartTask
+                    {
+                        CommandLine = $"sudo /bin/sh {batchStartTaskLocalPathOnBatchNode}",
+                        UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                        ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchStartTaskLocalPathOnBatchNode) }
+                    };
+                }
             }
 
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);

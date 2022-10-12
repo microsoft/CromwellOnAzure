@@ -53,6 +53,9 @@ namespace TesApi.Web
         public Task<string> DownloadBlobAsync(Uri blobAbsoluteUri) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.DownloadBlobAsync(blobAbsoluteUri));
 
         /// <inheritdoc/>
+        public Task<bool> BlobExistsAsync(Uri blobAbsoluteUri) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.BlobExistsAsync(blobAbsoluteUri));
+
+        /// <inheritdoc/>
         public Task<IEnumerable<string>> GetActivePoolIdsAsync(string prefix, TimeSpan minAge, CancellationToken cancellationToken) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.GetActivePoolIdsAsync(prefix, minAge, cancellationToken));
 
         /// <inheritdoc/>
