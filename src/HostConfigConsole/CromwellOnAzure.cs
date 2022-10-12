@@ -55,9 +55,8 @@ namespace HostConfigConsole
         private IStorageAccount storageAccount { get; }
 
         #region Initialization
-        public static async ValueTask<CromwellOnAzure> Create(string[] args)
+        public static async ValueTask<CromwellOnAzure> Create(CancellationTokenSource cts, string[] args)
         {
-            CancellationTokenSource cts = new();
             var configuration = Configuration.BuildConfiguration(args);
 
             await ValidateTokenProviderAsync();
@@ -508,6 +507,7 @@ namespace HostConfigConsole
             this.storageAccount = storageAccount;
         }
 
+        #region Public Methods
         public async ValueTask<HostConfig> GetHostConfig()
         {
             string? configText;
@@ -534,21 +534,25 @@ namespace HostConfigConsole
                     var resourceGroupRegex = new Regex("/*/resourceGroups/([^/]*)/*");
                     var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
                     var resourceGroupName = resourceGroupRegex.Match(batchAccount.Id).Groups[1].Value;
+                    var list = packages.ToList();
 
-                    await Task.WhenAll(packages.Select(async app =>
+                    list.Select(t => t.Name).Distinct(StringComparer.OrdinalIgnoreCase).ForEach(async app =>
                     {
-                        if (await (await batchManagementClient.Application.ListAsync(resourceGroupName, batchAccount.Name))
-                            .ToAsyncEnumerable(listNextAsync: new Func<string, CancellationToken, Task<IPage<Application>>>(async (link, ct) => await batchManagementClient.Application.ListNextAsync(link, ct)))
-                            .FirstOrDefaultAsync(a => a.Name.Equals(app.Name)) is not null)
+                        if (!await (await batchManagementClient.Application.ListAsync(resourceGroupName, batchAccount.Name))
+                            .ToAsyncEnumerable(listNextAsync: new(async (link, ct) => await batchManagementClient.Application.ListNextAsync(link, ct)))
+                            .AnyAsync(a => a.Name.Equals(app, StringComparison.OrdinalIgnoreCase), cts.Token))
                         {
-                            _ = await batchManagementClient.Application.CreateAsync(resourceGroupName, batchAccount.Name, app.Name);
+                            _ = await batchManagementClient.Application.CreateAsync(resourceGroupName, batchAccount.Name, app);
                         }
+                    });
 
+                    await Task.WhenAll(list.Select(async app =>
+                    {
                         var applicationPackage = await batchManagementClient.ApplicationPackage.CreateAsync(resourceGroupName, batchAccount.Name, app.Name, app.Version);
                         using var package = app.Open();
                         await new CloudBlockBlob(new Uri(applicationPackage.StorageUrl, UriKind.Absolute)).UploadFromStreamAsync(package);
                         _ = await batchManagementClient.ApplicationPackage.ActivateAsync(resourceGroupName, batchAccount.Name, app.Name, app.Version, "zip");
-                        _ = (await batchManagementClient.Application.UpdateAsync(resourceGroupName, batchAccount.Name, app.Name, new Microsoft.Azure.Management.Batch.Models.Application(allowUpdates: false))).Id;
+                        _ = (await batchManagementClient.Application.UpdateAsync(resourceGroupName, batchAccount.Name, app.Name, new Application(allowUpdates: false))).Id;
                     }).ToArray());
                 });
 
@@ -560,17 +564,22 @@ namespace HostConfigConsole
                     var resourceGroupRegex = new Regex("/*/resourceGroups/([^/]*)/*");
                     var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
                     var resourceGroupName = resourceGroupRegex.Match(batchAccount.Id).Groups[1].Value;
+                    var list = packages.ToList();
 
-                    await Task.WhenAll(packages.Select(async app =>
+                    await Task.WhenAll(list.Select(async app =>
                     {
                         await batchManagementClient.ApplicationPackage.DeleteAsync(resourceGroupName, batchAccount.Name, app.Name, app.Version);
-                        if (!await (await batchManagementClient.ApplicationPackage.ListAsync(resourceGroupName, batchAccount.Name, app.Name))
-                            .ToAsyncEnumerable(listNextAsync: new Func<string, CancellationToken, Task<IPage<ApplicationPackage>>>(async (link, ct) => await batchManagementClient.ApplicationPackage.ListNextAsync(link, ct)))
-                            .AnyAsync())
-                        {
-                            await batchManagementClient.Application.DeleteAsync(resourceGroupName, batchAccount.Name, app.Name);
-                        }
                     }).ToArray());
+
+                    list.Select(t => t.Name).Distinct(StringComparer.OrdinalIgnoreCase).ForEach(async app =>
+                    {
+                        if (!await (await batchManagementClient.ApplicationPackage.ListAsync(resourceGroupName, batchAccount.Name, app))
+                            .ToAsyncEnumerable(listNextAsync: new Func<string, CancellationToken, Task<IPage<ApplicationPackage>>>(async (link, ct) => await batchManagementClient.ApplicationPackage.ListNextAsync(link, ct)))
+                            .AnyAsync(cts.Token))
+                        {
+                            await batchManagementClient.Application.DeleteAsync(resourceGroupName, batchAccount.Name, app);
+                        }
+                    });
                 });
 
         public async ValueTask AddHostConfigBlobs(IEnumerable<(string Hash, Func<Stream> Open)> blobs)
@@ -599,8 +608,10 @@ namespace HostConfigConsole
                             await container.GetBlobClient(hash).DeleteAsync(snapshotsOption: Azure.Storage.Blobs.Models.DeleteSnapshotsOption.IncludeSnapshots, cancellationToken: cts.Token))
                         .ToArray());
                 });
+        #endregion
 
-        public Task Execute(string message, Func<Task> func)
+        #region Implementation
+        private Task Execute(string message, Func<Task> func)
             => Execute(message, func, cts);
 
         private Task<T> Execute<T>(string message, Func<Task<T>> func)
@@ -687,5 +698,6 @@ namespace HostConfigConsole
                 DisplayExample = displayExample;
             }
         }
+        #endregion
     }
 }

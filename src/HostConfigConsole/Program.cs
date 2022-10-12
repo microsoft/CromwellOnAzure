@@ -108,23 +108,32 @@ async Task<int> UpdateCmdAsync(string[] updateArgs, FileInfo? inFile, bool remov
         throw new InvalidOperationException("--input must exist and be accessible.");
     }
 
-    using var package = ConfigurationPackageReadable.Open(inFile);
-    var coa = await CromwellOnAzure.Create(updateArgs);
+    CancellationTokenSource cts = new();
 
-    var config = package.GetHostConfig() ?? throw new InvalidOperationException();
-    var updater = new Updater(config, package.GetResources(), package.GetApplications(), await coa.GetHostConfig());
-    await coa.AddApplications(updater.GetApplicationsToAdd());
-    await coa.AddHostConfigBlobs(updater.GetStartTasksToAdd());
-    await coa.WriteHostConfig(config);
-
-    if (removeApps)
+    try
     {
-        await coa.RemoveApplications(updater.GetApplicationsToRemove());
+        using var package = ConfigurationPackageReadable.Open(inFile);
+        var coa = await CromwellOnAzure.Create(cts, updateArgs);
+
+        var config = package.GetHostConfig() ?? throw new InvalidOperationException();
+        var updater = new Updater(config, package.GetResources(), package.GetApplications(), await coa.GetHostConfig());
+        await coa.AddApplications(updater.GetApplicationsToAdd());
+        await coa.AddHostConfigBlobs(updater.GetStartTasksToAdd());
+        await coa.WriteHostConfig(config);
+
+        if (removeApps)
+        {
+            await coa.RemoveApplications(updater.GetApplicationsToRemove());
+        }
+
+        if (removeFiles)
+        {
+            await coa.RemoveHostConfigBlobs(updater.GetStartTasksToRemove());
+        }
     }
-
-    if (removeFiles)
+    catch
     {
-        await coa.RemoveHostConfigBlobs(updater.GetStartTasksToRemove());
+        cts.Cancel();
     }
 
     return 0;
