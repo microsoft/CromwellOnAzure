@@ -30,8 +30,10 @@ namespace TesApi.Web
         /// <returns><see cref="IWebHostBuilder"/></returns>
         public static IWebHostBuilder CreateWebHostBuilder(string[] args)
             => WebHost.CreateDefaultBuilder<Startup>(args)
-                .UseUrls("http://0.0.0.0:80/")
-                .ConfigureAppConfiguration((context, config) => config.AddEnvironmentVariables()) // For Docker-Compose
+                .ConfigureAppConfiguration((context, config) =>
+                {
+                    config.AddEnvironmentVariables(); // For Docker-Compose
+                })
                 .ConfigureLogging((context, logging) =>
                 {
                     try
