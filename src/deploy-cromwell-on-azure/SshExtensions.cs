@@ -9,6 +9,8 @@ using Polly.Retry;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 
+#nullable disable
+
 namespace CromwellOnAzureDeployer
 {
     public static class SshExtensions

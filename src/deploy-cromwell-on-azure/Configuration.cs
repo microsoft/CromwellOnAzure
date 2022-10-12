@@ -8,6 +8,8 @@ using System.Reflection;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Configuration;
 
+#nullable disable
+
 namespace CromwellOnAzureDeployer
 {
     public class Configuration : UserAccessibleConfiguration

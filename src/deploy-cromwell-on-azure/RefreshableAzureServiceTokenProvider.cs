@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Rest;
 
+#nullable disable
+
 namespace CromwellOnAzureDeployer
 {
     /// <summary>

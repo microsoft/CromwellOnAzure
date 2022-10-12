@@ -12,6 +12,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+#nullable disable
+
 namespace CromwellOnAzureDeployer
 {
     internal static class ConsoleEx

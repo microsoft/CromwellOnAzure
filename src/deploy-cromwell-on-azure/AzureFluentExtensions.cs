@@ -5,6 +5,8 @@ using System;
 using Microsoft.Rest.Azure;
 using Newtonsoft.Json;
 
+#nullable disable
+
 namespace CromwellOnAzureDeployer
 {
     public static class AzureFluentExtensions

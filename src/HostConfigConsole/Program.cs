@@ -71,8 +71,9 @@ buildCmdArgs.AddValidator(result =>
     }
 });
 
-(var updateCmd, var updateCmdInFile, var updateRemoveFilesOpt, var updateRemoveAppsOpt) = new Command("update", "Updates CoA deployment with built deployment assets") { TreatUnmatchedTokensAsErrors = true }
-    .ConfigureCommand<Option<FileInfo>, FileInfo, Option<bool>, bool, Option<bool>, bool>(UpdateCmdAsync,
+(var updateCmd, var updateArgs, var updateCmdInFile, var updateRemoveFilesOpt, var updateRemoveAppsOpt) = new Command("update", "Updates CoA deployment with built deployment assets") { TreatUnmatchedTokensAsErrors = true }
+    .ConfigureCommand<Argument<string[]>, string[], Option<FileInfo>, FileInfo, Option<bool>, bool, Option<bool>, bool>(UpdateCmdAsync,
+        new Argument<string[]>("deployer-update-args", "Arguments passed to the deployer (deploy-cromwell-on-azure) to update the intended deployment."),
         new Option<FileInfo>(new[] { "--input", "-i" }, "Path to output file (used to stage metadata for the update command)."),
         new Option<bool>("--remove-obsolete-files", "Removes obsolete files. (May be dangerous to use while workflows are running)."),
         new Option<bool>("--remove-obsolete-apps", "Removes obsolete application packages. (This can be particularly dangerous with shared batch accounts)."));
@@ -99,35 +100,34 @@ return await new RootCommand("Host Configuration utility.") { buildCmd, updateCm
 static FileInfo DefaultHostConfig()
     => new(Path.Combine(Environment.CurrentDirectory, "HostConfigs"));
 
-Task<int> UpdateCmdAsync(FileInfo? inFile, bool removeFiles, bool removeApps)
+async Task<int> UpdateCmdAsync(string[] updateArgs, FileInfo? inFile, bool removeFiles, bool removeApps)
 {
     inFile ??= DefaultHostConfig();
     if (!inFile.Exists)
     {
-        Console.Error.WriteLine("--input must exist and be accessible.");
-        return Task.FromResult(2);
+        throw new InvalidOperationException("--input must exist and be accessible.");
     }
 
     using var package = ConfigurationPackageReadable.Open(inFile);
-    var coa = new CromwellOnAzure(inFile.DirectoryName ?? string.Empty);
+    var coa = await CromwellOnAzure.Create(updateArgs);
 
     var config = package.GetHostConfig() ?? throw new InvalidOperationException();
-    var updater = new Updater(config, package.GetResources(), package.GetApplications(), coa.GetHostConfig());
-    coa.AddApplications(updater.GetApplicationsToAdd());
-    coa.AddHostConfigBlobs(updater.GetStartTasksToAdd());
-    coa.WriteHostConfig(config);
+    var updater = new Updater(config, package.GetResources(), package.GetApplications(), await coa.GetHostConfig());
+    await coa.AddApplications(updater.GetApplicationsToAdd());
+    await coa.AddHostConfigBlobs(updater.GetStartTasksToAdd());
+    await coa.WriteHostConfig(config);
 
     if (removeApps)
     {
-        coa.RemoveApplications(updater.GetApplicationsToRemove());
+        await coa.RemoveApplications(updater.GetApplicationsToRemove());
     }
 
     if (removeFiles)
     {
-        coa.RemoveHostConfigBlobs(updater.GetStartTasksToRemove());
+        await coa.RemoveHostConfigBlobs(updater.GetStartTasksToRemove());
     }
 
-    return Task.FromResult(0);
+    return 0;
 }
 
 async Task<int> BuildCmdAsync(string[] hostconfigs, FileInfo? outFile, string hostConfigs)

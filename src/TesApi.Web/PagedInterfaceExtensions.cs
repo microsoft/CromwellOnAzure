@@ -6,8 +6,13 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
+using Microsoft.Azure.Management.Batch.Models;
+using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
+using Microsoft.Rest.Azure;
 using Polly.Retry;
+
+#nullable disable
 
 // TODO: move this to Common.csproj?
 namespace TesApi.Web
@@ -38,6 +43,18 @@ namespace TesApi.Web
             => new AsyncEnumerable<T>(source ?? throw new ArgumentNullException(nameof(source)));
 
         /// <summary>
+        /// Creates an <see cref="IAsyncEnumerable{T}"/> from an <see cref="IPage{T}"/>
+        /// </summary>
+        /// <typeparam name="T">The type of objects to enumerate.</typeparam>
+        /// <param name="source">The <see cref="IPage{T}"/> to enumerate.</param>
+        /// <param name="listNext">A method to access the relevant ListNext method.</param>
+        /// <param name="listNextAsync">A method to access the relevant ListNextAsync method.</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public static IAsyncEnumerable<T> ToAsyncEnumerable<T>(this IPage<T> source, Func<string, IPage<T>> listNext = default, Func<string, CancellationToken, Task<IPage<T>>> listNextAsync = default)
+            => new AsyncEnumerable<T>(source ?? throw new ArgumentNullException(nameof(source)), listNext, listNextAsync);
+
+        /// <summary>
         /// Adapts calls returning <see cref="IAsyncEnumerable{T}"/> to <see cref="AsyncRetryPolicy"/>.
         /// </summary>
         /// <typeparam name="T">Type of results returned in <see cref="IAsyncEnumerable{T}"/> by <paramref name="func"/>.</typeparam>
@@ -66,6 +83,19 @@ namespace TesApi.Web
             {
                 _ = source ?? throw new ArgumentNullException(nameof(source));
                 _getEnumerator = c => new PagedCollectionEnumerator<T>(source, c);
+            }
+
+            public AsyncEnumerable(IPage<T> source, Func<string, IPage<T>> listNext, Func<string, CancellationToken, Task<IPage<T>>> listNextAsync)
+            {
+                _ = source ?? throw new ArgumentNullException(nameof(source));
+                if (listNext is null ^ listNextAsync is null)
+                {
+                    _getEnumerator = c => new PageEnumerator<T>(source, listNext, listNextAsync, c);
+                }
+                else
+                {
+                    throw new ArgumentNullException(nameof(listNext), "listNext must be provided if listNextAsync is not provided.");
+                }
             }
 
             public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
@@ -179,6 +209,52 @@ namespace TesApi.Web
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 return await _source.MoveNextAsync(_cancellationToken);
+            }
+        }
+
+        private sealed class PageEnumerator<T> : IAsyncEnumerator<T>
+        {
+            private readonly Func<string, IPage<T>> _listNext;
+            private readonly Func<string, CancellationToken, Task<IPage<T>>> _listNextAsync;
+            private readonly CancellationToken _cancellationToken;
+            private string _nextLink;
+            private IEnumerator<T> _enumerator;
+
+            public PageEnumerator(IPage<T> source, Func<string, IPage<T>> listNext, Func<string, CancellationToken, Task<IPage<T>>> listNextAsync, CancellationToken cancellationToken)
+            {
+                _ = source ?? throw new ArgumentNullException(nameof(source));
+                _listNext = listNext;
+                _listNextAsync = listNextAsync;
+                _cancellationToken = cancellationToken;
+                _nextLink = source.NextPageLink;
+                _enumerator = source.GetEnumerator();
+            }
+
+            public T Current => _enumerator.Current;
+
+            public ValueTask DisposeAsync()
+            {
+                _enumerator?.Dispose();
+                return ValueTask.CompletedTask;
+            }
+
+            public async ValueTask<bool> MoveNextAsync()
+            {
+                {
+                    while (!(_enumerator?.MoveNext() ?? false))
+                    {
+                        _enumerator?.Dispose();
+                        _enumerator = null;
+                        if (string.IsNullOrWhiteSpace(_nextLink))
+                        {
+                            return false;
+                        }
+                        var source = _listNext?.Invoke(_nextLink) ?? await _listNextAsync.Invoke(_nextLink, _cancellationToken);
+                        _nextLink = source.NextPageLink;
+                        _enumerator = source.GetEnumerator();
+                    }
+                    return true;
+                }
             }
         }
         #endregion
