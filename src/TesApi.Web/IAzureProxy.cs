@@ -270,27 +270,6 @@ namespace TesApi.Web
         Task<(int? lowPriorityNodes, int? dedicatedNodes)> GetCurrentComputeNodesAsync(string poolId, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Gets the application packages currently present in the Batch Account
-        /// </summary>
-        /// <returns><see cref="BatchModels.ApplicationPackage"/></returns>
-        Task<IEnumerable<BatchModels.ApplicationPackage>> ListApplicationPackages(BatchModels.Application application);
-
-        /// <summary>
-        /// Gets the applications currently present in the Batch Account
-        /// </summary>
-        /// <returns><see cref="BatchModels.Application"/></returns>
-        Task<IEnumerable<BatchModels.Application>> ListApplications();
-
-        /// <summary>
-        /// Creates, activates, and loads a versioned package into a new Batch Application
-        /// </summary>
-        /// <param name="name"></param>
-        /// <param name="version"></param>
-        /// <param name="package"></param>
-        /// <returns></returns>
-        Task<string> CreateAndActivateBatchApplication(string name, string version, System.IO.Stream package);
-
-        /// <summary>
         /// Checks if a local file exists
         /// </summary>
         /// <param name="path"></param>

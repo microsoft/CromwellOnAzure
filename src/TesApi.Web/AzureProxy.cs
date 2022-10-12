@@ -861,39 +861,6 @@ namespace TesApi.Web
             => batchClient.JobOperations.ListJobs(detailLevel: detailLevel).ToAsyncEnumerable();
 
         /// <inheritdoc/>
-        public async Task<IEnumerable<BatchModels.Application>> ListApplications()
-        {
-            var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
-
-            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
-            return (await batchManagementClient.Application.ListAsync(batchResourceGroupName, batchAccountName))
-                .AsContinuousCollection(link => Extensions.Synchronize(() => batchManagementClient.Application.ListNextAsync(link)));
-        }
-
-        /// <inheritdoc/>
-        public async Task<IEnumerable<BatchModels.ApplicationPackage>> ListApplicationPackages(BatchModels.Application application)
-        {
-            var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
-
-            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
-            return (await batchManagementClient.ApplicationPackage.ListAsync(batchResourceGroupName, batchAccountName, application.Name))
-                .AsContinuousCollection(link => Extensions.Synchronize(() => batchManagementClient.ApplicationPackage.ListNextAsync(link)));
-        }
-
-        /// <inheritdoc/>
-        public async Task<string> CreateAndActivateBatchApplication(string name, string version, Stream package)
-        {
-            var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
-
-            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
-            _ = await batchManagementClient.Application.CreateAsync(batchResourceGroupName, batchAccountName, name);
-            var applicationPackage = await batchManagementClient.ApplicationPackage.CreateAsync(batchResourceGroupName, batchAccountName, name, version);
-            await new CloudBlockBlob(new Uri(applicationPackage.StorageUrl, UriKind.Absolute)).UploadFromStreamAsync(package);
-            _ = await batchManagementClient.ApplicationPackage.ActivateAsync(batchResourceGroupName, batchAccountName, name, version, "zip");
-            return (await batchManagementClient.Application.UpdateAsync(batchResourceGroupName, batchAccountName, name, new BatchModels.Application(allowUpdates: false))).Id;
-        }
-
-        /// <inheritdoc/>
         public async Task DisableBatchPoolAutoScaleAsync(string poolId, CancellationToken cancellationToken)
             => await batchClient.PoolOperations.DisableAutoScaleAsync(poolId, cancellationToken: cancellationToken);
 
