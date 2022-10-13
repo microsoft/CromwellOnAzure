@@ -44,7 +44,7 @@ namespace HostConfigConsole
             return new Directory(default, _client, _owner, _name, _path, _ref);
         }
 
-        private class Directory : FileSystemInfo, IDirectory
+        private class Directory : Base, IDirectory
         {
             private bool _enumerated = false;
             private IReadOnlyList<Lazy<IDirectory>> _directories = new ReadOnlyCollection<Lazy<IDirectory>>(Enumerable.Empty< Lazy<IDirectory>>().ToList());
@@ -52,42 +52,6 @@ namespace HostConfigConsole
 
             internal Directory(IDirectory? parent, GitHubClient client, string owner, string name, string path, string? @ref)
                 : base(parent, client, owner, name, path, @ref) { }
-
-            private void EnsureContents()
-            {
-                if (!_enumerated)
-                {
-                    var dirs = Enumerable.Empty<Lazy<IDirectory>>();
-                    var files = Enumerable.Empty<Lazy<IFile>>();
-
-                    foreach (var item in (_ref is null ? _client.Repository.Content.GetAllContents(_owner, _name, _path) : _client.Repository.Content.GetAllContentsByRef(_owner, _name, _path, _ref)).Result)
-                    {
-                        if (item.Type.TryParse(out var type))
-                        {
-                            switch (type)
-                            {
-                                case ContentType.File:
-                                    files = files.Append(new(() => new File(this, _client, _owner, _name, $"{_path.TrimEnd('/')}/{item.Name}", _ref)));
-                                    break;
-                                case ContentType.Dir:
-                                    dirs = dirs.Append(new(() => new Directory(this, _client, _owner, _name, $"{_path.TrimEnd('/')}/{item.Name}", _ref)));
-                                    break;
-                                case ContentType.Symlink:
-                                    //
-                                    break;
-                                case ContentType.Submodule:
-                                    //
-                                    break;
-
-                            }
-                        }
-                    }
-
-                    _directories = new ReadOnlyCollection<Lazy<IDirectory>>(dirs.ToList());
-                    _files = new ReadOnlyCollection<Lazy<IFile>>(files.ToList());
-                    _enumerated = true;
-                }
-            }
 
             public string FullName
                 => _path;
@@ -107,14 +71,75 @@ namespace HostConfigConsole
                 return _files.Select(i => i.Value);
             }
 
-            public IEnumerable<IFile> EnumerateFiles(string searchPattern)
+            public IFile? GetFile(string name)
             {
                 EnsureContents();
-                return _files.Select(i => i.Value).Where(i => i.Name == searchPattern); // TODO
+                return _files.Select(i => i.Value).FirstOrDefault(i => i.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            }
+
+            private void EnsureContents()
+            {
+                if (!_enumerated)
+                {
+                    EnumerateContents();
+                }
+            }
+
+            private void EnumerateContents()
+            {
+                var dirs = Enumerable.Empty<Lazy<IDirectory>>();
+                var files = Enumerable.Empty<Lazy<IFile>>();
+
+                foreach (var item in (_ref is null ? _client.Repository.Content.GetAllContents(_owner, _name, _path) : _client.Repository.Content.GetAllContentsByRef(_owner, _name, _path, _ref)).Result)
+                {
+                    if (item.Type.TryParse(out var type))
+                    {
+                        switch (type)
+                        {
+                            case ContentType.File:
+                                files = files.Append(new(() => new File(this, _client, _owner, _name, $"{_path.TrimEnd('/')}/{item.Name}", _ref)));
+                                break;
+                            case ContentType.Dir:
+                                dirs = dirs.Append(new(() => new Directory(this, _client, _owner, _name, $"{_path.TrimEnd('/')}/{item.Name}", _ref)));
+                                break;
+                            case ContentType.Symlink:
+                                //
+                                break;
+                            case ContentType.Submodule:
+                                //
+                                break;
+
+                        }
+                    }
+                }
+
+                _directories = new ReadOnlyCollection<Lazy<IDirectory>>(dirs.ToList());
+                _files = new ReadOnlyCollection<Lazy<IFile>>(files.ToList());
+                _enumerated = true;
             }
         }
 
-        private abstract class FileSystemInfo
+        private class File : Base, IFile
+        {
+            private byte[]? _data = default;
+
+            public File(IDirectory? parent, GitHubClient client, string owner, string name, string path, string? @ref)
+                : base(parent, client, owner, name, path, @ref) { }
+
+            public IDirectory? Directory
+                => _parent;
+
+            public Stream OpenRead()
+                => new MemoryStream(ReadAllBytes());
+
+            public byte[] ReadAllBytes()
+            {
+                _data ??= (_ref is null ? _client.Repository.Content.GetRawContent(_owner, _name, _path) : _client.Repository.Content.GetRawContentByRef(_owner, _name, _path, _ref)).Result;
+                return _data;
+            }
+        }
+
+        private abstract class Base
         {
             protected readonly GitHubClient _client;
             protected readonly string _owner;
@@ -123,7 +148,7 @@ namespace HostConfigConsole
             protected readonly string? _ref;
             protected readonly IDirectory? _parent;
 
-            protected FileSystemInfo(IDirectory? parent, GitHubClient client, string owner, string name, string path, string? @ref)
+            protected Base(IDirectory? parent, GitHubClient client, string owner, string name, string path, string? @ref)
             {
                 ArgumentNullException.ThrowIfNull(client);
                 ArgumentNullException.ThrowIfNull(owner);
@@ -141,29 +166,6 @@ namespace HostConfigConsole
 
             public string Name
                 => Path.GetFileName(_path);
-        }
-
-        private class File : FileSystemInfo, IFile
-        {
-            private byte[]? _data = default;
-
-            public File(IDirectory? parent, GitHubClient client, string owner, string name, string path, string? @ref)
-                : base(parent, client, owner, name, path, @ref) { }
-
-            public IDirectory? Directory
-                => _parent;
-
-            public Stream OpenRead()
-                => new MemoryStream(ReadAllBytes());
-
-            public byte[] ReadAllBytes()
-            {
-                if (_data is null)
-                {
-                    _data = (_ref is null ? _client.Repository.Content.GetRawContent(_owner, _name, _path) : _client.Repository.Content.GetRawContentByRef(_owner, _name, _path, _ref)).Result;
-                }
-                return _data;
-            }
         }
     }
 }

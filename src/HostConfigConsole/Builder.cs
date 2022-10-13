@@ -61,7 +61,7 @@ namespace HostConfigConsole
                 var dirList = _hostConfigs.EnumerateDirectories().Select(d => d.Name.ToUpperInvariant()).ToList();
                 (selected ?? Array.Empty<string>())
                     .Where(dir => !dirList.Contains(dir.ToUpperInvariant()))
-                    .ForEach(dir => throw new ArgumentException($"HostConfig '{dir}' was not found in '{_hostConfigs.FullName}'.", nameof(selected)));
+                    .ForEach(dir => throw new ArgumentException($"HostConfig '{dir}' was not found in '{_hostConfigs.Name}'.", nameof(selected)));
             }
 
             writeLine("Collecting CoA host configurations");
@@ -99,6 +99,7 @@ namespace HostConfigConsole
                         zipFiles.Select(GetFileHash),
                         zipFiles.Select(ExtractPackage)))
                     {
+                        if (hash is null) continue;
                         versions = versions.Append((hash, new(package.FileInfo.OpenRead)));
                         hashes.Add(name, hash);
 
@@ -227,7 +228,7 @@ namespace HostConfigConsole
         }
 
         private static HostConfiguration ParseConfig(IFile configFile)
-            => ConvertUserConfig(ParseUserConfig(OpenConfiguration(configFile.OpenRead())), configFile.Directory?.EnumerateFiles(Constants.StartTask).Select(GetFileHash).FirstOrDefault());
+            => ConvertUserConfig(ParseUserConfig(OpenConfiguration(configFile.OpenRead())), GetFileHash(configFile.Directory?.GetFile(Constants.StartTask)));
 
         private static UserHostConfig ParseUserConfig(TextReader? textReader)
             => ReadJson<UserHostConfig>(textReader, () => throw new ArgumentException("File is not a HostConfig configuration.", nameof(textReader)));
@@ -238,18 +239,17 @@ namespace HostConfigConsole
         private static StartTask ConvertStartTask(UserStartTask? userStartTask, string? startTaskHash)
             => new() { ResourceFiles = userStartTask?.ResourceFiles ?? Array.Empty<ResourceFile>(), StartTaskHash = startTaskHash };
 
-        private static string GetFileHash(IFile file)
-            => Convert.ToHexString(SHA256.HashData(file.ReadAllBytes()));
+        private static string? GetFileHash(IFile? file)
+            => file is null ? default : Convert.ToHexString(SHA256.HashData(file.ReadAllBytes()));
 
         public interface IDirectory
         {
             string Name { get; }
-            string FullName { get; }
             bool Exists { get; }
 
             IEnumerable<IDirectory> EnumerateDirectories();
             IEnumerable<IFile> EnumerateFiles();
-            IEnumerable<IFile> EnumerateFiles(string searchPattern);
+            IFile? GetFile(string name);
         }
 
         public interface IFile

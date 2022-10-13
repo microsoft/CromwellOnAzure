@@ -10,7 +10,7 @@ namespace HostConfigConsole
         internal static IDirectory GetDirectory(DirectoryInfo info)
             => new Directory(info);
 
-        private class Directory : FileSystemInfo, IDirectory
+        private class Directory : IDirectory
         {
             private readonly DirectoryInfo _info;
 
@@ -20,16 +20,13 @@ namespace HostConfigConsole
                 _info = info;
             }
 
-            public override bool Exists
+            public bool Exists
                 => _info.Exists;
 
-            public override string Name
+            public string Name
                 => _info.Name;
 
-            public DirectoryInfo? DirectoryInfo
-                => _info;
-
-            public override void Delete()
+            public void Delete()
                 => _info.Delete();
 
             public IEnumerable<IDirectory> EnumerateDirectories()
@@ -38,11 +35,11 @@ namespace HostConfigConsole
             public IEnumerable<IFile> EnumerateFiles()
                 => _info.EnumerateFiles().Select(i => new File(i));
 
-            public IEnumerable<IFile> EnumerateFiles(string searchPattern)
-                => _info.EnumerateFiles(searchPattern).Select(i => new File(i));
+            public IFile? GetFile(string name)
+                => _info.EnumerateFiles(name).Select(i => new File(i)).FirstOrDefault();
         }
 
-        private class File : FileSystemInfo, IFile
+        private class File : IFile
         {
             private readonly FileInfo _info;
 
@@ -52,19 +49,16 @@ namespace HostConfigConsole
                 _info = info;
             }
 
-            public override bool Exists
+            public bool Exists
                 => _info.Exists;
 
-            public override string Name
+            public string Name
                 => _info.Name;
 
             public IDirectory? Directory
                 => _info.Directory is null ? default : new Directory(_info.Directory);
 
-            public FileInfo? FileInfo
-                => _info;
-
-            public override void Delete()
+            public void Delete()
                 => _info.Delete();
 
             public Stream OpenRead()

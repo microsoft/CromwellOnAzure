@@ -146,9 +146,18 @@ async Task<int> BuildCmdAsync(string[] hostconfigs, FileInfo? outFile, string ho
     outFile ??= DefaultHostConfig();
     outFile.Directory?.Create();
 
-    var hostConfigsDir = Uri.TryCreate(hostConfigs, UriKind.Absolute, out var uri)
-        ? await GitHub.GetDirectory(uri)
-        : FileSystem.GetDirectory(new DirectoryInfo(hostConfigs));
+    Uri uri = new(hostConfigs, UriKind.RelativeOrAbsolute);
+    if (!uri.IsAbsoluteUri)
+    {
+        uri = new Uri(Path.Combine(Environment.CurrentDirectory, hostConfigs), UriKind.Absolute);
+    }
+
+    var hostConfigsDir = uri.Scheme switch
+    {
+        "file" => FileSystem.GetDirectory(new DirectoryInfo(uri.AbsolutePath)),
+        "https" => await GitHub.GetDirectory(uri),
+        _ => throw new InvalidOperationException("Unsupported hostConfigs URI scheme."),
+    };
 
     var (config, resources, applications) = new Builder(hostConfigsDir)
         .Build(Console.WriteLine, hostconfigs ?? Array.Empty<string>());
