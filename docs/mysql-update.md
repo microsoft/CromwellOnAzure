@@ -32,7 +32,16 @@
 
     ```sudo docker run -e MYSQL_ROOT_PASSWORD=<Your MySQL root password> -e MYSQL_DATABASE=<Your MySQL database name> -v /data/mysql:/var/lib/mysql -v /data/cromwellazure/mysql-init:/mysql-init mysql:latest ```
 
-    You can find default values for `MYSQL_ROOT_PASSWORD` and `MYSQL_DATABASE` in [docker-compose.mysql.yml](https://github.com/microsoft/CromwellOnAzure/blob/develop/src/deploy-cromwell-on-azure/scripts/docker-compose.mysql.yml)
+    You can find values for `MYSQL_ROOT_PASSWORD` and `MYSQL_DATABASE` in Blob container `configuration` that is located in the deployed Storage account. Open file `cromwell-application.conf` and search for database section
+     ```
+    database {
+        db.url = "jdbc:mysql://mysqldb/<Your MySQL database name>?<Properties>"
+        db.user = <Your MySQL root user>
+        db.password = <Your MySQL root password>
+        ...
+    }
+    ```
+
 
  - It is supposed to fail. If it keeps running, follow instructions in step 6 to stop the container, and return to terminal 1 
 
