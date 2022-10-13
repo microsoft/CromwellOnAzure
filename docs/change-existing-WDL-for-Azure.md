@@ -20,7 +20,9 @@ Ensure that the attributes `memory` and `disk` (note: use the singular form for 
 > GB - "GB", "G", "GiB", "Gi"<br/>
 > TB - "TB", "T", "TiB", "Ti"<br/>
 
-The `preemptible` attribute is a boolean (not an integer). You can specify `preemptible` as `true` or `false` for each task. When set to `true` Cromwell on Azure will use a [low-priority batch VM](https://docs.microsoft.com/en-us/azure/batch/batch-low-pri-vms#use-cases-for-low-priority-vms) to run the task.<br/>
+The `preemptible` attribute is a boolean. You can specify `preemptible` as `true` or `false` for each task. When set to `true` Cromwell on Azure will use a [low-priority batch VM](https://docs.microsoft.com/en-us/azure/batch/batch-low-pri-vms#use-cases-for-low-priority-vms) to run the task.<br/>
+
+Starting with Cromwell on Azure version 3.2 integer values for `preemptible` are accepted and will be converted to boolean: `true` for positive values, `false` otherwise.<br/>
 
 `bootDiskSizeGb` and `zones` attributes are not supported by the TES backend.<br/>
 Each of these runtime attributes are specific to your workflow and tasks within those workflows. The default values for resource requirements are as set above.<br/>
@@ -36,7 +38,7 @@ Left panel shows a WDL file created for GCP whereas the right panel is the modif
 
 ## Using maxRetries to replace the preemptible attribute
 
-For a GCP WDL, `preemptible` is an integer - specifying the number of retries when using the flag. For Cromwell on Azure, if you want to use the `preemptible` attribute but don’t use `maxRetries` for a task, consider also adding `maxRetries` to keep the retry functionality. Remember that for each task in a workflow, you can either use a low-priority VM in batch (default configuration) or use a dedicated VM by setting `preemptible` to either `true` or `false` respectively.
+For a GCP WDL, `preemptible` is an integer - specifying the number of retries when using the flag. Starting with Cromwell on Azure version 3.2 integer values for `preemptible` are accepted and will be converted to boolean (`true` for positive values, `false` otherwise), but the retry functionality is not provided. Consider adding `maxRetries` to keep the retry functionality. Remember that for each task in a workflow, you can either use a low-priority VM in batch (default configuration) or use a dedicated VM by setting `preemptible` to either `true` or `false` respectively.
 
 
 ![Preemptible Attribute](/docs/screenshots/preemptible.PNG)
