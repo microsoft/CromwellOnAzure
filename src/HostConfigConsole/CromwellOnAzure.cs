@@ -25,6 +25,8 @@ using Renci.SshNet;
 using Common.HostConfigs;
 using CromwellOnAzureDeployer;
 using TesApi.Web;
+using Microsoft.Azure.Management.KeyVault.Models;
+using Microsoft.Azure.Management.KeyVault;
 
 namespace HostConfigConsole
 {
@@ -43,6 +45,7 @@ namespace HostConfigConsole
         public const string HostConfigBlobsContainerName = "host-config-blobs";
         public const string ConfigurationContainerName = "configuration";
         public const string PersonalizedSettingsFileName = "settings-user";
+        public const string NonpersonalizedSettingsFileName = "settings-system";
         public const string CromwellAzureRootDir = "/data/cromwellazure";
         public const string SettingsDelimiter = "=:=";
         public const string SshNsgRuleName = "SSH";
@@ -53,458 +56,525 @@ namespace HostConfigConsole
         private BatchAccount batchAccount { get; }
         private string subscriptionId { get; }
         private IStorageAccount storageAccount { get; }
+        private Func<Task> restartServices { get; }
 
         #region Initialization
-        public static async ValueTask<CromwellOnAzure> Create(CancellationTokenSource cts, string[] args)
-        {
-            var configuration = Configuration.BuildConfiguration(args);
-
-            await ValidateTokenProviderAsync();
-
-            var tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
-            var azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
-            var azureClient = GetAzureClient(azureCredentials);
-            var azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
-            var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
-            var resourceManagerClient = GetResourceManagerClient(azureCredentials);
-
-            //await ValidateSubscriptionAndResourceGroupAsync(configuration);
-
-            var resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
-            configuration.RegionName = resourceGroup.RegionName;
-
-            var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
-            configuration.UseAks = existingAksCluster is not null;
-
-            IStorageAccount storageAccount;
-            Dictionary<string, string>? accountNames = null;
-            if (configuration.UseAks)
-            {
-                if (!string.IsNullOrEmpty(configuration.StorageAccountName))
+        public static Task<CromwellOnAzure> Create(CancellationTokenSource cts, string[] args)
+            => Execute<CromwellOnAzure>(
+                "Preparing to upgrade...",
+                async () =>
                 {
-                    storageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName)
-                        ?? throw new ValidationException($"Storage account {configuration.StorageAccountName}, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
-                }
-                else
-                {
-                    var storageAccounts = await azureSubscriptionClient.StorageAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName);
+                    var configuration = Configuration.BuildConfiguration(args);
 
-                    if (!storageAccounts.Any())
+                    await ValidateTokenProviderAsync();
+
+                    var tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
+                    var azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
+                    var azureClient = GetAzureClient(azureCredentials);
+                    var azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
+                    var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
+                    var resourceManagerClient = GetResourceManagerClient(azureCredentials);
+
+                    //await ValidateSubscriptionAndResourceGroupAsync(configuration);
+
+                    var resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
+                    configuration.RegionName = resourceGroup.RegionName;
+
+                    var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
+                    configuration.UseAks = existingAksCluster is not null;
+
+                    IStorageAccount storageAccount;
+                    Dictionary<string, string>? accountNames = null;
+                    Func<Task>? restartServices = null;
+
+                    if (configuration.UseAks)
                     {
-                        throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any storage accounts.");
+                        if (!string.IsNullOrEmpty(configuration.StorageAccountName))
+                        {
+                            storageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName)
+                                ?? throw new ValidationException($"Storage account {configuration.StorageAccountName}, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+                        }
+                        else
+                        {
+                            var storageAccounts = await azureSubscriptionClient.StorageAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName);
+
+                            if (!storageAccounts.Any())
+                            {
+                                throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any storage accounts.");
+                            }
+                            if (storageAccounts.Count() > 1)
+                            {
+                                throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple storage accounts. {nameof(configuration.StorageAccountName)} must be provided.");
+                            }
+
+                            storageAccount = storageAccounts.First();
+                        }
+
+                        accountNames = DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, cts), SettingsDelimiter);
+
+                        restartServices = new(async () =>
+                        {
+                            if (accountNames.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
+                            {
+                                configuration.CrossSubscriptionAKSDeployment = bool.Parse(crossSubscriptionAKSDeployment);
+                            }
+
+                            var keyVaultUri = string.Empty;
+                            if (accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
+                            {
+                                var keyVault = await GetKeyVaultAsync(keyVaultName);
+                                keyVaultUri = keyVault.Properties.VaultUri;
+                            }
+
+                            if (!accountNames.TryGetValue("ManagedIdentityClientId", out var managedIdentityClientId))
+                            {
+                                throw new ValidationException($"Could not retrieve ManagedIdentityClientId.");
+                            }
+
+                            var managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
+                                ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+
+                            if (accountNames.TryGetValue("Name", out var name))
+                            {
+                                configuration.Name = name;
+                            }
+
+                            var systemSettings = DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, cts), SettingsDelimiter);
+
+                            var kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
+
+                            await kubernetesManager.UpgradeAKSDeployment(
+                                accountNames.Union(systemSettings).ToDictionary(kv => kv.Key, kv => kv.Value),
+                                resourceGroup,
+                                storageAccount,
+                                managedIdentity,
+                                keyVaultUri);
+                        });
                     }
-                    if (storageAccounts.Count() > 1)
+                    else
                     {
-                        throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple storage accounts. {nameof(configuration.StorageAccountName)} must be provided.");
+                        var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
+
+                        if (!existingVms.Any())
+                        {
+                            throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any virtual machines.");
+                        }
+
+                        if (existingVms.Count() > 1 && string.IsNullOrWhiteSpace(configuration.VmName))
+                        {
+                            throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. {nameof(configuration.VmName)} must be provided.");
+                        }
+
+                        IVirtualMachine? linuxVm;
+                        if (!string.IsNullOrWhiteSpace(configuration.VmName))
+                        {
+                            linuxVm = existingVms.FirstOrDefault(vm => vm.Name.Equals(configuration.VmName, StringComparison.OrdinalIgnoreCase));
+
+                            if (linuxVm is null)
+                            {
+                                throw new ValidationException($"Virtual machine {configuration.VmName} does not exist in resource group {configuration.ResourceGroupName}.");
+                            }
+                        }
+                        else
+                        {
+                            linuxVm = existingVms.Single();
+                        }
+
+                        configuration.VmName = linuxVm.Name;
+                        configuration.RegionName = linuxVm.RegionName;
+                        configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() is null;
+                        var networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(g => g.NetworkInterfaceIds.Contains(linuxVm.GetPrimaryNetworkInterface().Id));
+
+                        if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup is null)
+                        {
+                            if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
+                            {
+                                configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                            }
+
+                            networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
+                            await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
+                        }
+
+                        try
+                        {
+                            await EnableSsh(networkSecurityGroup);
+                            var sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
+                            await WaitForSshConnectivityAsync(sshConnectionInfo);
+
+                            accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
+
+                            if (!accountNames.TryGetValue("DefaultStorageAccountName", out var storageAccountName))
+                            {
+                                throw new ValidationException($"Could not retrieve the default storage account name from virtual machine {configuration.VmName}.");
+                            }
+
+                            storageAccount = await GetExistingStorageAccountAsync(storageAccountName)
+                                ?? throw new ValidationException($"Storage account {storageAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+
+                            configuration.StorageAccountName = storageAccountName;
+
+                            restartServices = new(async () =>
+                            {
+                                try
+                                {
+                                    await EnableSsh(networkSecurityGroup);
+                                    await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"sudo systemctl restart cromwellazure");
+                                }
+                                finally
+                                {
+                                    await DisableSsh(networkSecurityGroup);
+                                }
+                            });
+                        }
+                        finally
+                        {
+                            await DisableSsh(networkSecurityGroup);
+                        }
                     }
 
-                    storageAccount = storageAccounts.First();
-                }
-
-                accountNames = DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, cts), SettingsDelimiter);
-            }
-            else
-            {
-                var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
-
-                if (!existingVms.Any())
-                {
-                    throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any virtual machines.");
-                }
-
-                if (existingVms.Count() > 1 && string.IsNullOrWhiteSpace(configuration.VmName))
-                {
-                    throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. {nameof(configuration.VmName)} must be provided.");
-                }
-
-                IVirtualMachine? linuxVm;
-                if (!string.IsNullOrWhiteSpace(configuration.VmName))
-                {
-                    linuxVm = existingVms.FirstOrDefault(vm => vm.Name.Equals(configuration.VmName, StringComparison.OrdinalIgnoreCase));
-
-                    if (linuxVm is null)
+                    if (!accountNames.Any())
                     {
-                        throw new ValidationException($"Virtual machine {configuration.VmName} does not exist in resource group {configuration.ResourceGroupName}.");
-                    }
-                }
-                else
-                {
-                    linuxVm = existingVms.Single();
-                }
-
-                configuration.VmName = linuxVm.Name;
-                configuration.RegionName = linuxVm.RegionName;
-                configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() is null;
-                var networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(g => g.NetworkInterfaceIds.Contains(linuxVm.GetPrimaryNetworkInterface().Id));
-
-                if (!configuration.PrivateNetworking.GetValueOrDefault() && networkSecurityGroup is null)
-                {
-                    if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
-                    {
-                        configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
+                        throw new ValidationException($"Could not retrieve account names from virtual machine {configuration.VmName}.");
                     }
 
-                    networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, configuration.NetworkSecurityGroupName);
-                    await AssociateNicWithNetworkSecurityGroupAsync(linuxVm.GetPrimaryNetworkInterface(), networkSecurityGroup);
-                }
-
-                try
-                {
-                    await EnableSsh(networkSecurityGroup);
-                    var sshConnectionInfo = GetSshConnectionInfo(linuxVm, configuration.VmUsername, configuration.VmPassword);
-                    await WaitForSshConnectivityAsync(sshConnectionInfo);
-
-                    accountNames = DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt || echo ''")).Output);
-
-                    if (!accountNames.TryGetValue("DefaultStorageAccountName", out var storageAccountName))
+                    if (!accountNames.TryGetValue("BatchAccountName", out var batchAccountName))
                     {
-                        throw new ValidationException($"Could not retrieve the default storage account name from virtual machine {configuration.VmName}.");
+                        throw new ValidationException($"Could not retrieve the Batch account name from virtual machine {configuration.VmName}.");
                     }
 
-                    storageAccount = await GetExistingStorageAccountAsync(storageAccountName)
-                        ?? throw new ValidationException($"Storage account {storageAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+                    var (batchAccount, subscriptionId) = await GetExistingBatchAccountAsync(batchAccountName);
+                    if (batchAccount is null) throw new ValidationException($"Batch account {batchAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
-                    configuration.StorageAccountName = storageAccountName;
-                }
-                finally
-                {
-                    await DisableSsh(networkSecurityGroup);
-                }
-            }
+                    configuration.BatchAccountName = batchAccountName;
 
-            if (!accountNames.Any())
-            {
-                throw new ValidationException($"Could not retrieve account names from virtual machine {configuration.VmName}.");
-            }
+                    return new(cts, tokenCredentials, batchAccount, subscriptionId, storageAccount, restartServices);
 
-            if (!accountNames.TryGetValue("BatchAccountName", out var batchAccountName))
-            {
-                throw new ValidationException($"Could not retrieve the Batch account name from virtual machine {configuration.VmName}.");
-            }
+                    // From CromwellOnAzureDeployer.Utility
+                    static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
+                        => text.Trim().Split(rowDelimiter)
+                            .Select(r => r.Trim().Split(fieldDelimiter))
+                            .ToDictionary(f => f[0].Trim(), f => f[1].Trim());
 
-            var (batchAccount, subscriptionId) = await GetExistingBatchAccountAsync(batchAccountName);
-            if (batchAccount is null) throw new ValidationException($"Batch account {batchAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+                    static Microsoft.Azure.Management.Fluent.Azure.IAuthenticated GetAzureClient(AzureCredentials azureCredentials)
+                        => Microsoft.Azure.Management.Fluent.Azure
+                            .Configure()
+                            .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                            .Authenticate(azureCredentials);
 
-            configuration.BatchAccountName = batchAccountName;
+                    IResourceManager GetResourceManagerClient(AzureCredentials azureCredentials)
+                        => ResourceManager
+                            .Configure()
+                            .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                            .Authenticate(azureCredentials)
+                            .WithSubscription(configuration.SubscriptionId);
 
-            return new(cts/*, configuration*/, tokenCredentials/*, azureSubscriptionClient, azureClient, resourceManagerClient, azureCredentials, subscriptionIds*/, batchAccount, subscriptionId, storageAccount);
-
-            // From CromwellOnAzureDeployer.Utility
-            static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
-                => text.Trim().Split(rowDelimiter)
-                    .Select(r => r.Trim().Split(fieldDelimiter))
-                    .ToDictionary(f => f[0].Trim(), f => f[1].Trim());
-
-            static Microsoft.Azure.Management.Fluent.Azure.IAuthenticated GetAzureClient(AzureCredentials azureCredentials)
-                => Microsoft.Azure.Management.Fluent.Azure
-                    .Configure()
-                    .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
-                    .Authenticate(azureCredentials);
-
-            IResourceManager GetResourceManagerClient(AzureCredentials azureCredentials)
-                => ResourceManager
-                    .Configure()
-                    .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
-                    .Authenticate(azureCredentials)
-                    .WithSubscription(configuration.SubscriptionId);
-
-            async Task ValidateTokenProviderAsync()
-            {
-                try
-                {
-                    await Execute("Retrieving Azure management token...", () => new AzureServiceTokenProvider("RunAs=Developer; DeveloperTool=AzureCli").GetAccessTokenAsync("https://management.azure.com/"), cts);
-                }
-                catch (AzureServiceTokenProviderException ex)
-                {
-                    ConsoleEx.WriteLine("No access token found.  Please install the Azure CLI and login with 'az login'", ConsoleColor.Red);
-                    ConsoleEx.WriteLine("Link: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli");
-                    ConsoleEx.WriteLine($"Error details: {ex.Message}");
-                    Environment.Exit(1);
-                }
-            }
-
-            //async Task ValidateSubscriptionAndResourceGroupAsync()
-            //{
-            //    const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
-            //    const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
-            //    const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
-
-            //    var azure = Microsoft.Azure.Management.Fluent.Azure
-            //        .Configure()
-            //        .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
-            //        .Authenticate(azureCredentials);
-
-            //    var subscriptionExists = (await azure.Subscriptions.ListAsync()).Any(sub => sub.SubscriptionId.Equals(configuration.SubscriptionId, StringComparison.OrdinalIgnoreCase));
-
-            //    if (!subscriptionExists)
-            //    {
-            //        throw new ValidationException($"Invalid or inaccessible subcription id '{configuration.SubscriptionId}'. Make sure that subscription exists and that you are either an Owner or have Contributor and User Access Administrator roles on the subscription.", displayExample: false);
-            //    }
-
-            //    var rgExists = !string.IsNullOrEmpty(configuration.ResourceGroupName) && await azureSubscriptionClient.ResourceGroups.ContainAsync(configuration.ResourceGroupName);
-
-            //    if (!string.IsNullOrEmpty(configuration.ResourceGroupName) && !rgExists)
-            //    {
-            //        throw new ValidationException($"If ResourceGroupName is provided, the resource group must already exist.", displayExample: false);
-            //    }
-
-            //    var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
-            //    var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
-
-            //    var currentPrincipalSubscriptionRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
-            //        .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
-            //        .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
-
-            //    var isuserAccessAdministrator = currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId);
-
-            //    if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && isuserAccessAdministrator))
-            //    {
-            //        if (!rgExists)
-            //        {
-            //            throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
-            //        }
-
-            //        var currentPrincipalRgRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}/resourceGroups/{configuration.ResourceGroupName}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
-            //            .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
-            //            .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
-
-            //        if (!currentPrincipalRgRoleIds.Contains(ownerRoleId))
-            //        {
-            //            throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
-            //        }
-
-            //        if (!isuserAccessAdministrator)
-            //        {
-            //            SkipBillingReaderRoleAssignment = true;
-            //            DisplayBillingReaderInsufficientAccessLevelWarning();
-            //        }
-            //    }
-            //}
-
-#pragma warning disable CS8603 // Possible null reference return.
-            async Task<IStorageAccount?> GetExistingStorageAccountAsync(string storageAccountName)
-                => (await Task.WhenAll(subscriptionIds.Select(async s =>
-                {
-                    try
+                    async Task ValidateTokenProviderAsync()
                     {
-                        return await azureClient.WithSubscription(s).StorageAccounts.ListAsync();
+                        try
+                        {
+                            await Execute("Retrieving Azure management token...", () => new AzureServiceTokenProvider("RunAs=Developer; DeveloperTool=AzureCli").GetAccessTokenAsync("https://management.azure.com/"), cts);
+                        }
+                        catch (AzureServiceTokenProviderException ex)
+                        {
+                            ConsoleEx.WriteLine("No access token found.  Please install the Azure CLI and login with 'az login'", ConsoleColor.Red);
+                            ConsoleEx.WriteLine("Link: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli");
+                            ConsoleEx.WriteLine($"Error details: {ex.Message}");
+                            Environment.Exit(1);
+                        }
                     }
-                    catch (Exception)
-                    {
-                        // Ignore exception if a user does not have the required role to list storage accounts in a subscription
-                        return null;
-                    }
-                })))
-                    .Where(a => a is not null)
-                    .SelectMany(a => a)
-                    .SingleOrDefault(a => a.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase) && a.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
-#pragma warning restore CS8603 // Possible null reference return.
 
-            async Task<(BatchAccount BatchAccount, string SubscriptionId)> GetExistingBatchAccountAsync(string batchAccountName)
-                => await (await Task.WhenAll(subscriptionIds.Select(async s =>
-                {
-                    IAsyncEnumerable<(BatchAccount BatchAccount, string SubscriptionId)> list;
-                    try
-                    {
-                        var client = new BatchManagementClient(tokenCredentials) { SubscriptionId = s };
-                        list = (await client.BatchAccount.ListAsync())
-                            .ToAsyncEnumerable(listNextAsync: new Func<string, CancellationToken, Task<IPage<BatchAccount>>>(async (link, ct) => await client.BatchAccount.ListNextAsync(link, ct)))
-                            .Select(b => (b, s));
-                    }
-                    catch (Exception e)
-                    {
-                        ConsoleEx.WriteLine(e.Message);
-                        list = AsyncEnumerable.Empty<(BatchAccount, string)>();
-                    }
-                    return list;
-                }
-                    ))).ToAsyncEnumerable()
-                    .SelectAwait(async a => await a.SingleOrDefaultAsync(a => a.BatchAccount.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase) && a.BatchAccount.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase)))
-                    .Where(a => a.BatchAccount is not null)
-                    .SingleOrDefaultAsync();
+                    //async Task ValidateSubscriptionAndResourceGroupAsync()
+                    //{
+                    //    const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
+                    //    const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
+                    //    const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
 
-            async Task<ManagedCluster?> ValidateAndGetExistingAKSClusterAsync()
-            {
-                if (string.IsNullOrWhiteSpace(configuration.AksClusterName))
-                {
-                    return null;
-                }
+                    //    var azure = Microsoft.Azure.Management.Fluent.Azure
+                    //        .Configure()
+                    //        .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                    //        .Authenticate(azureCredentials);
 
-                return (await GetExistingAKSClusterAsync(configuration.AksClusterName))
-                    ?? throw new ValidationException($"If AKS cluster name is provided, the cluster must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
-            }
+                    //    var subscriptionExists = (await azure.Subscriptions.ListAsync()).Any(sub => sub.SubscriptionId.Equals(configuration.SubscriptionId, StringComparison.OrdinalIgnoreCase));
 
-            async Task<ManagedCluster?> GetExistingAKSClusterAsync(string aksClusterName)
-            {
-#pragma warning disable CS8603 // Possible null reference return.
-                return (await Task.WhenAll(subscriptionIds.Select(async s =>
-                {
-                    try
-                    {
-                        var client = new ContainerServiceClient(tokenCredentials) { SubscriptionId = s };
-                        return await client.ManagedClusters.ListAsync();
-                    }
-                    catch (Exception e)
-                    {
-                        ConsoleEx.WriteLine(e.Message);
-                        return null;
-                    }
-                })))
-                    .Where(a => a is not null)
-                    .SelectMany(a => a)
-                    .SingleOrDefault(a => a.Name.Equals(aksClusterName, StringComparison.OrdinalIgnoreCase) && a.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
-#pragma warning restore CS8603 // Possible null reference return.
-            }
+                    //    if (!subscriptionExists)
+                    //    {
+                    //        throw new ValidationException($"Invalid or inaccessible subcription id '{configuration.SubscriptionId}'. Make sure that subscription exists and that you are either an Owner or have Contributor and User Access Administrator roles on the subscription.", displayExample: false);
+                    //    }
 
-            Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync(IResourceGroup resourceGroup, string networkSecurityGroupName)
-            {
-                const int SshAllowedPort = 22;
-                const int SshDefaultPriority = 300;
+                    //    var rgExists = !string.IsNullOrEmpty(configuration.ResourceGroupName) && await azureSubscriptionClient.ResourceGroups.ContainAsync(configuration.ResourceGroupName);
 
-                return Execute(
-                    $"Creating Network Security Group: {networkSecurityGroupName}...",
-                    () => azureSubscriptionClient.NetworkSecurityGroups.Define(networkSecurityGroupName)
-                        .WithRegion(configuration.RegionName)
-                        .WithExistingResourceGroup(resourceGroup)
-                        .DefineRule(SshNsgRuleName)
-                        .AllowInbound()
-                        .FromAnyAddress()
-                        .FromAnyPort()
-                        .ToAnyAddress()
-                        .ToPort(SshAllowedPort)
-                        .WithProtocol(Microsoft.Azure.Management.Network.Fluent.Models.SecurityRuleProtocol.Tcp)
-                        .WithPriority(SshDefaultPriority)
-                        .Attach()
-                        .CreateAsync(cts.Token),
-                    cts
-                );
-            }
+                    //    if (!string.IsNullOrEmpty(configuration.ResourceGroupName) && !rgExists)
+                    //    {
+                    //        throw new ValidationException($"If ResourceGroupName is provided, the resource group must already exist.", displayExample: false);
+                    //    }
 
-            Task EnableSsh(INetworkSecurityGroup? networkSecurityGroup)
-            {
-                try
-                {
-                    return networkSecurityGroup?.SecurityRules[SshNsgRuleName]?.Access switch
-                    {
-                        null => Task.CompletedTask,
-                        var x when Microsoft.Azure.Management.Network.Fluent.Models.SecurityRuleAccess.Allow.Equals(x) => SetKeepSshPortOpen(true),
-                        _ => Execute(
-                            "Enabling SSH on VM...",
-                            () => EnableSshPort(),
-                            cts),
-                    };
-                }
-                catch (KeyNotFoundException)
-                {
-                    return Task.CompletedTask;
-                }
+                    //    var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
+                    //    var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
 
-                Task<INetworkSecurityGroup> EnableSshPort()
-                {
-                    _ = SetKeepSshPortOpen(false);
-                    return networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).AllowInbound().Parent().ApplyAsync();
-                }
+                    //    var currentPrincipalSubscriptionRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
+                    //        .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
+                    //        .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
-                Task SetKeepSshPortOpen(bool value)
-                {
-                    configuration.KeepSshPortOpen = value;
-                    return Task.CompletedTask;
-                }
-            }
+                    //    var isuserAccessAdministrator = currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId);
 
-            Task DisableSsh(INetworkSecurityGroup? networkSecurityGroup)
-                => networkSecurityGroup is null ? Task.CompletedTask : Execute(
-                    "Disabling SSH on VM...",
-                    () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).DenyInbound().Parent().ApplyAsync(),
-                    cts
-                );
+                    //    if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && isuserAccessAdministrator))
+                    //    {
+                    //        if (!rgExists)
+                    //        {
+                    //            throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
+                    //        }
 
-            Task<INetworkInterface> AssociateNicWithNetworkSecurityGroupAsync(INetworkInterface networkInterface, INetworkSecurityGroup networkSecurityGroup)
-                => Execute(
-                    $"Associating VM NIC with Network Security Group {networkSecurityGroup.Name}...",
-                    () => networkInterface.Update().WithExistingNetworkSecurityGroup(networkSecurityGroup).ApplyAsync(),
-                    cts
-                );
+                    //        var currentPrincipalRgRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}/resourceGroups/{configuration.ResourceGroupName}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
+                    //            .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
+                    //            .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
-            static ConnectionInfo GetSshConnectionInfo(IVirtualMachine linuxVm, string vmUsername, string vmPassword)
-            {
-                var publicIPAddress = linuxVm.GetPrimaryPublicIPAddress();
+                    //        if (!currentPrincipalRgRoleIds.Contains(ownerRoleId))
+                    //        {
+                    //            throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
+                    //        }
 
-                return new ConnectionInfo(
-                    publicIPAddress is not null ? publicIPAddress.Fqdn : linuxVm.GetPrimaryNetworkInterface().PrimaryPrivateIP,
-                    vmUsername,
-                    new PasswordAuthenticationMethod(vmUsername, vmPassword));
-            }
+                    //        if (!isuserAccessAdministrator)
+                    //        {
+                    //            SkipBillingReaderRoleAssignment = true;
+                    //            DisplayBillingReaderInsufficientAccessLevelWarning();
+                    //        }
+                    //    }
+                    //}
 
-            Task WaitForSshConnectivityAsync(ConnectionInfo sshConnectionInfo)
-            {
-                var timeout = System.TimeSpan.FromMinutes(10);
-
-                return Execute(
-                    $"Waiting for VM to accept SSH connections at {sshConnectionInfo.Host}...",
-                    async () =>
-                    {
-                        var startTime = DateTime.UtcNow;
-
-                        while (!cts.IsCancellationRequested)
+        #pragma warning disable CS8603 // Possible null reference return.
+                    async Task<IStorageAccount?> GetExistingStorageAccountAsync(string storageAccountName)
+                        => (await Task.WhenAll(subscriptionIds.Select(async s =>
                         {
                             try
                             {
-                                using var sshClient = new SshClient(sshConnectionInfo);
-                                sshClient.ConnectWithRetries();
-                                sshClient.Disconnect();
+                                return await azureClient.WithSubscription(s).StorageAccounts.ListAsync();
                             }
-                            catch (SshAuthenticationException ex) when (ex.Message.StartsWith("Permission"))
+                            catch (Exception)
                             {
-                                throw new ValidationException($"Could not connect to VM '{sshConnectionInfo.Host}'. Reason: {ex.Message}", false);
+                                // Ignore exception if a user does not have the required role to list storage accounts in a subscription
+                                return null;
                             }
-                            catch
-                            {
-                                if (DateTime.UtcNow.Subtract(startTime) > timeout)
-                                {
-                                    throw new Exception("Timeout occurred while waiting for VM to accept SSH connections");
-                                }
-                                else
-                                {
-                                    await Task.Delay(System.TimeSpan.FromSeconds(5), cts.Token);
-                                    continue;
-                                }
-                            }
+                        })))
+                            .Where(a => a is not null)
+                            .SelectMany(a => a)
+                            .SingleOrDefault(a => a.Name.Equals(storageAccountName, StringComparison.OrdinalIgnoreCase) && a.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
+        #pragma warning restore CS8603 // Possible null reference return.
 
-                            break;
+                    async Task<(BatchAccount BatchAccount, string SubscriptionId)> GetExistingBatchAccountAsync(string batchAccountName)
+                        => await (await Task.WhenAll(subscriptionIds.Select(async s =>
+                        {
+                            IAsyncEnumerable<(BatchAccount BatchAccount, string SubscriptionId)> list;
+                            try
+                            {
+                                var client = new BatchManagementClient(tokenCredentials) { SubscriptionId = s };
+                                list = (await client.BatchAccount.ListAsync())
+                                    .ToAsyncEnumerable(listNextAsync: new Func<string, CancellationToken, Task<IPage<BatchAccount>>>(async (link, ct) => await client.BatchAccount.ListNextAsync(link, ct)))
+                                    .Select(b => (b, s));
+                            }
+                            catch (Exception e)
+                            {
+                                ConsoleEx.WriteLine(e.Message);
+                                list = AsyncEnumerable.Empty<(BatchAccount, string)>();
+                            }
+                            return list;
                         }
-                    },
-                    cts);
-            }
+                            ))).ToAsyncEnumerable()
+                            .SelectAwait(async a => await a.SingleOrDefaultAsync(a => a.BatchAccount.Name.Equals(batchAccountName, StringComparison.OrdinalIgnoreCase) && a.BatchAccount.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase)))
+                            .Where(a => a.BatchAccount is not null)
+                            .SingleOrDefaultAsync();
 
-            static async Task<(string Output, string Error, int ExitStatus)> ExecuteCommandOnVirtualMachineAsync(ConnectionInfo sshConnectionInfo, string command)
-            {
-                using var sshClient = new SshClient(sshConnectionInfo);
-                sshClient.ConnectWithRetries();
-                var (output, error, exitStatus) = await sshClient.ExecuteCommandAsync(command);
-                sshClient.Disconnect();
+                    async Task<ManagedCluster?> ValidateAndGetExistingAKSClusterAsync()
+                    {
+                        if (string.IsNullOrWhiteSpace(configuration.AksClusterName))
+                        {
+                            return null;
+                        }
 
-                return (output, error, exitStatus);
-            }
+                        return (await GetExistingAKSClusterAsync(configuration.AksClusterName))
+                            ?? throw new ValidationException($"If AKS cluster name is provided, the cluster must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+                    }
 
-            static Task<(string Output, string Error, int ExitStatus)> ExecuteCommandOnVirtualMachineWithRetriesAsync(ConnectionInfo sshConnectionInfo, string command)
-                => sshCommandRetryPolicy.ExecuteAsync(() => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, command));
-        }
+                    async Task<ManagedCluster?> GetExistingAKSClusterAsync(string aksClusterName)
+                    {
+        #pragma warning disable CS8603 // Possible null reference return.
+                        return (await Task.WhenAll(subscriptionIds.Select(async s =>
+                        {
+                            try
+                            {
+                                var client = new ContainerServiceClient(tokenCredentials) { SubscriptionId = s };
+                                return await client.ManagedClusters.ListAsync();
+                            }
+                            catch (Exception e)
+                            {
+                                ConsoleEx.WriteLine(e.Message);
+                                return null;
+                            }
+                        })))
+                            .Where(a => a is not null)
+                            .SelectMany(a => a)
+                            .SingleOrDefault(a => a.Name.Equals(aksClusterName, StringComparison.OrdinalIgnoreCase) && a.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
+        #pragma warning restore CS8603 // Possible null reference return.
+                    }
+
+                    Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync(IResourceGroup resourceGroup, string networkSecurityGroupName)
+                    {
+                        const int SshAllowedPort = 22;
+                        const int SshDefaultPriority = 300;
+
+                        return Execute(
+                            $"Creating Network Security Group: {networkSecurityGroupName}...",
+                            () => azureSubscriptionClient.NetworkSecurityGroups.Define(networkSecurityGroupName)
+                                .WithRegion(configuration.RegionName)
+                                .WithExistingResourceGroup(resourceGroup)
+                                .DefineRule(SshNsgRuleName)
+                                .AllowInbound()
+                                .FromAnyAddress()
+                                .FromAnyPort()
+                                .ToAnyAddress()
+                                .ToPort(SshAllowedPort)
+                                .WithProtocol(Microsoft.Azure.Management.Network.Fluent.Models.SecurityRuleProtocol.Tcp)
+                                .WithPriority(SshDefaultPriority)
+                                .Attach()
+                                .CreateAsync(cts.Token),
+                            cts
+                        );
+                    }
+
+                    Task EnableSsh(INetworkSecurityGroup? networkSecurityGroup)
+                    {
+                        try
+                        {
+                            return networkSecurityGroup?.SecurityRules[SshNsgRuleName]?.Access switch
+                            {
+                                null => Task.CompletedTask,
+                                var x when Microsoft.Azure.Management.Network.Fluent.Models.SecurityRuleAccess.Allow.Equals(x) => SetKeepSshPortOpen(true),
+                                _ => Execute(
+                                    "Enabling SSH on VM...",
+                                    () => EnableSshPort(),
+                                    cts),
+                            };
+                        }
+                        catch (KeyNotFoundException)
+                        {
+                            return Task.CompletedTask;
+                        }
+
+                        Task<INetworkSecurityGroup> EnableSshPort()
+                        {
+                            _ = SetKeepSshPortOpen(false);
+                            return networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).AllowInbound().Parent().ApplyAsync();
+                        }
+
+                        Task SetKeepSshPortOpen(bool value)
+                        {
+                            configuration.KeepSshPortOpen = value;
+                            return Task.CompletedTask;
+                        }
+                    }
+
+                    Task DisableSsh(INetworkSecurityGroup? networkSecurityGroup)
+                        => networkSecurityGroup is null ? Task.CompletedTask : Execute(
+                            "Disabling SSH on VM...",
+                            () => networkSecurityGroup.Update().UpdateRule(SshNsgRuleName).DenyInbound().Parent().ApplyAsync(),
+                            cts
+                        );
+
+                    Task<INetworkInterface> AssociateNicWithNetworkSecurityGroupAsync(INetworkInterface networkInterface, INetworkSecurityGroup networkSecurityGroup)
+                        => Execute(
+                            $"Associating VM NIC with Network Security Group {networkSecurityGroup.Name}...",
+                            () => networkInterface.Update().WithExistingNetworkSecurityGroup(networkSecurityGroup).ApplyAsync(),
+                            cts
+                        );
+
+                    static ConnectionInfo GetSshConnectionInfo(IVirtualMachine linuxVm, string vmUsername, string vmPassword)
+                    {
+                        var publicIPAddress = linuxVm.GetPrimaryPublicIPAddress();
+
+                        return new ConnectionInfo(
+                            publicIPAddress is not null ? publicIPAddress.Fqdn : linuxVm.GetPrimaryNetworkInterface().PrimaryPrivateIP,
+                            vmUsername,
+                            new PasswordAuthenticationMethod(vmUsername, vmPassword));
+                    }
+
+                    Task WaitForSshConnectivityAsync(ConnectionInfo sshConnectionInfo)
+                    {
+                        var timeout = System.TimeSpan.FromMinutes(10);
+
+                        return Execute(
+                            $"Waiting for VM to accept SSH connections at {sshConnectionInfo.Host}...",
+                            async () =>
+                            {
+                                var startTime = DateTime.UtcNow;
+
+                                while (!cts.IsCancellationRequested)
+                                {
+                                    try
+                                    {
+                                        using var sshClient = new SshClient(sshConnectionInfo);
+                                        sshClient.ConnectWithRetries();
+                                        sshClient.Disconnect();
+                                    }
+                                    catch (SshAuthenticationException ex) when (ex.Message.StartsWith("Permission"))
+                                    {
+                                        throw new ValidationException($"Could not connect to VM '{sshConnectionInfo.Host}'. Reason: {ex.Message}", false);
+                                    }
+                                    catch
+                                    {
+                                        if (DateTime.UtcNow.Subtract(startTime) > timeout)
+                                        {
+                                            throw new Exception("Timeout occurred while waiting for VM to accept SSH connections");
+                                        }
+                                        else
+                                        {
+                                            await Task.Delay(System.TimeSpan.FromSeconds(5), cts.Token);
+                                            continue;
+                                        }
+                                    }
+
+                                    break;
+                                }
+                            },
+                            cts);
+                    }
+
+                    static async Task<(string Output, string Error, int ExitStatus)> ExecuteCommandOnVirtualMachineAsync(ConnectionInfo sshConnectionInfo, string command)
+                    {
+                        using var sshClient = new SshClient(sshConnectionInfo);
+                        sshClient.ConnectWithRetries();
+                        var (output, error, exitStatus) = await sshClient.ExecuteCommandAsync(command);
+                        sshClient.Disconnect();
+
+                        return (output, error, exitStatus);
+                    }
+
+                    static Task<(string Output, string Error, int ExitStatus)> ExecuteCommandOnVirtualMachineWithRetriesAsync(ConnectionInfo sshConnectionInfo, string command)
+                        => sshCommandRetryPolicy.ExecuteAsync(() => ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, command));
+
+                    Task<Vault> GetKeyVaultAsync(string vaultName)
+                    {
+                        var keyVaultManagementClient = new KeyVaultManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+                        return keyVaultManagementClient.Vaults.GetAsync(configuration.ResourceGroupName, vaultName);
+                    }
+                },
+                cts);
         #endregion
 
-        private CromwellOnAzure(CancellationTokenSource cts, TokenCredentials tokenCredentials, BatchAccount batchAccount, string subscriptionId, IStorageAccount storageAccount)
+        private CromwellOnAzure(CancellationTokenSource cts, TokenCredentials tokenCredentials, BatchAccount batchAccount, string subscriptionId, IStorageAccount storageAccount, Func<Task> restartServices)
         {
             ArgumentNullException.ThrowIfNull(cts);
             ArgumentNullException.ThrowIfNull(tokenCredentials);
             ArgumentNullException.ThrowIfNull(batchAccount);
             ArgumentNullException.ThrowIfNull(subscriptionId);
             ArgumentNullException.ThrowIfNull(storageAccount);
+            ArgumentNullException.ThrowIfNull(restartServices);
 
             this.cts = cts;
             this.tokenCredentials = tokenCredentials;
             this.batchAccount = batchAccount;
             this.subscriptionId = subscriptionId;
             this.storageAccount = storageAccount;
+            this.restartServices = restartServices;
         }
 
         #region Public Methods
@@ -528,7 +598,7 @@ namespace HostConfigConsole
 
         public async ValueTask AddApplications(IEnumerable<(string Name, string Version, Func<Stream> Open)> packages)
             => await Execute(
-                "Adding Batch Applications.",
+                "Adding Batch Applications...",
                 async () =>
                 {
                     var resourceGroupRegex = new Regex("/*/resourceGroups/([^/]*)/*");
@@ -558,7 +628,7 @@ namespace HostConfigConsole
 
         public async ValueTask RemoveApplications(IEnumerable<(string Name, string Version)> packages)
             => await Execute(
-                "Removing Batch Applications.",
+                "Removing Batch Applications...",
                 async () =>
                 {
                     var resourceGroupRegex = new Regex("/*/resourceGroups/([^/]*)/*");
@@ -584,7 +654,7 @@ namespace HostConfigConsole
 
         public async ValueTask AddHostConfigBlobs(IEnumerable<(string Hash, Func<Stream> Open)> blobs)
             => await Execute(
-                "Writing host configuration resource blobs (task scripts).",
+                "Writing host configuration resource blobs (task scripts)...",
                 async () =>
                 {
                     var blobClient = await GetBlobClientAsync(storageAccount);
@@ -599,7 +669,7 @@ namespace HostConfigConsole
 
         public async ValueTask RemoveHostConfigBlobs(IEnumerable<string> blobs)
             => await Execute(
-                "Removing host configuration resource blobs (task scripts).",
+                "Removing host configuration resource blobs (task scripts)...",
                 async () =>
                 {
                     var blobClient = await GetBlobClientAsync(storageAccount);
@@ -608,6 +678,11 @@ namespace HostConfigConsole
                             await container.GetBlobClient(hash).DeleteAsync(snapshotsOption: Azure.Storage.Blobs.Models.DeleteSnapshotsOption.IncludeSnapshots, cancellationToken: cts.Token))
                         .ToArray());
                 });
+
+        public async ValueTask RestartServices()
+            => await Execute(
+                "Restarting CromwellOnAzure services...",
+                restartServices);
         #endregion
 
         #region Implementation

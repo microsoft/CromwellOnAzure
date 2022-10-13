@@ -11,6 +11,7 @@
     <Compile Include="..\deploy-cromwell-on-azure\AzureFluentExtensions.cs" Link="AzureFluentExtensions.cs" />
     <Compile Include="..\deploy-cromwell-on-azure\Configuration.cs" Link="Configuration.cs" />
     <Compile Include="..\deploy-cromwell-on-azure\ConsoleEx.cs" Link="ConsoleEx.cs" />
+    <Compile Include="..\deploy-cromwell-on-azure\KubernetesManager.cs" Link="KubernetesManager.cs" />
     <Compile Include="..\deploy-cromwell-on-azure\RefreshableAzureServiceTokenProvider.cs" Link="RefreshableAzureServiceTokenProvider.cs" />
     <Compile Include="..\deploy-cromwell-on-azure\SshExtensions.cs" Link="SshExtensions.cs" />
     <Compile Include="..\TesApi.Web\PagedInterfaceExtensions.cs" Link="PagedInterfaceExtensions.cs" />
@@ -20,10 +21,12 @@
     <PackageReference Include="Azure.Identity" Version="1.7.0" />
     <PackageReference Include="Azure.ResourceManager.Batch" Version="1.0.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.13.1" />
+    <PackageReference Include="KubernetesClient" Version="8.0.68" />
     <PackageReference Include="Microsoft.Azure.Batch" Version="15.3.0" />
     <PackageReference Include="Microsoft.Azure.Management.Batch" Version="14.0.0" />
     <PackageReference Include="Microsoft.Azure.Management.ContainerService" Version="1.2.0" />
     <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.38.1" />
+    <PackageReference Include="Microsoft.Azure.Management.KeyVault" Version="3.1.0" />
     <PackageReference Include="Microsoft.Azure.Management.Storage.Fluent" Version="1.38.1" />
     <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.6.2" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.1" />
@@ -45,6 +48,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="scripts\helm\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\deploy-cromwell-on-azure\scripts\helm\values-template.yaml" Link="scripts\helm\values-template.yaml" />
   </ItemGroup>
 
 </Project>

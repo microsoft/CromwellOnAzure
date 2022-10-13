@@ -98,7 +98,6 @@ namespace CromwellOnAzureDeployer
         public const string CromwellAzureRootDir = "/data/cromwellazure";
         public const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
         public const string SettingsDelimiter = "=:=";
-        public const string StorageAccountKeySecretName = "CoAStorageKey";
         public const string SshNsgRuleName = "SSH";
 
         private readonly CancellationTokenSource cts = new();
@@ -490,7 +489,7 @@ namespace CromwellOnAzureDeployer
                                 keyVault ??= await CreateKeyVaultAsync(configuration.KeyVaultName, managedIdentity, vnetAndSubnet.Value.vmSubnet);
                                 keyVaultUri = keyVault.Properties.VaultUri;
                                 var keys = await storageAccount.GetKeysAsync();
-                                await SetStorageKeySecret(keyVaultUri, StorageAccountKeySecretName, keys.First().Value);
+                                await SetStorageKeySecret(keyVaultUri, KubernetesManager.StorageAccountKeySecretName, keys.First().Value);
                             });
                         }
 

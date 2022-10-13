@@ -21,6 +21,8 @@ using Microsoft.Azure.Management.Storage.Fluent;
 using Polly;
 using Polly.Retry;
 
+#nullable disable
+
 namespace CromwellOnAzureDeployer
 {
     /// <summary>
@@ -36,6 +38,7 @@ namespace CromwellOnAzureDeployer
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
             .WaitAndRetryAsync(8, retryAttempt => System.TimeSpan.FromSeconds(5));
 
+        public const string StorageAccountKeySecretName = "CoAStorageKey";
         private const string BlobCsiRepo = "https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
         private const string BlobCsiDriverVersion = "v1.15.0";
         private const string AadPluginRepo = "https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts";
@@ -125,7 +128,7 @@ namespace CromwellOnAzureDeployer
                         { "accountName",  storageAccountName },
                         { "containerName", container },
                         { "keyVaultURL", keyVaultUrl },
-                        { "keyVaultSecretName", Deployer.StorageAccountKeySecretName}
+                        { "keyVaultSecretName", StorageAccountKeySecretName}
                     };
 
                     values.InternalContainersKeyVaultAuth.Add(containerConfig);

@@ -130,6 +130,8 @@ async Task<int> UpdateCmdAsync(string[] updateArgs, FileInfo? inFile, bool remov
         {
             await coa.RemoveHostConfigBlobs(updater.GetStartTasksToRemove());
         }
+
+        await coa.RestartServices();
     }
     catch
     {
