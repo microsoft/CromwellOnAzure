@@ -950,6 +950,7 @@ namespace CromwellOnAzureDeployer
             if (installedVersion is null || installedVersion < new Version(3, 2))
             {
                 await PatchAllowedVmSizesFileV320Async(storageAccount);
+                await PatchMySqlDbV320Async(sshConnectionInfo);
             }
         }
 
@@ -1323,7 +1324,6 @@ namespace CromwellOnAzureDeployer
                         (Utility.GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true)
                     }.Concat(!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault()
                         ? new[] {
-                        (Utility.GetFileContent("scripts", "env-12-local-my-sql-db.txt"), $"{CromwellAzureRootDir}/env-12-local-my-sql-db.txt", false),
                         (Utility.GetFileContent("scripts", "docker-compose.mysql.yml"), $"{CromwellAzureRootDir}/docker-compose.mysql.yml", false),
                         (Utility.GetFileContent("scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
                         (Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
@@ -1381,6 +1381,14 @@ namespace CromwellOnAzureDeployer
                     new Utility.ConfigReplaceTextItem("{PostgreSqlTesUserPassword}", configuration.PostgreSqlTesUserPassword),
                 }, "scripts", "env-13-postgre-sql-db.txt"),
                 $"{CromwellAzureRootDir}/env-13-postgre-sql-db.txt", false));
+            }
+            else
+            {
+                uploadList.Add((Utility.PersonalizeContent(new[]
+                {
+                    new Utility.ConfigReplaceTextItem("{DatabasePassword}", Utility.GeneratePassword()),
+                }, "scripts", "env-12-local-my-sql-db.txt"),
+                $"{CromwellAzureRootDir}/env-12-local-my-sql-db.txt", false));
             }
 
             await UploadFilesToVirtualMachineAsync(
@@ -2346,6 +2354,20 @@ namespace CromwellOnAzureDeployer
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
                 });
 
+        private Task PatchMySqlDbV320Async(ConnectionInfo sshConnectionInfo)
+            => Execute(
+                $"Patching '{AllowedVmSizesFileName}' in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                    {
+                        var mySqlDbSettings = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-12-local-my-sql-db.txt")).Output);
+                        mySqlDbSettings["MYSQL_ROOT_PASSWORD"] = Utility.GeneratePassword();
+
+                        await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.DictionaryToDelimitedText(mySqlDbSettings), $"{CromwellAzureRootDir}/env-12-local-my-sql-db.txt", false));
+                    }
+                });
+
         private Task PatchAllowedVmSizesFileV320Async(IStorageAccount storageAccount)
             => Execute(
                 $"Patching '{AllowedVmSizesFileName}' in '{ConfigurationContainerName}' storage container...",
@@ -2360,6 +2382,7 @@ namespace CromwellOnAzureDeployer
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, allowedVmSizesText);
                 });
+
         private Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Adding new settings to 'env-04-settings.txt' file on the VM...",
