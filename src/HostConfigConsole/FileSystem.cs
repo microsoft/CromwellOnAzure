@@ -26,17 +26,14 @@ namespace HostConfigConsole
             public string Name
                 => _info.Name;
 
-            public void Delete()
-                => _info.Delete();
+            public IAsyncEnumerable<IDirectory> EnumerateDirectories()
+                => _info.EnumerateDirectories().Select(i => new Directory(i)).ToAsyncEnumerable();
 
-            public IEnumerable<IDirectory> EnumerateDirectories()
-                => _info.EnumerateDirectories().Select(i => new Directory(i));
+            public IAsyncEnumerable<IFile> EnumerateFiles()
+                => _info.EnumerateFiles().Select(i => new File(i)).ToAsyncEnumerable();
 
-            public IEnumerable<IFile> EnumerateFiles()
-                => _info.EnumerateFiles().Select(i => new File(i));
-
-            public IFile? GetFile(string name)
-                => _info.EnumerateFiles(name).Select(i => new File(i)).FirstOrDefault();
+            public ValueTask<IFile?> GetFile(string name)
+                => ValueTask.FromResult<IFile?>(_info.EnumerateFiles(name).Select(i => new File(i)).FirstOrDefault());
         }
 
         private class File : IFile
@@ -58,14 +55,11 @@ namespace HostConfigConsole
             public IDirectory? Directory
                 => _info.Directory is null ? default : new Directory(_info.Directory);
 
-            public void Delete()
-                => _info.Delete();
+            public ValueTask<Stream> OpenRead()
+                => ValueTask.FromResult<Stream>(_info.OpenRead());
 
-            public Stream OpenRead()
-                => _info.OpenRead();
-
-            public byte[] ReadAllBytes()
-                => System.IO.File.ReadAllBytes(_info.FullName);
+            public async ValueTask<byte[]> ReadAllBytes()
+                => await System.IO.File.ReadAllBytesAsync(_info.FullName);
         }
     }
 }

@@ -14,15 +14,7 @@
       "minVmSize": "Standard_NP20s"
     },
     {
-      "container": "dragenpublicwestus.azurecr.io/dragen-xrt/el7/x86_64@sha256:b6de3f917817be17815d6bd644d171cb1f968d532c4e74c13583f15c42ca50d2",
-      "minVmSize": "Standard_NP20s"
-    },
-    {
       "container": "dragenpublicwestus.azurecr.io/dragen-xrt/el7/x86_64:3.10.8-11-g90bb18a0",
-      "minVmSize": "Standard_NP20s"
-    },
-    {
-      "container": "dragenpublicwestus.azurecr.io/dragen-xrt/el7/x86_64@sha256:5ba8881057245756ae61ae49ef54f89a44e60815b40c84a70964842a649d5c04",
       "minVmSize": "Standard_NP20s"
     }
   ],

@@ -159,7 +159,7 @@ async Task<int> BuildCmdAsync(string[] hostconfigs, FileInfo? outFile, string ho
         _ => throw new InvalidOperationException("Unsupported hostConfigs URI scheme."),
     };
 
-    var (config, resources, applications) = new Builder(hostConfigsDir)
+    var (config, resources, applications) = await new Builder(hostConfigsDir)
         .Build(Console.WriteLine, hostconfigs ?? Array.Empty<string>());
 
     bool areSame;
@@ -186,12 +186,12 @@ async Task<int> BuildCmdAsync(string[] hostconfigs, FileInfo? outFile, string ho
     {
         Console.WriteLine("Saving configuration");
         using var package = ConfigurationPackageWritable.Create(outFile);
-        resources.ForEach(resource => package.SetResource(resource.Name, resource.Stream.Value));
-        applications.ForEach(app =>
+        await Task.WhenAll(resources.Select(async resource => package.SetResource(resource.Name, await resource.Stream)).ToArray());
+        await Task.WhenAll(applications.Select(async app =>
         {
             var name = config.PackageHashes.FirstOrDefault(t => t.Value.Equals(app.Version, StringComparison.OrdinalIgnoreCase)).Key;
-            package.SetApplication(name, app.Version, app.Stream.Value);
-        });
+            package.SetApplication(name, app.Version, await app.Stream);
+        }).ToArray());
 
         package.SetHostConfig(config);
     }

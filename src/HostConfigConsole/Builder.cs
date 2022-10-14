@@ -2,15 +2,19 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using Common.HostConfigs;
 using HostConfigConsole.HostConfigs;
+using LazyCache;
+using Valleysoft.DockerRegistryClient;
 
 namespace HostConfigConsole
 {
@@ -36,18 +40,19 @@ namespace HostConfigConsole
             }
         }
 
-        public IEnumerable<(string Name, IEnumerable<IFile> AdditionalFiles)> GetHostConfigs()
+        public async IAsyncEnumerable<(string Name, IEnumerable<IFile> AdditionalFiles)> GetHostConfigs()
         {
-            foreach (var dir in _hostConfigs.EnumerateDirectories())
+            await foreach (var dir in _hostConfigs.EnumerateDirectories())
             {
-                if (IsDirViable(dir, out var files))
+                var (viable, files) = await GetDirMetadata(dir);
+                if (viable)
                 {
                     yield return (dir.Name, files);
                 }
             }
         }
 
-        public (HostConfig HostConfig, IEnumerable<(string Name, Lazy<Stream> Stream)>, IEnumerable<(string Version, Lazy<Stream> Stream)> ApplicationVersions) Build(Action<string> writeLine, params string[] selected)
+        public async ValueTask<(HostConfig HostConfig, IEnumerable<(string Name, AsyncLazy<Stream> Stream)>, IEnumerable<(string Version, AsyncLazy<Stream> Stream)> ApplicationVersions)> Build(Action<string> writeLine, params string[] selected)
         {
             ArgumentNullException.ThrowIfNull(writeLine);
             ArgumentNullException.ThrowIfNull(selected);
@@ -58,7 +63,7 @@ namespace HostConfigConsole
 
             if (filter)
             {
-                var dirList = _hostConfigs.EnumerateDirectories().Select(d => d.Name.ToUpperInvariant()).ToList();
+                var dirList = await _hostConfigs.EnumerateDirectories().Select(d => d.Name.ToUpperInvariant()).ToListAsync();
                 (selected ?? Array.Empty<string>())
                     .Where(dir => !dirList.Contains(dir.ToUpperInvariant()))
                     .ForEach(dir => throw new ArgumentException($"HostConfig '{dir}' was not found in '{_hostConfigs.Name}'.", nameof(selected)));
@@ -69,9 +74,9 @@ namespace HostConfigConsole
             var hashes = PackageHashes.Empty;
             var configs = HostConfigurations.Empty;
             var startTasks = new Dictionary<string, IFile>();
-            var versions = Enumerable.Empty<(string, Lazy<Stream>)>();
+            var versions = Enumerable.Empty<(string, AsyncLazy<Stream>)>();
 
-            foreach (var (hostConfig, hcFiles) in _hostConfigs.EnumerateDirectories().Where(Filter).Select(ParseHostConfigDir).Select(hcFiles => (hcFiles.FirstOrDefault()?.Directory?.Name, hcFiles.ToList())))
+            await foreach (var (hostConfig, hcFiles) in _hostConfigs.EnumerateDirectories().Where(Filter).Select(ParseHostConfigDir).SelectAwait(hcFiles => hcFiles.ToListAsync()).Select(hcFiles => (hcFiles.FirstOrDefault()?.Directory?.Name, hcFiles)))
             {
                 if (hostConfig is null) continue;
                 writeLine($"Processing {hostConfig}");
@@ -81,12 +86,12 @@ namespace HostConfigConsole
                 var nonZipFiles = Enumerable.Empty<IFile>();
                 nonZipFiles = configFile is null ? nonZipFiles : nonZipFiles.Append(configFile);
                 nonZipFiles = startTask is null ? nonZipFiles : nonZipFiles.Append(startTask);
-                var zipFiles = hcFiles.Except(nonZipFiles).ToList();
+                var zipFiles = hcFiles.Except(nonZipFiles);
 
                 if (configFile is not null)
                 {
-                    var configuration = ParseConfig(configFile);
-                    MungeVirtualMachineSizes(configuration.VmSizes);
+                    var configuration = await ParseConfig(configFile);
+                    await MungeVirtualMachineSizes(configuration.VmSizes);
                     configs.Add(hostConfig, configuration);
 
                     if (startTask is not null)
@@ -94,13 +99,11 @@ namespace HostConfigConsole
                         startTasks.Add(configuration.StartTask?.StartTaskHash ?? throw new InvalidOperationException(), startTask);
                     }
 
-                    foreach (var (name, hash, package) in
-                        zipFiles.Select(GetApplicationName).Zip(
-                        zipFiles.Select(GetFileHash),
-                        zipFiles.Select(ExtractPackage)))
+                    await foreach (var (name, hash, package) in zipFiles.ToAsyncEnumerable()
+                        .SelectAwait(async f => (GetApplicationName(f), await GetFileHash(f), await ExtractPackage(f))))
                     {
                         if (hash is null) continue;
-                        versions = versions.Append((hash, new(package.FileInfo.OpenRead)));
+                        versions = versions.Append((hash, new(async () => await package.FileInfo.OpenRead())));
                         hashes.Add(name, hash);
 
                         if (storedVersions.TryGetValue(name, out var keyMetadata))
@@ -118,7 +121,7 @@ namespace HostConfigConsole
                 }
                 else if (startTask is not null || zipFiles.Any())
                 {
-                    IEnumerable<IFile> list = zipFiles;
+                    var list = zipFiles;
 
                     if (startTask is not null)
                     {
@@ -136,20 +139,42 @@ namespace HostConfigConsole
                 HostConfigurations = configs
             };
 
-            return (config, startTasks.Select<KeyValuePair<string, IFile>, (string Name, Lazy<Stream> Stream)>(p => (p.Key, new(p.Value.OpenRead))), versions);
+            return (config, startTasks.Select<KeyValuePair<string, IFile>, (string Name, AsyncLazy<Stream> Stream)>(p => (p.Key, new(async () => await p.Value.OpenRead()))), versions);
         }
 
-        private static void MungeVirtualMachineSizes(VirtualMachineSizes vmSizes)
-            => vmSizes?.Where(size => size.Container is not null)
-                .ForEach(size => size.Container = Common.Utilities.NormalizeContainerImageName(size.Container).AbsoluteUri);
+        private static async ValueTask MungeVirtualMachineSizes(VirtualMachineSizes vmSizes)
+        {
+            var results = await Task.WhenAll(vmSizes?.Where(size => size.Container is not null).Select(async size =>
+                Enumerable.Empty<VirtualMachineSize>().Append(CopyWithNormalizedContainer(size, size.Container)).Append(CopyWithNormalizedContainer(size, await GetDigest(size))))
+                .ToArray() ?? Array.Empty<Task<IEnumerable<VirtualMachineSize>>>());
 
-        private static bool IsDirViable(IDirectory dir, out IEnumerable<IFile> additionalFiles)
+            vmSizes?.Clear();
+            vmSizes?.AddRange(results.SelectMany(l => l));
+
+            static VirtualMachineSize CopyWithNormalizedContainer(VirtualMachineSize size, string? container)
+                => new() { Container = Common.Utilities.NormalizeContainerImageName(container).AbsoluteUri, FamilyName = size.FamilyName, MinVmSize = size.MinVmSize, VmSize = size.VmSize };
+
+            static async ValueTask<string> GetDigest(VirtualMachineSize size)
+            {
+                var uri = Common.Utilities.NormalizeContainerImageName(size.Container);
+                var repository = uri.AbsolutePath.Split(':');
+                var name = string.Join(':', repository.Take(repository.Length - 1)).TrimStart('/');
+                var tag = repository.Skip(1).LastOrDefault() ?? "latest";
+                var manifest = await new DockerRegistryClient(uri.Host).Manifests.GetAsync(name, tag);
+
+                return uri.Scheme.Equals("docker", StringComparison.Ordinal)
+                    ? $"{uri.Host}{(uri.IsDefaultPort ? string.Empty : ":" + uri.Port.ToString(CultureInfo.InvariantCulture))}/{name}@{manifest.DockerContentDigest}"
+                    : $"{uri.GetLeftPart(UriPartial.Path)}@{manifest.DockerContentDigest}";
+            }
+        }
+
+        private static async ValueTask<(bool Viable, IEnumerable<IFile> AdditionalFiles)> GetDirMetadata(IDirectory dir)
         {
             var extraFiles = Enumerable.Empty<IFile>();
             var viable = false;
             var fileList = Constants.HostConfigFiles().Select(s => s.ToUpperInvariant()).ToList();
 
-            foreach (var file in dir.EnumerateFiles())
+            await foreach (var file in dir.EnumerateFiles())
             {
                 if (fileList.Contains(file.Name.ToUpperInvariant()))
                 {
@@ -161,16 +186,15 @@ namespace HostConfigConsole
                 }
             }
 
-            additionalFiles = viable ? extraFiles : Enumerable.Empty<IFile>();
-            return viable;
+            return (viable, viable ? extraFiles : Enumerable.Empty<IFile>());
         }
 
         private static string GetApplicationName(IFile file)
             => $"{file.Directory?.Name}_{Path.GetFileNameWithoutExtension(file.Name)}";
 
-        private static (IFile FileInfo, Package Package) ExtractPackage(IFile file)
+        private static async ValueTask<(IFile FileInfo, Package Package)> ExtractPackage(IFile file)
         {
-            using var zip = new ZipArchive(file.OpenRead());
+            using var zip = new ZipArchive(await file.OpenRead());
             return (file, new()
             {
                 ContainsTaskScript = zip.Entries
@@ -182,10 +206,10 @@ namespace HostConfigConsole
             });
         }
 
-        private static IEnumerable<IFile> ParseHostConfigDir(IDirectory dir)
+        private static async IAsyncEnumerable<IFile> ParseHostConfigDir(IDirectory dir)
         {
             var fileList = Constants.HostConfigFiles().Select(s => s.ToUpperInvariant()).ToList();
-            foreach (var file in dir.EnumerateFiles())
+            await foreach (var file in dir.EnumerateFiles())
             {
                 if (fileList.Contains(file.Name.ToUpperInvariant()))
                 {
@@ -227,8 +251,8 @@ namespace HostConfigConsole
                 };
         }
 
-        private static HostConfiguration ParseConfig(IFile configFile)
-            => ConvertUserConfig(ParseUserConfig(OpenConfiguration(configFile.OpenRead())), GetFileHash(configFile.Directory?.GetFile(Constants.StartTask)));
+        private static async ValueTask<HostConfiguration> ParseConfig(IFile configFile)
+            => ConvertUserConfig(ParseUserConfig(OpenConfiguration(await configFile.OpenRead())), await GetFileHash(await (configFile.Directory?.GetFile(Constants.StartTask) ?? ValueTask.FromResult<IFile?>(null))));
 
         private static UserHostConfig ParseUserConfig(TextReader? textReader)
             => ReadJson<UserHostConfig>(textReader, () => throw new ArgumentException("File is not a HostConfig configuration.", nameof(textReader)));
@@ -239,17 +263,17 @@ namespace HostConfigConsole
         private static StartTask ConvertStartTask(UserStartTask? userStartTask, string? startTaskHash)
             => new() { ResourceFiles = userStartTask?.ResourceFiles ?? Array.Empty<ResourceFile>(), StartTaskHash = startTaskHash };
 
-        private static string? GetFileHash(IFile? file)
-            => file is null ? default : Convert.ToHexString(SHA256.HashData(file.ReadAllBytes()));
+        private static async ValueTask<string?> GetFileHash(IFile? file)
+            => file is null ? default : Convert.ToHexString(SHA256.HashData(await file.ReadAllBytes()));
 
         public interface IDirectory
         {
             string Name { get; }
             bool Exists { get; }
 
-            IEnumerable<IDirectory> EnumerateDirectories();
-            IEnumerable<IFile> EnumerateFiles();
-            IFile? GetFile(string name);
+            IAsyncEnumerable<IDirectory> EnumerateDirectories();
+            IAsyncEnumerable<IFile> EnumerateFiles();
+            ValueTask<IFile?> GetFile(string name);
         }
 
         public interface IFile
@@ -257,8 +281,8 @@ namespace HostConfigConsole
             string Name { get; }
             IDirectory? Directory { get; }
 
-            Stream OpenRead();
-            byte[] ReadAllBytes();
+            ValueTask<Stream> OpenRead();
+            ValueTask<byte[]> ReadAllBytes();
         }
     }
 }

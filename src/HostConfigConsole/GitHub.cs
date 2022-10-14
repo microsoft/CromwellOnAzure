@@ -59,38 +59,44 @@ namespace HostConfigConsole
             public bool Exists
                 => true;
 
-            public IEnumerable<IDirectory> EnumerateDirectories()
+            public async IAsyncEnumerable<IDirectory> EnumerateDirectories()
             {
-                EnsureContents();
-                return _directories.Select(i => i.Value);
-            }
-
-            public IEnumerable<IFile> EnumerateFiles()
-            {
-                EnsureContents();
-                return _files.Select(i => i.Value);
-            }
-
-            public IFile? GetFile(string name)
-            {
-                EnsureContents();
-                return _files.Select(i => i.Value).FirstOrDefault(i => i.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-            }
-
-            private void EnsureContents()
-            {
-                if (!_enumerated)
+                await EnsureContents();
+                foreach (var item in _directories.Select(i => i.Value))
                 {
-                    EnumerateContents();
+                    yield return item;
                 }
             }
 
-            private void EnumerateContents()
+            public async IAsyncEnumerable<IFile> EnumerateFiles()
+            {
+                await EnsureContents();
+                foreach (var item in _files.Select(i => i.Value))
+                {
+                    yield return item;
+                }
+            }
+
+            public async ValueTask<IFile?> GetFile(string name)
+            {
+                await EnsureContents();
+                return _files.Select(i => i.Value).FirstOrDefault(i => i.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            }
+
+            private async ValueTask EnsureContents()
+            {
+                if (!_enumerated)
+                {
+                    await EnumerateContents();
+                }
+            }
+
+            private async ValueTask EnumerateContents()
             {
                 var dirs = Enumerable.Empty<Lazy<IDirectory>>();
                 var files = Enumerable.Empty<Lazy<IFile>>();
 
-                foreach (var item in (_ref is null ? _client.Repository.Content.GetAllContents(_owner, _name, _path) : _client.Repository.Content.GetAllContentsByRef(_owner, _name, _path, _ref)).Result)
+                foreach (var item in await (_ref is null ? _client.Repository.Content.GetAllContents(_owner, _name, _path) : _client.Repository.Content.GetAllContentsByRef(_owner, _name, _path, _ref)))
                 {
                     if (item.Type.TryParse(out var type))
                     {
@@ -129,12 +135,12 @@ namespace HostConfigConsole
             public IDirectory? Directory
                 => _parent;
 
-            public Stream OpenRead()
-                => new MemoryStream(ReadAllBytes());
+            public async ValueTask<Stream> OpenRead()
+                => new MemoryStream(await ReadAllBytes());
 
-            public byte[] ReadAllBytes()
+            public async ValueTask<byte[]> ReadAllBytes()
             {
-                _data ??= (_ref is null ? _client.Repository.Content.GetRawContent(_owner, _name, _path) : _client.Repository.Content.GetRawContentByRef(_owner, _name, _path, _ref)).Result;
+                _data ??= await (_ref is null ? _client.Repository.Content.GetRawContent(_owner, _name, _path) : _client.Repository.Content.GetRawContentByRef(_owner, _name, _path, _ref));
                 return _data;
             }
         }
