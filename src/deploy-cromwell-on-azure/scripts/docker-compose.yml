@@ -6,6 +6,7 @@ services:
   tes:
     image: "$TesImageName"
     environment:
+      - ASPNETCORE_URLS=http://0.0.0.0:80/
       - DefaultStorageAccountName=$DefaultStorageAccountName
       - CosmosDbAccountName=$CosmosDbAccountName
       - BatchAccountName=$BatchAccountName

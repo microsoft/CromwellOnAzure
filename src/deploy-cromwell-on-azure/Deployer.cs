@@ -341,7 +341,7 @@ namespace CromwellOnAzureDeployer
                         }
                         else
                         {
-                            await UpgradeVMDeployment(resourceGroup, accountNames, sshConnectionInfo, storageAccount, cosmosDb);
+                            await UpgradeVMDeployment(resourceGroup, accountNames, sshConnectionInfo, storageAccount, cosmosDb, linuxVm);
                         }
                     }
 
@@ -858,9 +858,8 @@ namespace CromwellOnAzureDeployer
                 () => containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksClusterName, cluster));
         }
 
-        private async Task UpgradeVMDeployment(IResourceGroup resourceGroup, Dictionary<string, string> accountNames, ConnectionInfo sshConnectionInfo, IStorageAccount storageAccount, ICosmosDBAccount cosmosDb)
+        private async Task UpgradeVMDeployment(IResourceGroup resourceGroup, Dictionary<string, string> accountNames, ConnectionInfo sshConnectionInfo, IStorageAccount storageAccount, ICosmosDBAccount cosmosDb, IVirtualMachine linuxVm)
         {
-            IVirtualMachine linuxVm = null;
             IIdentity managedIdentity = null;
 
             await ConfigureVmAsync(sshConnectionInfo, null);
@@ -1262,7 +1261,7 @@ namespace CromwellOnAzureDeployer
 
             if (configuration.Update)
             {
-                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down");
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo systemctl stop cromwellazure");
             }
 
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
@@ -1968,11 +1967,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var initScript = GetInitSqlString();
 
-                    var commands = new List<string[]>() 
-                    {
-                        new string[] { "apt", "update" },
-                        new string[] { "apt", "install", "-y", "postgresql-client" },
-                    };
+                    var commands = new List<string[]>() {};
 
                     var serverPath = $"{configuration.PostgreSqlServerName}.postgres.database.azure.com";
                     var username = configuration.PostgreSqlAdministratorLogin;
@@ -1982,8 +1977,8 @@ namespace CromwellOnAzureDeployer
                         username = $"{configuration.PostgreSqlAdministratorLogin}@{configuration.PostgreSqlServerName}";
                     }
                     commands.Add(new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:5432:{configuration.PostgreSqlCromwellDatabaseName}:{username}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" });
-                    commands.Add(new string[] { "chmod", "0600", "/root/.pgpass" });
-                    commands.Add(new string[] { "psql", "-h", serverPath, "-U", username, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", initScript });
+                    commands.Add(new string[] { "chmod", "0600", "/home/tes/.pgpass" });
+                    commands.Add(new string[] { "/usr/bin/psql", "-h", serverPath, "-U", username, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", initScript });
 
                     await kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "tes", commands, System.TimeSpan.FromMinutes(5));
                 });
