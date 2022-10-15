@@ -626,6 +626,9 @@ namespace TesApi.Web
         public Task<string> DownloadBlobAsync(Uri blobAbsoluteUri)
             => new CloudBlockBlob(blobAbsoluteUri).DownloadTextAsync();
 
+        public Task<bool> BlobExistsAsync(Uri blobAbsoluteUri)
+            => new CloudBlockBlob(blobAbsoluteUri).ExistsAsync();
+
         /// <summary>
         /// Gets the list of blobs in the given directory
         /// </summary>
@@ -840,7 +843,7 @@ namespace TesApi.Web
         /// <param name="nodeInfo">Information about the pool to be created</param>
         /// <param name="dockerInDockerImageName">Image that contains Docker to download private images</param>
         /// <param name="blobxferImageName">Image name for blobxfer, the Azure storage transfer tool</param>
-        /// <param name="identityResourceId">The resource ID of a user-assigned managed identity to assign to the pool</param>
+        /// <param name="identityResourceIds">The resource IDs of user-assigned managed identities to assign to the pool</param>
         /// <param name="disableBatchNodesPublicIpAddress">True to remove the public IP address of the Batch node</param>
         /// <param name="batchNodesSubnetId">The subnet ID of the Batch VM in the pool</param>
         /// <param name="startTaskSasUrl">SAS URL for the start task</param>
@@ -854,7 +857,7 @@ namespace TesApi.Web
             BatchNodeInfo nodeInfo,
             string dockerInDockerImageName, 
             string blobxferImageName, 
-            string identityResourceId, 
+            IEnumerable<string> identityResourceIds, 
             bool disableBatchNodesPublicIpAddress, 
             string batchNodesSubnetId,
             string startTaskSasUrl,
@@ -875,16 +878,15 @@ namespace TesApi.Web
 
                 Microsoft.Azure.Management.Batch.Models.StartTask startTask = null;
 
-                //if (useStartTask)
-                //{
-                //    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
-                //    {
-                //        // Pool StartTask: install Docker as start task if it's not already
-                //        CommandLine = $"/bin/sh {startTaskPath}",
-                //        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
-                //        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
-                //    };
-                //}
+                if (!string.IsNullOrWhiteSpace(startTaskSasUrl) && !string.IsNullOrWhiteSpace(startTaskPath))
+                {
+                    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
+                    {
+                        CommandLine = $"/bin/sh {startTaskPath}",
+                        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
+                        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
+                    };
+                }
 
                 var containerRegistryInfo = await GetContainerRegistryInfoAsync(executorImage);
 
@@ -949,10 +951,7 @@ namespace TesApi.Web
                     Identity = new Microsoft.Azure.Management.Batch.Models.BatchPoolIdentity
                     {
                         Type = Microsoft.Azure.Management.Batch.Models.PoolIdentityType.UserAssigned,
-                        UserAssignedIdentities = new Dictionary<string, Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities>
-                        {
-                            [identityResourceId] = new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities()
-                        }
+                        UserAssignedIdentities = identityResourceIds.ToDictionary(x => x, x => new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities())
                     },
                     StartTask = startTask
                 };

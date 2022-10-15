@@ -69,6 +69,10 @@ spec:
               value: {{ .Values.config.marthaSecretName }}
             - name: UsePreemptibleVmsOnly
               value: {{ .Values.config.usePreemptibleVmsOnly | quote}}
+            - name: GlobalStartTaskPath
+              value: {{ .Values.config.globalStartTaskPath }}
+            - name: GlobalManagedIdentity
+              value: {{ .Values.config.batchManagedIdentity }}
             - name: ExternalStorageContainers
 {{- $containers  := list -}}
 {{- range .Values.externalSasContainers }}
