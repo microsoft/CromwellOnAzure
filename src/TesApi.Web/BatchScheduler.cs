@@ -51,7 +51,9 @@ namespace TesApi.Web
         private readonly string marthaUrl;
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
-        //private readonly string defaultStorageAccountName;
+        private readonly string defaultStorageAccountName;
+        private readonly string globalStartTaskPath;
+        private readonly string globalManagedIdentity;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -76,11 +78,13 @@ namespace TesApi.Web
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
             this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
-            //this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
+            this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
-            
+            this.globalStartTaskPath = StandardizeStartTaskPath(GetStringValue(configuration, "GlobalStartTaskPath", string.Empty), this.defaultStorageAccountName);
+            this.globalManagedIdentity = GetStringValue(configuration, "GlobalManagedIdentity", string.Empty);
+
             this.batchNodeInfo = new BatchNodeInfo
             {
                 BatchImageOffer = GetStringValue(configuration, "BatchImageOffer"),
@@ -255,6 +259,18 @@ namespace TesApi.Web
             return string.Join('/', pathComponents.Take(pathComponents.Length - 1));
         }
 
+        private static string StandardizeStartTaskPath(string startTaskPath, string defaultStorageAccount)
+        {
+            if (string.IsNullOrWhiteSpace(startTaskPath) || startTaskPath.StartsWith($"/{defaultStorageAccount}"))
+            {
+                return startTaskPath;
+            }
+            else
+            {
+                return $"/{defaultStorageAccount}{startTaskPath}";
+            }
+        }
+
         /// <summary>
         /// Determines if the <see cref="TesInput"/> file is a Cromwell command script
         /// </summary>
@@ -299,21 +315,34 @@ namespace TesApi.Web
 
                 PoolInformation poolInformation = null;
 
+                var identities = new List<string>();
+                
+                if (!string.IsNullOrWhiteSpace(globalManagedIdentity))
+                {
+                    identities.Add(globalManagedIdentity);
+                }
+
                 if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+                {
+                    identities.Add(tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity));
+                }
+
+                if (identities.Count > 0)
                 {
                     // Only create manual pool if an identity was specified
                     
                     // By default, the pool will have the same name/ID as the job
                     var poolName = jobId;
-                    var identityResourceId = tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity);
                     string startTaskSasUrl = null;
 
-                    //if (useStartTask)
-                    //{
-                    //    var scriptPath = $"{batchExecutionPath}/start-task.sh";
-                    //    await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.StartTaskScript);
-                    //    startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
-                    //}
+                    if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
+                    {
+                        startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
+                        if (!await azureProxy.BlobExistsAsync(new Uri(startTaskSasUrl)))
+                        {
+                            startTaskSasUrl = null;
+                        }
+                    }
 
                     await azureProxy.CreateManualBatchPoolAsync(
                         poolName: poolName,
@@ -323,7 +352,7 @@ namespace TesApi.Web
                         nodeInfo: batchNodeInfo,
                         dockerInDockerImageName: dockerInDockerImageName,
                         blobxferImageName: blobxferImageName,
-                        identityResourceId: identityResourceId,
+                        identityResourceId: identities,
                         disableBatchNodesPublicIpAddress: disableBatchNodesPublicIpAddress,
                         batchNodesSubnetId: batchNodesSubnetId,
                         startTaskSasUrl: startTaskSasUrl,
@@ -834,21 +863,21 @@ namespace TesApi.Web
                 nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
 
             StartTask startTask = null;
+            
+            if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
+            {
+                var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
 
-            //if (useStartTask)
-            //{
-            //    var scriptPath = $"{batchExecutionDirectoryPath}/{startTaskScriptFilename}";
-            //    await this.storageAccessProvider.UploadBlobAsync(scriptPath, BatchUtils.StartTaskScript);
-            //    var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(scriptPath);
-
-            //    startTask = new Microsoft.Azure.Batch.StartTask
-            //    {
-            //        // Pool StartTask: install Docker as start task if it's not already
-            //        CommandLine = $"sudo /bin/sh {batchStartTaskLocalPathOnBatchNode}",
-            //        UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
-            //        ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchStartTaskLocalPathOnBatchNode) }
-            //    };
-            //}
+                if (await azureProxy.BlobExistsAsync(new Uri(scriptSasUrl)))
+                {
+                    startTask = new Microsoft.Azure.Batch.StartTask
+                    {
+                        CommandLine = $"sudo /bin/sh {batchStartTaskLocalPathOnBatchNode}",
+                        UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                        ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchStartTaskLocalPathOnBatchNode) }
+                    };
+                }
+            }
 
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
 
