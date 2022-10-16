@@ -24,7 +24,7 @@ These packages will be deployed into the kube-system namespace.
 - ### Blob CSI Driver - https://github.com/kubernetes-sigs/blob-csi-driver/
     This is used to mount the storage account to the containers.
 - ### AAD Pod Identity - https://github.com/Azure/aad-pod-identity
-    This is used to assigned managed identities to the containers. 
+    This is used to assign managed identities to the containers. 
 
 ### Logs and troubleshooting
 For troubleshooting any of the CoA services, you can login directly to the pods or get logs using the kubectl program. The deployer will write a kubeconfig to the temp directory, either copy that file to ~/.kube/config for reference it manually for each command with --kubeconfig {temp-directory}/kubeconfig.txt. You can also run the command `az aks get-credentials --resource-group {coa-resource-group} --name {aks-account} --subscription {subscription-id} --file kubeconfig.txt` to get the file.
@@ -85,6 +85,6 @@ externalSasContainers:
     containerName: 
 ```
 
-To add new storage accounts, please update the aksValues.yaml according the above template and run the update. 
+To add new storage accounts, please update the aksValues.yaml according to the above template and run the update. 
 
 The default storage account will be mounted using either the internalContainersMIAuth or internalContainersKeyVaultAuth depending on if the CrossSubscriptionAKSDeployment flag was used during deployment.
