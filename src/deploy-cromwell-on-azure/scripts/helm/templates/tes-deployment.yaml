@@ -95,34 +95,4 @@ spec:
             capabilities:
               add:
                 - NET_BIND_SERVICE
-          volumeMounts:
-{{- range .Values.defaultContainers }}
-            - mountPath: {{.}}
-              name: {{.}}-claim1
-{{- end }}
-{{- range .Values.externalContainers }}
-            - mountPath: /{{.accountName}}/{{.containerName}}
-              name: {{.accountName}}-{{.containerName}}-claim1
-{{- end }}
-{{- range .Values.externalSasContainers }}
-            - mountPath: /{{.accountName}}/{{.containerName}}
-              name: {{.accountName}}-{{.containerName}}-claim1
-{{- end }}
-      restartPolicy: Always
-      volumes:
-{{- range .Values.defaultContainers }}
-        - name: {{.}}-claim1
-          persistentVolumeClaim:
-            claimName: {{.}}-claim1
-{{- end }}
-{{- range .Values.externalContainers }}
-        - name: {{.accountName}}-{{.containerName}}-claim1
-          persistentVolumeClaim:
-            claimName: {{.accountName}}-{{.containerName}}-claim1
-{{- end }}
-{{- range .Values.externalSasContainers }}
-        - name: {{.accountName}}-{{.containerName}}-claim1
-          persistentVolumeClaim:
-            claimName: {{.accountName}}-{{.containerName}}-claim1
-{{- end }}
 status: {}
