@@ -1324,6 +1324,7 @@ namespace CromwellOnAzureDeployer
                         (Utility.GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true)
                     }.Concat(!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault()
                         ? new[] {
+                        (Utility.GetFileContent("scripts", "env-12-local-my-sql-db.txt"), $"{CromwellAzureRootDir}/env-12-local-my-sql-db.txt", false),
                         (Utility.GetFileContent("scripts", "docker-compose.mysql.yml"), $"{CromwellAzureRootDir}/docker-compose.mysql.yml", false),
                         (Utility.GetFileContent("scripts", "mysql", "init-user.sql"), $"{CromwellAzureRootDir}/mysql-init/init-user.sql", false),
                         (Utility.GetFileContent("scripts", "mysql", "unlock-change-log.sql"), $"{CromwellAzureRootDir}/mysql-init/unlock-change-log.sql", false)
