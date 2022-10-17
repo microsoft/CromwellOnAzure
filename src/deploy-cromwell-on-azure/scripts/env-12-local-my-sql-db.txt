@@ -1,3 +1,2 @@
 ﻿MySqlImageName=mysql:latest
-MYSQL_ROOT_PASSWORD={DatabasePassword}
 WaitForMySqlDbCommand=/wait-for-it/wait-for-it.sh mysqldb:3306 -t 255 --
