@@ -54,7 +54,7 @@ If this item is included, it contains the following items:
 This is an array of URLs to download. The following items describe the download:
 * httpUrl - Required. The URL of the file to download.
 * filePath - Required. The location on the Compute Node to which to download the file(s), relative to the task's working directory. Must include the filename, and must be a relative path.
-* fileMode - Optional. The file permission mode attribute in octal format. Defaults to 0770 (aka ug+rw).
+* fileMode - Optional. The file permission mode attribute in octal format. Defaults to 0770 (aka ug+rwx).
 
 #### DockerRun
 Container invocation related info is provided here.

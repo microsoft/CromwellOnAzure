@@ -590,11 +590,11 @@ namespace HostConfigConsole
                 configText = default;
             }
 
-            return Updater.ReadJson(string.IsNullOrWhiteSpace(configText) ? default : new StringReader(configText), () => new HostConfig());
+            return Deployer.ReadJson(string.IsNullOrWhiteSpace(configText) ? default : new StringReader(configText), () => new HostConfig());
         }
 
         public async ValueTask WriteHostConfig(HostConfig config)
-            => await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, HostConfigConfigurationFileName, Updater.WriteJson(config));
+            => await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, HostConfigConfigurationFileName, Deployer.WriteJson(config));
 
         public async ValueTask AddApplications(IEnumerable<(string Name, string Version, Func<Stream> Open)> packages)
             => await Execute(

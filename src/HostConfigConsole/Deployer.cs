@@ -15,7 +15,7 @@ namespace HostConfigConsole
     /// <summary>
     /// Compares two <see cref="HostConfigurations"/> and updates deployments
     /// </summary>
-    public sealed class Updater : Base
+    public sealed class Deployer : Base
     {
         private readonly ReadOnlyHostConfig _existing;
         private readonly ReadOnlyHostConfig _target;
@@ -42,7 +42,7 @@ namespace HostConfigConsole
         public IEnumerable<string> GetStartTasksToRemove()
             => _existing.StartTaskHashes.Except(_target.StartTaskHashes);
 
-        public Updater(HostConfig target, IReadOnlyDictionary<string, Lazy<Stream>> resources, IReadOnlyDictionary<string, Lazy<Stream>> packageVersions, HostConfig? existing = default)
+        public Deployer(HostConfig target, IReadOnlyDictionary<string, Lazy<Stream>> resources, IReadOnlyDictionary<string, Lazy<Stream>> packageVersions, HostConfig? existing = default)
         {
             ArgumentNullException.ThrowIfNull(target);
             ArgumentNullException.ThrowIfNull(resources);
