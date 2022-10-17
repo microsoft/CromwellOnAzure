@@ -39,6 +39,7 @@ namespace TesApi.Web
         private const string BatchScriptFileName = "batch_script";
         private const string UploadFilesScriptFileName = "upload_files_script";
         private const string DownloadFilesScriptFileName = "download_files_script";
+        private const string startTaskScriptFilename = "start-task.sh";
         private static readonly Regex queryStringRegex = new(@"[^\?.]*(\?.*)");
         private readonly string dockerInDockerImageName;
         private readonly string blobxferImageName;
@@ -55,7 +56,9 @@ namespace TesApi.Web
         private readonly string marthaUrl;
         private readonly string marthaKeyVaultName;
         private readonly string marthaSecretName;
-        //private readonly string defaultStorageAccountName;
+        private readonly string defaultStorageAccountName;
+        private readonly string globalStartTaskPath;
+        private readonly string globalManagedIdentity;
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -80,10 +83,12 @@ namespace TesApi.Web
             this.blobxferImageName = GetStringValue(configuration, "BlobxferImageName", "mcr.microsoft.com/blobxfer");
             this.cromwellDrsLocalizerImageName = GetStringValue(configuration, "CromwellDrsLocalizerImageName", "broadinstitute/cromwell-drs-localizer:develop");
             this.disableBatchNodesPublicIpAddress = GetBoolValue(configuration, "DisableBatchNodesPublicIpAddress", false);
-            //this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
+            this.defaultStorageAccountName = GetStringValue(configuration, "DefaultStorageAccountName", string.Empty);
             this.marthaUrl = GetStringValue(configuration, "MarthaUrl", string.Empty);
             this.marthaKeyVaultName = GetStringValue(configuration, "MarthaKeyVaultName", string.Empty);
             this.marthaSecretName = GetStringValue(configuration, "MarthaSecretName", string.Empty);
+            this.globalStartTaskPath = StandardizeStartTaskPath(GetStringValue(configuration, "GlobalStartTaskPath", string.Empty), this.defaultStorageAccountName);
+            this.globalManagedIdentity = GetStringValue(configuration, "GlobalManagedIdentity", string.Empty);
 
             this.batchNodeInfo = new BatchNodeInfo
             {
@@ -257,6 +262,18 @@ namespace TesApi.Web
             return string.Join('/', pathComponents.Take(pathComponents.Length - 1));
         }
 
+        private static string StandardizeStartTaskPath(string startTaskPath, string defaultStorageAccount)
+        {
+            if (string.IsNullOrWhiteSpace(startTaskPath) || startTaskPath.StartsWith($"/{defaultStorageAccount}"))
+            {
+                return startTaskPath;
+            }
+            else
+            {
+                return $"/{defaultStorageAccount}{startTaskPath}";
+            }
+        }
+
         /// <summary>
         /// Determines if the <see cref="TesInput"/> file is a Cromwell command script
         /// </summary>
@@ -300,15 +317,39 @@ namespace TesApi.Web
 
                 // TODO?: Support for multiple executors. Cromwell has single executor per task.
                 var containerConfiguration = await GetContainerConfigurationIfNeeded(tesTask.Executors.First().Image);
+                string startTaskSasUrl = null;
+
+                if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
+                {
+                    startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
+                    if (!await azureProxy.BlobExistsAsync(new Uri(startTaskSasUrl)))
+                    {
+                        startTaskSasUrl = null;
+                    }
+                }
+
+                var identities = new List<string>();
+
+                if (!string.IsNullOrWhiteSpace(globalManagedIdentity))
+                {
+                    identities.Add(globalManagedIdentity);
+                }
+
+                if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+                {
+                    identities.Add(tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity));
+                }
 
                 poolInformation = await CreateAutoPoolModePoolInformation(
                     GetPoolSpecification(
                         virtualMachineInfo.VmSize,
                         virtualMachineInfo.LowPriority,
                         batchNodeInfo,
+                        startTaskSasUrl,
+                        startTaskScriptFilename,
                         containerConfiguration),
                     jobId,
-                    tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true ? tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) : default);
+                    identities);
 
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, containerConfiguration is not null);
 
@@ -914,13 +955,13 @@ namespace TesApi.Web
         /// </summary>
         /// <param name="poolSpecification"></param>
         /// <param name="jobId"></param>
-        /// <param name="identityResourceId"></param>
-        /// <remarks>If <paramref name="identityResourceId"/> is provided, <paramref name="jobId"/> must also be provided.</remarks>
+        /// <param name="identityResourceIds"></param>
+        /// <remarks>If <paramref name="identityResourceIds"/> is provided, <paramref name="jobId"/> must also be provided.</remarks>
         /// <returns>An Azure Batch Pool specifier</returns>
-        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(PoolSpecification poolSpecification, string jobId = null, string identityResourceId = null)
+        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(PoolSpecification poolSpecification, string jobId = null, IEnumerable<string> identityResourceIds = null)
         {
             // By default, the pool will have the same name/ID as the job if the identity is provided, otherwise we return an actual autopool.
-            return string.IsNullOrWhiteSpace(identityResourceId)
+            return identityResourceIds is null || !identityResourceIds.Any()
                 ? new()
                 {
                     AutoPoolSpecification = new()
@@ -935,7 +976,7 @@ namespace TesApi.Web
                     ConvertPoolSpecificationToModelsPool(
                         $"TES_{jobId ?? throw new ArgumentNullException(nameof(jobId))}",
                         jobId,
-                        GetBatchPoolIdentity(identityResourceId),
+                        GetBatchPoolIdentity(identityResourceIds),
                         poolSpecification),
                     IsPreemptable());
 
@@ -951,10 +992,10 @@ namespace TesApi.Web
         /// <summary>
         /// Generate the BatchPoolIdentity object
         /// </summary>
-        /// <param name="identityResourceId"></param>
+        /// <param name="identityResourceIds"></param>
         /// <returns></returns>
-        private static BatchModels.BatchPoolIdentity GetBatchPoolIdentity(string identityResourceId)
-            => string.IsNullOrWhiteSpace(identityResourceId) ? null : new(BatchModels.PoolIdentityType.UserAssigned, new Dictionary<string, BatchModels.UserAssignedIdentities>() { [identityResourceId] = new() });
+        private static BatchModels.BatchPoolIdentity GetBatchPoolIdentity(IEnumerable<string> identityResourceIds)
+            => identityResourceIds is null || !identityResourceIds.Any() ? null : new(BatchModels.PoolIdentityType.UserAssigned, identityResourceIds.ToDictionary(x => x, x => new BatchModels.UserAssignedIdentities()));
 
         /// <summary>
         /// Generate the PoolSpecification object
@@ -962,9 +1003,11 @@ namespace TesApi.Web
         /// <param name="vmSize"></param>
         /// <param name="preemptable"></param>
         /// <param name="nodeInfo"></param>
+        /// <param name="startTaskSasUrl"></param>
+        /// <param name="startTaskPath"></param>
         /// <param name="containerConfiguration"></param>
         /// <returns></returns>
-        private PoolSpecification GetPoolSpecification(string vmSize, bool preemptable, BatchNodeInfo nodeInfo, ContainerConfiguration containerConfiguration)
+        private PoolSpecification GetPoolSpecification(string vmSize, bool preemptable, BatchNodeInfo nodeInfo, string startTaskSasUrl, string startTaskPath, ContainerConfiguration containerConfiguration)
         {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
@@ -977,6 +1020,17 @@ namespace TesApi.Web
                 ContainerConfiguration = containerConfiguration
             };
 
+            StartTask startTask = default;
+            if (!string.IsNullOrWhiteSpace(startTaskSasUrl) && !string.IsNullOrWhiteSpace(startTaskPath))
+            {
+                startTask = new StartTask
+                {
+                    CommandLine = $"/bin/sudo /bin/sh {startTaskPath}",
+                    UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
+                    ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(startTaskSasUrl, startTaskPath) }
+                };
+            }
+
             var poolSpecification = new PoolSpecification
             {
                 VirtualMachineConfiguration = vmConfig,
@@ -985,6 +1039,7 @@ namespace TesApi.Web
                 AutoScaleEnabled = false,
                 TargetLowPriorityComputeNodes = preemptable == true ? 1 : 0,
                 TargetDedicatedComputeNodes = preemptable == false ? 1 : 0,
+                StartTask = startTask,
             };
 
             if (!string.IsNullOrEmpty(this.batchNodesSubnetId))

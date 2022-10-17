@@ -134,6 +134,13 @@ namespace TesApi.Web
         Task<string> DownloadBlobAsync(Uri blobAbsoluteUri);
 
         /// <summary>
+        /// Check if a blob exists.
+        /// </summary>
+        /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
+        /// <returns>Blob exists boolean.</returns>
+        Task<bool> BlobExistsAsync(Uri blobAbsoluteUri);
+
+        /// <summary>
         /// Gets the list of blobs in the given directory
         /// </summary>
         /// <param name="directoryUri">Directory Uri</param>

@@ -24,6 +24,8 @@ config:
   marthaUrl: RUNTIME_PARAMETER
   marthaKeyVaultName: RUNTIME_PARAMETER
   marthaSecretName: RUNTIME_PARAMETER
+  globalStartTaskPath: /configuration/start-task.sh
+  batchManagedIdentity:
 
 images:
   cromwell: RUNTIME_PARAMETER
