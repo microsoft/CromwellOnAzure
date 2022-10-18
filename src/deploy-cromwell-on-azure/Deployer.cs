@@ -213,7 +213,7 @@ namespace CromwellOnAzureDeployer
                                 storageAccount = storageAccounts.First();
                             }
 
-                            accountNames = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, cts), SettingsDelimiter);
+                            accountNames = await kubernetesManager.GetAKSSettings(storageAccount);
                         }
                         else
                         {
@@ -310,7 +310,8 @@ namespace CromwellOnAzureDeployer
                         {
                             if (accountNames.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
                             {
-                                configuration.CrossSubscriptionAKSDeployment = bool.Parse(crossSubscriptionAKSDeployment);
+                                bool.TryParse(crossSubscriptionAKSDeployment, out var parsed);
+                                configuration.CrossSubscriptionAKSDeployment = parsed;
                             }
 
                             if (accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
@@ -333,18 +334,17 @@ namespace CromwellOnAzureDeployer
                             }
 
                             // Override any configuration that is used by the update.
-                            var systemSettings = Utility.DelimitedTextToDictionary(await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, cts), SettingsDelimiter);
-                            var versionString = systemSettings["CromwellOnAzureVersion"];
+                            var aksValues = await kubernetesManager.GetAKSSettings(storageAccount);
+                            var versionString = aksValues["CromwellOnAzureVersion"];
                             var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
+                            var settings = ConfigureSettings(managedIdentity, aksValues, installedVersion);
 
                             await kubernetesManager.UpgradeAKSDeployment(
-                                GetPersonalizedSettings(managedIdentity, accountNames, installedVersion).Union(GetSystemSettings(systemSettings)).ToDictionary(kv => kv.Key, kv => kv.Value),
+                                settings,
                                 resourceGroup,
                                 storageAccount,
                                 managedIdentity,
                                 keyVaultUri);
-
-                            await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(systemSettings, SettingsDelimiter));
                         }
                         else
                         {
@@ -513,15 +513,14 @@ namespace CromwellOnAzureDeployer
                             ConsoleEx.WriteLine();
                             compute = Task.Run(async () =>
                             {
-                                var personalizedSettings = GetPersonalizedSettings(managedIdentity, default, default);
-                                var systemSettings = GetSystemSettings(default);
+                                var settings = ConfigureSettings(managedIdentity, default, default);
 
                                 if (aksCluster == null && !configuration.ManualHelmDeployment)
                                 {
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
-                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount.Name, keyVaultUri, resourceGroup.Name, personalizedSettings.Union(systemSettings).ToDictionary(kv => kv.Key, kv => kv.Value), managedIdentity);
+                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity);
 
                                 if (configuration.ManualHelmDeployment)
                                 {
@@ -535,9 +534,6 @@ namespace CromwellOnAzureDeployer
                                     await kubernetesManager.DeployCoADependencies();
                                     await kubernetesManager.DeployHelmChartToClusterAsync();
                                 }
-
-                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, PersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(personalizedSettings, SettingsDelimiter));
-                                await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, NonpersonalizedSettingsFileName, Utility.DictionaryToDelimitedText(systemSettings, SettingsDelimiter));
                             });
                         }
                         else
@@ -991,10 +987,10 @@ namespace CromwellOnAzureDeployer
             return settings;
         }
 
-        private Dictionary<string, string> GetSystemSettings(Dictionary<string, string> settings)
+        private Dictionary<string, string> ConfigureSettings(IIdentity managedIdentity, Dictionary<string, string> settings, Version installedVersion)
         {
             settings ??= new();
-            var defaults = GetDefaultValues(new[] { "env-00-coa-version.txt", "env-02-internal-images.txt", "env-03-external-images.txt", });
+            var defaults = GetDefaultValues(new [] { "env-00-coa-version.txt", "env-01-account-names.txt", "env-02-internal-images.txt", "env-03-external-images.txt", "env-04-settings.txt" });
 
             // We always overwrite the CoA version
             UpdateSetting(settings, defaults, "CromwellOnAzureVersion", default(string), ignoreDefaults: false);
@@ -1010,14 +1006,6 @@ namespace CromwellOnAzureDeployer
             UpdateSetting(settings, defaults, "BlobxferImageName", configuration.BlobxferImageName);
             UpdateSetting(settings, defaults, "DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress, b => b.GetValueOrDefault().ToString(), configuration.DisableBatchNodesPublicIpAddress.GetValueOrDefault().ToString());
 
-            BackFillSettings(settings, defaults);
-            return settings;
-        }
-
-        private Dictionary<string, string> GetPersonalizedSettings(IIdentity managedIdentity, Dictionary<string, string> settings, Version installedVersion)
-        {
-            settings ??= new();
-            var defaults = GetDefaultValues(new [] { "env-01-account-names.txt", "env-04-settings.txt" });
 
             if (installedVersion is null)
             {
@@ -1031,7 +1019,6 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "AksCoANamespace", configuration.AksCoANamespace, ignoreDefaults: true);
 
                 var provisionPostgreSqlOnAzure = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault();
-                UpdateSetting(settings, defaults, "ProvisionPostgreSqlOnAzure", configuration.ProvisionPostgreSqlOnAzure);
                 UpdateSetting(settings, defaults, "CrossSubscriptionAKSDeployment", configuration.CrossSubscriptionAKSDeployment);
                 UpdateSetting(settings, defaults, "PostgreSqlServerName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlServerName : string.Empty, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlDatabaseName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellDatabaseName : string.Empty, ignoreDefaults: true);
@@ -1300,7 +1287,7 @@ namespace CromwellOnAzureDeployer
 
             if (configuration.Update)
             {
-                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo docker-compose -f {CromwellAzureRootDirSymLink}/docker-compose.yml down --remove-orphans");
+                await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"sudo systemctl stop cromwellazure");
             }
 
             await MountDataDiskOnTheVirtualMachineAsync(sshConnectionInfo);
@@ -2011,13 +1998,7 @@ namespace CromwellOnAzureDeployer
                 async () =>
                 {
                     var initScript = GetInitSqlString();
-
-                    var commands = new List<string[]>()
-                    {
-                        new string[] { "apt", "update" },
-                        new string[] { "apt", "install", "-y", "postgresql-client" },
-                    };
-
+                    var commands = new List<string[]>() {};
                     var serverPath = $"{configuration.PostgreSqlServerName}.postgres.database.azure.com";
                     var username = configuration.PostgreSqlAdministratorLogin;
 
@@ -2026,8 +2007,8 @@ namespace CromwellOnAzureDeployer
                         username = $"{configuration.PostgreSqlAdministratorLogin}@{configuration.PostgreSqlServerName}";
                     }
                     commands.Add(new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:5432:{configuration.PostgreSqlCromwellDatabaseName}:{username}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" });
-                    commands.Add(new string[] { "chmod", "0600", "/root/.pgpass" });
-                    commands.Add(new string[] { "psql", "-h", serverPath, "-U", username, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", initScript });
+                    commands.Add(new string[] { "chmod", "0600", "/home/tes/.pgpass" });
+                    commands.Add(new string[] { "/usr/bin/psql", "-h", serverPath, "-U", username, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", initScript });
 
                     await kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "tes", commands, System.TimeSpan.FromMinutes(5));
                 });
@@ -2822,19 +2803,31 @@ namespace CromwellOnAzureDeployer
 
             if (!configuration.Update)
             {
-                ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
                 ValidateDependantFeature(configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault(), nameof(configuration.CrossSubscriptionAKSDeployment), configuration.UseAks, nameof(configuration.UseAks));
             }
 
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTesImagePath != null, nameof(configuration.CustomTesImagePath));
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTriggerServiceImagePath != null, nameof(configuration.CustomTriggerServiceImagePath));
             ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomCromwellImagePath != null, nameof(configuration.CustomCromwellImagePath));
-            ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), !string.IsNullOrWhiteSpace(configuration.HelmBinaryPath), nameof(configuration.HelmBinaryPath));
 
             if (configuration.UseAks)
             {
                 ThrowIfNotProvidedForUpdate(configuration.AksClusterName, nameof(configuration.AksClusterName));
-                ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
+
+                if (!configuration.ManualHelmDeployment)
+                {
+                    ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), !string.IsNullOrWhiteSpace(configuration.HelmBinaryPath), nameof(configuration.HelmBinaryPath));
+                    ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
+                }
+
+                if (configuration.ProvisionPostgreSqlOnAzure is null)
+                {
+                    configuration.ProvisionPostgreSqlOnAzure = true;
+                }
+                else if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                {
+                    ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
+                }
             }
         }
 
@@ -3095,16 +3088,22 @@ namespace CromwellOnAzureDeployer
             return (await container.GetBlobClient(blobName).DownloadContentAsync(cts.Token)).Value.Content.ToString();
         }
 
-        private Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
-            => UploadBinaryToStorageAccountAsync(storageAccount, containerName, blobName, BinaryData.FromString(content));
+        private async Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
+            => await UploadTextToStorageAccountAsync(storageAccount, containerName, blobName, content, cts.Token);
 
-        private async Task UploadBinaryToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, BinaryData content)
+        internal static Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content, CancellationToken token)
+            => UploadBinaryToStorageAccountAsync(storageAccount, containerName, blobName, BinaryData.FromString(content), token);
+
+        //private async Task UploadBinaryToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, BinaryData content)
+        //    => await UploadBinaryToStorageAccountAsync(storageAccount, containerName, blobName, content, cts.Token);
+
+        internal static async Task UploadBinaryToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, BinaryData content, CancellationToken token)
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
             await container.CreateIfNotExistsAsync();
-            await container.GetBlobClient(blobName).UploadAsync(content, true, cts.Token);
+            await container.GetBlobClient(blobName).UploadAsync(content, true, token);
         }
 
         private static string GetLinuxParentPath(string path)

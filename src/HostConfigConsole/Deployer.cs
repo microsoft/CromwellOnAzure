@@ -8,6 +8,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using Azure.Storage.Blobs;
+using Azure.Storage;
 using Common.HostConfigs;
 
 namespace HostConfigConsole
@@ -92,6 +94,41 @@ namespace HostConfigConsole
                 ArgumentNullException.ThrowIfNull(obj);
                 throw new NotImplementedException();
             }
+        }
+    }
+}
+
+namespace CromwellOnAzureDeployer
+{
+    internal static class Deployer
+    {
+        public const string ConfigurationContainerName = "configuration";
+
+        private static async Task<BlobServiceClient> GetBlobClientAsync(Microsoft.Azure.Management.Storage.Fluent.IStorageAccount storageAccount)
+            => new(
+                new Uri($"https://{storageAccount.Name}.blob.core.windows.net"),
+                new StorageSharedKeyCredential(
+                    storageAccount.Name,
+                    (await storageAccount.GetKeysAsync())[0].Value));
+
+        internal static Task UploadTextToStorageAccountAsync(Microsoft.Azure.Management.Storage.Fluent.IStorageAccount storageAccount, string containerName, string blobName, string content, CancellationToken token)
+            => UploadBinaryToStorageAccountAsync(storageAccount, containerName, blobName, BinaryData.FromString(content), token);
+
+        internal static async Task UploadBinaryToStorageAccountAsync(Microsoft.Azure.Management.Storage.Fluent.IStorageAccount storageAccount, string containerName, string blobName, BinaryData content, CancellationToken token)
+        {
+            var blobClient = await GetBlobClientAsync(storageAccount);
+            var container = blobClient.GetBlobContainerClient(containerName);
+
+            await container.CreateIfNotExistsAsync();
+            await container.GetBlobClient(blobName).UploadAsync(content, true, token);
+        }
+
+        internal static async Task<string> DownloadTextFromStorageAccountAsync(Microsoft.Azure.Management.Storage.Fluent.IStorageAccount storageAccount, string containerName, string blobName, CancellationTokenSource cts)
+        {
+            var blobClient = await GetBlobClientAsync(storageAccount);
+            var container = blobClient.GetBlobContainerClient(containerName);
+
+            return (await container.GetBlobClient(blobName).DownloadContentAsync(cts.Token)).Value.Content.ToString();
         }
     }
 }

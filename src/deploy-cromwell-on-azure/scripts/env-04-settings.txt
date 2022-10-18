@@ -12,3 +12,5 @@ Name={DefaultName}
 MarthaUrl=
 MarthaKeyVaultName=
 MarthaSecretName=
+GlobalStartTaskPath=/configuration/start-task.sh
+GlobalManagedIdentity=

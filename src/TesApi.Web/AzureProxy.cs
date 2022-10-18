@@ -590,6 +590,10 @@ namespace TesApi.Web
             => new CloudBlockBlob(blobAbsoluteUri).DownloadTextAsync();
 
         /// <inheritdoc/>
+        public Task<bool> BlobExistsAsync(Uri blobAbsoluteUri)
+            => new CloudBlockBlob(blobAbsoluteUri).ExistsAsync();
+
+        /// <inheritdoc/>
         public async Task<IEnumerable<string>> ListBlobsAsync(Uri directoryUri)
         {
             var blob = new CloudBlockBlob(directoryUri);
@@ -803,7 +807,6 @@ namespace TesApi.Web
             try
             {
                 var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
-
                 var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = subscriptionId };
                 logger.LogInformation($"Creating manual batch pool named {poolInfo.Name} with vmSize {poolInfo.VmSize} and low priority {isPreemptable}");
                 var pool = await batchManagementClient.Pool.CreateAsync(batchResourceGroupName, batchAccountName, poolInfo.Name, poolInfo);

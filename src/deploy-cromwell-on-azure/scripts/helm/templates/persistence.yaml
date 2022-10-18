@@ -58,6 +58,9 @@ parameters:
   resourceGroup: {{ .resourceGroup }}
   storageAccount: {{ .accountName }}
   containerName: {{ .containerName }}
+mountOptions:
+  - -o allow_other
+  - --file-cache-timeout-in-seconds=120
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -94,6 +97,9 @@ spec:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain  # If set as "Delete" container would be removed after pvc deletion
   storageClassName: blob-fuse
+  mountOptions:
+    - -o allow_other
+    - --file-cache-timeout-in-seconds=120
   csi:
     driver: blob.csi.azure.com
     readOnly: false
@@ -142,6 +148,9 @@ parameters:
   resourceGroup: {{ .resourceGroup }}
   storageAccount: {{ .accountName }}
   containerName: {{ .containerName }}
+mountOptions:
+  - -o allow_other
+  - --file-cache-timeout-in-seconds=120
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -177,6 +186,9 @@ spec:
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - -o allow_other
+    - --file-cache-timeout-in-seconds=120
   csi:
     driver: blob.csi.azure.com
     readOnly: false
