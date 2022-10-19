@@ -19,7 +19,6 @@ namespace TesApi.Web
         // In FULL view, task message will include all fields EXCEPT custom fields added to support running TES with Cromwell on Azure
         private static readonly List<Tuple<Type, string>> PropertiesToSkip = new()
         {
-                Tuple.Create(typeof(TesTask), nameof(TesTask.IsCancelRequested)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.ErrorCount)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.EndTime)),
                 Tuple.Create(typeof(TesTask), nameof(TesTask.WorkflowId)),
