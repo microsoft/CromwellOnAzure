@@ -2348,6 +2348,7 @@ namespace CromwellOnAzureDeployer
                     async () =>
                     {
                         var envSettings = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt")).Output);
+                        // [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Previously hardcoded password only accessible within security context.")]
                         envSettings["MYSQL_ROOT_PASSWORD"] = "cromwell";
                         await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.DictionaryToDelimitedText(envSettings), $"{CromwellAzureRootDir}/env-04-settings.txt", false));
                     }
