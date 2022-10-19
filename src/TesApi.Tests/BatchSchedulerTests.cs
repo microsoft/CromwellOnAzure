@@ -190,8 +190,8 @@ namespace TesApi.Tests
             }
             finally
             {
-                var versionsFile = new FileInfo(Path.Combine(AppContext.BaseDirectory, @"HostConfigs", @"Versions.json"));
-                if (versionsFile.Exists) { versionsFile.Delete(); }
+                var hostConfigsDir = new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, @"HostConfigs"));
+                if (hostConfigsDir.Exists) { hostConfigsDir.Delete(true); }
             }
         }
 
@@ -412,6 +412,197 @@ namespace TesApi.Tests
             Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/batch_script")));
             Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/upload_files_script")));
             Assert.IsTrue(cloudTask.ResourceFiles.Any(f => f.FilePath.Equals("cromwell-executions/workflow1/workflowId1/call-Task1/execution/__batch/download_files_script")));
+        }
+
+        //[TestCategory("HostConfig")]
+        //[TestMethod]
+        //public async Task HostConfigBatchJobContainsExpectedBatchPoolInformationWindows()
+        //{
+        //    try
+        //    {
+        //        var hostConfigs = new HostConfig()
+        //        {
+        //            ApplicationVersions = new() { { "config1_start", new() { ApplicationId = "app1", Packages = new() { { "ver1", new() { ContainsTaskScript = true } } } } } },
+        //            PackageHashes = new() { { "config1_start", "ver1" } },
+        //            HostConfigurations = new() { { "config1", new()
+        //            {
+        //                BatchImage = new() { NodeAgentSkuId = "batch.node.windows amd64", ImageReference = new() { Offer = "WindowsServer", Publisher = "MicrosoftWindowsServer", Sku = "2012-Datacenter", Version = "latest" } },
+        //                StartTask = new()
+        //            } } }
+        //        };
+
+        //        var tesTask = GetTesTask();
+        //        tesTask.Resources.BackendParameters = new()
+        //        {
+        //            { TesResources.SupportedBackendParameters.docker_host_configuration.ToString(), "config1" }
+        //        };
+        //        using var serviceProvider = GetServiceProvider(
+        //            GetMockConfig(false)(),
+        //            GetMockAzureProxy(AzureProxyReturnValues.Defaults),
+        //            storage =>
+        //            {
+        //                storage.Setup(a => a.TryDownloadBlobAsync(It.IsAny<string>(), It.IsAny<Action<string>>()))
+        //                    .Callback<string, Action<string>>((blobRelativePath, action) => action?.Invoke(BatchUtils.WriteJson(hostConfigs)))
+        //                    .Returns(Task.FromResult(true));
+        //                storage.Setup(a => a.MapLocalPathToSasUrlAsync(It.IsAny<string>(), It.IsAny<bool>()))
+        //                     .Returns(Task.FromResult("https://storageaccount1.blob.core.windows.net/container1/blob1?sig=sassignature"));
+        //            });
+        //        var batchScheduler = serviceProvider.GetT();
+
+        //        await batchScheduler.ProcessTesTaskAsync(tesTask);
+
+        //        var createBatchPoolAsyncInvocation = serviceProvider.AzureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.CreateBatchPoolAsync));
+        //        var createBatchJobAsyncInvocation = serviceProvider.AzureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.CreateBatchJobAsync));
+
+        //        var cloudTask = createBatchJobAsyncInvocation?.Arguments[1] as CloudTask;
+        //        var poolInformation = createBatchJobAsyncInvocation?.Arguments[2] as PoolInformation;
+        //        var pool = createBatchPoolAsyncInvocation?.Arguments[0] as Pool;
+
+        //        Assert.IsNull(poolInformation.AutoPoolSpecification);
+        //        Assert.IsNotNull(poolInformation.PoolId);
+        //        Assert.AreEqual("hostname-dicated1-VTLHYLZ6TCZTQRE7KVU4Q3Y3UUPHEDZB-", poolInformation.PoolId[0..^13]);
+        //        Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
+        //        Assert.IsTrue(batchScheduler.TryGetPool(poolInformation.PoolId, out _));
+        //        Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
+        //        Assert.IsNotNull(pool.StartTask);
+        //        Assert.IsNotNull(pool.StartTask.EnvironmentSettings);
+        //        Assert.AreEqual(2, pool.StartTask.EnvironmentSettings.Count);
+        //        Assert.IsTrue(pool.StartTask.EnvironmentSettings.Any(t => t.Name.Equals("docker_host_application")));
+        //        Assert.AreEqual("AZ_BATCH_APP_PACKAGE_APP1#VER1", pool.StartTask.EnvironmentSettings.FirstOrDefault(t => t.Name.Equals("docker_host_application")).Value);
+        //    }
+        //    finally
+        //    {
+        //        var hostConfigsDir = new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, @"HostConfigs"));
+        //        if (hostConfigsDir.Exists) { hostConfigsDir.Delete(true); }
+        //    }
+        //}
+
+        [TestCategory("HostConfig")]
+        [TestMethod]
+        public async Task HostConfigBatchJobContainsExpectedBatchPoolInformationLinuxFile()
+        {
+            try
+            {
+                var hostConfigs = new HostConfig()
+                {
+                    HostConfigurations = new() { { "config1", new()
+                    {
+                        BatchImage = new() { NodeAgentSkuId = "batch.node.debian 8", ImageReference = new() { Offer = "Debian", Publisher = "Credativ", Sku = "8", Version = "latest" } },
+                        StartTask = new() { StartTaskHash = "hash1" }
+                    } } }
+                };
+
+                var tesTask = GetTesTask();
+                tesTask.Resources.BackendParameters = new()
+                {
+                    { TesResources.SupportedBackendParameters.docker_host_configuration.ToString(), "config1" }
+                };
+                using var serviceProvider = GetServiceProvider(
+                    GetMockConfig(false)(),
+                    GetMockAzureProxy(AzureProxyReturnValues.Defaults),
+                    storage =>
+                    {
+                        storage.Setup(a => a.TryDownloadBlobAsync(It.IsAny<string>(), It.IsAny<Action<string>>()))
+                            .Callback<string, Action<string>>((blobRelativePath, action) => action?.Invoke(BatchUtils.WriteJson(hostConfigs)))
+                            .Returns(Task.FromResult(true));
+                        storage.Setup(a => a.MapLocalPathToSasUrlAsync(It.IsAny<string>(), It.IsAny<bool>()))
+                             .Returns(Task.FromResult("https://storageaccount1.blob.core.windows.net/container1/blob1?sig=sassignature"));
+                        storage.Setup(a => a.MapLocalPathToSasUrlAsync(It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<bool>()))
+                             .Returns(Task.FromResult("https://storageaccount1.blob.core.windows.net/container1/blob1?sig=sassignature"));
+                    });
+                var batchScheduler = serviceProvider.GetT();
+
+                await batchScheduler.ProcessTesTaskAsync(tesTask);
+
+                var createBatchPoolAsyncInvocation = serviceProvider.AzureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.CreateBatchPoolAsync));
+                var createBatchJobAsyncInvocation = serviceProvider.AzureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.CreateBatchJobAsync));
+
+                var cloudTask = createBatchJobAsyncInvocation?.Arguments[1] as CloudTask;
+                var poolInformation = createBatchJobAsyncInvocation?.Arguments[2] as PoolInformation;
+                var pool = createBatchPoolAsyncInvocation?.Arguments[0] as Pool;
+
+                Assert.IsNull(poolInformation.AutoPoolSpecification);
+                Assert.IsNotNull(poolInformation.PoolId);
+                Assert.AreEqual("hostname-dicated1-VTLHYLZ6TCZTQRE7KVU4Q3Y3UUPHEDZB-", poolInformation.PoolId[0..^13]);
+                Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
+                Assert.IsTrue(batchScheduler.TryGetPool(poolInformation.PoolId, out _));
+                Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
+                Assert.IsNotNull(pool.StartTask);
+                Assert.IsNotNull(pool.StartTask.EnvironmentSettings);
+                Assert.AreEqual(1, pool.StartTask.EnvironmentSettings.Count);
+                Assert.AreEqual(1, pool.StartTask.ResourceFiles.Count);
+                Assert.IsNotNull(pool.StartTask.ResourceFiles.First().HttpUrl);
+                Assert.AreEqual("start-task.sh", pool.StartTask.ResourceFiles.First().FilePath);
+                Assert.AreEqual("0755", pool.StartTask.ResourceFiles.First().FileMode);
+            }
+            finally
+            {
+                var hostConfigsDir = new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, @"HostConfigs"));
+                if (hostConfigsDir.Exists) { hostConfigsDir.Delete(true); }
+            }
+        }
+
+        [TestCategory("HostConfig")]
+        [TestMethod]
+        public async Task HostConfigBatchJobContainsExpectedBatchPoolInformationLinuxApplication()
+        {
+            try
+            {
+                var hostConfigs = new HostConfig()
+                {
+                    ApplicationVersions = new() { { "config1_start", new() { ApplicationId = "app1", Packages = new() { { "ver1", new() { ContainsTaskScript = true } } } } } },
+                    PackageHashes = new() { { "config1_start", "ver1" } },
+                    HostConfigurations = new() { { "config1", new()
+                    {
+                        BatchImage = new() { NodeAgentSkuId = "batch.node.debian 8", ImageReference = new() { Offer = "Debian", Publisher = "Credativ", Sku = "8", Version = "latest" } },
+                        StartTask = new()
+                    } } }
+                };
+
+                var tesTask = GetTesTask();
+                tesTask.Resources.BackendParameters = new()
+                {
+                    { TesResources.SupportedBackendParameters.docker_host_configuration.ToString(), "config1" }
+                };
+                using var serviceProvider = GetServiceProvider(
+                    GetMockConfig(false)(),
+                    GetMockAzureProxy(AzureProxyReturnValues.Defaults),
+                    storage =>
+                    {
+                        storage.Setup(a => a.TryDownloadBlobAsync(It.IsAny<string>(), It.IsAny<Action<string>>()))
+                            .Callback<string, Action<string>>((blobRelativePath, action) => action?.Invoke(BatchUtils.WriteJson(hostConfigs)))
+                            .Returns(Task.FromResult(true));
+                        storage.Setup(a => a.MapLocalPathToSasUrlAsync(It.IsAny<string>(), It.IsAny<bool>()))
+                             .Returns(Task.FromResult("https://storageaccount1.blob.core.windows.net/container1/blob1?sig=sassignature"));
+                    });
+                var batchScheduler = serviceProvider.GetT();
+
+                await batchScheduler.ProcessTesTaskAsync(tesTask);
+
+                var createBatchPoolAsyncInvocation = serviceProvider.AzureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.CreateBatchPoolAsync));
+                var createBatchJobAsyncInvocation = serviceProvider.AzureProxy.Invocations.FirstOrDefault(i => i.Method.Name == nameof(IAzureProxy.CreateBatchJobAsync));
+
+                var cloudTask = createBatchJobAsyncInvocation?.Arguments[1] as CloudTask;
+                var poolInformation = createBatchJobAsyncInvocation?.Arguments[2] as PoolInformation;
+                var pool = createBatchPoolAsyncInvocation?.Arguments[0] as Pool;
+
+                Assert.IsNull(poolInformation.AutoPoolSpecification);
+                Assert.IsNotNull(poolInformation.PoolId);
+                Assert.AreEqual("hostname-dicated1-VTLHYLZ6TCZTQRE7KVU4Q3Y3UUPHEDZB-", poolInformation.PoolId[0..^13]);
+                Assert.AreEqual("VmSizeDedicated1", pool.VmSize);
+                Assert.IsTrue(batchScheduler.TryGetPool(poolInformation.PoolId, out _));
+                Assert.AreEqual(1, pool.DeploymentConfiguration.VirtualMachineConfiguration.ContainerConfiguration.ContainerRegistries.Count);
+                Assert.IsNotNull(pool.StartTask);
+                Assert.IsNotNull(pool.StartTask.EnvironmentSettings);
+                Assert.AreEqual(2, pool.StartTask.EnvironmentSettings.Count);
+                Assert.IsTrue(pool.StartTask.EnvironmentSettings.Any(t => t.Name.Equals("docker_host_application")));
+                Assert.AreEqual("AZ_BATCH_APP_PACKAGE_app1_ver1", pool.StartTask.EnvironmentSettings.FirstOrDefault(t => t.Name.Equals("docker_host_application")).Value);
+            }
+            finally
+            {
+                var hostConfigsDir = new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, @"HostConfigs"));
+                if (hostConfigsDir.Exists) { hostConfigsDir.Delete(true); }
+            }
         }
 
         [TestCategory("Batch Pools")]
@@ -1176,8 +1367,8 @@ namespace TesApi.Tests
             return (jobId, cloudTask, poolInformation, batchModelsPool);
         }
 
-        private static TestServices.TestServiceProvider<BatchScheduler> GetServiceProvider(IEnumerable<(string Key, string Value)> configuration, Action<Mock<IAzureProxy>> azureProxy)
-            => new(wrapAzureProxy: true, configuration: configuration, azureProxy: azureProxy, batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
+        private static TestServices.TestServiceProvider<BatchScheduler> GetServiceProvider(IEnumerable<(string Key, string Value)> configuration, Action<Mock<IAzureProxy>> azureProxy, Action<Mock<IStorageAccessProvider>> storageAccessProvider = default)
+            => new(mockStorageAccessProvider: storageAccessProvider is not null, wrapAzureProxy: true, configuration: configuration, azureProxy: azureProxy, batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"), storageAccessProvider: storageAccessProvider);
 
         private static async Task<TesState> GetNewTesTaskStateAsync(TesTask tesTask, AzureProxyReturnValues azureProxyReturnValues)
         {

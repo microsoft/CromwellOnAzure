@@ -1164,7 +1164,7 @@ namespace TesApi.Web
                         ApplicationPackageReference appPkg = default;
                         try
                         {
-                            var (Id, Version, Variable) = BatchUtils.GetBatchApplicationForHostConfigTask(hostConfigKey, "start");
+                            var (Id, Version, Variable) = BatchUtils.GetBatchApplicationForHostConfigTask(hostConfigKey, "start", BatchUtils.IsComputeNodeWindows(batchResult?.Value.BatchNodeAgentSkuId));
                             appPkg = new ApplicationPackageReference { ApplicationId = Id, Version = Version };
                             appDir = Variable;
                             isScriptInApp = BatchUtils.DoesHostConfigTaskIncludeTaskScript(hostConfigKey, "start");

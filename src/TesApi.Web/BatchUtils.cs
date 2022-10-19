@@ -6,6 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Common.HostConfigs;
 using Newtonsoft.Json;
 
@@ -61,6 +62,22 @@ namespace TesApi.Web
             => FindMetadata($"{host}_{task}").ContainsTaskScript;
 
         /// <summary>
+        /// Determines if compute node will be running Windows
+        /// </summary>
+        /// <param name="nodeAgentSKUId">Node agent SKU Id</param>
+        /// <returns>True if running Windows, false otherwise.</returns>
+        public static bool IsComputeNodeWindows(string nodeAgentSKUId)
+        {
+            if (string.IsNullOrWhiteSpace(nodeAgentSKUId))
+            {
+                return false;
+            }
+
+            var regex = new Regex(@"^batch\.node\.(\w+)", RegexOptions.CultureInvariant);
+            return regex.IsMatch(nodeAgentSKUId) && regex.Match(nodeAgentSKUId).Groups["1"].Value.Equals("windows");
+        }
+
+        /// <summary>
         /// Gets the environment variable on the compute node where the application's contents will be provided.
         /// </summary>
         /// <param name="host">The <seealso cref="Tes.Models.TesResources.BackendParameters"/> <see cref="Tes.Models.TesResources.SupportedBackendParameters.docker_host_configuration"/> value</param>
@@ -70,23 +87,20 @@ namespace TesApi.Web
         public static (string Id, string Version, string Variable) GetBatchApplicationForHostConfigTask(string host, string task, bool isWindows = false)
         {
             var metadata = FindMetadata($"{host}_{task}");
-            var version = metadata.Version ?? throw new KeyNotFoundException();
+            var version = metadata.Version ?? throw new KeyNotFoundException("Batch Application Version not found.");
             var variable = $"AZ_BATCH_APP_PACKAGE_{metadata.ServerAppName}#{version}";
             return (metadata.ServerAppName, version, isWindows ? variable.ToUpperInvariant() : variable.Replace('.', '_').Replace('-', '_').Replace('#', '_'));
         }
 
         private static (string Version, bool ContainsTaskScript, string ServerAppName) FindMetadata(string name)
         {
-            string hashVal = default;
-            ApplicationVersion appVersions = default;
-            Package package = default;
-            var version = GetApplicationPayloadHashes()?.TryGetValue(name, out hashVal) ?? false
+            var version = GetApplicationPayloadHashes()?.TryGetValue(name, out var hashVal) ?? false
                 ? hashVal
                 : null;
             return version is null
                 ? default
-                : GetBatchApplicationVersions()?.TryGetValue(name, out appVersions) ?? false
-                    ? appVersions.Packages?.TryGetValue(version, out package) ?? false
+                : GetBatchApplicationVersions()?.TryGetValue(name, out var appVersions) ?? false
+                    ? appVersions.Packages?.TryGetValue(version, out var package) ?? false
                         ? (version, package.ContainsTaskScript, appVersions.ApplicationId)
                         : default
                     : default;
