@@ -1341,13 +1341,13 @@ namespace CromwellOnAzureDeployer
 
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
         {
-            var env04Settings = Utility.GetFileContent("scripts", "env-04-settings.txt");
+            var env04SettingsContent = Utility.GetFileContent("scripts", "env-04-settings.txt");
 
             if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
             {
-                var env04SettingsAsDir = Utility.DelimitedTextToDictionary(env04Settings);
-                env04SettingsAsDir["MYSQL_ROOT_PASSWORD"] = Utility.GeneratePassword();
-                env04Settings = Utility.DictionaryToDelimitedText(env04SettingsAsDir);
+                var env04Settings = Utility.DelimitedTextToDictionary(env04SettingsContent);
+                env04Settings["MYSQL_ROOT_PASSWORD"] = Utility.GeneratePassword();
+                env04SettingsContent = Utility.DictionaryToDelimitedText(env04Settings);
             }
 
             var uploadList = new List<(string, string, bool)>
@@ -1363,7 +1363,7 @@ namespace CromwellOnAzureDeployer
                 }, "scripts", "env-01-account-names.txt"),
                 $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
-                (env04Settings, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                (env04SettingsContent, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
             };
 
             if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
