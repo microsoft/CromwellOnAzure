@@ -19,7 +19,7 @@ namespace HostConfigConsole
 
             removeAppsOption.AddValidator(results =>
             {
-                if (results.GetValueForOption(removeAppsOption) && !results.GetValueForOption(removeFilesOption))
+                if (results.GetValueForOption(removeAppsOption).GetValueOrDefault() && !results.GetValueForOption(removeFilesOption).GetValueOrDefault())
                 {
                     Console.WriteLine("WARNING: --remove-obsolete-apps is set while --remove-obsolete-files is not set. This is not a generally expected use cage.");
                     Console.WriteLine();
@@ -40,13 +40,13 @@ namespace HostConfigConsole
         private readonly Argument<string[]> cmdArgs
             = new("deployer-update-args", "Arguments passed to the deployer (deploy-cromwell-on-azure) to update the intended deployment. Some (or all) can also be passed via 'config.json'. It is highly recommended to place after all options and prefix with '--'.");
 
-        private readonly Option<FileInfo> inFileOption
+        private readonly Option<FileInfo?> inFileOption
             = new(new[] { "--input", "-i" }, "Path to output file (used to stage metadata for the update command).");
 
-        private readonly Option<bool> removeFilesOption
+        private readonly Option<bool?> removeFilesOption
             = new("--remove-obsolete-files", "Removes obsolete task script files.");
 
-        private readonly Option<bool> removeAppsOption
+        private readonly Option<bool?> removeAppsOption
             = new("--remove-obsolete-apps", "Removes obsolete application packages. (This can be particularly dangerous with shared batch accounts).");
 
         private sealed class CommandHandler : CommandHandler<bool?, bool?, FileInfo?, string[]>, BaseCommand

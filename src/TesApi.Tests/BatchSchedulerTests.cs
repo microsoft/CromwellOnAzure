@@ -42,7 +42,7 @@ namespace TesApi.Tests
             Assert.IsTrue(batchScheduler.RemovePoolFromList(pool));
             Assert.AreEqual(0, batchScheduler.GetPoolGroupKeys().Count());
 
-            pool = await batchScheduler.GetOrAddPoolAsync(key, false, id => new Pool(name: id));
+            pool = await batchScheduler.GetOrAddPoolAsync(key, false, id => ValueTask.FromResult(new Pool(name: id)));
 
             Assert.AreEqual(1, batchScheduler.GetPoolGroupKeys().Count());
             Assert.IsTrue(batchScheduler.TryGetPool(pool.Pool.PoolId, out var pool1));
@@ -61,7 +61,7 @@ namespace TesApi.Tests
             var count = batchScheduler.GetPools().Count();
             serviceProvider.AzureProxy.Verify(mock => mock.CreateBatchPoolAsync(It.IsAny<Pool>(), It.IsAny<bool>()), Times.Once);
 
-            var pool = await batchScheduler.GetOrAddPoolAsync(key, false, id => new Pool(name: id));
+            var pool = await batchScheduler.GetOrAddPoolAsync(key, false, id => ValueTask.FromResult(new Pool(name: id)));
             await pool.ServicePoolAsync();
 
             Assert.AreEqual(batchScheduler.GetPools().Count(), count);
@@ -84,7 +84,7 @@ namespace TesApi.Tests
             var key = batchScheduler.GetPoolGroupKeys().First();
             var count = batchScheduler.GetPools().Count();
 
-            var pool = await batchScheduler.GetOrAddPoolAsync(key, false, id => new Pool(name: id));
+            var pool = await batchScheduler.GetOrAddPoolAsync(key, false, id => ValueTask.FromResult(new Pool(name: id)));
             await pool.ServicePoolAsync();
 
             Assert.AreNotEqual(batchScheduler.GetPools().Count(), count);
@@ -1317,7 +1317,7 @@ namespace TesApi.Tests
             => new(wrapAzureProxy: true, configuration: GetMockConfig()(), azureProxy: GetMockAzureProxy(azureProxyReturn ?? AzureProxyReturnValues.Defaults), batchPoolRepositoryArgs: ("endpoint", "key", "databaseId", "containerId", "partitionKeyValue"));
 
         private static async Task<IBatchPool> AddPool(BatchScheduler batchPools)
-            => await batchPools.GetOrAddPoolAsync("key1", false, id => new Pool(name: id, displayName: "display1", vmSize: "vmSize1"));
+            => await batchPools.GetOrAddPoolAsync("key1", false, id => ValueTask.FromResult(new Pool(name: id, displayName: "display1", vmSize: "vmSize1")));
 
         private struct BatchJobAndTaskStates
         {

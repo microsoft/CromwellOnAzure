@@ -448,7 +448,7 @@ namespace TesApi.Web
                 {
                     var (startTask, nodeInfo, applicationPackages) = poolSpec.Value;
                     poolInformation = await CreateAutoPoolModePoolInformation(
-                        GetPoolSpecification(
+                        await GetPoolSpecification(
                             virtualMachineInfo.VmSize,
                             false,
                             virtualMachineInfo.LowPriority,
@@ -463,14 +463,14 @@ namespace TesApi.Web
                 }
                 else
                 {
-                    poolInformation = (await GetOrAddPoolAsync(poolName, virtualMachineInfo.LowPriority, id =>
+                    poolInformation = (await GetOrAddPoolAsync(poolName, virtualMachineInfo.LowPriority, async id =>
                     {
                         var (startTask, nodeInfo, applicationPackages) = poolSpec.Value;
                         return ConvertPoolSpecificationToModelsPool(
                             name: id,
                             displayName: displayName,
                             GetBatchPoolIdentity(identities),
-                            GetPoolSpecification(
+                            await GetPoolSpecification(
                                 virtualMachineInfo.VmSize,
                                 true,
                                 virtualMachineInfo.LowPriority,
@@ -1201,7 +1201,7 @@ namespace TesApi.Web
 
                         return (appPkg,
                             isScriptInApp || hostConfig.StartTask.StartTaskHash is not null
-                            ? new StartTask(hostConfig.StartTask.StartTaskHash is not null ? $"/bin/env ./{StartTaskScriptFilename}" : $"/usr/bin/sh -c '${appDir}/{StartTaskScriptFilename}'")
+                            ? new StartTask(hostConfig.StartTask.StartTaskHash is not null ? $"/usr/bin/env ./{StartTaskScriptFilename}" : $"/usr/bin/env ${{{appDir}}}/{StartTaskScriptFilename}")
                             {
                                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                                 ResourceFiles = resourcesAsList,
@@ -1362,7 +1362,7 @@ namespace TesApi.Web
         /// <param name="applicationPackages"></param>
         /// <param name="startTask"></param>
         /// <returns></returns>
-        private PoolSpecification GetPoolSpecification(string vmSize, bool autoscaled, bool preemptable, BatchNodeInfo nodeInfo, string startTaskSasUrl, string startTaskPath, ContainerConfiguration containerConfiguration, IEnumerable<ApplicationPackageReference> applicationPackages, StartTask startTask)
+        private async ValueTask<PoolSpecification> GetPoolSpecification(string vmSize, bool autoscaled, bool preemptable, BatchNodeInfo nodeInfo, string startTaskSasUrl, string startTaskPath, ContainerConfiguration containerConfiguration, IEnumerable<ApplicationPackageReference> applicationPackages, StartTask startTask)
         {
             var vmConfig = new VirtualMachineConfiguration(
                 imageReference: new ImageReference(
@@ -1384,13 +1384,14 @@ namespace TesApi.Web
                     {
                         UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                         ResourceFiles = new List<ResourceFile> { script },
-                        CommandLine = $"/bin/sudo /bin/sh -c ./{startTaskPath}",
+                        CommandLine = $"/usr/bin/env ./{startTaskPath}",
                     };
                 }
                 else
                 {
                     startTask.ResourceFiles.Add(script);
-                    startTask.CommandLine = $"/bin/sh -c /bin/sudo /bin/sh -c ./{startTaskPath} && {startTask.CommandLine} || exit";
+                    startTask.ResourceFiles.Add(ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/job-prep.sh", GetStartTaskSasTokenDuration()), "main-start-task.sh", "0755"));
+                    startTask.CommandLine = $"/usr/bin/env ./main-start-task.sh";
                 }
             }
 
@@ -1916,7 +1917,7 @@ namespace TesApi.Web
         internal bool IsPoolAvailable(string key)
             => batchPools.TryGetValue(key, out var pools) && pools.Any(p => p.IsAvailable);
 
-        internal async Task<IBatchPool> GetOrAddPoolAsync(string key, bool isPreemptable, Func<string, BatchModels.Pool> modelPoolFactory)
+        internal async Task<IBatchPool> GetOrAddPoolAsync(string key, bool isPreemptable, Func<string, ValueTask<BatchModels.Pool>> modelPoolFactory)
         {
             if (enableBatchAutopool)
             {
@@ -1947,7 +1948,7 @@ namespace TesApi.Web
 
                 try
                 {
-                    var modelPool = modelPoolFactory(poolId);
+                    var modelPool = await modelPoolFactory(poolId);
                     modelPool.Metadata ??= new List<BatchModels.MetadataItem>();
                     modelPool.Metadata.Add(new(PoolHostName, this.hostname));
                     modelPool.Metadata.Add(new(PoolIsDedicated, (!isPreemptable).ToString()));

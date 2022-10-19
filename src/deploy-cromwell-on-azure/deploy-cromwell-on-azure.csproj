@@ -29,6 +29,7 @@
     <None Remove="scripts\helm\templates\tes-deployment.yaml" />
     <None Remove="scripts\helm\templates\triggerservice-deployment.yaml" />
     <None Remove="scripts\helm\values-template.yaml" />
+    <None Remove="scripts\start-task.sh" />
   </ItemGroup>
 
   <ItemGroup>
@@ -122,6 +123,7 @@
     <EmbeddedResource Include="scripts\mount_containers.sh" />
     <EmbeddedResource Include="scripts\mysql\init-user.sql" />
     <EmbeddedResource Include="scripts\mysql\unlock-change-log.sql" />
+    <EmbeddedResource Include="scripts\start-task.sh" />
     <EmbeddedResource Include="scripts\startup.sh" />
     <EmbeddedResource Include="scripts\wait-for-it.sh" />
     <EmbeddedResource Include="test.wdl" />

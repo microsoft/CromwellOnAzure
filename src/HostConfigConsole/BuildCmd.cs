@@ -77,13 +77,13 @@ namespace HostConfigConsole
         private readonly Argument<string[]> hostConfigs
             = new("host-configs", "Zero or more directory names of host configuration descriptor directories.") { Arity = ArgumentArity.ZeroOrMore };
 
-        private readonly Option<FileInfo> outFileOption
+        private readonly Option<FileInfo?> outFileOption
             = new(new[] { "--output", "-o" }, "Path to output file (used to stage metadata for the update command).");
 
         private readonly Option<string> hostConfigsDirOption
             = new(new[] { "--host-configs-directory", "-d" }, "Path to directory containing all the host configuration descriptor directories to process.") { IsRequired = true };
 
-        private sealed class CommandHandler : CommandHandler<string, FileInfo, string[]>, BaseCommand
+        private sealed class CommandHandler : CommandHandler<string, FileInfo?, string[]>, BaseCommand
         {
             public CommandHandler(params Symbol[] symbols)
                 : base(symbols) { }
