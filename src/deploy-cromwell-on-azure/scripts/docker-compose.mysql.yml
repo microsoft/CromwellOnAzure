@@ -6,7 +6,7 @@ services:
   mysqldb:
     image: "$MySqlImageName"
     environment:
-      - MYSQL_ROOT_PASSWORD=cromwell
+      - MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
       - MYSQL_DATABASE=cromwell_db
     volumes:
       - type: bind
