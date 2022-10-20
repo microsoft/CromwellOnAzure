@@ -1390,7 +1390,7 @@ namespace TesApi.Web
                 else
                 {
                     startTask.ResourceFiles.Add(script);
-                    startTask.ResourceFiles.Add(ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/job-prep.sh", GetStartTaskSasTokenDuration()), "main-start-task.sh", "0755"));
+                    startTask.ResourceFiles.Add(ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/start-task.sh", GetStartTaskSasTokenDuration()), "main-start-task.sh", "0755"));
                     startTask.CommandLine = $"/usr/bin/env ./main-start-task.sh";
                 }
             }
