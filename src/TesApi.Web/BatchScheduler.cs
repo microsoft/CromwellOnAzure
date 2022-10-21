@@ -768,6 +768,8 @@ namespace TesApi.Web
                 }
             };
 
+            logger.LogInformation($"{nameof(poolHasContainerConfig)} = {poolHasContainerConfig}");
+
             if (poolHasContainerConfig)
             {
                 // If the executor image is private, and in order to run multiple containers in the main task, the image has to be downloaded via pool ContainerConfiguration.
@@ -775,6 +777,7 @@ namespace TesApi.Web
                 // If the executor image is public, there is no need for pool ContainerConfiguration and task can run normally, without being wrapped in a docker container.
                 // Volume mapping for docker.sock below allows the docker client in the container to access host's docker daemon.
                 var containerRunOptions = $"--rm -v /var/run/docker.sock:/var/run/docker.sock -v /mnt:/mnt ";
+                logger.LogInformation($"Adding ContainerSettings with {nameof(dockerInDockerImageName)} = {dockerInDockerImageName}");
                 cloudTask.ContainerSettings = new TaskContainerSettings(dockerInDockerImageName, containerRunOptions);
             }
 
