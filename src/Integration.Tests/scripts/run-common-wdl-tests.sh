@@ -3,10 +3,10 @@
 # Licensed under the MIT License.
 
 echo "Run Common Workflows starting"
-resource_group_name="coainttest-$(Build.BuildNumber)"
-storage_account_name_prefix="coainttest"
+resource_group_name=$1 # f.ex."coainttest-$(Build.BuildNumber)"
+storage_account_name_prefix=$2 # f.ex."coainttest"
 
-testWorkingDirectory=$(System.DefaultWorkingDirectory)
+testWorkingDirectory=$3 # f.ex.$(System.DefaultWorkingDirectory)
 
 echo "Getting the storage account in resource group name: $resource_group_name."
 storageAccountName=`az storage account list \
