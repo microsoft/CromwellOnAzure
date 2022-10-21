@@ -883,6 +883,7 @@ namespace TesApi.Web
             }
 
             var containerRegistryInfo = await azureProxy.GetContainerRegistryInfoAsync(executorImage);
+            logger.LogInformation($"CreateAutoPoolPoolInformation: executorImage = {executorImage} containerRegistryInfo: {(containerRegistryInfo is null ? "Container registry was not found or is not accessible." : "Container registry succcessfully found.")}");
 
             if (containerRegistryInfo is not null)
             {
@@ -900,6 +901,7 @@ namespace TesApi.Web
                 };
 
                 var containerRegistryInfoForDockerInDocker = await azureProxy.GetContainerRegistryInfoAsync(dockerInDockerImageName);
+                logger.LogInformation($"containerRegistryInfoForDockerInDocker: {(containerRegistryInfoForDockerInDocker is null ? "containerRegistryInfoForDockerInDocker was not found or is not accessible." : "containerRegistryInfoForDockerInDocker succcessfully found.")}");
 
                 if (containerRegistryInfoForDockerInDocker is not null && containerRegistryInfoForDockerInDocker.RegistryServer != containerRegistryInfo.RegistryServer)
                 {
@@ -912,6 +914,7 @@ namespace TesApi.Web
                 }
 
                 var containerRegistryInfoForBlobXfer = await azureProxy.GetContainerRegistryInfoAsync(blobxferImageName);
+                logger.LogInformation($"containerRegistryInfoForBlobXfer: {(containerRegistryInfoForBlobXfer is null ? "containerRegistryInfoForBlobXfer was not found or is not accessible." : "containerRegistryInfoForBlobXfer succcessfully found.")}");
 
                 if (containerRegistryInfoForBlobXfer is not null && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfo.RegistryServer && containerRegistryInfoForBlobXfer.RegistryServer != containerRegistryInfoForDockerInDocker.RegistryServer)
                 {
