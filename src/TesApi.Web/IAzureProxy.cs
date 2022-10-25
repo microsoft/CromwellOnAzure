@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -54,7 +54,7 @@ namespace TesApi.Web
         /// <summary>
         /// Creates a Pool in Azure Batch that is NOT an AutoPool
         /// </summary>
-        Task CreateManualBatchPoolAsync(
+        Task<bool> CreateManualBatchPoolAsync(
             string poolName,
             string vmSize,
             bool isLowPriority,

@@ -850,7 +850,7 @@ namespace TesApi.Web
         /// <param name="startTaskSasUrl">SAS URL for the start task</param>
         /// <param name="startTaskPath">Local path on the Azure Batch node for the script</param>
         /// <returns></returns>
-        public async Task CreateManualBatchPoolAsync(
+        public async Task<bool> CreateManualBatchPoolAsync(
             string poolName, 
             string vmSize, 
             bool isLowPriority, 
@@ -865,6 +865,8 @@ namespace TesApi.Web
             string startTaskPath
             )
         {
+            bool hasContainerConfig = false;
+
             try
             {
                 var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
@@ -893,10 +895,13 @@ namespace TesApi.Web
 
                 if (containerRegistryInfo is not null)
                 {
+
                     var containerRegistryMgmt = new Microsoft.Azure.Management.Batch.Models.ContainerRegistry(
                         userName: containerRegistryInfo.Username,
                         registryServer: containerRegistryInfo.RegistryServer,
                         password: containerRegistryInfo.Password);
+
+                    hasContainerConfig = true;
 
                     // Download private images at node startup, since those cannot be downloaded in the main task that runs multiple containers.
                     // Doing this also requires that the main task runs inside a container, hence downloading the "docker" image (contains docker client) as well.
@@ -970,6 +975,7 @@ namespace TesApi.Web
                 logger.LogInformation($"Creating manual batch pool named {poolName} with vmSize {vmSize} and low priority {isLowPriority}");
                 var pool = await batchManagementClient.Pool.CreateAsync(batchResourceGroupName, batchAccountName, poolInfo.Name, poolInfo);
                 logger.LogInformation($"Successfully created manual batch pool named {poolName} with vmSize {vmSize} and low priority {isLowPriority}");
+                return hasContainerConfig;
             }
             catch (Exception exc)
             {
