@@ -6,15 +6,15 @@ namespace CromwellApiClient
 {
     public class ProcessedTriggerInfo
     {
-        public ProcessedWorkflowItem WorkflowSource { get; private set; }
+        public string WorkflowUrl { get; private set; }
         public List<ProcessedWorkflowItem> WorkflowInputs { get; private set; }
         public ProcessedWorkflowItem WorkflowOptions { get; private set; }
         public ProcessedWorkflowItem WorkflowDependencies { get; private set; }
 
-        public ProcessedTriggerInfo(ProcessedWorkflowItem workflowSource, List<ProcessedWorkflowItem> workflowInputs,
+        public ProcessedTriggerInfo(string workflowUrl, List<ProcessedWorkflowItem> workflowInputs,
             ProcessedWorkflowItem workflowOptions, ProcessedWorkflowItem workflowDependencies)
         {
-            this.WorkflowSource = workflowSource;
+            this.WorkflowUrl = workflowUrl;
             this.WorkflowInputs = workflowInputs;
             this.WorkflowOptions = workflowOptions;
             this.WorkflowDependencies = workflowDependencies;

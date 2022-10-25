@@ -332,8 +332,7 @@ namespace TriggerService.Tests
 
         private void VerifyTriggerFileProcessing(ProcessedTriggerInfo processedTriggerInfo, int inputFilesCount)
         {
-            Assert.AreEqual(azureName, processedTriggerInfo.WorkflowSource.Filename, "comparing azureName to workflowSourceFilename");
-            AssertBytesEqual(processedTriggerInfo.WorkflowSource.Data, httpClientData, "workflowSourceData");
+            Assert.AreEqual(azureName, processedTriggerInfo.WorkflowUrl, "comparing azureName to workflowSourceFilename");
 
             AssertNamesEqual(processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(), inputFilesCount, azureName, "workflowInputsFilenames");
             AssertBytesEqual(processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(), inputFilesCount, httpClientData, "workflowInputsData");
@@ -384,8 +383,6 @@ namespace TriggerService.Tests
 
         private static List<CromwellApiClient.CromwellApiClient.FileToPost> RetrievePostFiles(ProcessedTriggerInfo processedTriggerInfo)
             => CromwellApiClient.CromwellApiClient.AccumulatePostFiles(
-                processedTriggerInfo.WorkflowSource.Filename,
-                processedTriggerInfo.WorkflowSource.Data,
                 processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
                 processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
                 processedTriggerInfo.WorkflowOptions.Filename,
@@ -400,8 +397,7 @@ namespace TriggerService.Tests
             Assert.AreEqual(processedTriggerInfo.WorkflowInputs.Count + 1, files.Count, "unexpected number of files");
 
             Assert.AreEqual("workflowSource", files[0].ParameterName, $"unexpected ParameterName for the 0th file");
-            Assert.AreEqual(processedTriggerInfo.WorkflowSource.Filename, files[0].Filename, $"unexpected Filename for the 0th file");
-            AssertBytesEqual(processedTriggerInfo.WorkflowSource.Data, files[0].Data, "files[0].Data");
+            Assert.AreEqual(processedTriggerInfo.WorkflowUrl, files[0].Filename, $"unexpected Filename for the 0th file");
 
             for (var i = 0; i < processedTriggerInfo.WorkflowInputs.Count; i++)
             {
