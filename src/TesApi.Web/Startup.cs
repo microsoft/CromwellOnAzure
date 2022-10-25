@@ -42,6 +42,7 @@ namespace TesApi.Web
             Configuration = configuration;
             this.hostingEnvironment = hostingEnvironment;
             logger = loggerFactory.CreateLogger<Startup>();
+            logger.LogInformation($"TES starting at {DateTime.UtcNow}...");
             this.loggerFactory = loggerFactory;
             azureOfferDurableId = Configuration.GetValue("AzureOfferDurableId", DefaultAzureOfferDurableId);
         }
