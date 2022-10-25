@@ -327,6 +327,8 @@ namespace TesApi.Web
                     identities.Add(tesTask.Resources?.GetBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity));
                 }
 
+                bool poolHasContainerConfig = false;
+
                 if (identities.Count > 0)
                 {
                     // Only create manual pool if an identity was specified
@@ -344,7 +346,7 @@ namespace TesApi.Web
                         }
                     }
 
-                    await azureProxy.CreateManualBatchPoolAsync(
+                    var result = await azureProxy.CreateManualBatchPoolAsync(
                         poolName: poolName,
                         vmSize: virtualMachineInfo.VmSize,
                         isLowPriority: virtualMachineInfo.LowPriority,
@@ -358,15 +360,17 @@ namespace TesApi.Web
                         startTaskSasUrl: startTaskSasUrl,
                         startTaskPath: batchStartTaskLocalPathOnBatchNode
                     );
-                        
+
+                    poolHasContainerConfig = result.PoolHasContainerConfig;
                     poolInformation = new PoolInformation { PoolId = poolName };
                 }
                 else
                 {
                     poolInformation = await CreateAutoPoolPoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority, true, batchExecutionPath);
+                    poolHasContainerConfig = poolInformation?.AutoPoolSpecification?.PoolSpecification?.VirtualMachineConfiguration?.ContainerConfiguration is not null;
                 }
 
-                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, poolInformation?.AutoPoolSpecification?.PoolSpecification?.VirtualMachineConfiguration?.ContainerConfiguration is not null);
+                var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, poolHasContainerConfig);
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
                 await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
