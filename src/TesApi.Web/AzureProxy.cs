@@ -850,7 +850,7 @@ namespace TesApi.Web
         /// <param name="startTaskSasUrl">SAS URL for the start task</param>
         /// <param name="startTaskPath">Local path on the Azure Batch node for the script</param>
         /// <returns></returns>
-        public async Task CreateManualBatchPoolAsync(
+        public async Task<ManualBatchPoolCreationResult> CreateManualBatchPoolAsync(
             string poolName, 
             string vmSize, 
             bool isLowPriority, 
@@ -865,6 +865,8 @@ namespace TesApi.Web
             string startTaskPath
             )
         {
+            var result = new ManualBatchPoolCreationResult();
+
             try
             {
                 var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
@@ -893,6 +895,8 @@ namespace TesApi.Web
 
                 if (containerRegistryInfo is not null)
                 {
+                    result.PoolHasContainerConfig = true;
+
                     var containerRegistryMgmt = new Microsoft.Azure.Management.Batch.Models.ContainerRegistry(
                         userName: containerRegistryInfo.Username,
                         registryServer: containerRegistryInfo.RegistryServer,
@@ -970,6 +974,7 @@ namespace TesApi.Web
                 logger.LogInformation($"Creating manual batch pool named {poolName} with vmSize {vmSize} and low priority {isLowPriority}");
                 var pool = await batchManagementClient.Pool.CreateAsync(batchResourceGroupName, batchAccountName, poolInfo.Name, poolInfo);
                 logger.LogInformation($"Successfully created manual batch pool named {poolName} with vmSize {vmSize} and low priority {isLowPriority}");
+                return result;
             }
             catch (Exception exc)
             {
