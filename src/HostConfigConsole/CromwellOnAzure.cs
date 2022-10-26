@@ -219,6 +219,7 @@ namespace HostConfigConsole
                                 try
                                 {
                                     await EnableSsh(networkSecurityGroup);
+                                    await WaitForSshConnectivityAsync(sshConnectionInfo);
                                     await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"sudo systemctl restart cromwellazure");
                                 }
                                 finally
