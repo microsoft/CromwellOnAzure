@@ -923,6 +923,7 @@ namespace TesApi.Tests
             azureProxy.Setup(a => a.GetBatchActivePoolCount()).Returns(azureProxyReturnValues.ActivePoolCount);
             azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>())).Returns(Task.FromResult(azureProxyReturnValues.DownloadedBlobContent));
             azureProxy.Setup(a => a.LocalFileExists(It.IsAny<string>())).Returns(azureProxyReturnValues.LocalFileExists);
+            azureProxy.Setup(a => a.CreateManualBatchPoolAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<BatchNodeInfo>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IEnumerable<string>>(), It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Returns(Task.FromResult(new ManualBatchPoolCreationResult()));
 
             return azureProxy;
         }

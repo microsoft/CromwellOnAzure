@@ -83,6 +83,18 @@ To mitigate, log on to the host VM and execute the following and then restart th
 sudo docker exec -it cromwellazure_mysqldb_1 bash -c 'mysql -ucromwell -Dcromwell_db -pcromwell -e"SELECT * FROM DATABASECHANGELOGLOCK;UPDATE DATABASECHANGELOGLOCK SET LOCKED=0, LOCKGRANTED=null, LOCKEDBY=null where ID=1;SELECT * FROM DATABASECHANGELOGLOCK;"'
 ```
 
+### Trigger JSON file for my workflow stays in the "new" directory in the workflows container and no task is started
+The root cause is most likely failing MySQL upgrade. 
+
+You may see the following Cromwell container logs:
+> Failed to instantiate Cromwell System. Shutting down Cromwell.
+java.sql.SQLTransientConnectionException: db - Connection is not available, request timed out after 15000ms.
+
+and MySQL container logs as a symptom:
+> Upgrade is not supported after a crash or shutdown with innodb_fast_shutdown = 2. 
+
+To mitigate, follow instructions on [MySQL update](mysql-update.md).
+
 ## Setup
 ### Setup Cromwell on Azure for multiple users in the same Azure subscription
 Cromwell on Azure is designed to be flexible for single and multiple user scenarios. Here we have envisioned four general scenarios and demonstrated how they relate to your Azure account, Azure Batch service, Subscription ID, and Resource Groups, each depicted below.
@@ -250,7 +262,6 @@ bool DebugLogging = false | Y | N | N | Prints all log information.
 string PostgreSqlServerName | Y | Y | N | Name of existing postgresql server. 
 bool UsePostgreSqlSingleServer = false | Y | N | N | Use Postgresql single server rather than flexi servers, only recommended if you need to use private endpoints. 
 string KeyVaultName | Y | Y | N | Name of an existing key vault
-string UserObjectId | Y | N | N | ObjectId of the user running the deployer, can be found in AAD. Required to assign proper permissions to KeyVault when using AKS. 
 bool CrossSubscriptionAKSDeployment | Y | N | N | AKS cluster is in a different subscription than the storage account, so a keyvault and storage key will be used for storage auth for AKS.
 
 The following are more advanced configuration parameters:
