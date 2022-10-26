@@ -516,7 +516,18 @@ namespace TesApi.Web
             }
             catch (Exception exc)
             {
-                logger.LogError(exc, $"Pool ID: {poolId} exception while attempting to delete the pool");
+                var batchErrorCode = (exc as BatchException)?.RequestInformation?.BatchError?.Code;
+
+                if (!string.IsNullOrWhiteSpace(batchErrorCode) 
+                    && batchErrorCode.Equals("PoolBeingDeleted", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Do not throw if it's a deletion race condition
+                    // Docs: https://learn.microsoft.com/en-us/rest/api/batchservice/Pool/Delete?tabs=HTTP
+
+                    return;
+                }
+
+                logger.LogError(exc, $"Pool ID: {poolId} exception while attempting to delete the pool.  Batch error code: {batchErrorCode}");
                 throw;
             }
         }
