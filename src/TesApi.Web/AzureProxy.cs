@@ -251,25 +251,25 @@ namespace TesApi.Web
         /// <returns></returns>
         public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
         {
-            logger.LogInformation($"TES task {cloudTask.Id} - creating Batch job");
+            logger.LogInformation($"TES task: {cloudTask.Id} - creating Batch job");
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
             job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
             await job.CommitAsync();
-            logger.LogInformation($"TES task {cloudTask.Id} - Batch job committed successfully.");
+            logger.LogInformation($"TES task: {cloudTask.Id} - Batch job committed successfully.");
 
             try
             {
-                logger.LogInformation($"TES task {cloudTask.Id} adding task to job.");
+                logger.LogInformation($"TES task: {cloudTask.Id} adding task to job.");
                 job = await batchRaceConditionJobNotFoundRetryPolicy.ExecuteAsync(() => 
                     batchClient.JobOperations.GetJobAsync(job.Id));
 
                 await job.AddTaskAsync(cloudTask);
-                logger.LogInformation($"TES task {cloudTask.Id} added task successfully.");
+                logger.LogInformation($"TES task: {cloudTask.Id} added task successfully.");
             }
             catch (Exception ex)
             {
                 var batchError = JsonConvert.SerializeObject((ex as BatchException)?.RequestInformation?.BatchError);
-                logger.LogError(ex, $"TES task {cloudTask.Id} deleting {job.Id} because adding task to it failed. Batch error: {batchError}");
+                logger.LogError(ex, $"TES task: {cloudTask.Id} deleting {job.Id} because adding task to it failed. Batch error: {batchError}");
 
                 await batchClient.JobOperations.DeleteJobAsync(job.Id);
 
@@ -510,13 +510,13 @@ namespace TesApi.Web
 
                 foreach (var pool in poolsToDelete)
                 {
-                    logger.LogInformation($"Deleting pool {pool.Id}");
+                    logger.LogInformation($"Pool ID: {pool.Id} Pool State: {pool?.State} deleting...");
                     await batchClient.PoolOperations.DeletePoolAsync(pool.Id, cancellationToken: cancellationToken);
                 }
             }
             catch (Exception exc)
             {
-                logger.LogError(exc, $"Exception while attempting to delete pool starting with ID: {poolId}");
+                logger.LogError(exc, $"Pool ID: {poolId} exception while attempting to delete the pool");
                 throw;
             }
         }

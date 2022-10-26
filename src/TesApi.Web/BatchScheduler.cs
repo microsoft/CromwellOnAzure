@@ -150,7 +150,7 @@ namespace TesApi.Web
             async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
             { 
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, newTaskState, batchInfo); 
             }
             Task DeleteBatchJobAndSetTaskExecutorErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.EXECUTORERROREnum, batchInfo);
@@ -163,7 +163,7 @@ namespace TesApi.Web
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             { 
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
                 tesTask.IsCancelRequested = false; 
             }
 
@@ -203,7 +203,7 @@ namespace TesApi.Web
 
             try
             {
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
             }
             catch (Exception exc)
             {
@@ -235,14 +235,6 @@ namespace TesApi.Web
                    
             var tesTaskChanged = await HandleTesTaskTransitionAsync(tesTask, combinedBatchTaskInfo);
             return tesTaskChanged;
-        }
-
-        private async Task DeleteManualBatchPoolIfExistsAsync(TesTask tesTask)
-        {
-            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
-            {
-                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
-            }
         }
 
         private static string GetCromwellExecutionDirectoryPath(TesTask task)
@@ -356,7 +348,7 @@ namespace TesApi.Web
                         }
                     }
 
-                    logger.LogInformation($"TES task {tesTask.Id} creating Manual Batch Pool using VM size {virtualMachineInfo.VmSize}");
+                    logger.LogInformation($"TES task: {tesTask.Id} creating Manual Batch Pool using VM size {virtualMachineInfo.VmSize}");
                     var result = await azureProxy.CreateManualBatchPoolAsync(
                         poolName: poolName,
                         vmSize: virtualMachineInfo.VmSize,
@@ -377,7 +369,7 @@ namespace TesApi.Web
                 }
                 else
                 {
-                    logger.LogInformation($"TES task {tesTask.Id} creating Auto Pool using VM size {virtualMachineInfo.VmSize}");
+                    logger.LogInformation($"TES task: {tesTask.Id} creating Auto Pool using VM size {virtualMachineInfo.VmSize}");
                     poolInformation = await CreateAutoPoolPoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority, true, batchExecutionPath);
                     poolHasContainerConfig = poolInformation?.AutoPoolSpecification?.PoolSpecification?.VirtualMachineConfiguration?.ContainerConfiguration is not null;
                 }
