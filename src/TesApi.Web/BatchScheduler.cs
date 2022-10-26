@@ -36,6 +36,7 @@ namespace TesApi.Web
         private const string startTaskScriptFilename = "start-task.sh";
         private static readonly string batchStartTaskLocalPathOnBatchNode = $"/mnt/batch/tasks/startup/wd/{startTaskScriptFilename}";
         private static readonly Regex queryStringRegex = new(@"[^\?.]*(\?.*)");
+        private readonly HashSet<string> onlyLogBatchTaskStateOnce = new HashSet<string>();
         private readonly string dockerInDockerImageName;
         private readonly string blobxferImageName;
         private readonly string cromwellDrsLocalizerImageName;
@@ -224,6 +225,14 @@ namespace TesApi.Web
         public async Task<bool> ProcessTesTaskAsync(TesTask tesTask)
         {
             var combinedBatchTaskInfo = await GetBatchTaskStateAsync(tesTask);
+            string msg = $"TES task: {tesTask.Id} BatchTaskState: {combinedBatchTaskInfo.BatchTaskState}";
+
+            if (!onlyLogBatchTaskStateOnce.Contains(msg))
+            {
+                logger.LogInformation(msg);
+                onlyLogBatchTaskStateOnce.Add(msg);
+            }
+                   
             var tesTaskChanged = await HandleTesTaskTransitionAsync(tesTask, combinedBatchTaskInfo);
             return tesTaskChanged;
         }
@@ -340,6 +349,7 @@ namespace TesApi.Web
                     if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
                     {
                         startTaskSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
+
                         if (!await azureProxy.BlobExistsAsync(new Uri(startTaskSasUrl)))
                         {
                             startTaskSasUrl = null;
@@ -366,6 +376,7 @@ namespace TesApi.Web
                 }
                 else
                 {
+                    logger.LogInformation($"TES task {tesTask.Id} creating Auto Pool using VM size {virtualMachineInfo.VmSize}");
                     poolInformation = await CreateAutoPoolPoolInformation(dockerImage, virtualMachineInfo.VmSize, virtualMachineInfo.LowPriority, true, batchExecutionPath);
                     poolHasContainerConfig = poolInformation?.AutoPoolSpecification?.PoolSpecification?.VirtualMachineConfiguration?.ContainerConfiguration is not null;
                 }
@@ -379,38 +390,38 @@ namespace TesApi.Web
             }
             catch (AzureBatchQuotaMaxedOutException exception)
             {
-                logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {exception.Message}. Task will remain in queue.");
+                logger.LogWarning($"TES task: {tesTask.Id} AzureBatchQuotaMaxedOutException.Message: {exception.Message} . Not enough quota available.  Task will remain with state QUEUED.");
             }
             catch (AzureBatchLowQuotaException exception)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
                 tesTask.SetFailureReason("InsufficientBatchQuota", exception.Message);
-                logger.LogError(exception.Message);
+                logger.LogError(exception, $"TES task: {tesTask.Id} AzureBatchLowQuotaException.Message: {exception.Message}");
             }
             catch (AzureBatchVirtualMachineAvailabilityException exception)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
                 tesTask.AddTesTaskLog(); // Adding new log here because this exception is thrown from GetVmSizeAsync() and AddTesTaskLog() above is called after that. This way each attempt will have its own log entry.
                 tesTask.SetFailureReason("NoVmSizeAvailable", exception.Message);
-                logger.LogError(exception.Message);
+                logger.LogError(exception, $"TES task: {tesTask.Id} AzureBatchVirtualMachineAvailabilityException.Message: {exception.Message}");
             }
-            catch (TesException exc)
+            catch (TesException exception)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
-                tesTask.SetFailureReason(exc);
-                logger.LogError(exc, exc.Message);
+                tesTask.SetFailureReason(exception);
+                logger.LogError(exception, $"TES task: {tesTask.Id} TesException.Message: {exception.Message}");
             }
-            catch (BatchClientException exc)
+            catch (BatchClientException exception)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
-                tesTask.SetFailureReason("BatchClientException", string.Join(",", exc.Data.Values), exc.Message, exc.StackTrace);
-                logger.LogError(exc, exc.Message + ", " + string.Join(",", exc.Data.Values));
+                tesTask.SetFailureReason("BatchClientException", string.Join(",", exception.Data.Values), exception.Message, exception.StackTrace);
+                logger.LogError(exception, $"TES task: {tesTask.Id} BatchClientException.Message: {exception.Message} {string.Join(",", exception?.Data?.Values)}");
             }
-            catch (Exception exc)
+            catch (Exception exception)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
-                tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
-                logger.LogError(exc, exc.Message);
+                tesTask.SetFailureReason("UnknownError", exception.Message, exception.StackTrace);
+                logger.LogError(exception, $"TES task: {tesTask.Id} Exception.Message: {exception.Message}");
             }
         }
 
