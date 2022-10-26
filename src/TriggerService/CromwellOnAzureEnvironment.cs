@@ -135,6 +135,11 @@ namespace TriggerService
                 throw new ArgumentNullException(nameof(Workflow.WorkflowUrl), "must specify a WorkflowUrl in the Trigger File");
             }
 
+            if (!Uri.TryCreate(triggerInfo.WorkflowUrl, UriKind.Absolute, out var _))
+            {
+                throw new ArgumentException("The WorkflowUrl was not a valid URI");
+            }
+
             if (triggerInfo.WorkflowInputsUrl is not null)
             {
                 workflowInputs.Add(await GetBlobFileNameAndData(triggerInfo.WorkflowInputsUrl));
