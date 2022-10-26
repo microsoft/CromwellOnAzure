@@ -356,6 +356,7 @@ namespace TesApi.Web
                         }
                     }
 
+                    logger.LogInformation($"TES task {tesTask.Id} creating Manual Batch Pool using VM size {virtualMachineInfo.VmSize}");
                     var result = await azureProxy.CreateManualBatchPoolAsync(
                         poolName: poolName,
                         vmSize: virtualMachineInfo.VmSize,
