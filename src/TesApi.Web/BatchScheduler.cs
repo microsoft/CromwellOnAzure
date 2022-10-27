@@ -36,7 +36,6 @@ namespace TesApi.Web
         private const string startTaskScriptFilename = "start-task.sh";
         private static readonly string batchStartTaskLocalPathOnBatchNode = $"/mnt/batch/tasks/startup/wd/{startTaskScriptFilename}";
         private static readonly Regex queryStringRegex = new(@"[^\?.]*(\?.*)");
-        private readonly HashSet<string> onlyLogBatchTaskStateOnce = new HashSet<string>();
         private readonly string dockerInDockerImageName;
         private readonly string blobxferImageName;
         private readonly string cromwellDrsLocalizerImageName;
@@ -55,6 +54,7 @@ namespace TesApi.Web
         private readonly string defaultStorageAccountName;
         private readonly string globalStartTaskPath;
         private readonly string globalManagedIdentity;
+        private HashSet<string> onlyLogBatchTaskStateOnce = new HashSet<string>();
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -235,6 +235,17 @@ namespace TesApi.Web
                    
             var tesTaskChanged = await HandleTesTaskTransitionAsync(tesTask, combinedBatchTaskInfo);
             return tesTaskChanged;
+        }
+
+        /// <summary>
+        /// Garbage collects the old batch task state log hashset
+        /// </summary>
+        public void ClearBatchLogState()
+        {
+            if (onlyLogBatchTaskStateOnce.Count > 0)
+            {
+                onlyLogBatchTaskStateOnce = new HashSet<string>();
+            }
         }
 
         private static string GetCromwellExecutionDirectoryPath(TesTask task)

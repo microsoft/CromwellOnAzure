@@ -115,6 +115,7 @@ namespace TesApi.Web
 
             if (!tesTasks.Any())
             {
+                batchScheduler.ClearBatchLogState();
                 return;
             }
 
