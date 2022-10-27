@@ -547,11 +547,11 @@ namespace TesApi.Web
                 try
                 {
                     var registries = (await azureClient.WithSubscription(subId).ContainerRegistries.ListAsync()).ToList();
-                    logger.LogInformation(@"Searching {subscriptionId} for container registries.", subId);
+                    logger.LogInformation(@$"Searching {subId} for container registries.");
 
                     foreach (var r in registries)
                     {
-                        logger.LogInformation(@"Found {Name}. AdminUserEnabled: {AdminUserEnabled}", r.Name, r.AdminUserEnabled);
+                        logger.LogInformation(@$"Found {r.Name}. AdminUserEnabled: {r.AdminUserEnabled}");
 
                         try
                         {
