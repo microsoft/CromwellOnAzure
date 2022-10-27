@@ -518,8 +518,7 @@ namespace TesApi.Web
             {
                 var batchErrorCode = (exc as BatchException)?.RequestInformation?.BatchError?.Code;
 
-                if (!string.IsNullOrWhiteSpace(batchErrorCode) 
-                    && batchErrorCode.Equals("PoolBeingDeleted", StringComparison.OrdinalIgnoreCase))
+                if (batchErrorCode?.Trim().Equals("PoolBeingDeleted", StringComparison.OrdinalIgnoreCase) == true)
                 {
                     // Do not throw if it's a deletion race condition
                     // Docs: https://learn.microsoft.com/en-us/rest/api/batchservice/Pool/Delete?tabs=HTTP
