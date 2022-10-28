@@ -115,6 +115,7 @@ namespace TesApi.Web
 
             if (!tesTasks.Any())
             {
+                batchScheduler.ClearBatchLogState();
                 return;
             }
 
@@ -154,7 +155,7 @@ namespace TesApi.Web
                         tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
                     }
 
-                    logger.LogError(exc, $"TES Task '{tesTask.Id}' threw an exception.");
+                    logger.LogError(exc, $"TES task: {tesTask.Id} threw an exception in OrchestrateTesTasksOnBatch().");
                     await repository.UpdateItemAsync(tesTask);
                 }
             }
