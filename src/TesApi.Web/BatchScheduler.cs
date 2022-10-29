@@ -59,6 +59,7 @@ namespace TesApi.Web
         private readonly string defaultStorageAccountName;
         private readonly string globalStartTaskPath;
         private readonly string globalManagedIdentity;
+        private HashSet<string> onlyLogBatchTaskStateOnce = new();
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -154,7 +155,7 @@ namespace TesApi.Web
             async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
             {
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
                 SetTaskStateAndLog(tesTask, newTaskState, batchInfo);
             }
 
@@ -169,7 +170,7 @@ namespace TesApi.Web
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
             {
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
                 tesTask.IsCancelRequested = false;
             }
 
@@ -209,7 +210,7 @@ namespace TesApi.Web
 
             try
             {
-                await DeleteManualBatchPoolIfExistsAsync(tesTask);
+                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
             }
             catch (Exception exc)
             {
@@ -229,13 +230,27 @@ namespace TesApi.Web
         /// <param name="tesTask">The <see cref="TesTask"/></param>
         /// <returns>True if the TES task needs to be persisted.</returns>
         public async ValueTask<bool> ProcessTesTaskAsync(TesTask tesTask)
-            => await HandleTesTaskTransitionAsync(tesTask, await GetBatchTaskStateAsync(tesTask));
-
-        private async Task DeleteManualBatchPoolIfExistsAsync(TesTask tesTask)
         {
-            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
+            var combinedBatchTaskInfo = await GetBatchTaskStateAsync(tesTask);
+            string msg = $"TES task: {tesTask.Id} BatchTaskState: {combinedBatchTaskInfo.BatchTaskState}";
+
+            if (!onlyLogBatchTaskStateOnce.Contains(msg))
             {
-                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
+                logger.LogInformation(msg);
+                onlyLogBatchTaskStateOnce.Add(msg);
+            }
+
+            return await HandleTesTaskTransitionAsync(tesTask, combinedBatchTaskInfo);
+        }
+
+        /// <summary>
+        /// Garbage collects the old batch task state log hashset
+        /// </summary>
+        public void ClearBatchLogState()
+        {
+            if (onlyLogBatchTaskStateOnce.Count > 0)
+            {
+                onlyLogBatchTaskStateOnce = new();
             }
         }
 
@@ -342,17 +357,17 @@ namespace TesApi.Web
 
                 poolInformation = await CreateAutoPoolModePoolInformation(
                     GetPoolSpecification(
-                        virtualMachineInfo.VmSize,
-                        virtualMachineInfo.LowPriority,
-                        batchNodeInfo,
-                        startTaskSasUrl,
-                        startTaskScriptFilename,
-                        containerConfiguration),
-                    jobId,
-                    identities);
+                        vmSize: virtualMachineInfo.VmSize,
+                        preemptable: virtualMachineInfo.LowPriority,
+                        nodeInfo: batchNodeInfo,
+                        startTaskSasUrl: startTaskSasUrl,
+                        startTaskPath: startTaskScriptFilename,
+                        containerConfiguration: containerConfiguration),
+                    tesTaskId: tesTask.Id,
+                    jobId: jobId,
+                    identityResourceIds: identities);
 
                 var cloudTask = await ConvertTesTaskToBatchTaskAsync(tesTask, containerConfiguration is not null);
-
                 logger.LogInformation($"Creating batch job for TES task {tesTask.Id}. Using VM size {virtualMachineInfo.VmSize}.");
                 await azureProxy.CreateBatchJobAsync(jobId, cloudTask, poolInformation);
 
@@ -362,44 +377,44 @@ namespace TesApi.Web
             }
             catch (AzureBatchQuotaMaxedOutException exception)
             {
-                logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {exception.Message}. Task will remain in queue.");
+                logger.LogWarning($"TES task: {tesTask.Id} AzureBatchQuotaMaxedOutException.Message: {exception.Message} . Not enough quota available.  Task will remain with state QUEUED.");
             }
             catch (AzureBatchLowQuotaException exception)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
                 tesTask.AddTesTaskLog(); // Adding new log here because this exception is thrown from CheckBatchAccountQuotas() and AddTesTaskLog() above is called after that. This way each attempt will have its own log entry.
                 tesTask.SetFailureReason("InsufficientBatchQuota", exception.Message);
-                logger.LogError(exception.Message);
+                logger.LogError(exception, $"TES task: {tesTask.Id} AzureBatchLowQuotaException.Message: {exception.Message}");
             }
             catch (AzureBatchVirtualMachineAvailabilityException exception)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
                 tesTask.AddTesTaskLog(); // Adding new log here because this exception is thrown from GetVmSizeAsync() and AddTesTaskLog() above is called after that. This way each attempt will have its own log entry.
                 tesTask.SetFailureReason("NoVmSizeAvailable", exception.Message);
-                logger.LogError(exception.Message);
+                logger.LogError(exception, $"TES task: {tesTask.Id} AzureBatchVirtualMachineAvailabilityException.Message: {exception.Message}");
             }
-            catch (TesException exc)
+            catch (TesException exception)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
-                tesTask.SetFailureReason(exc);
-                logger.LogError(exc, exc.Message);
+                tesTask.SetFailureReason(exception);
+                logger.LogError(exception, $"TES task: {tesTask.Id} TesException.Message: {exception.Message}");
             }
-            catch (BatchClientException exc)
+            catch (BatchClientException exception)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
-                tesTask.SetFailureReason("BatchClientException", string.Join(",", exc.Data.Values), exc.Message, exc.StackTrace);
-                logger.LogError(exc, exc.Message + ", " + string.Join(",", exc.Data.Values));
+                tesTask.SetFailureReason("BatchClientException", string.Join(",", exception.Data.Values), exception.Message, exception.StackTrace);
+                logger.LogError(exception, $"TES task: {tesTask.Id} BatchClientException.Message: {exception.Message} {string.Join(",", exception?.Data?.Values)}");
             }
-            catch (BatchException exc) when (exc.InnerException is Microsoft.Azure.Batch.Protocol.Models.BatchErrorException beex && @"ActiveJobAndScheduleQuotaReached".Equals(beex.Body.Code, StringComparison.OrdinalIgnoreCase))
+            catch (BatchException exception) when (exception.InnerException is Microsoft.Azure.Batch.Protocol.Models.BatchErrorException batcnErrorException && @"ActiveJobAndScheduleQuotaReached".Equals(batcnErrorException.Body.Code, StringComparison.OrdinalIgnoreCase))
             {
-                tesTask.SetWarning(beex.Body.Message.Value, Array.Empty<string>());
-                logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {beex.Body.Message.Value}. Task will remain in queue.");
+                tesTask.SetWarning(batcnErrorException.Body.Message.Value, Array.Empty<string>());
+                logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {batcnErrorException.Body.Message.Value}. Task will remain in queue.");
             }
-            catch (Exception exc)
+            catch (Exception exception)
             {
                 tesTask.State = TesState.SYSTEMERROREnum;
-                tesTask.SetFailureReason("UnknownError", exc.Message, exc.StackTrace);
-                logger.LogError(exc, exc.Message);
+                tesTask.SetFailureReason("UnknownError", exception.Message, exception.StackTrace);
+                logger.LogError(exception, $"TES task: {tesTask.Id} Exception.Message: {exception.Message}");
             }
             finally
             {
@@ -954,14 +969,27 @@ namespace TesApi.Web
         /// Constructs an Azure Batch PoolInformation instance
         /// </summary>
         /// <param name="poolSpecification"></param>
+        /// <param name="tesTaskId"></param>
         /// <param name="jobId"></param>
         /// <param name="identityResourceIds"></param>
         /// <remarks>If <paramref name="identityResourceIds"/> is provided, <paramref name="jobId"/> must also be provided.</remarks>
         /// <returns>An Azure Batch Pool specifier</returns>
-        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(PoolSpecification poolSpecification, string jobId = null, IEnumerable<string> identityResourceIds = null)
+        private async Task<PoolInformation> CreateAutoPoolModePoolInformation(PoolSpecification poolSpecification, string tesTaskId, string jobId, IEnumerable<string> identityResourceIds = null)
         {
+            var identities = identityResourceIds?.ToArray() ?? Array.Empty<string>();
+            var isAutoPool = identityResourceIds is null || !identityResourceIds.Any();
+
+            if (isAutoPool)
+            {
+                logger.LogInformation($"TES task: {tesTaskId} creating Auto Pool using VM size {poolSpecification.VirtualMachineSize}");
+            }
+            else
+            {
+                logger.LogInformation($"TES task: {tesTaskId} creating Manual Batch Pool using VM size {poolSpecification.VirtualMachineSize}");
+            }
+
             // By default, the pool will have the same name/ID as the job if the identity is provided, otherwise we return an actual autopool.
-            return identityResourceIds is null || !identityResourceIds.Any()
+            return isAutoPool
                 ? new()
                 {
                     AutoPoolSpecification = new()
@@ -974,9 +1002,9 @@ namespace TesApi.Web
                 }
                 : await azureProxy.CreateBatchPoolAsync(
                     ConvertPoolSpecificationToModelsPool(
-                        $"TES_{jobId ?? throw new ArgumentNullException(nameof(jobId))}",
+                        $"TES_{jobId}",
                         jobId,
-                        GetBatchPoolIdentity(identityResourceIds),
+                        GetBatchPoolIdentity(identities),
                         poolSpecification),
                     IsPreemptable());
 
@@ -992,10 +1020,10 @@ namespace TesApi.Web
         /// <summary>
         /// Generate the BatchPoolIdentity object
         /// </summary>
-        /// <param name="identityResourceIds"></param>
+        /// <param name="identities"></param>
         /// <returns></returns>
-        private static BatchModels.BatchPoolIdentity GetBatchPoolIdentity(IEnumerable<string> identityResourceIds)
-            => identityResourceIds is null || !identityResourceIds.Any() ? null : new(BatchModels.PoolIdentityType.UserAssigned, identityResourceIds.ToDictionary(x => x, x => new BatchModels.UserAssignedIdentities()));
+        private static BatchModels.BatchPoolIdentity GetBatchPoolIdentity(string[] identities)
+            => identities is null || !identities.Any() ? null : new(BatchModels.PoolIdentityType.UserAssigned, identities.ToDictionary(x => x, x => new BatchModels.UserAssignedIdentities()));
 
         /// <summary>
         /// Generate the PoolSpecification object

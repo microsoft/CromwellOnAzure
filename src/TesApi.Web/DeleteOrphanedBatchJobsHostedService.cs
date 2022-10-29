@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Tes.Extensions;
 using Tes.Models;
 using Tes.Repository;
 
@@ -50,7 +49,7 @@ namespace TesApi.Web
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    break;
+                    return;
                 }
                 catch (Exception ex) when (!(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
                 {
@@ -62,7 +61,9 @@ namespace TesApi.Web
                     await Task.Delay(runInterval, cancellationToken);
                 }
                 catch (TaskCanceledException)
-                { }
+                {
+                    return;
+                }
             }
         }
 
@@ -87,10 +88,7 @@ namespace TesApi.Web
                         await azureProxy.DeleteBatchJobAsync(tesTaskId, cancellationToken);
                         logger.LogInformation($"Deleted orphaned Batch Job '{jobId}'");
 
-                        if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
-                        {
-                            await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
-                        }
+                        await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
                     }
                     else
                     {

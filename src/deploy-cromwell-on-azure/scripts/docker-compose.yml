@@ -35,6 +35,7 @@ services:
       - MarthaUrl=$MarthaUrl
       - MarthaKeyVaultName=$MarthaKeyVaultName
       - MarthaSecretName=$MarthaSecretName
+      - GlobalStartTaskPath=$GlobalStartTaskPath
       - PostgreSqlServerName=$PostgreSqlServerName
       - PostgreSqlTesDatabaseName=$PostgreSqlTesDatabaseName
       - PostgreSqlTesUserLogin=$PostgreSqlTesUserLogin
