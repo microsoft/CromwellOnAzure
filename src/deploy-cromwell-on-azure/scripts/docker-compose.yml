@@ -38,6 +38,7 @@ services:
       - MarthaSecretName=$MarthaSecretName
       - BatchPoolRotationForcedDays=$BatchPoolRotationForcedDays
       - Name=$Name
+      - GlobalStartTaskPath=$GlobalStartTaskPath
       - PostgreSqlServerName=$PostgreSqlServerName
       - PostgreSqlTesDatabaseName=$PostgreSqlTesDatabaseName
       - PostgreSqlTesUserLogin=$PostgreSqlTesUserLogin

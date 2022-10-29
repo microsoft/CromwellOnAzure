@@ -968,6 +968,7 @@ namespace CromwellOnAzureDeployer
 
                 await PatchContainersAddJobPreparationScriptV320Async(storageAccount);
                 await PatchAllowedVmSizesFileV320Async(storageAccount);
+                await PatchMySqlDbRootPasswordV320Async(sshConnectionInfo);
             }
         }
 
@@ -1362,6 +1363,16 @@ namespace CromwellOnAzureDeployer
 
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
         {
+            var env04SettingsContent = Utility.GetFileContent("scripts", "env-04-settings.txt");
+            env04SettingsContent = env04SettingsContent.Replace("{DefaultName}", configuration.Name);
+
+            if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+            {
+                var env04Settings = Utility.DelimitedTextToDictionary(env04SettingsContent);
+                env04Settings["MYSQL_ROOT_PASSWORD"] = Utility.GeneratePassword();
+                env04SettingsContent = Utility.DictionaryToDelimitedText(env04Settings);
+            }
+
             var uploadList = new List<(string, string, bool)>
             {
                 (Utility.PersonalizeContent(new []
@@ -1375,11 +1386,7 @@ namespace CromwellOnAzureDeployer
                 }, "scripts", "env-01-account-names.txt"),
                 $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
-                (Utility.PersonalizeContent(new []
-                {
-                    new Utility.ConfigReplaceTextItem("{DefaultName}", configuration.Name),
-                }, "scripts", "env-04-settings.txt"),
-                $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                (env04SettingsContent, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
             };
 
             if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
@@ -2365,6 +2372,23 @@ namespace CromwellOnAzureDeployer
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
                 });
+
+        private async Task PatchMySqlDbRootPasswordV320Async(ConnectionInfo sshConnectionInfo)
+        {
+            if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+            {
+                await Execute(
+                    $"Adding new setting to 'env-04-settings.txt' file on the VM...",
+                    async () =>
+                    {
+                        var envSettings = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt")).Output);
+                        // [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Previously hardcoded password only accessible within security context.")]
+                        envSettings["MYSQL_ROOT_PASSWORD"] = "cromwell";
+                        await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.DictionaryToDelimitedText(envSettings), $"{CromwellAzureRootDir}/env-04-settings.txt", false));
+                    }
+                );
+            }
+        }
 
         private Task PatchContainersAddJobPreparationScriptV320Async(IStorageAccount storageAccount)
             => Execute(
