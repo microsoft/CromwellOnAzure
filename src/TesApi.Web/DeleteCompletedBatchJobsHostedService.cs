@@ -100,10 +100,8 @@ namespace TesApi.Web
 
             foreach (var jobId in jobsToDelete)
             {
-                logger.LogInformation($"Job Id to delete: {jobId}");
-
                 var tesTaskId = jobId.Split(new[] { '-' })[0];
-                logger.LogInformation($"TES task Id to delete: {tesTaskId}");
+                logger.LogInformation($"TES task: {tesTaskId} deleting Batch Job ID: {jobId}");
 
                 TesTask tesTask = null;
 
@@ -116,6 +114,16 @@ namespace TesApi.Web
                         tesTask.State == TesState.UNKNOWNEnum)
                     {
                         await azureProxy.DeleteBatchJobAsync(tesTaskId, cancellationToken);
+
+                        try
+                        {
+                            await azureProxy.DeleteBatchPoolIfExistsAsync(tesTaskId, cancellationToken);
+                        }
+                        catch (Exception exc)
+                        {
+                            logger.LogError(exc, $"TES task: {tesTaskId} Exception in DeleteOldBatchJobs when attempting to delete the manual batch pool");
+                            // Do not rethrow
+                        }
                     }
                 }
             }

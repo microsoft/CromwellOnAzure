@@ -29,7 +29,9 @@ Ensure that the attributes `memory` and `disk` (note: use the singular form for 
 > GB - "GB", "G", "GiB", "Gi"<br/>
 > TB - "TB", "T", "TiB", "Ti"<br/>
 
-The `preemptible` attribute is a boolean (not an integer). You can specify `preemptible` as `true` or `false` for each task. When set to `true` Cromwell on Azure will use a [low-priority batch VM](https://docs.microsoft.com/en-us/azure/batch/batch-low-pri-vms#use-cases-for-low-priority-vms) to run the task. If set to `false` Cromwell on Azure will use a [dedicated VM](https://docs.microsoft.com/en-us/azure/batch/nodes-and-pools#node-type-and-target) to run the task.<br/>
+The `preemptible` attribute is a boolean. You can specify `preemptible` as `true` or `false` for each task. When set to `true` Cromwell on Azure will use a [low-priority batch VM](https://docs.microsoft.com/en-us/azure/batch/batch-low-pri-vms#use-cases-for-low-priority-vms) to run the task. If set to `false` Cromwell on Azure will use a [dedicated VM](https://docs.microsoft.com/en-us/azure/batch/nodes-and-pools#node-type-and-target) to run the task.<br/>
+
+Starting with Cromwell on Azure version 3.2 integer values for `preemptible` are accepted and will be converted to boolean: `true` for positive values, `false` otherwise.<br/>
 
 `bootDiskSizeGb` and `zones` attributes are not supported by the TES backend.<br/>
 Each of these runtime attributes are specific to your workflow and tasks within those workflows. The default values for resource requirements are as set above.<br/>

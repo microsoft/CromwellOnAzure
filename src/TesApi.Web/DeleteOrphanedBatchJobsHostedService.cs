@@ -49,7 +49,7 @@ namespace TesApi.Web
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    break;
+                    return;
                 }
                 catch (Exception ex) when (!(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
                 {
@@ -61,7 +61,9 @@ namespace TesApi.Web
                     await Task.Delay(runInterval, cancellationToken);
                 }
                 catch (TaskCanceledException)
-                { }
+                {
+                    return;
+                }
             }
         }
 
@@ -85,6 +87,8 @@ namespace TesApi.Web
                     {
                         await azureProxy.DeleteBatchJobAsync(tesTaskId, cancellationToken);
                         logger.LogInformation($"Deleted orphaned Batch Job '{jobId}'");
+
+                        await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
                     }
                     else
                     {

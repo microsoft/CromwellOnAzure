@@ -1405,6 +1405,9 @@ namespace TesApi.Tests
                 azureProxy.Setup(a => a.GetActivePoolsAsync(It.IsAny<string>()))
                     .Returns(AsyncEnumerable.Empty<CloudPool>());
 
+                azureProxy.Setup(a => a.GetNextBatchJobIdAsync(It.IsAny<string>()))
+                    .Returns(Task.FromResult(azureProxyReturnValues.NextBatchJobId));
+
                 azureProxy.Setup(a => a.GetBatchJobAndTaskStateAsync(It.IsAny<string>()))
                     .Returns(Task.FromResult(azureProxyReturnValues.BatchJobAndTaskState));
 
@@ -1440,6 +1443,39 @@ namespace TesApi.Tests
 
                 azureProxy.Setup(a => a.GetBatchPoolAsync(It.IsAny<string>(), It.IsAny<DetailLevel>(), It.IsAny<CancellationToken>()))
                     .Returns((string id, DetailLevel detailLevel, CancellationToken cancellationToken) => Task.FromResult(azureProxyReturnValues.GetBatchPoolImpl(id)));
+
+                azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>()))
+                    .Returns(Task.FromResult(azureProxyReturnValues.DownloadedBlobContent));
+
+                azureProxy.Setup(a => a.LocalFileExists(It.IsAny<string>()))
+                    .Returns(azureProxyReturnValues.LocalFileExists);
+
+                azureProxy.Setup(a => a.GetStorageAccountInfoAsync("defaultstorageaccount"))
+                    .Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["defaultstorageaccount"]));
+
+                azureProxy.Setup(a => a.GetStorageAccountInfoAsync("storageaccount1"))
+                    .Returns(Task.FromResult(azureProxyReturnValues.StorageAccountInfos["storageaccount1"]));
+
+                azureProxy.Setup(a => a.GetContainerRegistryInfoAsync("registryServer1/imageName1:tag1"))
+                    .Returns(Task.FromResult(azureProxyReturnValues.ContainerRegistryInfo));
+
+                azureProxy.Setup(a => a.GetStorageAccountKeyAsync(It.IsAny<StorageAccountInfo>()))
+                    .Returns(Task.FromResult(azureProxyReturnValues.StorageAccountKey));
+
+                azureProxy.Setup(a => a.GetVmSizesAndPricesAsync())
+                    .Returns(Task.FromResult(azureProxyReturnValues.VmSizesAndPrices));
+
+                azureProxy.Setup(a => a.GetBatchAccountQuotasAsync())
+                    .Returns(Task.FromResult(azureProxyReturnValues.BatchQuotas));
+
+                azureProxy.Setup(a => a.GetBatchActiveNodeCountByVmSize())
+                    .Returns(azureProxyReturnValues.ActiveNodeCountByVmSize);
+
+                azureProxy.Setup(a => a.GetBatchActiveJobCount())
+                    .Returns(azureProxyReturnValues.ActiveJobCount);
+
+                azureProxy.Setup(a => a.GetBatchActivePoolCount())
+                    .Returns(azureProxyReturnValues.ActivePoolCount);
 
                 azureProxy.Setup(a => a.DownloadBlobAsync(It.IsAny<Uri>()))
                     .Returns(Task.FromResult(azureProxyReturnValues.DownloadedBlobContent));

@@ -52,5 +52,10 @@ namespace TesApi.Web
         /// <param name="pool">Pool to remove.</param>
         /// <returns></returns>
         bool RemovePoolFromList(IBatchPool pool);
+
+        /// <summary>
+        /// Garbage collects the old batch task state log hashset
+        /// </summary>
+        void ClearBatchLogState();
     }
 }
