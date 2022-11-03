@@ -499,11 +499,6 @@ namespace CromwellOnAzureDeployer
                         Task compute = null;
                         if (configuration.UseAks)
                         {
-                            ConsoleEx.WriteLine();
-                            ConsoleEx.WriteLine($"Resource group: {resourceGroup.Name}");
-                            ConsoleEx.WriteLine($"K8S cluster: {configuration.AksClusterName}");
-                            ConsoleEx.WriteLine($"K8S CoA namespace: {configuration.AksCoANamespace}");
-                            ConsoleEx.WriteLine();
                             compute = Task.Run(async () =>
                             {
                                 var settings = ConfigureSettings(managedIdentity, default, default);
@@ -1500,7 +1495,7 @@ namespace CromwellOnAzureDeployer
             var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1";
 
             return Execute(
-                $"Assigning Storage Blob Data Reader role for VM to Storage Account resource scope...",
+                $"Assigning Storage Blob Data Reader role for user-managed identity to Storage Account resource scope...",
                 () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                     () => azureSubscriptionClient.AccessManagement.RoleAssignments
                         .Define(Guid.NewGuid().ToString())
@@ -1512,7 +1507,7 @@ namespace CromwellOnAzureDeployer
 
         private Task AssignVmAsContributorToStorageAccountAsync(IIdentity managedIdentity, IResource storageAccount)
             => Execute(
-                $"Assigning {BuiltInRole.Contributor} role for VM to Storage Account resource scope...",
+                $"Assigning {BuiltInRole.Contributor} role for user-managed identity to Storage Account resource scope...",
                 () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                     () => azureSubscriptionClient.AccessManagement.RoleAssignments
                         .Define(Guid.NewGuid().ToString())
@@ -1645,7 +1640,7 @@ namespace CromwellOnAzureDeployer
 
         private Task AssignVmAsContributorToBatchAccountAsync(IIdentity managedIdentity, BatchAccount batchAccount)
             => Execute(
-                $"Assigning {BuiltInRole.Contributor} role for VM to Batch Account resource scope...",
+                $"Assigning {BuiltInRole.Contributor} role for user-managed identity to Batch Account resource scope...",
                 () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                     () => azureSubscriptionClient.AccessManagement.RoleAssignments
                         .Define(Guid.NewGuid().ToString())
@@ -1656,7 +1651,7 @@ namespace CromwellOnAzureDeployer
 
         private Task AssignVmAsContributorToCosmosDb(IIdentity managedIdentity, IResource cosmosDb)
             => Execute(
-                $"Assigning {BuiltInRole.Contributor} role for VM to Cosmos DB resource scope...",
+                $"Assigning {BuiltInRole.Contributor} role for user-managed identity to Cosmos DB resource scope...",
                 () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                     () => azureSubscriptionClient.AccessManagement.RoleAssignments
                         .Define(Guid.NewGuid().ToString())
@@ -1778,7 +1773,7 @@ namespace CromwellOnAzureDeployer
             try
             {
                 await Execute(
-                    $"Assigning {BuiltInRole.BillingReader} role for VM to Subscription scope...",
+                    $"Assigning {BuiltInRole.BillingReader} role for user-managed identity to Subscription scope...",
                     () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                         () => azureSubscriptionClient.AccessManagement.RoleAssignments
                             .Define(Guid.NewGuid().ToString())
@@ -1795,7 +1790,7 @@ namespace CromwellOnAzureDeployer
 
         private Task AssignVmAsContributorToAppInsightsAsync(IIdentity managedIdentity, IResource appInsights)
             => Execute(
-                $"Assigning {BuiltInRole.Contributor} role for VM to App Insights resource scope...",
+                $"Assigning {BuiltInRole.Contributor} role for user-managed identity to App Insights resource scope...",
                 () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                     () => azureSubscriptionClient.AccessManagement.RoleAssignments
                         .Define(Guid.NewGuid().ToString())

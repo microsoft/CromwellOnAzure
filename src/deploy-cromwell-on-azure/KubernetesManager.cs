@@ -72,8 +72,9 @@ namespace CromwellOnAzureDeployer
         public async Task DeployCoADependencies()
         {
             await ExecHelmProcess($"repo add aad-pod-identity {AadPluginRepo}");
-            await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig {kubeConfigPath}");
             await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
+            await ExecHelmProcess($"repo update");
+            await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig {kubeConfigPath}");
             await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig {kubeConfigPath}");
         }
 
