@@ -109,7 +109,8 @@ namespace CromwellOnAzureDeployer
             "Microsoft.OperationalInsights",
             "Microsoft.insights",
             "Microsoft.Network",
-            "Microsoft.Storage"
+            "Microsoft.Storage",
+            "Microsoft.DBforPostgreSQL"
         };
 
         private Configuration configuration { get; set; }
