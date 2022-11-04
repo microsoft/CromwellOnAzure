@@ -1217,7 +1217,7 @@ namespace TesApi.Web
         private async Task<PoolInformation> CreateAutoPoolModePoolInformation(PoolSpecification poolSpecification, string tesTaskId, string jobId, IEnumerable<string> identityResourceIds = null)
         {
             var identities = identityResourceIds?.ToArray() ?? Array.Empty<string>();
-            var isAutoPool = identityResourceIds is null || !identityResourceIds.Any();
+            var isAutoPool = !identities.Any();
 
             if (isAutoPool)
             {
