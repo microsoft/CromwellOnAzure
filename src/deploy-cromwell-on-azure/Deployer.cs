@@ -65,7 +65,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Net.WebSockets;
-using Microsoft.Rest.Azure;
 using static Microsoft.Azure.Management.ResourceManager.Fluent.Core.RestClient;
 
 namespace CromwellOnAzureDeployer
@@ -109,7 +108,8 @@ namespace CromwellOnAzureDeployer
             "Microsoft.OperationalInsights",
             "Microsoft.insights",
             "Microsoft.Network",
-            "Microsoft.Storage"
+            "Microsoft.Storage",
+            "Microsoft.DBforPostgreSQL"
         };
 
         private Configuration configuration { get; set; }

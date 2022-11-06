@@ -36,10 +36,13 @@ namespace CromwellOnAzureDeployer
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
             .WaitAndRetryAsync(8, retryAttempt => System.TimeSpan.FromSeconds(5));
 
-        private const string BlobCsiRepo = "https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
-        private const string BlobCsiDriverVersion = "v1.15.0";
-        private const string AadPluginRepo = "https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts";
-        private const string AadPluginVersion = "4.1.12";
+        private const string BlobCsiDriverGithubReleaseVersion = "v1.17.0";
+        private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseVersion}/charts";
+
+
+        private const string AadPluginGithubReleaseVersion = "v1.8.13";
+        private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
+        private const string AadPluginVersion = "4.1.14";
 
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
@@ -71,11 +74,21 @@ namespace CromwellOnAzureDeployer
 
         public async Task DeployCoADependencies()
         {
-            await ExecHelmProcess($"repo add aad-pod-identity {AadPluginRepo}");
-            await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
+            var helmRepoList = await ExecHelmProcess($"repo list");
+
+            if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("aad-pod-identity", StringComparison.OrdinalIgnoreCase))
+            {
+                await ExecHelmProcess($"repo add aad-pod-identity {AadPluginRepo}");
+            }
+
+            if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("blob-csi-driver", StringComparison.OrdinalIgnoreCase))
+            {
+                await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
+            }
+            
             await ExecHelmProcess($"repo update");
             await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig {kubeConfigPath}");
-            await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverVersion} --kubeconfig {kubeConfigPath}");
+            await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig {kubeConfigPath}");
         }
 
         public async Task DeployHelmChartToClusterAsync()
@@ -217,7 +230,7 @@ namespace CromwellOnAzureDeployer
             return settings;
         }
 
-        private async Task ExecHelmProcess(string command)
+        private async Task<string> ExecHelmProcess(string command)
         {
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
@@ -226,17 +239,16 @@ namespace CromwellOnAzureDeployer
             p.StartInfo.Arguments = command;
             p.Start();
 
-            if (configuration.DebugLogging)
+            var standardOutput = p.StandardOutput?.ReadToEnd();
+
+            if (configuration.DebugLogging && !string.IsNullOrWhiteSpace(standardOutput))
             {
-                var line = p.StandardOutput.ReadLine();
-                while (line != null)
-                {
-                    ConsoleEx.WriteLine("HELM: " + line);
-                    line = p.StandardOutput.ReadLine();
-                }
+                ConsoleEx.WriteLine("HELM:");
+                ConsoleEx.WriteLine(standardOutput);
             }
 
             await p.WaitForExitAsync();
+            return standardOutput;
         }
 
         public async Task ExecuteCommandsOnPod(IKubernetes client, string podName, IEnumerable<string[]> commands, TimeSpan timeout)
