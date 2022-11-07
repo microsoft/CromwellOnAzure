@@ -526,12 +526,6 @@ namespace CromwellOnAzureDeployer
                         }
                         else
                         {
-                            ConsoleEx.WriteLine();
-                            ConsoleEx.WriteLine($"Resource group: {resourceGroup.Name}");
-                            ConsoleEx.WriteLine($"VM host: {configuration.VmName}.{configuration.RegionName}.cloudapp.azure.com");
-                            ConsoleEx.WriteLine($"VM username: {configuration.VmUsername}");
-                            ConsoleEx.WriteLine($"VM password: {configuration.VmPassword}");
-                            ConsoleEx.WriteLine();
                             compute = CreateVirtualMachineAsync(managedIdentity, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name)
                                 .ContinueWith(async t =>
                                     {
