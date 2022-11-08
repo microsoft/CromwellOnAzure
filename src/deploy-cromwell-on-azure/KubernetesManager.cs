@@ -38,23 +38,24 @@ namespace CromwellOnAzureDeployer
 
         private const string BlobCsiDriverGithubReleaseVersion = "v1.17.0";
         private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseVersion}/charts";
-
-
         private const string AadPluginGithubReleaseVersion = "v1.8.13";
         private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
         private const string AadPluginVersion = "4.1.14";
 
+        public string HelmValuesYamlPath { get; set; }
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
         private CancellationTokenSource cts { get; set; }
         private string kubeConfigPath { get; set; }
-
+        
         public KubernetesManager(Configuration config, AzureCredentials credentials, CancellationTokenSource cts)
         {
-            this.configuration = config;
-            this.azureCredentials = credentials;
             this.cts = cts;
-            this.kubeConfigPath = Path.Join(Path.GetTempPath(), "kubeconfig.txt");
+            configuration = config;
+            azureCredentials = credentials;
+            kubeConfigPath = Path.Join(Path.GetTempPath(), "kubeconfig.txt");
+            HelmValuesYamlPath = Path.Join(Path.GetTempPath(), "scripts", "helm", "values.yaml");
+            Directory.CreateDirectory(Path.GetDirectoryName(HelmValuesYamlPath));
         }
 
         public async Task<IKubernetes> GetKubernetesClient(IResource resourceGroupObject)
@@ -140,7 +141,8 @@ namespace CromwellOnAzureDeployer
             }
 
             var valuesString = KubernetesYaml.Serialize(values);
-            await File.WriteAllTextAsync(Path.Join("scripts", "helm", "values.yaml"), valuesString);
+            ConsoleEx.WriteLine($"Writing: {HelmValuesYamlPath}");
+            await File.WriteAllTextAsync(HelmValuesYamlPath, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
         }
 
@@ -149,7 +151,8 @@ namespace CromwellOnAzureDeployer
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
             UpdateValuesFromSettings(values, settings);
             var valuesString = KubernetesYaml.Serialize(values);
-            await File.WriteAllTextAsync(Path.Join("scripts", "helm", "values.yaml"), valuesString);
+            ConsoleEx.WriteLine($"Writing: {HelmValuesYamlPath}");
+            await File.WriteAllTextAsync(HelmValuesYamlPath, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
         }
 

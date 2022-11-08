@@ -512,7 +512,8 @@ namespace CromwellOnAzureDeployer
 
                                 if (configuration.ManualHelmDeployment)
                                 {
-                                    ConsoleEx.WriteLine("Please deploy helm chart, and press Enter to continue.");
+                                    ConsoleEx.WriteLine($"Please modify: {kubernetesManager.HelmValuesYamlPath}");
+                                    ConsoleEx.WriteLine($"Then, deploy the helm chart, and press Enter to continue.");
                                     ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer));
                                     ConsoleEx.ReadLine();
                                 }
