@@ -42,20 +42,25 @@ namespace CromwellOnAzureDeployer
         private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
         private const string AadPluginVersion = "4.1.14";
 
-        public string HelmValuesYamlPath { get; set; }
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
         private CancellationTokenSource cts { get; set; }
         private string kubeConfigPath { get; set; }
-        
+        private string helmRootDirectory { get; set; }
+
+        public string HelmValuesYamlPath { get; set; }
+
         public KubernetesManager(Configuration config, AzureCredentials credentials, CancellationTokenSource cts)
         {
             this.cts = cts;
             configuration = config;
             azureCredentials = credentials;
-            kubeConfigPath = Path.Join(Path.GetTempPath(), "cromwell-on-azure", "kubeconfig.txt");
-            HelmValuesYamlPath = Path.Join(Path.GetTempPath(), "cromwell-on-azure", "values.yaml");
-            Directory.CreateDirectory(Path.GetDirectoryName(HelmValuesYamlPath));
+            var workingDirectory = Directory.GetCurrentDirectory();
+            kubeConfigPath = Path.Join(workingDirectory, "cromwell-on-azure", "aks", "kubeconfig.txt");
+            HelmValuesYamlPath = Path.Join(workingDirectory, "cromwell-on-azure", "helm", "values.yaml");
+            helmRootDirectory = Path.GetDirectoryName(HelmValuesYamlPath);
+            Directory.CreateDirectory(helmRootDirectory);
+            Directory.CreateDirectory(Path.GetDirectoryName(kubeConfigPath));
         }
 
         public async Task<IKubernetes> GetKubernetesClient(IResource resourceGroupObject)
@@ -94,7 +99,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task DeployHelmChartToClusterAsync()
         {
-           await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace");
+           await ExecHelmProcess($"upgrade --install cromwellonazure {helmRootDirectory} --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace");
         }
 
         public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
