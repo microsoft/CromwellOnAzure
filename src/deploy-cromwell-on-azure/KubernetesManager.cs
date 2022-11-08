@@ -36,12 +36,13 @@ namespace CromwellOnAzureDeployer
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
             .WaitAndRetryAsync(8, retryAttempt => System.TimeSpan.FromSeconds(5));
 
+        private const string BlobCsiDriverGithubReleaseVersion = "v1.17.0";
+
         // Note: there is a bug in the blob-csi-driver values.yaml
         // https://github.com/kubernetes-sigs/blob-csi-driver/issues/783
-        //private const string BlobCsiDriverGithubReleaseVersion = "v1.17.0";
-        //private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseVersion}/charts";
-
+        // private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseVersion}/charts";
         private const string BlobCsiRepo = "https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
+
         private const string AadPluginGithubReleaseVersion = "v1.8.13";
         private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
         private const string AadPluginVersion = "4.1.14";
