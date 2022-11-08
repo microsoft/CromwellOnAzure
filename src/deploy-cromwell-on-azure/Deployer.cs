@@ -152,8 +152,8 @@ namespace CromwellOnAzureDeployer
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
                 kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
                 networkManagementClient = new Microsoft.Azure.Management.Network.NetworkManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
-                postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
-                postgreSqlSingleManagementClient = new SingleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+                postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 600 };
+                postgreSqlSingleManagementClient = new SingleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 600 };
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
