@@ -53,8 +53,8 @@ namespace CromwellOnAzureDeployer
             this.cts = cts;
             configuration = config;
             azureCredentials = credentials;
-            kubeConfigPath = Path.Join(Path.GetTempPath(), "kubeconfig.txt");
-            HelmValuesYamlPath = Path.Join(Path.GetTempPath(), "scripts", "helm", "values.yaml");
+            kubeConfigPath = Path.Join(Path.GetTempPath(), "cromwell-on-azure", "kubeconfig.txt");
+            HelmValuesYamlPath = Path.Join(Path.GetTempPath(), "cromwell-on-azure", "values.yaml");
             Directory.CreateDirectory(Path.GetDirectoryName(HelmValuesYamlPath));
         }
 
