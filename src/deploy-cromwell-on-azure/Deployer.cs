@@ -512,7 +512,7 @@ namespace CromwellOnAzureDeployer
 
                                 if (configuration.ManualHelmDeployment)
                                 {
-                                    ConsoleEx.WriteLine($"Please modify: {kubernetesManager.HelmValuesYamlPath}");
+                                    ConsoleEx.WriteLine($"Please modify: {kubernetesManager.TempHelmValuesYamlPath}");
                                     ConsoleEx.WriteLine($"Then, deploy the helm chart, and press Enter to continue.");
                                     ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer));
                                     ConsoleEx.ReadLine();
@@ -628,6 +628,12 @@ namespace CromwellOnAzureDeployer
                     if (!configuration.KeepSshPortOpen.GetValueOrDefault())
                     {
                         await DisableSsh(networkSecurityGroup);
+                    }
+
+                    if (configuration.UseAks)
+                    {
+                        ConsoleEx.WriteLine($"Deleting: {kubernetesManager.TempHelmValuesYamlPath}");
+                        File.Delete(kubernetesManager.TempHelmValuesYamlPath);
                     }
                 }
 
