@@ -42,7 +42,6 @@ namespace CromwellOnAzureDeployer
         // https://github.com/kubernetes-sigs/blob-csi-driver/issues/783
         // private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseVersion}/charts";
         private const string BlobCsiRepo = "https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
-
         private const string AadPluginGithubReleaseVersion = "v1.8.13";
         private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
         private const string AadPluginVersion = "4.1.14";
@@ -50,27 +49,27 @@ namespace CromwellOnAzureDeployer
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
         private CancellationTokenSource cts { get; set; }
+        private string workingDirectoryTemp { get; set; }
         private string kubeConfigPath { get; set; }
-        private string helmRootDirectory { get; set; }
-        private string helmScriptsRootDirectory { get; set; }
+        private string valuesTemplatePath { get; set; }
+        private string generatedHelmScriptsRootDirectory { get; set; }
+        private string includedHelmScriptsRootDirectory { get; set; }
         public string TempHelmValuesYamlPath { get; set; }
-
+        
         public KubernetesManager(Configuration config, AzureCredentials credentials, CancellationTokenSource cts)
         {
             this.cts = cts;
             configuration = config;
             azureCredentials = credentials;
-
-            helmScriptsRootDirectory = Path.Join(
-                Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName),
-                "scripts",
-                "helm");
-
             var workingDirectory = Directory.GetCurrentDirectory();
-            kubeConfigPath = Path.Join(workingDirectory, "cromwell-on-azure", "aks", "kubeconfig.txt");
-            TempHelmValuesYamlPath = Path.Join(workingDirectory, "cromwell-on-azure", "helm", "values.yaml");
-            helmRootDirectory = Path.GetDirectoryName(TempHelmValuesYamlPath);
-            Directory.CreateDirectory(helmRootDirectory);
+
+            includedHelmScriptsRootDirectory = Path.Join(workingDirectory, "scripts", "helm");
+            workingDirectoryTemp = Path.Join(workingDirectory, "cromwell-on-azure");
+            kubeConfigPath = Path.Join(workingDirectoryTemp, "aks", "kubeconfig.txt");
+            TempHelmValuesYamlPath = Path.Join(workingDirectoryTemp, "helm", "values.yaml");
+            generatedHelmScriptsRootDirectory = Path.GetDirectoryName(TempHelmValuesYamlPath);
+            valuesTemplatePath = Path.Join(includedHelmScriptsRootDirectory, "values-template.yaml");
+            Directory.CreateDirectory(generatedHelmScriptsRootDirectory);
             Directory.CreateDirectory(Path.GetDirectoryName(kubeConfigPath));
         }
 
@@ -81,8 +80,8 @@ namespace CromwellOnAzureDeployer
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
             var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup, configuration.AksClusterName);
-            var kubeConfigFile = new FileInfo(Path.Join(kubeConfigPath));
-            File.WriteAllText(kubeConfigFile.FullName, Encoding.Default.GetString(creds.Kubeconfigs.First().Value));
+            var kubeConfigFile = new FileInfo(kubeConfigPath);
+            await File.WriteAllTextAsync(kubeConfigFile.FullName, Encoding.Default.GetString(creds.Kubeconfigs.First().Value));
 
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
             var k8sClientConfiguration = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
@@ -110,12 +109,12 @@ namespace CromwellOnAzureDeployer
 
         public async Task DeployHelmChartToClusterAsync()
         {
-            await ExecHelmProcess($"upgrade --install cromwellonazure {helmScriptsRootDirectory} --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace");
+            await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace");
         }
 
         public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
         {
-            var values = KubernetesYaml.Deserialize<HelmValues>(Utility.GetFileContent("scripts", "helm", "values-template.yaml"));
+            var values = KubernetesYaml.Deserialize<HelmValues>(await File.ReadAllTextAsync(valuesTemplatePath));
             UpdateValuesFromSettings(values, settings);
             values.Config["resourceGroup"] = resourceGroupName;
             values.Identity["name"] = managedId.Name;
@@ -157,7 +156,6 @@ namespace CromwellOnAzureDeployer
             }
 
             var valuesString = KubernetesYaml.Serialize(values);
-            ConsoleEx.WriteLine($"Writing: {TempHelmValuesYamlPath}");
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
         }
@@ -167,43 +165,8 @@ namespace CromwellOnAzureDeployer
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
             UpdateValuesFromSettings(values, settings);
             var valuesString = KubernetesYaml.Serialize(values);
-            ConsoleEx.WriteLine($"Writing: {TempHelmValuesYamlPath}");
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
-        }
-
-        private static void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)
-        {
-            values.Config["cromwellOnAzureVersion"] = settings["CromwellOnAzureVersion"];
-            values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
-            values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
-            values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
-            values.Config["cosmosDbAccountName"] = settings["CosmosDbAccountName"];
-            values.Config["batchAccountName"] = settings["BatchAccountName"];
-            values.Config["batchNodesSubnetId"] = settings["BatchNodesSubnetId"];
-            values.Config["coaNamespace"] = settings["AksCoANamespace"];
-            values.Config["disableBatchNodesPublicIpAddress"] = settings["DisableBatchNodesPublicIpAddress"];
-            values.Config["disableBatchScheduling"] = settings["DisableBatchScheduling"];
-            values.Config["usePreemptibleVmsOnly"] = settings["UsePreemptibleVmsOnly"];
-            values.Config["blobxferImageName"] = settings["BlobxferImageName"];
-            values.Config["dockerInDockerImageName"] = settings["DockerInDockerImageName"];
-            values.Config["batchImageOffer"] = settings["BatchImageOffer"];
-            values.Config["batchImagePublisher"] = settings["BatchImagePublisher"];
-            values.Config["batchImageSku"] = settings["BatchImageSku"];
-            values.Config["batchImageVersion"] = settings["BatchImageVersion"];
-            values.Config["batchNodeAgentSkuId"] = settings["BatchNodeAgentSkuId"];
-            values.Config["marthaUrl"] = settings["MarthaUrl"];
-            values.Config["marthaKeyVaultName"] = settings["MarthaKeyVaultName"];
-            values.Config["marthaSecretName"] = settings["MarthaSecretName"];
-            values.Images["tes"] = settings["TesImageName"];
-            values.Images["triggerservice"] = settings["TriggerServiceImageName"];
-            values.Images["cromwell"] = settings["CromwellImageName"];
-            values.Config["crossSubscriptionAKSDeployment"] = settings["CrossSubscriptionAKSDeployment"];
-            values.Config["postgreSqlServerName"] = settings["PostgreSqlServerName"];
-            values.Config["postgreSqlDatabaseName"] = settings["PostgreSqlDatabaseName"];
-            values.Config["postgreSqlUserLogin"] = settings["PostgreSqlUserLogin"];
-            values.Config["postgreSqlUserPassword"] = settings["PostgreSqlUserPassword"];
-            values.Config["usePostgreSqlSingleServer"] = settings["UsePostgreSqlSingleServer"];
         }
 
         public async Task<Dictionary<string, string>> GetAKSSettings(IStorageAccount storageAccount)
@@ -211,65 +174,6 @@ namespace CromwellOnAzureDeployer
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
             return ValuesToSettings(values);
         }
-
-        private static Dictionary<string, string> ValuesToSettings(HelmValues values)
-        {
-            var settings = new Dictionary<string, string>();
-            settings["CromwellOnAzureVersion"] = values.Config["cromwellOnAzureVersion"];
-            settings["DefaultStorageAccountName"] = values.Persistence["storageAccount"];
-            settings["AzureServicesAuthConnectionString"] = values.Config["azureServicesAuthConnectionString"];
-            settings["ApplicationInsightsAccountName"] = values.Config["applicationInsightsAccountName"];
-            settings["CosmosDbAccountName"] = values.Config["cosmosDbAccountName"];
-            settings["BatchAccountName"] = values.Config["batchAccountName"];
-            settings["BatchNodesSubnetId"] = values.Config["batchNodesSubnetId"];
-            settings["AksCoANamespace"] = values.Config["coaNamespace"];
-            settings["DisableBatchNodesPublicIpAddress"] = values.Config["disableBatchNodesPublicIpAddress"];
-            settings["DisableBatchScheduling"] = values.Config["disableBatchScheduling"];
-            settings["UsePreemptibleVmsOnly"] = values.Config["usePreemptibleVmsOnly"];
-            settings["BlobxferImageName"] = values.Config["blobxferImageName"];
-            settings["DockerInDockerImageName"] = values.Config["dockerInDockerImageName"];
-            settings["BatchImageOffer"] = values.Config["batchImageOffer"];
-            settings["BatchImagePublisher"] = values.Config["batchImagePublisher"];
-            settings["BatchImageSku"] = values.Config["batchImageSku"];
-            settings["BatchImageVersion"] = values.Config["batchImageVersion"];
-            settings["BatchNodeAgentSkuId"] = values.Config["batchNodeAgentSkuId"];
-            settings["MarthaUrl"] = values.Config["marthaUrl"];
-            settings["MarthaKeyVaultName"] = values.Config["marthaKeyVaultName"];
-            settings["MarthaSecretName"] = values.Config["marthaSecretName"];
-            settings["TesImageName"] = values.Images["tes"];
-            settings["TriggerServiceImageName"] = values.Images["triggerservice"];
-            settings["CromwellImageName"] = values.Images["cromwell"];
-            settings["CrossSubscriptionAKSDeployment"] = values.Config["crossSubscriptionAKSDeployment"];
-            settings["PostgreSqlServerName"] = values.Config["postgreSqlServerName"];
-            settings["PostgreSqlDatabaseName"] = values.Config["postgreSqlDatabaseName"];
-            settings["PostgreSqlUserLogin"] = values.Config["postgreSqlUserLogin"];
-            settings["PostgreSqlUserPassword"] = values.Config["postgreSqlUserPassword"];
-            settings["UsePostgreSqlSingleServer"] = values.Config["usePostgreSqlSingleServer"];
-            settings["ManagedIdentityClientId"] = values.Identity["clientId"];
-            return settings;
-        }
-
-        private async Task<string> ExecHelmProcess(string command)
-        {
-            var p = new Process();
-            p.StartInfo.UseShellExecute = false;
-            p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.FileName = configuration.HelmBinaryPath;
-            p.StartInfo.Arguments = command;
-            p.Start();
-
-            var standardOutput = p.StandardOutput?.ReadToEnd();
-
-            if (configuration.DebugLogging && !string.IsNullOrWhiteSpace(standardOutput))
-            {
-                ConsoleEx.WriteLine("HELM:");
-                ConsoleEx.WriteLine(standardOutput);
-            }
-
-            await p.WaitForExitAsync();
-            return standardOutput;
-        }
-
         public async Task ExecuteCommandsOnPod(IKubernetes client, string podName, IEnumerable<string[]> commands, TimeSpan timeout)
         {
             var printHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
@@ -335,6 +239,153 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId, string keyVaultUrl)
+        {
+            await UpgradeValuesYaml(storageAccount, settings);
+            await DeployHelmChartToClusterAsync();
+        }
+        
+        public void DeleteTempFiles()
+        {
+            Directory.Delete(workingDirectoryTemp, true);
+        }
+
+        private static void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)
+        {
+            values.Config["cromwellOnAzureVersion"] = settings["CromwellOnAzureVersion"];
+            values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
+            values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
+            values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
+            values.Config["cosmosDbAccountName"] = settings["CosmosDbAccountName"];
+            values.Config["batchAccountName"] = settings["BatchAccountName"];
+            values.Config["batchNodesSubnetId"] = settings["BatchNodesSubnetId"];
+            values.Config["coaNamespace"] = settings["AksCoANamespace"];
+            values.Config["disableBatchNodesPublicIpAddress"] = settings["DisableBatchNodesPublicIpAddress"];
+            values.Config["disableBatchScheduling"] = settings["DisableBatchScheduling"];
+            values.Config["usePreemptibleVmsOnly"] = settings["UsePreemptibleVmsOnly"];
+            values.Config["blobxferImageName"] = settings["BlobxferImageName"];
+            values.Config["dockerInDockerImageName"] = settings["DockerInDockerImageName"];
+            values.Config["batchImageOffer"] = settings["BatchImageOffer"];
+            values.Config["batchImagePublisher"] = settings["BatchImagePublisher"];
+            values.Config["batchImageSku"] = settings["BatchImageSku"];
+            values.Config["batchImageVersion"] = settings["BatchImageVersion"];
+            values.Config["batchNodeAgentSkuId"] = settings["BatchNodeAgentSkuId"];
+            values.Config["marthaUrl"] = settings["MarthaUrl"];
+            values.Config["marthaKeyVaultName"] = settings["MarthaKeyVaultName"];
+            values.Config["marthaSecretName"] = settings["MarthaSecretName"];
+            values.Images["tes"] = settings["TesImageName"];
+            values.Images["triggerservice"] = settings["TriggerServiceImageName"];
+            values.Images["cromwell"] = settings["CromwellImageName"];
+            values.Config["crossSubscriptionAKSDeployment"] = settings["CrossSubscriptionAKSDeployment"];
+            values.Config["postgreSqlServerName"] = settings["PostgreSqlServerName"];
+            values.Config["postgreSqlDatabaseName"] = settings["PostgreSqlDatabaseName"];
+            values.Config["postgreSqlUserLogin"] = settings["PostgreSqlUserLogin"];
+            values.Config["postgreSqlUserPassword"] = settings["PostgreSqlUserPassword"];
+            values.Config["usePostgreSqlSingleServer"] = settings["UsePostgreSqlSingleServer"];
+        }
+
+        private static Dictionary<string, string> ValuesToSettings(HelmValues values)
+        {
+            var settings = new Dictionary<string, string>();
+            settings["CromwellOnAzureVersion"] = values.Config["cromwellOnAzureVersion"];
+            settings["DefaultStorageAccountName"] = values.Persistence["storageAccount"];
+            settings["AzureServicesAuthConnectionString"] = values.Config["azureServicesAuthConnectionString"];
+            settings["ApplicationInsightsAccountName"] = values.Config["applicationInsightsAccountName"];
+            settings["CosmosDbAccountName"] = values.Config["cosmosDbAccountName"];
+            settings["BatchAccountName"] = values.Config["batchAccountName"];
+            settings["BatchNodesSubnetId"] = values.Config["batchNodesSubnetId"];
+            settings["AksCoANamespace"] = values.Config["coaNamespace"];
+            settings["DisableBatchNodesPublicIpAddress"] = values.Config["disableBatchNodesPublicIpAddress"];
+            settings["DisableBatchScheduling"] = values.Config["disableBatchScheduling"];
+            settings["UsePreemptibleVmsOnly"] = values.Config["usePreemptibleVmsOnly"];
+            settings["BlobxferImageName"] = values.Config["blobxferImageName"];
+            settings["DockerInDockerImageName"] = values.Config["dockerInDockerImageName"];
+            settings["BatchImageOffer"] = values.Config["batchImageOffer"];
+            settings["BatchImagePublisher"] = values.Config["batchImagePublisher"];
+            settings["BatchImageSku"] = values.Config["batchImageSku"];
+            settings["BatchImageVersion"] = values.Config["batchImageVersion"];
+            settings["BatchNodeAgentSkuId"] = values.Config["batchNodeAgentSkuId"];
+            settings["MarthaUrl"] = values.Config["marthaUrl"];
+            settings["MarthaKeyVaultName"] = values.Config["marthaKeyVaultName"];
+            settings["MarthaSecretName"] = values.Config["marthaSecretName"];
+            settings["TesImageName"] = values.Images["tes"];
+            settings["TriggerServiceImageName"] = values.Images["triggerservice"];
+            settings["CromwellImageName"] = values.Images["cromwell"];
+            settings["CrossSubscriptionAKSDeployment"] = values.Config["crossSubscriptionAKSDeployment"];
+            settings["PostgreSqlServerName"] = values.Config["postgreSqlServerName"];
+            settings["PostgreSqlDatabaseName"] = values.Config["postgreSqlDatabaseName"];
+            settings["PostgreSqlUserLogin"] = values.Config["postgreSqlUserLogin"];
+            settings["PostgreSqlUserPassword"] = values.Config["postgreSqlUserPassword"];
+            settings["UsePostgreSqlSingleServer"] = values.Config["usePostgreSqlSingleServer"];
+            settings["ManagedIdentityClientId"] = values.Identity["clientId"];
+            return settings;
+        }
+
+        private async Task<string> ExecHelmProcess(string command)
+        {
+            var p = new Process();
+            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
+            p.StartInfo.FileName = configuration.HelmBinaryPath;
+            p.StartInfo.Arguments = command;
+            p.Start();
+
+            var standardOutputStringBuilder = new StringBuilder();
+            var standardErrorStringBuilder = new StringBuilder();
+
+            _ = Task.Run(async () =>
+            {
+                var line = (await p.StandardOutput.ReadLineAsync())?.Trim();
+
+                while (line != null)
+                {
+                    if (configuration.DebugLogging)
+                    {
+                        ConsoleEx.WriteLine($"HELM: {line}");
+                    }
+
+                    standardOutputStringBuilder.AppendLine(line);
+                    line = await p.StandardOutput.ReadLineAsync().WaitAsync(cts.Token);
+                }
+            });
+
+            _ = Task.Run(async () =>
+            {
+                var line = (await p.StandardError.ReadLineAsync())?.Trim();
+
+                while (line != null)
+                {
+                    if (configuration.DebugLogging)
+                    {
+                        ConsoleEx.WriteLine($"HELM: {line}");
+                    }
+
+                    standardErrorStringBuilder.AppendLine(line);
+                    line = await p.StandardError.ReadLineAsync().WaitAsync(cts.Token);
+                }
+            });
+
+            await p.WaitForExitAsync();
+            var standardOutput = standardOutputStringBuilder.ToString();
+            var standardError = standardErrorStringBuilder.ToString();
+
+            if (p.ExitCode != 0)
+            {
+                ConsoleEx.WriteLine(standardOutput);
+                ConsoleEx.WriteLine(standardError);
+                Debugger.Break();
+                throw new Exception($"HELM exited with exit code = {p.ExitCode}");
+            }
+
+            if (standardOutput.Contains("Error", StringComparison.OrdinalIgnoreCase) || standardError.Contains("Error", StringComparison.OrdinalIgnoreCase))
+            {
+                Debugger.Break();
+            }
+
+            return standardOutput;
+        }
+
         private async Task<bool> WaitForWorkloadWithTimeout(IKubernetes client, string deploymentName, System.TimeSpan timeout, CancellationToken cancellationToken)
         {
             var timer = Stopwatch.StartNew();
@@ -353,12 +404,6 @@ namespace CromwellOnAzureDeployer
             });
 
             return result.Outcome == OutcomeType.Successful;
-        }
-
-        public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId, string keyVaultUrl)
-        {
-            await UpgradeValuesYaml(storageAccount, settings);
-            await DeployHelmChartToClusterAsync();
         }
 
         private class HelmValues

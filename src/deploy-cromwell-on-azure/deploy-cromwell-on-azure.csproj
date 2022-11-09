@@ -18,19 +18,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="scripts\helm\Chart.yaml" />
-    <None Remove="scripts\helm\README.md" />
-    <None Remove="scripts\helm\templates\cromwell-deployment.yaml" />
-    <None Remove="scripts\helm\templates\identity.yaml" />
-    <None Remove="scripts\helm\templates\mysqldb-deployment.yaml" />
-    <None Remove="scripts\helm\templates\persistence.yaml" />
-    <None Remove="scripts\helm\templates\service.yaml" />
-    <None Remove="scripts\helm\templates\tes-deployment.yaml" />
-    <None Remove="scripts\helm\templates\triggerservice-deployment.yaml" />
-    <None Remove="scripts\helm\values-template.yaml" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Include="..\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
   </ItemGroup>
 
@@ -66,12 +53,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Update="samples\config.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
   
   <ItemGroup>
     <EmbeddedResource Include="scripts\containers-to-mount" />
@@ -87,33 +68,6 @@
     <EmbeddedResource Include="scripts\env-04-settings.txt" />
     <EmbeddedResource Include="scripts\env-12-local-my-sql-db.txt" />
     <EmbeddedResource Include="scripts\env-13-postgre-sql-db.txt" />
-    <EmbeddedResource Include="scripts\helm\Chart.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\README.md">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\cromwell-deployment.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\identity.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\persistence.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\service.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\tes-deployment.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\triggerservice-deployment.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\values-template.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
     <EmbeddedResource Include="scripts\install-cromwellazure.sh" />
     <EmbeddedResource Include="scripts\mount-data-disk.sh" />
     <EmbeddedResource Include="scripts\mount.blobfuse" />
@@ -124,6 +78,36 @@
     <EmbeddedResource Include="scripts\wait-for-it.sh" />
     <EmbeddedResource Include="test.wdl" />
     <EmbeddedResource Include="testInputs.json" />
+    <Content Update="samples\config.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="scripts\helm\Chart.yaml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="scripts\helm\values-template.yaml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="scripts\helm\README.md">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="scripts\helm\templates\cromwell-deployment.yaml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="scripts\helm\templates\identity.yaml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="scripts\helm\templates\persistence.yaml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="scripts\helm\templates\service.yaml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="scripts\helm\templates\tes-deployment.yaml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="scripts\helm\templates\triggerservice-deployment.yaml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

@@ -152,8 +152,8 @@ namespace CromwellOnAzureDeployer
                 resourceManagerClient = GetResourceManagerClient(azureCredentials);
                 kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
                 networkManagementClient = new Microsoft.Azure.Management.Network.NetworkManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
-                postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 600 };
-                postgreSqlSingleManagementClient = new SingleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 600 };
+                postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 1200 };
+                postgreSqlSingleManagementClient = new SingleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 1200 };
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
@@ -497,6 +497,7 @@ namespace CromwellOnAzureDeployer
                         }
 
                         Task compute = null;
+
                         if (configuration.UseAks)
                         {
                             compute = Task.Run(async () =>
@@ -550,6 +551,11 @@ namespace CromwellOnAzureDeployer
                                     },
                                     TaskContinuationOptions.OnlyOnRanToCompletion)
                                 .Unwrap();
+                        }
+
+                        if (compute.Exception != null)
+                        {
+                            throw compute.Exception;
                         }
 
                         await Task.WhenAll(new Task[]
@@ -632,8 +638,7 @@ namespace CromwellOnAzureDeployer
 
                     if (configuration.UseAks)
                     {
-                        ConsoleEx.WriteLine($"Deleting: {kubernetesManager.TempHelmValuesYamlPath}");
-                        File.Delete(kubernetesManager.TempHelmValuesYamlPath);
+                        kubernetesManager.DeleteTempFiles();
                     }
                 }
 
