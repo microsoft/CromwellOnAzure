@@ -3,7 +3,6 @@
 
 using System;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using Common;
 using LazyCache;
@@ -19,6 +18,7 @@ using Newtonsoft.Json.Serialization;
 using Tes.Models;
 using Tes.Repository;
 using TesApi.Filters;
+using TesApi.Web.Management;
 
 namespace TesApi.Web
 {
@@ -83,6 +83,7 @@ namespace TesApi.Web
 
                 .AddSingleton(cachingAzureProxy)
                 .AddSingleton(azureProxy)
+                .AddSingleton(storageAccessProvider)
 
                 .AddControllers()
                 .AddNewtonsoftJson(opts =>
@@ -92,7 +93,9 @@ namespace TesApi.Web
                 }).Services
 
                 .AddSingleton<IRepository<TesTask>>(new CachingWithRetriesRepository<TesTask>(repository))
-                .AddSingleton<IBatchScheduler>(new BatchScheduler(loggerFactory.CreateLogger<BatchScheduler>(), Configuration, cachingAzureProxy, storageAccessProvider))
+                .AddLogging()
+                .AddSingleton<IResourceQuotaVerifier, ArmResourceQuotaVerifier>()
+                .AddSingleton<IBatchScheduler, BatchScheduler>()
 
                 .AddSwaggerGen(c =>
                 {
@@ -118,7 +121,7 @@ namespace TesApi.Web
                 .AddHostedService<DeleteOrphanedAutoPoolsHostedService>()
                 .AddHostedService<RefreshVMSizesAndPricesHostedService>()
 
-            // Configure AppInsights Azure Service when in PRODUCTION environment
+                // Configure AppInsights Azure Service when in PRODUCTION environment
                 .IfThenElse(hostingEnvironment.IsProduction(),
                     s =>
                     {

@@ -21,6 +21,7 @@ using Newtonsoft.Json;
 using Tes.Extensions;
 using Tes.Models;
 using TesApi.Web;
+using TesApi.Web.Management;
 
 namespace TesApi.Tests
 {
@@ -49,7 +50,7 @@ namespace TesApi.Tests
             state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new() { { "vm_size", "VMSIZE1" } } }, azureProxyReturnValues);
             Assert.AreEqual(TesState.INITIALIZINGEnum, state);
 
-            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new() { { "vm_size", "VmSize1" } } , CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
+            state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new() { { "vm_size", "VmSize1" } }, CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
             Assert.AreEqual(TesState.INITIALIZINGEnum, state);
 
             state = await GetNewTesTaskStateAsync(new TesResources { Preemptible = true, BackendParameters = new(), CpuCores = 1000, RamGb = 100000, DiskGb = 1000000 }, azureProxyReturnValues);
@@ -102,7 +103,8 @@ namespace TesApi.Tests
                 new Mock<ILogger>().Object,
                 GetMockConfig(),
                 new CachingWithRetriesAzureProxy(proxy, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions())))),
-                new StorageAccessProvider(new Mock<ILogger>().Object, GetMockConfig(), proxy));
+                new StorageAccessProvider(new Mock<ILogger>().Object, GetMockConfig(), proxy),
+                new ArmResourceQuotaVerifier(proxy, new Mock<ILogger>().Object));
 
             var size = await batchScheduler.GetVmSizeAsync(task);
             Assert.AreEqual(vmSize, size.VmSize);
@@ -135,7 +137,7 @@ namespace TesApi.Tests
             var dedicatedCoreQuotaPerVMFamily = new List<VirtualMachineFamilyCoreQuota> { new VirtualMachineFamilyCoreQuota("VmFamily2", 1) };
             azureProxyReturnValues.BatchQuotas = new AzureBatchAccountQuotas { ActiveJobAndJobScheduleQuota = 1, PoolQuota = 1, DedicatedCoreQuota = 100, LowPriorityCoreQuota = 100, DedicatedCoreQuotaPerVMFamilyEnforced = true, DedicatedCoreQuotaPerVMFamily = dedicatedCoreQuotaPerVMFamily };
 
-           Assert.AreEqual(TesState.SYSTEMERROREnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 2, RamGb = 1, Preemptible = false }, azureProxyReturnValues));
+            Assert.AreEqual(TesState.SYSTEMERROREnum, await GetNewTesTaskStateAsync(new TesResources { CpuCores = 2, RamGb = 1, Preemptible = false }, azureProxyReturnValues));
         }
 
         [TestMethod]
@@ -860,10 +862,11 @@ namespace TesApi.Tests
         private static async Task<(string JobId, CloudTask CloudTask, PoolInformation PoolInformation)> ProcessTesTaskAndGetBatchJobArgumentsAsync(TesTask tesTask, IConfiguration configuration, Mock<IAzureProxy> azureProxy)
         {
             var batchScheduler = new BatchScheduler(
-                new Mock<ILogger>().Object, 
-                configuration, 
+                new Mock<ILogger>().Object,
+                configuration,
                 new CachingWithRetriesAzureProxy(azureProxy.Object, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions())))),
-                new StorageAccessProvider(new Mock<ILogger>().Object, configuration, azureProxy.Object)
+                new StorageAccessProvider(new Mock<ILogger>().Object, configuration, azureProxy.Object),
+                new ArmResourceQuotaVerifier(azureProxy.Object, new Mock<ILogger>().Object)
             );
 
             await batchScheduler.ProcessTesTaskAsync(tesTask);

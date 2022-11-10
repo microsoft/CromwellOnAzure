@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Tes.Extensions;
 using Tes.Models;
+using TesApi.Web.Management;
 
 namespace TesApi.Web
 {
@@ -43,6 +44,7 @@ namespace TesApi.Web
         private readonly IAzureProxy azureProxy;
         private readonly IStorageAccessProvider storageAccessProvider;
         private readonly IEnumerable<string> allowedVmSizes;
+        private readonly IResourceQuotaVerifier quotaVerifier;
         private readonly List<TesTaskStateTransition> tesTaskStateTransitions;
         private readonly bool usePreemptibleVmsOnly;
         private readonly string batchNodesSubnetId;
@@ -54,7 +56,9 @@ namespace TesApi.Web
         private readonly string defaultStorageAccountName;
         private readonly string globalStartTaskPath;
         private readonly string globalManagedIdentity;
+
         private HashSet<string> onlyLogBatchTaskStateOnce = new HashSet<string>();
+
 
         /// <summary>
         /// Orchestrates <see cref="TesTask"/>s on Azure Batch
@@ -63,11 +67,13 @@ namespace TesApi.Web
         /// <param name="configuration">Configuration <see cref="IConfiguration"/></param>
         /// <param name="azureProxy">Azure proxy <see cref="IAzureProxy"/></param>
         /// <param name="storageAccessProvider">Storage access provider <see cref="IStorageAccessProvider"/></param>
-        public BatchScheduler(ILogger logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider)
+        /// <param name="quotaVerifier">Quota verifier <see cref="IResourceQuotaVerifier"/>></param>
+        public BatchScheduler(ILogger logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, IResourceQuotaVerifier quotaVerifier)
         {
             this.logger = logger;
             this.azureProxy = azureProxy;
             this.storageAccessProvider = storageAccessProvider;
+            this.quotaVerifier = quotaVerifier;
 
             static bool GetBoolValue(IConfiguration configuration, string key, bool defaultValue) => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : bool.Parse(configuration[key]);
             static string GetStringValue(IConfiguration configuration, string key, string defaultValue = "") => string.IsNullOrWhiteSpace(configuration[key]) ? defaultValue : configuration[key];
@@ -148,10 +154,10 @@ namespace TesApi.Web
             }
 
             async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
-            { 
+            {
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
-                SetTaskStateAndLog(tesTask, newTaskState, batchInfo); 
+                SetTaskStateAndLog(tesTask, newTaskState, batchInfo);
             }
             Task DeleteBatchJobAndSetTaskExecutorErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             Task DeleteBatchJobAndSetTaskSystemErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.SYSTEMERROREnum, batchInfo);
@@ -161,10 +167,10 @@ namespace TesApi.Web
                 : DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.QUEUEDEnum, batchInfo);
 
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
-            { 
+            {
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
-                tesTask.IsCancelRequested = false; 
+                tesTask.IsCancelRequested = false;
             }
 
             tesTaskStateTransitions = new List<TesTaskStateTransition>()
@@ -232,7 +238,7 @@ namespace TesApi.Web
                 logger.LogInformation(msg);
                 onlyLogBatchTaskStateOnce.Add(msg);
             }
-                   
+
             var tesTaskChanged = await HandleTesTaskTransitionAsync(tesTask, combinedBatchTaskInfo);
             return tesTaskChanged;
         }
@@ -317,7 +323,7 @@ namespace TesApi.Web
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
-                await CheckBatchAccountQuotas(virtualMachineInfo);
+                await quotaVerifier.CheckBatchAccountQuotasAsync(virtualMachineInfo);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
                 tesTaskLog.VirtualMachineInfo = virtualMachineInfo;
@@ -328,7 +334,7 @@ namespace TesApi.Web
                 PoolInformation poolInformation = null;
 
                 var identities = new List<string>();
-                
+
                 if (!string.IsNullOrWhiteSpace(globalManagedIdentity))
                 {
                     identities.Add(globalManagedIdentity);
@@ -344,7 +350,7 @@ namespace TesApi.Web
                 if (identities.Count > 0)
                 {
                     // Only create manual pool if an identity was specified
-                    
+
                     // By default, the pool will have the same name/ID as the job
                     var poolName = jobId;
                     string startTaskSasUrl = null;
@@ -647,7 +653,7 @@ namespace TesApi.Web
             var executionDirectoryUri = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync(cromwellExecutionDirectoryPath, getContainerSas: true));
             var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.Contains($"/{BatchExecutionDirectoryName}"));
             var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
-            
+
             var filesToDownload = await Task.WhenAll(
                 inputFiles
                 .Where(f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) != true) // do not attempt to download DRS input files since the cromwell-drs-localizer will
@@ -659,14 +665,16 @@ namespace TesApi.Web
 
             // Using --include and not using --no-recursive as a workaround for https://github.com/Azure/blobxfer/issues/123
             var downloadFilesScriptContent = "total_bytes=0 && "
-                + string.Join(" && ", filesToDownload.Select(f => {
+                + string.Join(" && ", filesToDownload.Select(f =>
+                {
                     var setVariables = $"path='{f.Path}' && url='{f.Url}'";
 
                     var downloadSingleFile = f.Url.Contains(".blob.core.")
                         ? $"blobxfer download --storage-url \"$url\" --local-path \"$path\" --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
                         : "mkdir -p $(dirname \"$path\") && wget -O \"$path\" \"$url\"";
 
-                    return $"{setVariables} && {downloadSingleFile} && {exitIfDownloadedFileIsNotFound} && {incrementTotalBytesTransferred}"; }))
+                    return $"{setVariables} && {downloadSingleFile} && {exitIfDownloadedFileIsNotFound} && {incrementTotalBytesTransferred}";
+                }))
                 + $" && echo FileDownloadSizeInBytes=$total_bytes >> {metricsPath}";
 
             var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
@@ -682,7 +690,8 @@ namespace TesApi.Web
             // Syntax is: If file or directory doesn't exist, run a noop (":") operator, otherwise run the upload command:
             // { if not exists do nothing else upload; } && { ... }
             var uploadFilesScriptContent = "total_bytes=0 && "
-                + string.Join(" && ", filesToUpload.Select(f => {
+                + string.Join(" && ", filesToUpload.Select(f =>
+                {
                     var setVariables = $"path='{f.Path}' && url='{f.Url}'";
                     var blobxferCommand = $"blobxfer upload --storage-url \"$url\" --local-path \"$path\" --one-shot-bytes 104857600 {(f.Type == TesFileType.FILEEnum ? "--rename --no-recursive" : string.Empty)}";
 
@@ -760,7 +769,7 @@ namespace TesApi.Web
             sb.AppendLine($"write_ts DownloadEnd && \\");
             sb.AppendLine($"chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \\");
             sb.AppendLine($"write_ts ExecutorStart && \\");
-            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{ string.Join(" && ", executor.Command.Skip(1))}\" && \\");
+            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{string.Join(" && ", executor.Command.Skip(1))}\" && \\");
             sb.AppendLine($"write_ts ExecutorEnd && \\");
             sb.AppendLine($"write_ts UploadStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} {uploadFilesScriptPath} && \\");
@@ -882,7 +891,7 @@ namespace TesApi.Web
                 nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
 
             StartTask startTask = null;
-            
+
             if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
             {
                 var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
@@ -993,80 +1002,6 @@ namespace TesApi.Web
         }
 
         /// <summary>
-        /// Check quotas for available active jobs, pool and CPU cores.
-        /// </summary>
-        /// <param name="vmInfo">Dedicated virtual machine information.</param>
-        private async Task CheckBatchAccountQuotas(VirtualMachineInformation vmInfo)
-        {
-            var workflowCoresRequirement = vmInfo.NumberOfCores.Value;
-            var isDedicated = !vmInfo.LowPriority;
-            var vmFamily = vmInfo.VmFamily;
-
-            var batchQuotas = await azureProxy.GetBatchAccountQuotasAsync();
-            var totalCoreQuota = isDedicated ? batchQuotas.DedicatedCoreQuota : batchQuotas.LowPriorityCoreQuota;
-            var isDedicatedAndPerVmFamilyCoreQuotaEnforced = isDedicated && batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced;
-
-            var vmFamilyCoreQuota = isDedicatedAndPerVmFamilyCoreQuotaEnforced
-                ? batchQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(q => vmFamily.Equals(q.Name, StringComparison.OrdinalIgnoreCase))?.CoreQuota ?? 0
-                : workflowCoresRequirement;
-
-            var poolQuota = batchQuotas.PoolQuota;
-            var activeJobAndJobScheduleQuota = batchQuotas.ActiveJobAndJobScheduleQuota;
-
-            var activeJobsCount = azureProxy.GetBatchActiveJobCount();
-            var activePoolsCount = azureProxy.GetBatchActivePoolCount();
-            var activeNodeCountByVmSize = azureProxy.GetBatchActiveNodeCountByVmSize().ToList();
-            var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
-
-            var totalCoresInUse = activeNodeCountByVmSize
-                .Sum(x =>
-                    virtualMachineInfoList
-                        .FirstOrDefault(vm => vm.VmSize.Equals(x.VirtualMachineSize, StringComparison.OrdinalIgnoreCase))?
-                        .NumberOfCores * (isDedicated ? x.DedicatedNodeCount : x.LowPriorityNodeCount));
-
-            if (workflowCoresRequirement > totalCoreQuota)
-            {
-                // The workflow task requires more cores than the total Batch account's cores quota - FAIL
-                throw new AzureBatchLowQuotaException($"Azure Batch Account does not have enough {(isDedicated ? "dedicated" : "low priority")} cores quota to run a workflow with cpu core requirement of {workflowCoresRequirement}. Please submit an Azure Support request to increase your quota: {AzureSupportUrl}");
-            }
-
-            if (isDedicatedAndPerVmFamilyCoreQuotaEnforced && workflowCoresRequirement > vmFamilyCoreQuota)
-            {
-                // The workflow task requires more cores than the total Batch account's dedicated family quota - FAIL
-                throw new AzureBatchLowQuotaException($"Azure Batch Account does not have enough dedicated {vmFamily} cores quota to run a workflow with cpu core requirement of {workflowCoresRequirement}. Please submit an Azure Support request to increase your quota: {AzureSupportUrl}");
-            }
-
-            if (activeJobsCount + 1 > activeJobAndJobScheduleQuota)
-            {
-                throw new AzureBatchQuotaMaxedOutException($"No remaining active jobs quota available. There are {activeJobsCount} active jobs out of {activeJobAndJobScheduleQuota}.");
-            }
-
-            if (activePoolsCount + 1 > poolQuota)
-            {
-                throw new AzureBatchQuotaMaxedOutException($"No remaining pool quota available. There are {activePoolsCount} pools in use out of {poolQuota}.");
-            }
-
-            if ((totalCoresInUse + workflowCoresRequirement) > totalCoreQuota)
-            {
-                throw new AzureBatchQuotaMaxedOutException($"Not enough core quota remaining to schedule task requiring {workflowCoresRequirement} {(isDedicated ? "dedicated" : "low priority")} cores. There are {totalCoresInUse} cores in use out of {totalCoreQuota}.");
-            }
-
-            if (isDedicatedAndPerVmFamilyCoreQuotaEnforced)
-            {
-                var vmSizesInRequestedFamily = virtualMachineInfoList.Where(vm => vm.VmFamily.Equals(vmFamily, StringComparison.OrdinalIgnoreCase)).Select(vm => vm.VmSize).ToList();
-                var activeNodeCountByVmSizeInRequestedFamily = activeNodeCountByVmSize.Where(x => vmSizesInRequestedFamily.Contains(x.VirtualMachineSize, StringComparer.OrdinalIgnoreCase));
-
-                var dedicatedCoresInUseInRequestedVmFamily = activeNodeCountByVmSizeInRequestedFamily
-                    .Sum(x => virtualMachineInfoList.FirstOrDefault(vm => vm.VmSize.Equals(x.VirtualMachineSize, StringComparison.OrdinalIgnoreCase))?.NumberOfCores * x.DedicatedNodeCount);
-
-                if (dedicatedCoresInUseInRequestedVmFamily + workflowCoresRequirement > vmFamilyCoreQuota)
-                {
-                    throw new AzureBatchQuotaMaxedOutException($"Not enough core quota remaining to schedule task requiring {workflowCoresRequirement} dedicated {vmFamily} cores. There are {dedicatedCoresInUseInRequestedVmFamily} cores in use out of {vmFamilyCoreQuota}.");
-                }
-            }
-        }
-
-        /// <summary>
         /// Gets the cheapest available VM size that satisfies the <see cref="TesTask"/> execution requirements
         /// </summary>
         /// <param name="tesTask"><see cref="TesTask"/></param>
@@ -1074,7 +1009,7 @@ namespace TesApi.Web
         /// <returns>The virtual machine info</returns>
         public async Task<VirtualMachineInformation> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
         {
-            bool allowedVmSizesFilter(VirtualMachineInformation vm) => allowedVmSizes is null || ! allowedVmSizes.Any() || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) || allowedVmSizes.Contains(vm.VmFamily, StringComparer.OrdinalIgnoreCase);
+            bool allowedVmSizesFilter(VirtualMachineInformation vm) => allowedVmSizes is null || !allowedVmSizes.Any() || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) || allowedVmSizes.Contains(vm.VmFamily, StringComparer.OrdinalIgnoreCase);
 
             var tesResources = tesTask.Resources;
 
@@ -1153,7 +1088,7 @@ namespace TesApi.Web
             {
                 return selectedVm;
             }
-           
+
             if (!eligibleVms.Any())
             {
                 noVmFoundMessage += $" There are no VM sizes that match the requirements. Review the task resources.";
@@ -1220,7 +1155,7 @@ namespace TesApi.Web
                     {
                         var metrics = DelimitedTextToDictionary(metricsContent.Trim());
 
-                        var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKiB", out var diskSizeInKiB)  ? diskSizeInKiB / kiBInGB : (double?)null;
+                        var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKiB", out var diskSizeInKiB) ? diskSizeInKiB / kiBInGB : (double?)null;
                         var diskUsedInGB = TryGetValueAsDouble(metrics, "DiskUsedInKiB", out var diskUsedInKiB) ? diskUsedInKiB / kiBInGB : (double?)null;
 
                         batchNodeMetrics = new BatchNodeMetrics
@@ -1234,12 +1169,12 @@ namespace TesApi.Web
                             FileUploadDurationInSeconds = GetDurationInSeconds(metrics, "UploadStart", "UploadEnd"),
                             FileUploadSizeInGB = TryGetValueAsDouble(metrics, "FileUploadSizeInBytes", out var fileUploadSizeInBytes) ? fileUploadSizeInBytes / bytesInGB : (double?)null,
                             DiskUsedInGB = diskUsedInGB,
-                            DiskUsedPercent = diskUsedInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsedInGB / diskSizeInGB * 100 ) : null,
+                            DiskUsedPercent = diskUsedInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsedInGB / diskSizeInGB * 100) : null,
                             VmCpuModelName = metrics.GetValueOrDefault("VmCpuModelName")
                         };
 
                         taskStartTime = TryGetValueAsDateTimeOffset(metrics, "BlobXferPullStart", out var startTime) ? (DateTimeOffset?)startTime : null;
-                        taskEndTime = TryGetValueAsDateTimeOffset(metrics, "UploadEnd", out var endTime) ? (DateTimeOffset?)endTime: null;
+                        taskEndTime = TryGetValueAsDateTimeOffset(metrics, "UploadEnd", out var endTime) ? (DateTimeOffset?)endTime : null;
                     }
                     catch (Exception ex)
                     {
