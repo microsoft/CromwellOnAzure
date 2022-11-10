@@ -505,6 +505,10 @@ namespace TesApi.Web
                 }
             }
         }
+
+        /// <inheritdoc/>
+        public async ValueTask<DateTime> GetAllocationStateTransitionTime(CancellationToken cancellationToken = default) // TODO: put this at front of list by returning earliest possible time, or put at end of list by returning UtcNow?
+            => (await _azureProxy.GetBatchPoolAsync(Pool.PoolId, new ODATADetailLevel { SelectClause = "allocationStateTransitionTime" }, cancellationToken)).AllocationStateTransitionTime ?? DateTime.UtcNow;
     }
 
     /// <content>

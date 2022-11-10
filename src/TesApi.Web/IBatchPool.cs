@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Batch;
@@ -79,5 +80,12 @@ namespace TesApi.Web
         /// <param name="serviceKind">The type of <see cref="ServiceKind"/> service call.</param>
         /// <param name="cancellationToken"></param>
         ValueTask ServicePoolAsync(ServiceKind serviceKind, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Gets the last time the pool's compute node list was changed.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        ValueTask<DateTime> GetAllocationStateTransitionTime(CancellationToken cancellationToken = default);
     }
 }
