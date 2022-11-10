@@ -327,8 +327,7 @@ namespace CromwellOnAzureDeployer
             p.StartInfo.Arguments = command;
             p.Start();
 
-            var standardOutputStringBuilder = new StringBuilder();
-            var standardErrorStringBuilder = new StringBuilder();
+            var outputStringBuilder = new StringBuilder();
 
             _ = Task.Run(async () =>
             {
@@ -341,7 +340,7 @@ namespace CromwellOnAzureDeployer
                         ConsoleEx.WriteLine($"HELM: {line}");
                     }
 
-                    standardOutputStringBuilder.AppendLine(line);
+                    outputStringBuilder.AppendLine(line);
                     line = await p.StandardOutput.ReadLineAsync().WaitAsync(cts.Token);
                 }
             });
@@ -357,29 +356,26 @@ namespace CromwellOnAzureDeployer
                         ConsoleEx.WriteLine($"HELM: {line}");
                     }
 
-                    standardErrorStringBuilder.AppendLine(line);
+                    outputStringBuilder.AppendLine(line);
                     line = await p.StandardError.ReadLineAsync().WaitAsync(cts.Token);
                 }
             });
 
             await p.WaitForExitAsync();
-            var standardOutput = standardOutputStringBuilder.ToString();
-            var standardError = standardErrorStringBuilder.ToString();
+            var output = outputStringBuilder.ToString();
 
             if (p.ExitCode != 0)
             {
-                ConsoleEx.WriteLine(standardOutput);
-                ConsoleEx.WriteLine(standardError);
+                foreach (var line in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    ConsoleEx.WriteLine("HELM: {line}");
+                }
+
                 Debugger.Break();
-                throw new Exception($"HELM exited with exit code = {p.ExitCode}");
+                throw new Exception($"HELM ExitCode = {p.ExitCode}");
             }
 
-            if (standardOutput.Contains("Error", StringComparison.OrdinalIgnoreCase) || standardError.Contains("Error", StringComparison.OrdinalIgnoreCase))
-            {
-                Debugger.Break();
-            }
-
-            return standardOutput;
+            return output;
         }
 
         private async Task<bool> WaitForWorkloadWithTimeout(IKubernetes client, string deploymentName, System.TimeSpan timeout, CancellationToken cancellationToken)
