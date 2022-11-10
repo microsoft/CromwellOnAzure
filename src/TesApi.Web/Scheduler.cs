@@ -131,7 +131,7 @@ namespace TesApi.Web
         /// Retrieves all actionable TES tasks from the database, performs an action in the batch system, and updates the resultant state
         /// </summary>
         /// <returns></returns>
-        private async ValueTask OrchestrateTesTasksOnBatch(CancellationToken _1)
+        private async ValueTask OrchestrateTesTasksOnBatch(CancellationToken stoppingToken)
         {
             var tesTasks = (await repository.GetItemsAsync(
                     predicate: t => t.State == TesState.QUEUEDEnum
@@ -231,6 +231,11 @@ namespace TesApi.Web
                 {
                     logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw {exc.GetType().FullName}: '{exc.Message}'. Stack trace: {exc.StackTrace}");
                 }
+            }
+
+            if (batchScheduler.NeedPoolFlush)
+            {
+                await batchScheduler.FlushPoolsAsync(stoppingToken);
             }
 
             logger.LogDebug($"OrchestrateTesTasksOnBatch for {tesTasks.Count} tasks completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");

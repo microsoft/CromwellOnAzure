@@ -15,6 +15,11 @@ namespace TesApi.Web
     public interface IBatchScheduler
     {
         /// <summary>
+        /// Flag indicating that empty pools need to be flushed because pool quota has been reached.
+        /// </summary>
+        bool NeedPoolFlush { get; }
+
+        /// <summary>
         /// Iteratively schedule a <see cref="TesTask"/> on a batch system until completion or failure
         /// </summary>
         /// <param name="tesTask"><see cref="TesTask"/> to schedule on the batch system</param>
@@ -51,5 +56,12 @@ namespace TesApi.Web
         /// Garbage collects the old batch task state log hashset
         /// </summary>
         void ClearBatchLogState();
+
+        /// <summary>
+        /// Flushes empty pools to accomodate pool quota limits.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        ValueTask FlushPoolsAsync(CancellationToken cancellationToken);
     }
 }

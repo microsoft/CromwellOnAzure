@@ -421,13 +421,14 @@ namespace TesApi.Web
         private async Task AddBatchJobAsync(TesTask tesTask)
         {
             PoolInformation poolInformation = null;
+            string poolName = null;
 
             try
             {
                 var jobId = await azureProxy.GetNextBatchJobIdAsync(tesTask.Id);
                 var virtualMachineInfo = await GetVmSizeAsync(tesTask);
 
-                var (poolName, displayName) = this.enableBatchAutopool ? default : await GetPoolName(tesTask, virtualMachineInfo);
+                (poolName, var displayName) = this.enableBatchAutopool ? default : await GetPoolName(tesTask, virtualMachineInfo);
                 await CheckBatchAccountQuotas(virtualMachineInfo, poolName);
 
                 var tesTaskLog = tesTask.AddTesTaskLog();
@@ -505,6 +506,11 @@ namespace TesApi.Web
             catch (AzureBatchQuotaMaxedOutException exception)
             {
                 logger.LogWarning($"TES task: {tesTask.Id} AzureBatchQuotaMaxedOutException.Message: {exception.Message} . Not enough quota available.  Task will remain with state QUEUED.");
+
+                if (exception.Message.StartsWith("No remaining pool quota available", StringComparison.OrdinalIgnoreCase))
+                {
+                    neededPools.Add(poolName);
+                }
             }
             catch (AzureBatchLowQuotaException exception)
             {
@@ -532,10 +538,22 @@ namespace TesApi.Web
                 tesTask.SetFailureReason("BatchClientException", string.Join(",", exception.Data.Values), exception.Message, exception.StackTrace);
                 logger.LogError(exception, $"TES task: {tesTask.Id} BatchClientException.Message: {exception.Message} {string.Join(",", exception?.Data?.Values)}");
             }
-            catch (BatchException exception) when (exception.InnerException is Microsoft.Azure.Batch.Protocol.Models.BatchErrorException batcnErrorException && @"ActiveJobAndScheduleQuotaReached".Equals(batcnErrorException.Body.Code, StringComparison.OrdinalIgnoreCase))
+            catch (BatchException exception) when (exception.InnerException is Microsoft.Azure.Batch.Protocol.Models.BatchErrorException batcnErrorException && IsJobQuotaException(batcnErrorException.Body.Code))
             {
                 tesTask.SetWarning(batcnErrorException.Body.Message.Value, Array.Empty<string>());
                 logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {batcnErrorException.Body.Message.Value}. Task will remain in queue.");
+            }
+            catch (BatchException exception) when (exception.InnerException is Microsoft.Azure.Batch.Protocol.Models.BatchErrorException batcnErrorException && IsPoolQuotaException(batcnErrorException.Body.Code))
+            {
+                neededPools.Add(poolName);
+                tesTask.SetWarning(batcnErrorException.Body.Message.Value, Array.Empty<string>());
+                logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {batcnErrorException.Body.Message.Value}. Task will remain in queue.");
+            }
+            catch (Microsoft.Rest.Azure.CloudException exception) when (IsPoolQuotaException(exception.Body.Code))
+            {
+                neededPools.Add(poolName);
+                tesTask.SetWarning(exception.Body.Message, Array.Empty<string>());
+                logger.LogDebug($"Not enough quota available for task Id {tesTask.Id}. Reason: {exception.Body.Message}. Task will remain in queue.");
             }
             catch (Exception exception)
             {
@@ -550,6 +568,17 @@ namespace TesApi.Web
                     await azureProxy.DeleteBatchPoolIfExistsAsync(poolInformation.PoolId);
                 }
             }
+
+            static bool IsJobQuotaException(string code)
+                => @"ActiveJobAndScheduleQuotaReached".Equals(code, StringComparison.OrdinalIgnoreCase);
+
+            static bool IsPoolQuotaException(string code)
+                => code switch
+                {
+                    "AutoPoolCreationFailedWithQuotaReached" => true,
+                    "PoolQuotaReached" => true,
+                    _ => false,
+                };
         }
 
         /// <summary>
@@ -1724,6 +1753,11 @@ namespace TesApi.Web
 
         #region BatchPools
         private readonly BatchPools batchPools = new();
+        private readonly HashSet<string> neededPools = new();
+
+        /// <inheritdoc/>
+        public bool NeedPoolFlush
+            => 0 != neededPools.Count;
 
         internal bool TryGetPool(string poolId, out IBatchPool batchPool)
         {
@@ -1809,15 +1843,16 @@ namespace TesApi.Web
             }
         }
 
-        /// <inheritdoc/>
-        public async ValueTask<IEnumerable<Task>> GetShutdownCandidatePools(CancellationToken cancellationToken)
-        {
-            return (await batchPools
+        private async ValueTask<List<IBatchPool>> GetEmptyPools(CancellationToken cancellationToken)
+            => await batchPools
                 .ToAsyncEnumerable()
                 .WhereAwait(async p => await p.CanBeDeleted(cancellationToken))
-                .ToListAsync(cancellationToken))
+                .ToListAsync(cancellationToken);
+
+        /// <inheritdoc/>
+        public async ValueTask<IEnumerable<Task>> GetShutdownCandidatePools(CancellationToken cancellationToken)
+            => (await GetEmptyPools(cancellationToken))
                 .Select(t => azureProxy.DeleteBatchPoolAsync(t.Pool.PoolId));
-        }
 
         /// <inheritdoc/>
         public IEnumerable<IBatchPool> GetPools()
@@ -1826,6 +1861,34 @@ namespace TesApi.Web
         /// <inheritdoc/>
         public bool RemovePoolFromList(IBatchPool pool)
             => batchPools.Remove(pool);
+
+        /// <inheritdoc/>
+        public async ValueTask FlushPoolsAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (!this.enableBatchAutopool)
+                {
+                    var pools = (await GetEmptyPools(cancellationToken))
+                        .OrderBy(p => p.GetAllocationStateTransitionTime(cancellationToken))
+                        .Take(neededPools.Count)
+                        .ToList();
+
+                    if (pools.Any())
+                    {
+                        await Task.WhenAll(pools.Select(async p =>
+                        {
+                            await azureProxy.DeleteBatchPoolAsync(p.Pool.PoolId);
+                            _ = RemovePoolFromList(p);
+                        }).ToArray());
+                    }
+                }
+            }
+            finally
+            {
+                neededPools.Clear();
+            }
+        }
 
         private bool AddPool(IBatchPool pool)
             => batchPools.Add(pool);
