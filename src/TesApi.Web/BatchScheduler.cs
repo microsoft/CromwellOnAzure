@@ -859,7 +859,7 @@ namespace TesApi.Web
         private async ValueTask<JobPreparationTask> GetJobPreparationTask(TesTask tesTask)
             => enableBatchAutopool ? default : new()
             {
-                CommandLine = @"/bin/env ./job-prep.sh",
+                CommandLine = @"./job-prep.sh",
                 EnvironmentSettings = new[] { new EnvironmentSetting("COA_EXECUTOR", tesTask.Executors.First().Image) },
                 RerunOnComputeNodeRebootAfterSuccess = false,
                 ResourceFiles = new[] { ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/job-prep.sh"), @"job-prep.sh", @"0755") },
@@ -1271,7 +1271,7 @@ namespace TesApi.Web
 
                         return (appPkg,
                             isScriptInApp || hostConfig.StartTask.StartTaskHash is not null
-                            ? new StartTask(hostConfig.StartTask.StartTaskHash is not null ? $"/usr/bin/env ./{StartTaskScriptFilename}" : $"/usr/bin/env ${{{appDir}}}/{StartTaskScriptFilename}")
+                            ? new StartTask(hostConfig.StartTask.StartTaskHash is not null ? $"./{StartTaskScriptFilename}" : $"/usr/bin/env ${{{appDir}}}/{StartTaskScriptFilename}")
                             {
                                 UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                                 ResourceFiles = resourcesAsList,
@@ -1467,14 +1467,14 @@ namespace TesApi.Web
                     {
                         UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                         ResourceFiles = new List<ResourceFile> { script },
-                        CommandLine = $"/usr/bin/env ./{startTaskPath}",
+                        CommandLine = $"./{startTaskPath}",
                     };
                 }
                 else
                 {
                     startTask.ResourceFiles.Add(script);
                     startTask.ResourceFiles.Add(ResourceFile.FromUrl(await this.storageAccessProvider.MapLocalPathToSasUrlAsync($"/{this.defaultStorageAccountName}/inputs/coa-tes/start-task.sh", GetStartTaskSasTokenDuration()), "main-start-task.sh", "0755"));
-                    startTask.CommandLine = $"/usr/bin/env ./main-start-task.sh";
+                    startTask.CommandLine = $"./main-start-task.sh";
                 }
             }
 
