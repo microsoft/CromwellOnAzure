@@ -2100,13 +2100,16 @@ namespace TesApi.Web
             => batchPools.Remove(pool);
 
         /// <inheritdoc/>
-        public async ValueTask FlushPoolsAsync(CancellationToken cancellationToken)
+        public async ValueTask FlushPoolsAsync(IEnumerable<string> assignedPools, CancellationToken cancellationToken)
         {
+            assignedPools = assignedPools.ToList();
+
             try
             {
                 if (!this.enableBatchAutopool)
                 {
                     var pools = (await GetEmptyPools(cancellationToken))
+                        .Where(p => !assignedPools.Contains(p.Pool.PoolId))
                         .OrderBy(p => p.GetAllocationStateTransitionTime(cancellationToken))
                         .Take(neededPools.Count)
                         .ToList();

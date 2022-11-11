@@ -66,8 +66,9 @@ namespace TesApi.Web
         /// <summary>
         /// Flushes empty pools to accomodate pool quota limits.
         /// </summary>
+        /// <param name="assignedPools">Pool Ids of pools connected to active TES Tasks. Used to prevent accidentally removing active pools.</param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        ValueTask FlushPoolsAsync(CancellationToken cancellationToken);
+        ValueTask FlushPoolsAsync(IEnumerable<string> assignedPools, CancellationToken cancellationToken);
     }
 }

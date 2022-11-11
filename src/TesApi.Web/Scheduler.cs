@@ -135,6 +135,8 @@ namespace TesApi.Web
         /// <returns></returns>
         private async ValueTask OrchestrateTesTasksOnBatch(CancellationToken stoppingToken)
         {
+            var pools = new HashSet<string>();
+
             var tesTasks = (await repository.GetItemsAsync(
                     predicate: t => t.State == TesState.QUEUEDEnum
                         || t.State == TesState.INITIALIZINGEnum
@@ -233,11 +235,16 @@ namespace TesApi.Web
                 {
                     logger.LogError(exc, $"Updating TES Task '{tesTask.Id}' threw {exc.GetType().FullName}: '{exc.Message}'. Stack trace: {exc.StackTrace}");
                 }
+
+                if (!string.IsNullOrWhiteSpace(tesTask.PoolId) && (TesState.QUEUEDEnum == tesTask.State || TesState.RUNNINGEnum == tesTask.State))
+                {
+                    pools.Add(tesTask.PoolId);
+                }
             }
 
             if (batchScheduler.NeedPoolFlush)
             {
-                await batchScheduler.FlushPoolsAsync(stoppingToken);
+                await batchScheduler.FlushPoolsAsync(pools, stoppingToken);
             }
 
             logger.LogDebug($"OrchestrateTesTasksOnBatch for {tesTasks.Count} tasks completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds} seconds.");
