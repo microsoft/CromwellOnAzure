@@ -368,7 +368,7 @@ namespace CromwellOnAzureDeployer
             {
                 foreach (var line in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    ConsoleEx.WriteLine("HELM: {line}");
+                    ConsoleEx.WriteLine($"HELM: {line}");
                 }
 
                 Debugger.Break();
