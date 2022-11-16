@@ -37,9 +37,9 @@ namespace CromwellOnAzureDeployer
             .WaitAndRetryAsync(8, retryAttempt => System.TimeSpan.FromSeconds(5));
 
         private const string BlobCsiRepo = "https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/charts";
-        private const string BlobCsiDriverVersion = "v1.15.0";
+        private const string BlobCsiDriverVersion = "v1.17.0";
         private const string AadPluginRepo = "https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts";
-        private const string AadPluginVersion = "4.1.12";
+        private const string AadPluginVersion = "4.1.14";
 
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
@@ -297,7 +297,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task WaitForCromwell(IKubernetes client)
         {
-            if (!await WaitForWorkloadWithTimeout(client, "cromwell", TimeSpan.FromMinutes(3), cts.Token))
+            if (!await WaitForWorkloadWithTimeout(client, "cromwell", TimeSpan.FromMinutes(10), cts.Token))
             {
                 throw new Exception("Timed out waiting for Cromwell to start.");
             }

@@ -140,7 +140,7 @@ namespace CromwellOnAzureDeployer
             {
                 ValidateInitialCommandLineArgsAsync();
 
-                ConsoleEx.WriteLine("Running...");
+                ConsoleEx.WriteLine($"Running... started at {DateTime.UtcNow} UTC (Local: {DateTime.Now})");
 
                 await ValidateTokenProviderAsync();
 
@@ -609,7 +609,7 @@ namespace CromwellOnAzureDeployer
                     {
                         if (kubernetesClient is not null)
                         {
-                            await kubernetesManager.WaitForCromwell(kubernetesClient);
+                            await Execute($"Waiting for Cromwell to start: {configuration.VnetName}...", async () => await kubernetesManager.WaitForCromwell(kubernetesClient));
                         }
                     }
                     else
