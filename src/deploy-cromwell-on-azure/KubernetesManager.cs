@@ -295,7 +295,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        public async Task WaitForCromwell(IKubernetes client)
+        public async Task WaitForCromwellAsync(IKubernetes client)
         {
             if (!await WaitForWorkloadWithTimeout(client, "cromwell", TimeSpan.FromMinutes(10), cts.Token))
             {
