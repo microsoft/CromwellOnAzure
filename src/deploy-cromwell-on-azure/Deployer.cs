@@ -609,7 +609,7 @@ namespace CromwellOnAzureDeployer
                     {
                         if (kubernetesClient is not null)
                         {
-                            await Execute($"Waiting for Cromwell to start...", async () => await kubernetesManager.WaitForCromwell(kubernetesClient));
+                            await Execute($"Waiting for Cromwell to start...", async () => await kubernetesManager.WaitForCromwellAsync(kubernetesClient));
                         }
                     }
                     else
