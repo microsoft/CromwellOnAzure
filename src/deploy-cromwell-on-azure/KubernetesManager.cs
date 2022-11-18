@@ -124,10 +124,10 @@ namespace CromwellOnAzureDeployer
                     values.InternalContainersMIAuth.Add(containerConfig);
                 }
             }
-
+            
             var valuesString = KubernetesYaml.Serialize(values);
-            var path = Path.Join("scripts", "helm", "values.yaml");
-            var directory = Directory.GetDirectoryRoot(path);
+            var path = Path.Join(Environment.CurrentDirectory, "scripts", "helm", "values.yaml");
+            var directory = Path.GetDirectoryName(path);
             Directory.CreateDirectory(directory);
             await File.WriteAllTextAsync(path, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
@@ -138,8 +138,8 @@ namespace CromwellOnAzureDeployer
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
             UpdateValuesFromSettings(values, settings);
             var valuesString = KubernetesYaml.Serialize(values);
-            var path = Path.Join("scripts", "helm", "values.yaml");
-            var directory = Directory.GetDirectoryRoot(path);
+            var path = Path.Join(Environment.CurrentDirectory, "scripts", "helm", "values.yaml");
+            var directory = Path.GetDirectoryName(path);
             Directory.CreateDirectory(directory);
             await File.WriteAllTextAsync(path, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
