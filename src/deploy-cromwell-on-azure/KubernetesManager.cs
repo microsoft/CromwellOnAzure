@@ -50,16 +50,17 @@ namespace CromwellOnAzureDeployer
         private string valuesTemplatePath { get; set; }
         private string generatedHelmScriptsRootDirectory { get; set; }
         private string includedHelmScriptsRootDirectory { get; set; }
+        private string deployerDirectory { get; set; }
         public string TempHelmValuesYamlPath { get; set; }
-        
+
         public KubernetesManager(Configuration config, AzureCredentials credentials, CancellationTokenSource cts)
         {
             this.cts = cts;
             configuration = config;
             azureCredentials = credentials;
             var workingDirectory = Directory.GetCurrentDirectory();
-
-            includedHelmScriptsRootDirectory = Path.Join(workingDirectory, "scripts", "helm");
+            deployerDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            includedHelmScriptsRootDirectory = Path.Combine(deployerDirectory, "scripts", "helm"); //Path.Join(workingDirectory, "scripts", "helm");
             workingDirectoryTemp = Path.Join(workingDirectory, "cromwell-on-azure");
             kubeConfigPath = Path.Join(workingDirectoryTemp, "aks", "kubeconfig.txt");
             TempHelmValuesYamlPath = Path.Join(workingDirectoryTemp, "helm", "values.yaml");
@@ -67,6 +68,22 @@ namespace CromwellOnAzureDeployer
             valuesTemplatePath = Path.Join(includedHelmScriptsRootDirectory, "values-template.yaml");
             Directory.CreateDirectory(generatedHelmScriptsRootDirectory);
             Directory.CreateDirectory(Path.GetDirectoryName(kubeConfigPath));
+            CopyHelmFiles(includedHelmScriptsRootDirectory, Path.Join(workingDirectoryTemp, "helm"));
+        }
+
+        private void CopyHelmFiles(string path, string wd)
+        {
+            foreach (var dir in Directory.EnumerateDirectories(path, "*", SearchOption.AllDirectories))
+            {
+                var target = dir.Replace(path, wd);
+                Directory.CreateDirectory(target);
+            }
+
+            foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+            {
+                var info = new FileInfo(file);
+                info.CopyTo(file.Replace(path, wd));
+            }
         }
 
         public async Task<IKubernetes> GetKubernetesClient(IResource resourceGroupObject)
@@ -105,7 +122,10 @@ namespace CromwellOnAzureDeployer
 
         public async Task DeployHelmChartToClusterAsync()
         {
-            await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace");
+            // https://helm.sh/docs/helm/helm_upgrade/
+            // The chart argument can be either: a chart reference('example/mariadb'), a path to a chart directory, a packaged chart, or a fully qualified URL
+            await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace",
+                workingDirectory: deployerDirectory);
         }
 
         public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
@@ -235,7 +255,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IResourceGroup resourceGroup, IStorageAccount storageAccount, IIdentity managedId, string keyVaultUrl)
+        public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IStorageAccount storageAccount)
         {
             await UpgradeValuesYaml(storageAccount, settings);
             await DeployHelmChartToClusterAsync();
@@ -317,7 +337,7 @@ namespace CromwellOnAzureDeployer
             return settings;
         }
 
-        private async Task<string> ExecHelmProcess(string command)
+        private async Task<string> ExecHelmProcess(string command, string workingDirectory = null)
         {
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
@@ -325,6 +345,12 @@ namespace CromwellOnAzureDeployer
             p.StartInfo.RedirectStandardError = true;
             p.StartInfo.FileName = configuration.HelmBinaryPath;
             p.StartInfo.Arguments = command;
+
+            if (!string.IsNullOrWhiteSpace(workingDirectory))
+            {
+                p.StartInfo.WorkingDirectory = workingDirectory;
+            }
+
             p.Start();
 
             var outputStringBuilder = new StringBuilder();
