@@ -60,7 +60,17 @@ The following are instructions on how to setup a virtual network, and azure cont
     az storage account network-rule add --resource-group $resource_group_name --account-name $storage_account_name --subnet vmsubnet --vnet-name $vnet_name
     az storage account network-rule add --resource-group $resource_group_name --account-name $storage_account_name --subnet mysqlsubnet --vnet-name $vnet_name
     az storage account network-rule add --resource-group $resource_group_name --account-name $storage_account_name --subnet batchnodessubnet --vnet-name $vnet_name
-
+    
+    stroageAccountId="/subscriptions/$subscription/resourceGroups/$resource_group_name/providers/Microsoft.Storage/storageAccounts/$storage_account_name"
+    MSYS_NO_PATHCONV=1 az network private-endpoint create \
+            --name $private_endpoint_name_storage \
+            --resource-group $resource_group_name \
+            --vnet-name $vnet_name  \
+            --subnet pesubnet \
+            --private-connection-resource-id $stroageAccountId \
+            --group-id "Blob" \
+            --connection-name "myConnection"
+        
     az cosmosdb create --name $cosmos_db_name --resource-group $resource_group_name \
         --default-consistency-level Eventual \
         --locations regionName="$location" failoverPriority=0 isZoneRedundant=False \
