@@ -122,25 +122,29 @@ The following are instructions on how to setup a virtual network, and azure cont
     // Copy and paste all the environments variables such as $subscription from the other shell.
     batchsubnetid=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $vnet_name --name batchnodessubnet --query id --output tsv)
     version=3.1.0
+    coa_identifier=coavsmmain
     
     //Download the installer
     wget https://github.com/microsoft/CromwellOnAzure/releases/download/$version/deploy-cromwell-on-azure-linux
+    chmod 744 deploy-cromwell-on-azure-linux
     
+    // Login into Az
+    az login
 
 
-    ./deploy-cromwell-on-azure-linux --subscriptionid $subscription --regionname japaneast \
-        --mainidentifierprefix coajsaunmain \
+    ./deploy-cromwell-on-azure-linux --SubscriptionId $subscription --RegionName $location \
+        --MainIdentifierPrefix $coa_identifier \
         --StorageAccountName $storage_account_name \
         --CosmosDbAccountName $cosmos_db_name \
-        --privatenetworking true \
+        --PrivateNetworking true \
         --BatchNodesSubnetId $batchsubnetid \
         --DisableBatchNodesPublicIpAddress true \
         --DockerInDockerImageName "$mycontainerregistry.azurecr.io/docker" \
         --BlobxferImageName "$mycontainerregistry.azurecr.io/blobxfer" \
-        --resourcegroupname $resource_group_name \
-        --vnetname $vnet_name \
-        --vnetresourcegroupname $resource_group_name \
-        --subnetname vmsubnet
+        --ResourceGroupName $resource_group_name \
+        --VnetName $vnet_name \
+        --VnetResourceGroupName $resource_group_name \
+        --SubnetName vmsubnet
     ```
 
 
