@@ -16,13 +16,13 @@ The following are instructions on how to setup a virtual network, and azure cont
     private_endpoint_name_storage=myprivateendpoint123storage
     location=eastus
     failoverLocation=eastus2
-    az group create -n $resource_group_name -l japaneast
+    az group create -n $resource_group_name -l $location
     ```
 
 ### 1. Provision a virtual network and subnets for CoA resources with an appropriate CIDR. 
 
     ```
-    az network vnet create -g $resource_group_name -n $vnet_name --address-prefixes 10.1.0.0/16`
+    az network vnet create -g $resource_group_name -n $vnet_name --address-prefixes 10.1.0.0/16
     az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n vmsubnet --address-prefixes 10.1.0.0/24
     az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n mysqlsubnet --address-prefixes 10.1.1.0/24
     az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n batchnodessubnet --address-prefixes 10.1.2.0/24
