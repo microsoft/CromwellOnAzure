@@ -118,7 +118,7 @@ The following are instructions on how to setup a virtual network, and azure cont
     
     version=3.1.0
     curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-    A
+    wget https://github.com/microsoft/CromwellOnAzure/releases/download/$version/deploy-cromwell-on-azure-linux
     
     // Copy and paste all the environments variables such as $subscription from the other shell.
     batchsubnetid=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $vnet_name --name batchnodessubnet --query id --output tsv)
