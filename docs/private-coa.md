@@ -14,6 +14,8 @@ The following are instructions on how to setup a virtual network, and azure cont
     cosmos_db_name=coacosmosdbjsaun123
     private_endpoint_name_cosmos=myprivateendpoint123cosmos
     private_endpoint_name_storage=myprivateendpoint123storage
+    location=eastus
+    failoverLocation=eastus2
     az group create -n $resource_group_name -l japaneast
     ```
 
