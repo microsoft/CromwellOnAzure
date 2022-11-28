@@ -115,9 +115,10 @@ The following are instructions on how to setup a virtual network, and azure cont
 ### 5. SSH into the deployer VM we created, and run the deployer.
     ```
     ssh azureuser@{public-ip}
-
+    
+    version=3.1.0
     curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-    wget https://github.com/microsoft/CromwellOnAzure/releases/download/3.0.0/deploy-cromwell-on-azure-linux
+    A
     
     // Copy and paste all the environments variables such as $subscription from the other shell.
     batchsubnetid=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $vnet_name --name batchnodessubnet --query id --output tsv)
