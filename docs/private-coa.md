@@ -157,6 +157,3 @@ The following are instructions on how to setup a virtual network, and azure cont
         --VmSubnetName vmsubnet
     ```
 
-
-
-Task e5eee20a_6920ab86dc374c6b8c66762b94736543 failed. ExitCode: 1, BatchJobInfo: {"MoreThanOneActiveJobFound":false,"ActiveJobWithMissingAutoPool":false,"AttemptNumber":1,"NodeAllocationFailed":false,"NodeErrorCode":null,"NodeErrorDetails":null,"JobState":0,"JobStartTime":"2022-06-10T05:38:25.2447107Z","JobEndTime":null,"JobSchedulingError":null,"NodeState":0,"TaskState":3,"TaskExitCode":1,"TaskExecutionResult":1,"TaskStartTime":"2022-06-10T05:41:07.237451Z","TaskEndTime":"2022-06-10T05:41:24.968525Z","TaskFailureInformation":{"Category":0,"Code":"FailureExitCode","Details":[{"Name":"Message","Value":"The task process exited with an unexpected exit code"},{"Name":"AdditionalErrorCode","Value":"FailureExitCode"}],"Message":"The task exited with an exit code representing a failure"},"TaskContainerState":null,"TaskContainerError":null}
