@@ -70,7 +70,7 @@ The following are instructions on how to setup a virtual network, and azure cont
             --private-connection-resource-id $stroageAccountId \
             --group-id "Blob" \
             --connection-name "myConnection"
-        
+
     az cosmosdb create --name $cosmos_db_name --resource-group $resource_group_name \
         --default-consistency-level Eventual \
         --locations regionName="$location" failoverPriority=0 isZoneRedundant=False \
@@ -154,7 +154,7 @@ The following are instructions on how to setup a virtual network, and azure cont
         --ResourceGroupName $resource_group_name \
         --VnetName $vnet_name \
         --VnetResourceGroupName $resource_group_name \
-        --SubnetName vmsubnet
+        --VmSubnetName vmsubnet
     ```
 
 
