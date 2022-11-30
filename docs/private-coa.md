@@ -3,7 +3,7 @@
 The following are instructions on how to setup a virtual network, and azure container registry to run Cromwell on Azure with private networking so that no components have public IP addresses, all traffic is routed through the virtual network or private endpoints. 
 
 
-### 0. Set variables:
+### 0. Set variables and create Resource group:
 
     ```
     subscription="594bef42-33f3-42df-b056-e7399d6ae7a0"
@@ -16,6 +16,8 @@ The following are instructions on how to setup a virtual network, and azure cont
     private_endpoint_name_storage=myprivateendpoint123storage
     location=eastus
     failoverLocation=eastus2
+    
+    // Create Resource group
     az group create -n $resource_group_name -l $location
     ```
 
@@ -52,8 +54,22 @@ The following are instructions on how to setup a virtual network, and azure cont
     ```
     az vm create -n PrivateDeployerVM3 -g $resource_group_name --vnet-name $vnet_name --subnet vmsubnet --image UbuntuLTS --admin-username azureuser --generate-ssh-keys
     ```
+    
+### 3. SSH into the deployer VM we created
 
-### 3. Create CosmosDb and Storage Account to be used by CoA without public access, and establish private endpoints with virtual network we already created.
+    ```
+    ssh azureuser@{public-ip}
+    
+    // Copy and paste all the environments variables such as $subscription from the other shell.
+    batchsubnetid=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $vnet_name --name batchnodessubnet --query id --output tsv)
+
+    
+    // Login into Az
+    az login  
+    ```
+  
+
+### 4. Create CosmosDb and Storage Account to be used by CoA without public access, and establish private endpoints with virtual network we already created.
     ```
     az storage account create --name $storage_account_name --resource-group $resource_group_name
 
@@ -127,26 +143,18 @@ The following are instructions on how to setup a virtual network, and azure cont
       --image ubuntu:22.04
     ```
 
-### 5. SSH into the deployer VM we created, and run the deployer.
+### 5. Run the deployer.
     ```
-    ssh azureuser@{public-ip}
-    
-
     curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
     
-    // Copy and paste all the environments variables such as $subscription from the other shell.
-    batchsubnetid=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $vnet_name --name batchnodessubnet --query id --output tsv)
+    // Set environment variables for CoA
     version=3.1.0
     coa_identifier=coavsmmain
     
     //Download the installer
     wget https://github.com/microsoft/CromwellOnAzure/releases/download/$version/deploy-cromwell-on-azure-linux
     chmod 744 deploy-cromwell-on-azure-linux
-    
-    // Login into Az
-    az login
-
-
+   
     ./deploy-cromwell-on-azure-linux --SubscriptionId $subscription --RegionName $location \
         --MainIdentifierPrefix $coa_identifier \
         --StorageAccountName $storage_account_name \
