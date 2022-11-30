@@ -110,16 +110,21 @@ The following are instructions on how to setup a virtual network, and azure cont
     ```
     az acr create --resource-group $resource_group_name --name $mycontainerregistry --sku Basic
     az acr login --name $mycontainerregistry
+    
+    az acr import \
+      --name $mycontainerregistry \
+      --source docker.io/library/docker:latest \
+      --image docker:v1
 
-    docker pull docker
-    docker tag docker $mycontainerregistry.azurecr.io/docker:v1
-    docker push $mycontainerregistry.azurecr.io/docker:v1
-    docker rmi $mycontainerregistry.azurecr.io/docker:v1
+    az acr import \
+      --name $mycontainerregistry \
+      --source mcr.microsoft.com/blobxfer \
+      --image blobxfer:v1
 
-    docker pull mcr.microsoft.com/blobxfer
-    docker tag mcr.microsoft.com/blobxfer $mycontainerregistry.azurecr.io/blobxfer:v1
-    docker push $mycontainerregistry.azurecr.io/blobxfer:v1
-    docker rmi $mycontainerregistry.azurecr.io/blobxfer:v1
+    az acr import \
+      --name $mycontainerregistry \
+      --source mcr.microsoft.com/mirror/docker/library/ubuntu:22.04 \
+      --image ubuntu:22.04
     ```
 
 ### 5. SSH into the deployer VM we created, and run the deployer.
