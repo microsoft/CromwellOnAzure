@@ -30,13 +30,13 @@ namespace CromwellOnAzureDeployer
     {
         private static readonly AsyncRetryPolicy WorkloadReadyRetryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryAsync(12, retryAttempt => System.TimeSpan.FromSeconds(15));
+            .WaitAndRetryAsync(12, retryAttempt => TimeSpan.FromSeconds(15));
 
         private static readonly AsyncRetryPolicy KubeExecRetryPolicy = Policy
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
-            .WaitAndRetryAsync(8, retryAttempt => System.TimeSpan.FromSeconds(5));
+            .WaitAndRetryAsync(8, retryAttempt => TimeSpan.FromSeconds(5));
 
-        private const string BlobCsiDriverGithubReleaseVersion = "v1.17.0";
+        private const string BlobCsiDriverGithubReleaseVersion = "v1.18.0";
         private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseVersion}/charts";
         private const string AadPluginGithubReleaseVersion = "v1.8.13";
         private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
@@ -71,23 +71,7 @@ namespace CromwellOnAzureDeployer
             CopyHelmFiles(includedHelmScriptsRootDirectory, Path.Join(workingDirectoryTemp, "helm"));
         }
 
-        private void CopyHelmFiles(string path, string wd)
-        {
-            foreach (var existingDirectory in Directory.EnumerateDirectories(path, "*", SearchOption.AllDirectories))
-            {
-                var newDirectory = existingDirectory.Replace(path, wd);
-                Directory.CreateDirectory(newDirectory);
-            }
-
-            foreach (var filePath in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
-            {
-                var fileInfo = new FileInfo(filePath);
-                var destinatonFilePath = filePath.Replace(path, wd);
-                fileInfo.CopyTo(destinatonFilePath, overwrite: true);
-            }
-        }
-
-        public async Task<IKubernetes> GetKubernetesClient(IResource resourceGroupObject)
+        public async Task<IKubernetes> GetKubernetesClientAsync(IResource resourceGroupObject)
         {
             var resourceGroup = resourceGroupObject.Name;
             var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
@@ -102,30 +86,30 @@ namespace CromwellOnAzureDeployer
             return new Kubernetes(k8sClientConfiguration);
         }
 
-        public async Task DeployCoADependencies()
+        public async Task DeployCoADependenciesAsync()
         {
-            var helmRepoList = await ExecHelmProcess($"repo list");
+            var helmRepoList = await ExecHelmProcessAsync($"repo list");
 
             if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("aad-pod-identity", StringComparison.OrdinalIgnoreCase))
             {
-                await ExecHelmProcess($"repo add aad-pod-identity {AadPluginRepo}");
+                await ExecHelmProcessAsync($"repo add aad-pod-identity {AadPluginRepo}");
             }
 
             if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("blob-csi-driver", StringComparison.OrdinalIgnoreCase))
             {
-                await ExecHelmProcess($"repo add blob-csi-driver {BlobCsiRepo}");
+                await ExecHelmProcessAsync($"repo add blob-csi-driver {BlobCsiRepo}");
             }
             
-            await ExecHelmProcess($"repo update");
-            await ExecHelmProcess($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig {kubeConfigPath}");
-            await ExecHelmProcess($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig {kubeConfigPath}");
+            await ExecHelmProcessAsync($"repo update");
+            await ExecHelmProcessAsync($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig {kubeConfigPath}");
+            await ExecHelmProcessAsync($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig {kubeConfigPath}");
         }
 
         public async Task DeployHelmChartToClusterAsync()
         {
             // https://helm.sh/docs/helm/helm_upgrade/
             // The chart argument can be either: a chart reference('example/mariadb'), a path to a chart directory, a packaged chart, or a fully qualified URL
-            await ExecHelmProcess($"upgrade --install cromwellonazure ./helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace",
+            await ExecHelmProcessAsync($"upgrade --install cromwellonazure ./helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace",
                 workingDirectory: workingDirectoryTemp);
         }
 
@@ -177,7 +161,7 @@ namespace CromwellOnAzureDeployer
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
         }
 
-        public async Task UpgradeValuesYaml(IStorageAccount storageAccount, Dictionary<string, string> settings)
+        public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
             UpdateValuesFromSettings(values, settings);
@@ -186,12 +170,13 @@ namespace CromwellOnAzureDeployer
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
         }
 
-        public async Task<Dictionary<string, string>> GetAKSSettings(IStorageAccount storageAccount)
+        public async Task<Dictionary<string, string>> GetAKSSettingsAsync(IStorageAccount storageAccount)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
             return ValuesToSettings(values);
         }
-        public async Task ExecuteCommandsOnPod(IKubernetes client, string podName, IEnumerable<string[]> commands, TimeSpan timeout)
+
+        public async Task ExecuteCommandsOnPodAsync(IKubernetes client, string podName, IEnumerable<string[]> commands)
         {
             var printHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
             {
@@ -227,7 +212,7 @@ namespace CromwellOnAzureDeployer
             var pods = await client.CoreV1.ListNamespacedPodAsync(configuration.AksCoANamespace);
             var workloadPod = pods.Items.Where(x => x.Metadata.Name.Contains(podName)).FirstOrDefault();
 
-            if (!await WaitForWorkloadWithTimeout(client, podName, timeout, cts.Token))
+            if (!await WaitForWorkloadAsync(client, podName, cts.Token))
             {
                 throw new Exception($"Timed out waiting for {podName} to start.");
             }
@@ -248,17 +233,17 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        public async Task WaitForCromwell(IKubernetes client)
+        public async Task WaitForCromwellAsync(IKubernetes client)
         {
-            if (!await WaitForWorkloadWithTimeout(client, "cromwell", TimeSpan.FromMinutes(3), cts.Token))
+            if (!await WaitForWorkloadAsync(client, "cromwell", cts.Token))
             {
                 throw new Exception("Timed out waiting for Cromwell to start.");
             }
         }
 
-        public async Task UpgradeAKSDeployment(Dictionary<string, string> settings, IStorageAccount storageAccount)
+        public async Task UpgradeAKSDeploymentAsync(Dictionary<string, string> settings, IStorageAccount storageAccount)
         {
-            await UpgradeValuesYaml(storageAccount, settings);
+            await UpgradeValuesYamlAsync(storageAccount, settings);
             await DeployHelmChartToClusterAsync();
         }
         
@@ -267,10 +252,25 @@ namespace CromwellOnAzureDeployer
             Directory.Delete(workingDirectoryTemp, true);
         }
 
+        private void CopyHelmFiles(string path, string wd)
+        {
+            foreach (var existingDirectory in Directory.EnumerateDirectories(path, "*", SearchOption.AllDirectories))
+            {
+                var newDirectory = existingDirectory.Replace(path, wd);
+                Directory.CreateDirectory(newDirectory);
+            }
+
+            foreach (var filePath in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+            {
+                var fileInfo = new FileInfo(filePath);
+                var destinatonFilePath = filePath.Replace(path, wd);
+                fileInfo.CopyTo(destinatonFilePath, overwrite: true);
+            }
+        }
+
         private static void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)
         {
             values.Config["cromwellOnAzureVersion"] = settings["CromwellOnAzureVersion"];
-            values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
             values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
             values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
             values.Config["cosmosDbAccountName"] = settings["CosmosDbAccountName"];
@@ -290,22 +290,22 @@ namespace CromwellOnAzureDeployer
             values.Config["marthaUrl"] = settings["MarthaUrl"];
             values.Config["marthaKeyVaultName"] = settings["MarthaKeyVaultName"];
             values.Config["marthaSecretName"] = settings["MarthaSecretName"];
-            values.Images["tes"] = settings["TesImageName"];
-            values.Images["triggerservice"] = settings["TriggerServiceImageName"];
-            values.Images["cromwell"] = settings["CromwellImageName"];
             values.Config["crossSubscriptionAKSDeployment"] = settings["CrossSubscriptionAKSDeployment"];
             values.Config["postgreSqlServerName"] = settings["PostgreSqlServerName"];
             values.Config["postgreSqlDatabaseName"] = settings["PostgreSqlDatabaseName"];
             values.Config["postgreSqlUserLogin"] = settings["PostgreSqlUserLogin"];
             values.Config["postgreSqlUserPassword"] = settings["PostgreSqlUserPassword"];
             values.Config["usePostgreSqlSingleServer"] = settings["UsePostgreSqlSingleServer"];
+            values.Images["tes"] = settings["TesImageName"];
+            values.Images["triggerservice"] = settings["TriggerServiceImageName"];
+            values.Images["cromwell"] = settings["CromwellImageName"];
+            values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
         }
 
         private static Dictionary<string, string> ValuesToSettings(HelmValues values)
         {
             var settings = new Dictionary<string, string>();
             settings["CromwellOnAzureVersion"] = values.Config["cromwellOnAzureVersion"];
-            settings["DefaultStorageAccountName"] = values.Persistence["storageAccount"];
             settings["AzureServicesAuthConnectionString"] = values.Config["azureServicesAuthConnectionString"];
             settings["ApplicationInsightsAccountName"] = values.Config["applicationInsightsAccountName"];
             settings["CosmosDbAccountName"] = values.Config["cosmosDbAccountName"];
@@ -325,9 +325,6 @@ namespace CromwellOnAzureDeployer
             settings["MarthaUrl"] = values.Config["marthaUrl"];
             settings["MarthaKeyVaultName"] = values.Config["marthaKeyVaultName"];
             settings["MarthaSecretName"] = values.Config["marthaSecretName"];
-            settings["TesImageName"] = values.Images["tes"];
-            settings["TriggerServiceImageName"] = values.Images["triggerservice"];
-            settings["CromwellImageName"] = values.Images["cromwell"];
             settings["CrossSubscriptionAKSDeployment"] = values.Config["crossSubscriptionAKSDeployment"];
             settings["PostgreSqlServerName"] = values.Config["postgreSqlServerName"];
             settings["PostgreSqlDatabaseName"] = values.Config["postgreSqlDatabaseName"];
@@ -335,30 +332,34 @@ namespace CromwellOnAzureDeployer
             settings["PostgreSqlUserPassword"] = values.Config["postgreSqlUserPassword"];
             settings["UsePostgreSqlSingleServer"] = values.Config["usePostgreSqlSingleServer"];
             settings["ManagedIdentityClientId"] = values.Identity["clientId"];
+            settings["TesImageName"] = values.Images["tes"];
+            settings["TriggerServiceImageName"] = values.Images["triggerservice"];
+            settings["CromwellImageName"] = values.Images["cromwell"];
+            settings["DefaultStorageAccountName"] = values.Persistence["storageAccount"];
             return settings;
         }
 
-        private async Task<string> ExecHelmProcess(string command, string workingDirectory = null)
+        private async Task<string> ExecHelmProcessAsync(string command, string workingDirectory = null)
         {
-            var p = new Process();
-            p.StartInfo.UseShellExecute = false;
-            p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.RedirectStandardError = true;
-            p.StartInfo.FileName = configuration.HelmBinaryPath;
-            p.StartInfo.Arguments = command;
+            var process = new Process();
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.FileName = configuration.HelmBinaryPath;
+            process.StartInfo.Arguments = command;
 
             if (!string.IsNullOrWhiteSpace(workingDirectory))
             {
-                p.StartInfo.WorkingDirectory = workingDirectory;
+                process.StartInfo.WorkingDirectory = workingDirectory;
             }
 
-            p.Start();
+            process.Start();
 
             var outputStringBuilder = new StringBuilder();
 
             _ = Task.Run(async () =>
             {
-                var line = (await p.StandardOutput.ReadLineAsync())?.Trim();
+                var line = (await process.StandardOutput.ReadLineAsync())?.Trim();
 
                 while (line != null)
                 {
@@ -368,13 +369,13 @@ namespace CromwellOnAzureDeployer
                     }
 
                     outputStringBuilder.AppendLine(line);
-                    line = await p.StandardOutput.ReadLineAsync().WaitAsync(cts.Token);
+                    line = await process.StandardOutput.ReadLineAsync().WaitAsync(cts.Token);
                 }
             });
 
             _ = Task.Run(async () =>
             {
-                var line = (await p.StandardError.ReadLineAsync())?.Trim();
+                var line = (await process.StandardError.ReadLineAsync())?.Trim();
 
                 while (line != null)
                 {
@@ -384,14 +385,14 @@ namespace CromwellOnAzureDeployer
                     }
 
                     outputStringBuilder.AppendLine(line);
-                    line = await p.StandardError.ReadLineAsync().WaitAsync(cts.Token);
+                    line = await process.StandardError.ReadLineAsync().WaitAsync(cts.Token);
                 }
             });
 
-            await p.WaitForExitAsync();
+            await process.WaitForExitAsync();
             var output = outputStringBuilder.ToString();
 
-            if (p.ExitCode != 0)
+            if (process.ExitCode != 0)
             {
                 foreach (var line in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
                 {
@@ -399,15 +400,15 @@ namespace CromwellOnAzureDeployer
                 }
 
                 Debugger.Break();
-                throw new Exception($"HELM ExitCode = {p.ExitCode}");
+                throw new Exception($"HELM ExitCode = {process.ExitCode}");
             }
 
             return output;
         }
 
-        private async Task<bool> WaitForWorkloadWithTimeout(IKubernetes client, string deploymentName, System.TimeSpan timeout, CancellationToken cancellationToken)
+        private async Task<bool> WaitForWorkloadAsync(IKubernetes client, string deploymentName, CancellationToken cancellationToken)
         {
-            var timer = Stopwatch.StartNew();
+            var stopWatch = Stopwatch.StartNew();
             var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
             var deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
 

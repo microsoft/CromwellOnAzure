@@ -211,7 +211,7 @@ namespace CromwellOnAzureDeployer
                                 storageAccount = storageAccounts.First();
                             }
 
-                            accountNames = await kubernetesManager.GetAKSSettings(storageAccount);
+                            accountNames = await kubernetesManager.GetAKSSettingsAsync(storageAccount);
                         }   
                         else
                         {
@@ -327,12 +327,12 @@ namespace CromwellOnAzureDeployer
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
                             // Override any configuration that is used by the update.
-                            var aksValues = await kubernetesManager.GetAKSSettings(storageAccount);
+                            var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccount);
                             var versionString = aksValues["CromwellOnAzureVersion"];
                             var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
                             var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
 
-                            await kubernetesManager.UpgradeAKSDeployment(
+                            await kubernetesManager.UpgradeAKSDeploymentAsync(
                                 settings,
                                 storageAccount);
                         }
@@ -550,8 +550,8 @@ namespace CromwellOnAzureDeployer
                                 }
                                 else
                                 {
-                                    kubernetesClient = await kubernetesManager.GetKubernetesClient(resourceGroup);
-                                    await kubernetesManager.DeployCoADependencies();
+                                    kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
+                                    await kubernetesManager.DeployCoADependenciesAsync();
                                     await kubernetesManager.DeployHelmChartToClusterAsync();
                                 }
                             });
@@ -603,7 +603,7 @@ namespace CromwellOnAzureDeployer
                     {
                         if (kubernetesClient is not null)
                         {
-                            await kubernetesManager.WaitForCromwell(kubernetesClient);
+                            await kubernetesManager.WaitForCromwellAsync(kubernetesClient);
                         }
                     }
                     else
@@ -1988,7 +1988,7 @@ namespace CromwellOnAzureDeployer
                         new string[] { "/usr/bin/psql", "-h", serverPath, "-U", username, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", initScript }
                     };
 
-                    await kubernetesManager.ExecuteCommandsOnPod(kubernetesClient, "tes", commands, System.TimeSpan.FromMinutes(5));
+                    await kubernetesManager.ExecuteCommandsOnPodAsync(kubernetesClient, "tes", commands);
                 });
 
         private static async Task SetStorageKeySecret(string vaultUrl, string secretName, string secretValue)
