@@ -10,10 +10,18 @@ using Tes.Models;
 namespace TesApi.Web.Management;
 
 /// <summary>
-/// Verifies that batch account can fulfill the compute requirements using the ARM API. 
+/// Quota provider that uses the ARM API. 
 /// </summary>
-public class ArmResourceQuotaVerifier : BaseResourceQuotaVerifier
+public class ArmResourceQuotaProvider : IResourceQuotaProvider
 {
+    /// <summary>
+    /// Azure proxy instance
+    /// </summary>
+    protected readonly IAzureProxy azureProxy;
+    /// <summary>
+    /// Logger instance.
+    /// </summary>
+    protected readonly ILogger logger;
 
 
     /// <summary>
@@ -21,18 +29,10 @@ public class ArmResourceQuotaVerifier : BaseResourceQuotaVerifier
     /// </summary>
     /// <param name="azureProxy"></param>
     /// <param name="logger"></param>
-    public ArmResourceQuotaVerifier(IAzureProxy azureProxy, ILogger logger) : base(azureProxy, logger)
+    public ArmResourceQuotaProvider(IAzureProxy azureProxy, ILogger logger)
     {
-    }
-
-    /// <summary>
-    /// Retrieves batch account quota information using the ARM API. 
-    /// </summary>
-    /// <returns>Batch account quota information</returns>
-    /// <exception cref="NotImplementedException"></exception>
-    protected override async Task<BatchAccountQuotas> GetBatchAccountQuotasFromManagementServiceAsync(VirtualMachineInformation vmInfo)
-    {
-        return ToBatchAccountQuotas(await azureProxy.GetBatchAccountQuotasAsync(), vmInfo);
+        this.azureProxy = azureProxy;
+        this.logger = logger;
     }
 
     private BatchAccountQuotas ToBatchAccountQuotas(AzureBatchAccountQuotas batchAccountQuotas, VirtualMachineInformation vmInfo)
@@ -56,4 +56,11 @@ public class ArmResourceQuotaVerifier : BaseResourceQuotaVerifier
             batchAccountQuotas.ActiveJobAndJobScheduleQuota, batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced);
     }
 
+    /// <summary>
+    /// Retrieves batch account quota information using the ARM API. 
+    /// </summary>
+    public async Task<BatchAccountQuotas> GetBatchAccountQuotaInformationAsync(VirtualMachineInformation virtualMachineInformation)
+    {
+        return ToBatchAccountQuotas(await azureProxy.GetBatchAccountQuotasAsync(), virtualMachineInformation);
+    }
 }

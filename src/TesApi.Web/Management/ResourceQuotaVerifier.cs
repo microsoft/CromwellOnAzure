@@ -11,38 +11,28 @@ namespace TesApi.Web.Management;
 
 
 /// <summary>
-/// Base class containing checks that verify that the batch account can fulfill the compute requirements.
+/// Contains logic that verifies if the batch account can fulfill the compute requirements using quota information.
 /// </summary>
-public abstract class BaseResourceQuotaVerifier : IResourceQuotaVerifier
+public class ResourceQuotaVerifier : IResourceQuotaVerifier
 {
     private const string AzureSupportUrl = $"https://portal.azure.com/#blade/Microsoft_Azure_Support/HelpAndSupportBlade/newsupportrequest";
+    private readonly IAzureProxy azureProxy;
+    private readonly ILogger logger;
+    private readonly IResourceQuotaProvider resourceQuotaProvider;
 
-    /// <summary>
-    /// Azure proxy instance
-    /// </summary>
-    protected readonly IAzureProxy azureProxy;
-    /// <summary>
-    /// Logger instance.
-    /// </summary>
-    protected readonly ILogger logger;
 
     /// <summary>
     /// Constructor of BaseResourceQuotaVerifier
     /// </summary>
     /// <param name="azureProxy"></param>
+    /// <param name="resourceQuotaProvider"></param>
     /// <param name="logger"></param>
-    protected BaseResourceQuotaVerifier(IAzureProxy azureProxy, ILogger logger)
+    public ResourceQuotaVerifier(IAzureProxy azureProxy, IResourceQuotaProvider resourceQuotaProvider, ILogger logger)
     {
         this.azureProxy = azureProxy;
         this.logger = logger;
+        this.resourceQuotaProvider = resourceQuotaProvider;
     }
-
-    /// <summary>
-    /// Returns the quota information for the requested vm family 
-    /// </summary>
-    /// <param name="virtualMachineInformation">Requested vm family information</param>
-    /// <returns></returns>
-    protected abstract Task<BatchAccountQuotas> GetBatchAccountQuotasFromManagementServiceAsync(VirtualMachineInformation virtualMachineInformation);
 
     /// <summary>
     /// Verifies if the batch account can fulfill the compute requirements
@@ -55,8 +45,24 @@ public abstract class BaseResourceQuotaVerifier : IResourceQuotaVerifier
         var workflowCoresRequirement = virtualMachineInformation.NumberOfCores ?? 0;
         var isDedicated = !virtualMachineInformation.LowPriority;
         var vmFamily = virtualMachineInformation.VmFamily;
+        BatchAccountQuotas batchQuotas;
 
-        var batchQuotas = await GetBatchAccountQuotasFromManagementServiceAsync(virtualMachineInformation);
+        try
+        {
+            batchQuotas = await resourceQuotaProvider.GetBatchAccountQuotaInformationAsync(virtualMachineInformation);
+
+            if (batchQuotas == null)
+            {
+                throw new InvalidOperationException(
+                    "Could not obtain quota information from the management service. The return value was null");
+            }
+        }
+        catch (Exception e)
+        {
+            logger.LogError("Failed to retrieve quota information for the management provider", e);
+            throw;
+        }
+
         var isDedicatedAndPerVmFamilyCoreQuotaEnforced = isDedicated && batchQuotas.DedicatedCoreQuotaPerVMFamilyEnforced;
         var batchUtilization = await GetBatchAccountUtilizationAsync(virtualMachineInformation);
 
@@ -110,6 +116,7 @@ public abstract class BaseResourceQuotaVerifier : IResourceQuotaVerifier
                     .NumberOfCores * (isDedicated ? x.DedicatedNodeCount : x.LowPriorityNodeCount)) ?? 0;
 
         var vmSizesInRequestedFamily = virtualMachineInfoList.Where(vm => String.Equals(vm.VmFamily, vmInfo.VmFamily, StringComparison.OrdinalIgnoreCase)).Select(vm => vm.VmSize).ToList();
+
         var activeNodeCountByVmSizeInRequestedFamily = activeNodeCountByVmSize.Where(x => vmSizesInRequestedFamily.Contains(x.VirtualMachineSize, StringComparer.OrdinalIgnoreCase));
 
         var dedicatedCoresInUseInRequestedVmFamily = activeNodeCountByVmSizeInRequestedFamily
@@ -118,6 +125,6 @@ public abstract class BaseResourceQuotaVerifier : IResourceQuotaVerifier
 
         return new BatchAccountUtilization(activeJobsCount, activePoolsCount, totalCoresInUse, dedicatedCoresInUseInRequestedVmFamily);
 
-
     }
+
 }

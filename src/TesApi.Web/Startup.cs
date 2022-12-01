@@ -94,7 +94,8 @@ namespace TesApi.Web
 
                 .AddSingleton<IRepository<TesTask>>(new CachingWithRetriesRepository<TesTask>(repository))
                 .AddLogging()
-                .AddSingleton<IResourceQuotaVerifier, ArmResourceQuotaVerifier>()
+                .AddSingleton<IResourceQuotaProvider, ArmResourceQuotaProvider>()
+                .AddSingleton<IResourceQuotaVerifier, ResourceQuotaVerifier>()
                 .AddSingleton<IBatchScheduler, BatchScheduler>()
 
                 .AddSwaggerGen(c =>
