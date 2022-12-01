@@ -58,17 +58,31 @@ namespace CromwellOnAzureDeployer
             this.cts = cts;
             configuration = config;
             azureCredentials = credentials;
-            var workingDirectory = Directory.GetCurrentDirectory();
-            deployerDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            includedHelmScriptsRootDirectory = Path.Combine(deployerDirectory, "scripts", "helm");
-            workingDirectoryTemp = Path.Join(workingDirectory, "cromwell-on-azure");
-            kubeConfigPath = Path.Join(workingDirectoryTemp, "aks", "kubeconfig.txt");
-            TempHelmValuesYamlPath = Path.Join(workingDirectoryTemp, "helm", "values.yaml");
-            generatedHelmScriptsRootDirectory = Path.GetDirectoryName(TempHelmValuesYamlPath);
-            valuesTemplatePath = Path.Join(includedHelmScriptsRootDirectory, "values-template.yaml");
-            Directory.CreateDirectory(generatedHelmScriptsRootDirectory);
-            Directory.CreateDirectory(Path.GetDirectoryName(kubeConfigPath));
-            CopyHelmFiles(includedHelmScriptsRootDirectory, Path.Join(workingDirectoryTemp, "helm"));
+
+            CreateAndInitializeWorkingDirectories();
+        }
+
+        private void CreateAndInitializeWorkingDirectories()
+        {
+            try
+            {
+                var workingDirectory = Directory.GetCurrentDirectory();
+                deployerDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+                includedHelmScriptsRootDirectory = Path.Combine(deployerDirectory, "scripts", "helm");
+                workingDirectoryTemp = Path.Join(workingDirectory, "cromwell-on-azure");
+                kubeConfigPath = Path.Join(workingDirectoryTemp, "aks", "kubeconfig.txt");
+                TempHelmValuesYamlPath = Path.Join(workingDirectoryTemp, "helm", "values.yaml");
+                generatedHelmScriptsRootDirectory = Path.GetDirectoryName(TempHelmValuesYamlPath);
+                valuesTemplatePath = Path.Join(includedHelmScriptsRootDirectory, "values-template.yaml");
+                Directory.CreateDirectory(generatedHelmScriptsRootDirectory);
+                Directory.CreateDirectory(Path.GetDirectoryName(kubeConfigPath));
+                CopyHelmFiles(includedHelmScriptsRootDirectory, Path.Join(workingDirectoryTemp, "helm"));
+            }
+            catch (Exception exc)
+            {
+                ConsoleEx.WriteLine(exc.ToString());
+                throw;
+            }
         }
 
         public async Task<IKubernetes> GetKubernetesClientAsync(IResource resourceGroupObject)
