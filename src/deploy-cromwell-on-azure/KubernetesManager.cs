@@ -73,16 +73,17 @@ namespace CromwellOnAzureDeployer
 
         private void CopyHelmFiles(string path, string wd)
         {
-            foreach (var dir in Directory.EnumerateDirectories(path, "*", SearchOption.AllDirectories))
+            foreach (var existingDirectory in Directory.EnumerateDirectories(path, "*", SearchOption.AllDirectories))
             {
-                var target = dir.Replace(path, wd);
-                Directory.CreateDirectory(target);
+                var newDirectory = existingDirectory.Replace(path, wd);
+                Directory.CreateDirectory(newDirectory);
             }
 
-            foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+            foreach (var filePath in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
             {
-                var info = new FileInfo(file);
-                info.CopyTo(file.Replace(path, wd));
+                var fileInfo = new FileInfo(filePath);
+                var destinatonFilePath = filePath.Replace(path, wd);
+                fileInfo.CopyTo(destinatonFilePath, overwrite: true);
             }
         }
 
@@ -124,8 +125,8 @@ namespace CromwellOnAzureDeployer
         {
             // https://helm.sh/docs/helm/helm_upgrade/
             // The chart argument can be either: a chart reference('example/mariadb'), a path to a chart directory, a packaged chart, or a fully qualified URL
-            await ExecHelmProcess($"upgrade --install cromwellonazure ./scripts/helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace",
-                workingDirectory: deployerDirectory);
+            await ExecHelmProcess($"upgrade --install cromwellonazure ./helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace",
+                workingDirectory: workingDirectoryTemp);
         }
 
         public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
