@@ -99,12 +99,14 @@ namespace TesApi.Tests
             task.Resources.Preemptible = preemptible;
             task.Resources.BackendParameters = backendParameters;
 
+            var logger = new Mock<ILogger>().Object;
+
             var batchScheduler = new BatchScheduler(
                 new Mock<ILogger>().Object,
                 GetMockConfig(),
                 new CachingWithRetriesAzureProxy(proxy, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions())))),
                 new StorageAccessProvider(new Mock<ILogger>().Object, GetMockConfig(), proxy),
-                new ArmResourceQuotaVerifier(proxy, new Mock<ILogger>().Object));
+                new ResourceQuotaVerifier(proxy, new ArmResourceQuotaProvider(proxy, logger), logger));
 
             var size = await batchScheduler.GetVmSizeAsync(task);
             Assert.AreEqual(vmSize, size.VmSize);
@@ -866,7 +868,7 @@ namespace TesApi.Tests
                 configuration,
                 new CachingWithRetriesAzureProxy(azureProxy.Object, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions())))),
                 new StorageAccessProvider(new Mock<ILogger>().Object, configuration, azureProxy.Object),
-                new ArmResourceQuotaVerifier(azureProxy.Object, new Mock<ILogger>().Object)
+                new ResourceQuotaVerifier(azureProxy.Object, new ArmResourceQuotaProvider(azureProxy.Object, new Mock<ILogger>().Object), new Mock<ILogger>().Object)
             );
 
             await batchScheduler.ProcessTesTaskAsync(tesTask);
