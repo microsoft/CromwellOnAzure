@@ -60,7 +60,7 @@ namespace CromwellOnAzureDeployer
             azureCredentials = credentials;
             var workingDirectory = Directory.GetCurrentDirectory();
             deployerDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            includedHelmScriptsRootDirectory = Path.Combine(deployerDirectory, "scripts", "helm"); //Path.Join(workingDirectory, "scripts", "helm");
+            includedHelmScriptsRootDirectory = Path.Combine(deployerDirectory, "scripts", "helm");
             workingDirectoryTemp = Path.Join(workingDirectory, "cromwell-on-azure");
             kubeConfigPath = Path.Join(workingDirectoryTemp, "aks", "kubeconfig.txt");
             TempHelmValuesYamlPath = Path.Join(workingDirectoryTemp, "helm", "values.yaml");
@@ -408,7 +408,6 @@ namespace CromwellOnAzureDeployer
 
         private async Task<bool> WaitForWorkloadAsync(IKubernetes client, string deploymentName, CancellationToken cancellationToken)
         {
-            var stopWatch = Stopwatch.StartNew();
             var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
             var deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
 
