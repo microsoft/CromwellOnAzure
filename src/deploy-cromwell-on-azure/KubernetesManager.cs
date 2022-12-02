@@ -249,7 +249,9 @@ namespace CromwellOnAzureDeployer
             {
                 var workingDirectory = Directory.GetCurrentDirectory();
                 deployerDirectory = Path.GetDirectoryName(AppContext.BaseDirectory);
+                ConsoleEx.WriteLine("Deployer dir: " + deployerDirectory);
                 includedHelmScriptsRootDirectory = Path.Join(deployerDirectory, "scripts", "helm");
+                ConsoleEx.WriteLine("includedHelmScriptsRootDirectory: " + includedHelmScriptsRootDirectory);
                 workingDirectoryTemp = Path.Join(workingDirectory, "cromwell-on-azure");
                 kubeConfigPath = Path.Join(workingDirectoryTemp, "aks", "kubeconfig.txt");
                 TempHelmValuesYamlPath = Path.Join(workingDirectoryTemp, "helm", "values.yaml");
