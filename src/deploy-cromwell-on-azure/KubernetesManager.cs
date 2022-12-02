@@ -17,6 +17,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.WebSockets;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -48,9 +49,7 @@ namespace CromwellOnAzureDeployer
         private string workingDirectoryTemp { get; set; }
         private string kubeConfigPath { get; set; }
         private string valuesTemplatePath { get; set; }
-        private string generatedHelmScriptsRootDirectory { get; set; }
-        private string includedHelmScriptsRootDirectory { get; set; }
-        private string deployerDirectory { get; set; }
+        private string helmScriptsRootDirectory { get; set; }
         public string TempHelmValuesYamlPath { get; set; }
 
         public KubernetesManager(Configuration config, AzureCredentials credentials, CancellationTokenSource cts)
@@ -248,39 +247,19 @@ namespace CromwellOnAzureDeployer
             try
             {
                 var workingDirectory = Directory.GetCurrentDirectory();
-                deployerDirectory = Path.GetDirectoryName(AppContext.BaseDirectory);
-                ConsoleEx.WriteLine("Deployer dir: " + deployerDirectory);
-                includedHelmScriptsRootDirectory = Path.Join(deployerDirectory, "scripts", "helm");
-                ConsoleEx.WriteLine("includedHelmScriptsRootDirectory: " + includedHelmScriptsRootDirectory);
                 workingDirectoryTemp = Path.Join(workingDirectory, "cromwell-on-azure");
+                helmScriptsRootDirectory = Path.Join(workingDirectoryTemp, "helm");
                 kubeConfigPath = Path.Join(workingDirectoryTemp, "aks", "kubeconfig.txt");
-                TempHelmValuesYamlPath = Path.Join(workingDirectoryTemp, "helm", "values.yaml");
-                generatedHelmScriptsRootDirectory = Path.GetDirectoryName(TempHelmValuesYamlPath);
-                valuesTemplatePath = Path.Join(includedHelmScriptsRootDirectory, "values-template.yaml");
-                Directory.CreateDirectory(generatedHelmScriptsRootDirectory);
+                TempHelmValuesYamlPath = Path.Join(helmScriptsRootDirectory, "values.yaml");
+                valuesTemplatePath = Path.Join(helmScriptsRootDirectory, "values-template.yaml");
+                Directory.CreateDirectory(helmScriptsRootDirectory);
                 Directory.CreateDirectory(Path.GetDirectoryName(kubeConfigPath));
-                CopyHelmFiles(includedHelmScriptsRootDirectory, Path.Join(workingDirectoryTemp, "helm"));
+                Utility.WriteEmbeddedFilesAsync(helmScriptsRootDirectory, "scripts", "helm").Wait();
             }
             catch (Exception exc)
             {
                 ConsoleEx.WriteLine(exc.ToString());
                 throw;
-            }
-        }
-
-        private void CopyHelmFiles(string path, string wd)
-        {
-            foreach (var existingDirectory in Directory.EnumerateDirectories(path, "*", SearchOption.AllDirectories))
-            {
-                var newDirectory = existingDirectory.Replace(path, wd);
-                Directory.CreateDirectory(newDirectory);
-            }
-
-            foreach (var filePath in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
-            {
-                var fileInfo = new FileInfo(filePath);
-                var destinatonFilePath = filePath.Replace(path, wd);
-                fileInfo.CopyTo(destinatonFilePath, overwrite: true);
             }
         }
 
