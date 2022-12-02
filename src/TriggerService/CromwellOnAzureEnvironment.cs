@@ -103,7 +103,8 @@ namespace TriggerService
                         processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
                         processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
                         processedTriggerInfo.WorkflowOptions.Filename, processedTriggerInfo.WorkflowOptions.Data,
-                        processedTriggerInfo.WorkflowDependencies.Filename, processedTriggerInfo.WorkflowDependencies.Data);
+                        processedTriggerInfo.WorkflowDependencies.Filename, processedTriggerInfo.WorkflowDependencies.Data,
+                        processedTriggerInfo.Labels.Filename, processedTriggerInfo.Labels.Data);
 
                     await SetStateToInProgressAsync(blobTrigger.ContainerName, blobTrigger.Name, response.Id.ToString());
                 }
@@ -152,8 +153,9 @@ namespace TriggerService
 
             var workflowOptions = await GetBlobFileNameAndData(triggerInfo.WorkflowOptionsUrl);
             var workflowDependencies = await GetBlobFileNameAndData(triggerInfo.WorkflowDependenciesUrl);
+            var workflowLabels = await GetBlobFileNameAndData(triggerInfo.LabelsUrl);
 
-            return new ProcessedTriggerInfo(workflowSource, workflowInputs, workflowOptions, workflowDependencies);
+            return new ProcessedTriggerInfo(workflowSource, workflowInputs, workflowOptions, workflowDependencies, workflowLabels);
         }
 
         public async Task UpdateWorkflowStatusesAsync()

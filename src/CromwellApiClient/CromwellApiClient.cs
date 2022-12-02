@@ -60,7 +60,9 @@ namespace CromwellApiClient
             string workflowOptionsFilename = null,
             byte[] workflowOptionsData = null,
             string workflowDependenciesFilename = null,
-            byte[] workflowDependenciesData = null)
+            byte[] workflowDependenciesData = null,
+            string workflowLabelFilename = null,
+            byte[] workflowLabelData = null)
         {
             var files = AccumulatePostFiles(
                 workflowSourceFilename,
@@ -70,7 +72,9 @@ namespace CromwellApiClient
                 workflowOptionsFilename,
                 workflowOptionsData,
                 workflowDependenciesFilename,
-                workflowDependenciesData);
+                workflowDependenciesData,
+                workflowLabelFilename,
+                workflowLabelData);
             return await PostAsync<PostWorkflowResponse>(string.Empty, files);
         }
 
@@ -82,7 +86,9 @@ namespace CromwellApiClient
             string workflowOptionsFilename = null,
             byte[] workflowOptionsData = null,
             string workflowDependenciesFilename = null,
-            byte[] workflowDependenciesData = null)
+            byte[] workflowDependenciesData = null,
+            string workflowLabelFilename = null,
+            byte[] workflowLabelData = null)
         {
             var files = new List<FileToPost> {
                 new FileToPost(workflowSourceFilename, workflowSourceData, "workflowSource", removeTabs: true)
@@ -102,6 +108,11 @@ namespace CromwellApiClient
             if (workflowDependenciesFilename is not null && workflowDependenciesData is not null)
             {
                 files.Add(new FileToPost(workflowDependenciesFilename, workflowDependenciesData, "workflowDependencies"));
+            }
+
+            if (workflowLabelFilename is not null && workflowLabelData is not null)
+            {
+                files.Add(new FileToPost(workflowLabelFilename, workflowLabelData, "labels"));
             }
 
             return files;
