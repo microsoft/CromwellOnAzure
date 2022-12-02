@@ -58,7 +58,7 @@ namespace CromwellOnAzureDeployer
             configuration = config;
             azureCredentials = credentials;
 
-            CreateAndInitializeWorkingDirectories().Wait();
+            CreateAndInitializeWorkingDirectoriesAsync().Wait();
         }
 
         public async Task<IKubernetes> GetKubernetesClientAsync(IResource resourceGroupObject)

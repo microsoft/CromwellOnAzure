@@ -105,15 +105,16 @@ namespace CromwellOnAzureDeployer
             {
                 var content = (await new StreamReader(assembly.GetManifestResourceStream(file)).ReadToEndAsync()).Replace("\r\n", "\n");
                 var componentsAsPath = string.Join(Path.DirectorySeparatorChar, pathComponentsRelativeToAppBase);
-                var path = file.Replace(componentSubstring, "").TrimStart('.');
-                var outputPath = Path.Join(outputBasePath, path);
-                var lastPeriodBeforeFilename = path.LastIndexOf('.', path.LastIndexOf('.') - 1);
+                var pathSeparatedByPeriods = file.Replace(componentSubstring, "").TrimStart('.');
+                var outputPath = Path.Join(outputBasePath, pathSeparatedByPeriods);
+                var lastPeriodBeforeFilename = pathSeparatedByPeriods.LastIndexOf('.', pathSeparatedByPeriods.LastIndexOf('.') - 1);
 
                 if (lastPeriodBeforeFilename > 0)
                 {
-                    var subs = path.Substring(0, lastPeriodBeforeFilename).Replace('.', Path.PathSeparator);
-                    var filename = path.Substring(lastPeriodBeforeFilename + 1);
-                    outputPath = Path.Join(outputBasePath, subs, filename);
+                    // There are subdirectories present
+                    var subdirectories = pathSeparatedByPeriods.Substring(0, lastPeriodBeforeFilename).Replace('.', Path.PathSeparator);
+                    var filename = pathSeparatedByPeriods.Substring(lastPeriodBeforeFilename + 1);
+                    outputPath = Path.Join(outputBasePath, subdirectories, filename);
                 }
 
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
