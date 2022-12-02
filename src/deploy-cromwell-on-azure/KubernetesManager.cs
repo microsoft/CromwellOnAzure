@@ -239,7 +239,10 @@ namespace CromwellOnAzureDeployer
         
         public void DeleteTempFiles()
         {
-            Directory.Delete(workingDirectoryTemp, true);
+            if (Directory.Exists(workingDirectoryTemp))
+            {
+                Directory.Delete(workingDirectoryTemp, true);
+            }
         }
 
         private void CreateAndInitializeWorkingDirectories()
