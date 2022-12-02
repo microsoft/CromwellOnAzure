@@ -391,7 +391,9 @@ namespace TriggerService.Tests
                 processedTriggerInfo.WorkflowOptions.Filename,
                 processedTriggerInfo.WorkflowOptions.Data,
                 processedTriggerInfo.WorkflowDependencies.Filename,
-                processedTriggerInfo.WorkflowDependencies.Data);
+                processedTriggerInfo.WorkflowDependencies.Data,
+                processedTriggerInfo.Labels.Filename,
+                processedTriggerInfo.Labels.Data);
 
         private static void VerifyPostFiles(ProcessedTriggerInfo processedTriggerInfo)
         {
