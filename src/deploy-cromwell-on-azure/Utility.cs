@@ -119,6 +119,7 @@ namespace CromwellOnAzureDeployer
 
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
                 await File.WriteAllTextAsync(outputPath, content);
+                ConsoleEx.WriteLine($"Wrote: {outputPath}");
             }
         }
 

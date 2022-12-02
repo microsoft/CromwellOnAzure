@@ -250,6 +250,8 @@ namespace CromwellOnAzureDeployer
             try
             {
                 var workingDirectory = Directory.GetCurrentDirectory();
+                ConsoleEx.WriteLine(workingDirectory);
+
                 workingDirectoryTemp = Path.Join(workingDirectory, "cromwell-on-azure");
                 helmScriptsRootDirectory = Path.Join(workingDirectoryTemp, "helm");
                 kubeConfigPath = Path.Join(workingDirectoryTemp, "aks", "kubeconfig.txt");
@@ -258,6 +260,7 @@ namespace CromwellOnAzureDeployer
                 Directory.CreateDirectory(helmScriptsRootDirectory);
                 Directory.CreateDirectory(Path.GetDirectoryName(kubeConfigPath));
                 await Utility.WriteEmbeddedFilesAsync(helmScriptsRootDirectory, "scripts", "helm");
+                ConsoleEx.WriteLine(helmScriptsRootDirectory);
             }
             catch (Exception exc)
             {
