@@ -58,7 +58,7 @@ namespace CromwellOnAzureDeployer
             configuration = config;
             azureCredentials = credentials;
 
-            CreateAndInitializeWorkingDirectories();
+            CreateAndInitializeWorkingDirectories().Wait();
         }
 
         public async Task<IKubernetes> GetKubernetesClientAsync(IResource resourceGroupObject)
@@ -245,7 +245,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private void CreateAndInitializeWorkingDirectories()
+        private async Task CreateAndInitializeWorkingDirectoriesAsync()
         {
             try
             {
@@ -257,7 +257,7 @@ namespace CromwellOnAzureDeployer
                 valuesTemplatePath = Path.Join(helmScriptsRootDirectory, "values-template.yaml");
                 Directory.CreateDirectory(helmScriptsRootDirectory);
                 Directory.CreateDirectory(Path.GetDirectoryName(kubeConfigPath));
-                Utility.WriteEmbeddedFilesAsync(helmScriptsRootDirectory, "scripts", "helm").Wait();
+                await Utility.WriteEmbeddedFilesAsync(helmScriptsRootDirectory, "scripts", "helm");
             }
             catch (Exception exc)
             {
