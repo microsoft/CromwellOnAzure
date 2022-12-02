@@ -248,8 +248,8 @@ namespace CromwellOnAzureDeployer
             try
             {
                 var workingDirectory = Directory.GetCurrentDirectory();
-                deployerDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-                includedHelmScriptsRootDirectory = Path.Combine(deployerDirectory, "scripts", "helm");
+                deployerDirectory = Path.GetDirectoryName(AppContext.BaseDirectory);
+                includedHelmScriptsRootDirectory = Path.Join(deployerDirectory, "scripts", "helm");
                 workingDirectoryTemp = Path.Join(workingDirectory, "cromwell-on-azure");
                 kubeConfigPath = Path.Join(workingDirectoryTemp, "aks", "kubeconfig.txt");
                 TempHelmValuesYamlPath = Path.Join(workingDirectoryTemp, "helm", "values.yaml");
