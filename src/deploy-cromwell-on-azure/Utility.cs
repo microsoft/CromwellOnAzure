@@ -97,15 +97,15 @@ namespace CromwellOnAzureDeployer
         public static async Task WriteEmbeddedFilesAsync(string outputBasePath, params string[] pathComponentsRelativeToAppBase)
         {
             var assembly = typeof(Deployer).Assembly;
-            var assemblyName = assembly.GetName().Name;
             var resourceNames = assembly.GetManifestResourceNames();
+
+            // Assembly is renamed by the build process, so get it from the first resource name
+            var firstResourceName = resourceNames.First();
+            var assemblyName = firstResourceName.Substring(0, firstResourceName.IndexOf('.'));
             var componentSubstring = $"{assemblyName}.{string.Join(".", pathComponentsRelativeToAppBase)}";
-            ConsoleEx.WriteLine($"DEBUG RN count: {resourceNames.Length}");
 
             foreach (var file in resourceNames.Where(r => r.StartsWith(componentSubstring)))
             {
-                ConsoleEx.WriteLine($"DEBUG file: {file}");
-
                 var content = (await new StreamReader(assembly.GetManifestResourceStream(file)).ReadToEndAsync()).Replace("\r\n", "\n");
                 var componentsAsPath = string.Join(Path.DirectorySeparatorChar, pathComponentsRelativeToAppBase);
                 var pathSeparatedByPeriods = file.Replace(componentSubstring, "").TrimStart('.');
@@ -122,7 +122,6 @@ namespace CromwellOnAzureDeployer
 
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
                 await File.WriteAllTextAsync(outputPath, content);
-                ConsoleEx.WriteLine($"DEBUG WROTE: {outputPath}");
             }
         }
 
