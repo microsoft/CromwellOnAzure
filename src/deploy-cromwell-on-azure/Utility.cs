@@ -100,9 +100,12 @@ namespace CromwellOnAzureDeployer
             var assemblyName = assembly.GetName().Name;
             var resourceNames = assembly.GetManifestResourceNames();
             var componentSubstring = $"{assemblyName}.{string.Join(".", pathComponentsRelativeToAppBase)}";
+            ConsoleEx.WriteLine($"DEBUG RN count: {resourceNames.Length}");
 
             foreach (var file in resourceNames.Where(r => r.StartsWith(componentSubstring)))
             {
+                ConsoleEx.WriteLine($"DEBUG file: {file}");
+
                 var content = (await new StreamReader(assembly.GetManifestResourceStream(file)).ReadToEndAsync()).Replace("\r\n", "\n");
                 var componentsAsPath = string.Join(Path.DirectorySeparatorChar, pathComponentsRelativeToAppBase);
                 var pathSeparatedByPeriods = file.Replace(componentSubstring, "").TrimStart('.');
@@ -119,7 +122,7 @@ namespace CromwellOnAzureDeployer
 
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
                 await File.WriteAllTextAsync(outputPath, content);
-                ConsoleEx.WriteLine($"Wrote: {outputPath}");
+                ConsoleEx.WriteLine($"DEBUG WROTE: {outputPath}");
             }
         }
 
