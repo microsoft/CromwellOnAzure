@@ -107,7 +107,6 @@ namespace CromwellOnAzureDeployer
             foreach (var file in resourceNames.Where(r => r.StartsWith(componentSubstring)))
             {
                 var content = (await new StreamReader(assembly.GetManifestResourceStream(file)).ReadToEndAsync()).Replace("\r\n", "\n");
-                var componentsAsPath = string.Join(Path.DirectorySeparatorChar, pathComponentsRelativeToAppBase);
                 var pathSeparatedByPeriods = file.Replace(componentSubstring, "").TrimStart('.');
                 var outputPath = Path.Join(outputBasePath, pathSeparatedByPeriods);
                 var lastPeriodBeforeFilename = pathSeparatedByPeriods.LastIndexOf('.', pathSeparatedByPeriods.LastIndexOf('.') - 1);
@@ -115,7 +114,7 @@ namespace CromwellOnAzureDeployer
                 if (lastPeriodBeforeFilename > 0)
                 {
                     // There are subdirectories present
-                    var subdirectories = pathSeparatedByPeriods.Substring(0, lastPeriodBeforeFilename).Replace('.', Path.PathSeparator);
+                    var subdirectories = pathSeparatedByPeriods.Substring(0, lastPeriodBeforeFilename).Replace('.', Path.DirectorySeparatorChar);
                     var filename = pathSeparatedByPeriods.Substring(lastPeriodBeforeFilename + 1);
                     outputPath = Path.Join(outputBasePath, subdirectories, filename);
                 }

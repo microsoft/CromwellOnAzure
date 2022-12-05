@@ -81,33 +81,15 @@
     <Content Update="samples\config.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <EmbeddedResource Include="scripts\helm\Chart.yaml">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\values-template.yaml">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\README.md">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\cromwell-deployment.yaml">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\identity.yaml">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\persistence.yaml">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\service.yaml">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\tes-deployment.yaml">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="scripts\helm\templates\triggerservice-deployment.yaml">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </EmbeddedResource>
+    <EmbeddedResource Include="scripts\helm\Chart.yaml" />
+    <EmbeddedResource Include="scripts\helm\values-template.yaml" />
+    <EmbeddedResource Include="scripts\helm\README.md" />
+    <EmbeddedResource Include="scripts\helm\templates\cromwell-deployment.yaml" />
+    <EmbeddedResource Include="scripts\helm\templates\identity.yaml" />
+    <EmbeddedResource Include="scripts\helm\templates\persistence.yaml" />
+    <EmbeddedResource Include="scripts\helm\templates\service.yaml" />
+    <EmbeddedResource Include="scripts\helm\templates\tes-deployment.yaml" />
+    <EmbeddedResource Include="scripts\helm\templates\triggerservice-deployment.yaml" />
   </ItemGroup>
 
   <ItemGroup>
