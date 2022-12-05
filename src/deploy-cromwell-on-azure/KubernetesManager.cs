@@ -23,7 +23,7 @@ using Polly.Retry;
 namespace CromwellOnAzureDeployer
 {
     /// <summary>
-    ///     Class to hold all the kubernetes specific deployer logic. 
+    /// Class to hold all the kubernetes specific deployer logic. 
     /// </summary>
     internal class KubernetesManager
     {
