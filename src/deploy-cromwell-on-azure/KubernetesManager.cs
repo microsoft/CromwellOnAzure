@@ -390,18 +390,15 @@ namespace CromwellOnAzureDeployer
             await process.WaitForExitAsync();
             var output = outputStringBuilder.ToString();
 
-            if (throwOnNonZeroExitCode)
+            if (throwOnNonZeroExitCode && process.ExitCode != 0)
             {
-                if (process.ExitCode != 0)
+                foreach (var line in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    foreach (var line in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
-                    {
-                        ConsoleEx.WriteLine($"HELM: {line}");
-                    }
-
-                    Debugger.Break();
-                    throw new Exception($"HELM ExitCode = {process.ExitCode}");
+                    ConsoleEx.WriteLine($"HELM: {line}");
                 }
+
+                Debugger.Break();
+                throw new Exception($"HELM ExitCode = {process.ExitCode}");
             }
 
             return output;
