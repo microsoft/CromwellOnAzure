@@ -78,7 +78,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task DeployCoADependenciesAsync()
         {
-            var helmRepoList = await ExecHelmProcessAsync($"repo list");
+            var helmRepoList = await ExecHelmProcessAsync($"repo list", workingDirectory: null, throwOnNonZeroExitCode: false);
 
             if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("aad-pod-identity", StringComparison.OrdinalIgnoreCase))
             {
@@ -337,7 +337,7 @@ namespace CromwellOnAzureDeployer
             return settings;
         }
 
-        private async Task<string> ExecHelmProcessAsync(string command, string workingDirectory = null)
+        private async Task<string> ExecHelmProcessAsync(string command, string workingDirectory = null, bool throwOnNonZeroExitCode = true)
         {
             var process = new Process();
             process.StartInfo.UseShellExecute = false;
@@ -390,15 +390,18 @@ namespace CromwellOnAzureDeployer
             await process.WaitForExitAsync();
             var output = outputStringBuilder.ToString();
 
-            if (process.ExitCode != 0)
+            if (throwOnNonZeroExitCode)
             {
-                foreach (var line in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+                if (process.ExitCode != 0)
                 {
-                    ConsoleEx.WriteLine($"HELM: {line}");
-                }
+                    foreach (var line in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        ConsoleEx.WriteLine($"HELM: {line}");
+                    }
 
-                Debugger.Break();
-                throw new Exception($"HELM ExitCode = {process.ExitCode}");
+                    Debugger.Break();
+                    throw new Exception($"HELM ExitCode = {process.ExitCode}");
+                }
             }
 
             return output;
