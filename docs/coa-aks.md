@@ -1,7 +1,7 @@
 ## Cromwell on AKS Instructions and Troubleshooting
 
 ### Deployment Dependencies
-The CoA deployer requires the user to have Helm 3 installed locally to deploy with AKS. Use the flag "--HelmBinaryPath HELM_PATH" to give the deployer the path to the helm binary, if no flag is passed the deployer will assume Helm is installed with Chocolatey at "C:\\ProgramData\\chocolatey\\bin\\helm.exe".
+The CoA deployer requires the user to have Helm 3 installed locally to deploy with AKS. Use the flag "--HelmBinaryPath HELM_PATH" to give the deployer the path to the helm binary, if no flag is passed, the deployer will assume Helm is installed at "C:\\ProgramData\\chocolatey\\bin\\helm.exe" (Windows) or "/usr/local/bin/helm" (Linux, macOS).
 
 ### Deployment Models
 
