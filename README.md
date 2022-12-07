@@ -49,43 +49,6 @@ If you are running into an issue and cannot find any information in the troubles
 
 Download the required executable from [Releases](https://github.com/microsoft/CromwellOnAzure/releases). Choose the runtime of your choice from `win-x64`, `linux-x64`, `osx-x64`. *On Windows machines, we recommend using the `win-x64` runtime (deployment using the `linux-x64` runtime via the Windows Subsystem for Linux is not supported).*<br/>
 
-### Optional: build the executable yourself
-
-#### Linux
-*Preqrequisites*:<br/>
-.NET 6 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
-
-For example, instructions for *Ubuntu 18.04* are available [here](https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu#1804-) and below for convenience:
-
-```
-wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
-sudo dpkg -i packages-microsoft-prod.deb
-rm packages-microsoft-prod.deb
-sudo apt-get update && \
-sudo apt-get install -y apt-transport-https && \
-sudo apt-get update && \
-sudo apt-get install -y dotnet-sdk-6.0
-```
-
-#### Windows
-*Preqrequisites*:<br/>
-.NET 6 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
-
-*Recommended*:<br/>
-VS 2022
-
-#### Build steps
-1. Clone the [Cromwell on Azure repository](https://github.com/microsoft/CromwellOnAzure)
-2. Build the solution using `dotnet build` on bash or Powershell. For Windows, you can choose to build and test using VS 2022
-3. Run tests using `dotnet test` on bash or Powershell
-4. [Publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish#synopsis) the `deploy-cromwell-on-azure` project [as a self-contained deployment with your target runtime identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/deploying/#self-contained-deployments-scd) to produce the executable
-
-Example<br/> 
-Linux: `dotnet publish -r linux-x64`<br/>
-Windows: `dotnet publish -r win-x64`<br/>
-
-Learn more about `dotnet` commands [here](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet#dotnet-commands)
-
 ### Run the deployment executable
 
 1. **Linux and OS X only**: assign execute permissions to the file by running the following command on the terminal:<br/>
@@ -233,3 +196,40 @@ Other WDL examples on Cromwell on Azure:
 ## Related Projects
 
 [Genomics Data Analysis with Jupyter Notebooks on Azure](https://github.com/microsoft/genomicsnotebook)<br/>
+
+### How to build the deployment executable yourself
+
+#### Building on Linux
+*Preqrequisites*:<br/>
+.NET 6 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
+
+For example, instructions for *Ubuntu 18.04* are available [here](https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu#1804-) and below for convenience:
+
+```
+wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+rm packages-microsoft-prod.deb
+sudo apt-get update && \
+sudo apt-get install -y apt-transport-https && \
+sudo apt-get update && \
+sudo apt-get install -y dotnet-sdk-6.0
+```
+
+#### Building on Windows
+*Preqrequisites*:<br/>
+.NET 6 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
+
+*Recommended*:<br/>
+VS 2022
+
+#### Build steps
+1. Clone the [Cromwell on Azure repository](https://github.com/microsoft/CromwellOnAzure)
+2. Build the solution using `dotnet build` on bash or Powershell. For Windows, you can choose to build and test using VS 2022
+3. Run tests using `dotnet test` on bash or Powershell
+4. [Publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish#synopsis) the `deploy-cromwell-on-azure` project [as a self-contained deployment with your target runtime identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/deploying/#self-contained-deployments-scd) to produce the executable
+
+Example<br/> 
+Linux: `dotnet publish -r linux-x64`<br/>
+Windows: `dotnet publish -r win-x64`<br/>
+
+Learn more about `dotnet` commands [here](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet#dotnet-commands)
