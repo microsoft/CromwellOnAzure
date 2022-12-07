@@ -17,9 +17,11 @@ using Microsoft.Azure.Batch.Common;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
+using Microsoft.Azure.Management.Compute.Fluent;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
@@ -28,6 +30,8 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Tes.Models;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
+using Polly;
+using Polly.Retry;
 
 namespace TesApi.Web
 {
@@ -40,6 +44,9 @@ namespace TesApi.Web
         private const string DefaultAzureBillingRegionName = "US West";
 
         private static readonly HttpClient httpClient = new();
+        private static readonly AsyncRetryPolicy batchRaceConditionJobNotFoundRetryPolicy = Policy
+            .Handle<BatchException>(ex => ex.RequestInformation.BatchError.Code == BatchErrorCodeStrings.JobNotFound)
+            .WaitAndRetryAsync(10, retryAttempt => TimeSpan.FromSeconds(1));
 
         private readonly ILogger logger;
         private readonly Func<Task<BatchAccount>> getBatchAccountFunc;
@@ -244,21 +251,25 @@ namespace TesApi.Web
         /// <returns></returns>
         public async Task CreateBatchJobAsync(string jobId, CloudTask cloudTask, PoolInformation poolInformation)
         {
+            logger.LogInformation($"TES task: {cloudTask.Id} - creating Batch job");
             var job = batchClient.JobOperations.CreateJob(jobId, poolInformation);
+            job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
             await job.CommitAsync();
+            logger.LogInformation($"TES task: {cloudTask.Id} - Batch job committed successfully.");
 
             try
             {
-                job = await batchClient.JobOperations.GetJobAsync(job.Id); // Retrieve the "bound" version of the job
-                job.PoolInformation = poolInformation;  // Redoing this since the container registry password is not retrieved by GetJobAsync()
-                job.OnAllTasksComplete = OnAllTasksComplete.TerminateJob;
+                logger.LogInformation($"TES task: {cloudTask.Id} adding task to job.");
+                job = await batchRaceConditionJobNotFoundRetryPolicy.ExecuteAsync(() => 
+                    batchClient.JobOperations.GetJobAsync(job.Id));
+
                 await job.AddTaskAsync(cloudTask);
-                await job.CommitAsync();
+                logger.LogInformation($"TES task: {cloudTask.Id} added task successfully.");
             }
             catch (Exception ex)
             {
                 var batchError = JsonConvert.SerializeObject((ex as BatchException)?.RequestInformation?.BatchError);
-                logger.LogError(ex, $"Deleting {job.Id} because adding task to it failed. Batch error: {batchError}");
+                logger.LogError(ex, $"TES task: {cloudTask.Id} deleting {job.Id} because adding task to it failed. Batch error: {batchError}");
 
                 await batchClient.JobOperations.DeleteJobAsync(job.Id);
 
@@ -499,13 +510,23 @@ namespace TesApi.Web
 
                 foreach (var pool in poolsToDelete)
                 {
-                    logger.LogInformation($"Deleting pool {pool.Id}");
+                    logger.LogInformation($"Pool ID: {pool.Id} Pool State: {pool?.State} deleting...");
                     await batchClient.PoolOperations.DeletePoolAsync(pool.Id, cancellationToken: cancellationToken);
                 }
             }
             catch (Exception exc)
             {
-                logger.LogError(exc, $"Exception while attempting to delete pool starting with ID: {poolId}");
+                var batchErrorCode = (exc as BatchException)?.RequestInformation?.BatchError?.Code;
+
+                if (batchErrorCode?.Trim().Equals("PoolBeingDeleted", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    // Do not throw if it's a deletion race condition
+                    // Docs: https://learn.microsoft.com/en-us/rest/api/batchservice/Pool/Delete?tabs=HTTP
+
+                    return;
+                }
+
+                logger.LogError(exc, $"Pool ID: {poolId} exception while attempting to delete the pool.  Batch error code: {batchErrorCode}");
                 throw;
             }
         }
@@ -526,11 +547,11 @@ namespace TesApi.Web
                 try
                 {
                     var registries = (await azureClient.WithSubscription(subId).ContainerRegistries.ListAsync()).ToList();
-                    logger.LogInformation(@"Searching {subscriptionId} for container registries.", subId);
+                    logger.LogInformation(@$"Searching {subId} for container registries.");
 
                     foreach (var r in registries)
                     {
-                        logger.LogInformation(@"Found {Name}. AdminUserEnabled: {AdminUserEnabled}", r.Name, r.AdminUserEnabled);
+                        logger.LogInformation(@$"Found {r.Name}. AdminUserEnabled: {r.AdminUserEnabled}");
 
                         try
                         {
@@ -619,6 +640,10 @@ namespace TesApi.Web
         public Task<string> DownloadBlobAsync(Uri blobAbsoluteUri)
             => new CloudBlockBlob(blobAbsoluteUri).DownloadTextAsync();
 
+        /// <inheritdoc/>
+        public Task<bool> BlobExistsAsync(Uri blobAbsoluteUri)
+            => new CloudBlockBlob(blobAbsoluteUri).ExistsAsync();
+
         /// <summary>
         /// Gets the list of blobs in the given directory
         /// </summary>
@@ -706,7 +731,7 @@ namespace TesApi.Web
             }
         }
 
-        private IEnumerable<VmPrice> ExtractVmPricesFromRateCardResponse(List<(string VmSize, string FamilyName, string MeterName, string MeterSubCategory)> supportedVmSizes, string pricingContent)
+        private IEnumerable<VmPrice> ExtractVmPricesFromRateCardResponse(List<(string VmSize, string MeterName, string MeterSubCategory)> supportedVmSizes, string pricingContent)
         {
             var rateCardMeters = JObject.Parse(pricingContent)["Meters"]
                 .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
@@ -739,7 +764,16 @@ namespace TesApi.Web
             static double ConvertMiBToGiB(int value) => Math.Round(value / 1024.0, 2);
 
             var azureClient = await GetAzureManagementClientAsync();
-            var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).VirtualMachines.Sizes.ListByRegionAsync(location)).ToList();
+
+            var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).ComputeSkus.ListbyRegionAndResourceTypeAsync(Region.Create(location), ComputeResourceType.VirtualMachines))
+                .Select(vm => new { VmSize = vm.Name.Value, VmFamily = vm.Inner.Family, Capabilities = vm.Capabilities.ToDictionary(c => c.Name, c => c.Value) })
+                .Select(vm => new {
+                    VmSize = vm.VmSize,
+                    VmFamily = vm.VmFamily,
+                    NumberOfCores = int.Parse(vm.Capabilities.GetValueOrDefault("vCPUsAvailable", vm.Capabilities["vCPUs"])),
+                    MemoryGiB = double.Parse(vm.Capabilities["MemoryGB"]),
+                    DiskGiB = ConvertMiBToGiB(int.Parse(vm.Capabilities["MaxResourceVolumeMB"])),
+                    MaxDataDiskCount = int.Parse(vm.Capabilities.GetValueOrDefault("MaxDataDiskCount", "0")) });
 
             IEnumerable<VmPrice> vmPrices;
 
@@ -758,21 +792,21 @@ namespace TesApi.Web
 
             var vmInfos = new List<VirtualMachineInformation>();
 
-            foreach (var (VmSize, FamilyName, _, _) in supportedVmSizes)
+            foreach (var (vmSize, _, _) in supportedVmSizes)
             {
-                var vmSpecification = vmSizesAvailableAtLocation.SingleOrDefault(x => x.Name.Equals(VmSize, StringComparison.OrdinalIgnoreCase));
-                var vmPrice = vmPrices.SingleOrDefault(x => x.VmSize.Equals(VmSize, StringComparison.OrdinalIgnoreCase));
+                var vmSpecification = vmSizesAvailableAtLocation.SingleOrDefault(vm => vm.VmSize.Equals(vmSize, StringComparison.OrdinalIgnoreCase));
+                var vmPrice = vmPrices.SingleOrDefault(vm => vm.VmSize.Equals(vmSize, StringComparison.OrdinalIgnoreCase));
 
                 if (vmSpecification is not null && vmPrice is not null)
                 {
                     vmInfos.Add(new VirtualMachineInformation
                     {
-                        VmSize = VmSize,
-                        MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
+                        VmSize = vmSize,
+                        MemoryInGB = vmSpecification.MemoryGiB,
                         NumberOfCores = vmSpecification.NumberOfCores,
-                        ResourceDiskSizeInGB = ConvertMiBToGiB(vmSpecification.ResourceDiskSizeInMB),
+                        ResourceDiskSizeInGB = vmSpecification.DiskGiB,
                         MaxDataDiskCount = vmSpecification.MaxDataDiskCount,
-                        VmFamily = FamilyName,
+                        VmFamily = vmSpecification.VmFamily,
                         LowPriority = false,
                         PricePerHour = vmPrice.PricePerHourDedicated
                     });
@@ -781,12 +815,12 @@ namespace TesApi.Web
                     {
                         vmInfos.Add(new VirtualMachineInformation
                         {
-                            VmSize = VmSize,
-                            MemoryInGB = ConvertMiBToGiB(vmSpecification.MemoryInMB),
+                            VmSize = vmSize,
+                            MemoryInGB = vmSpecification.MemoryGiB,
                             NumberOfCores = vmSpecification.NumberOfCores,
-                            ResourceDiskSizeInGB = ConvertMiBToGiB(vmSpecification.ResourceDiskSizeInMB),
+                            ResourceDiskSizeInGB = vmSpecification.DiskGiB,
                             MaxDataDiskCount = vmSpecification.MaxDataDiskCount,
-                            VmFamily = FamilyName,
+                            VmFamily = vmSpecification.VmFamily,
                             LowPriority = true,
                             PricePerHour = vmPrice.PricePerHourLowPriority
                         });
@@ -824,13 +858,13 @@ namespace TesApi.Web
         /// <param name="nodeInfo">Information about the pool to be created</param>
         /// <param name="dockerInDockerImageName">Image that contains Docker to download private images</param>
         /// <param name="blobxferImageName">Image name for blobxfer, the Azure storage transfer tool</param>
-        /// <param name="identityResourceId">The resource ID of a user-assigned managed identity to assign to the pool</param>
+        /// <param name="identityResourceIds">The resource IDs of user-assigned managed identities to assign to the pool</param>
         /// <param name="disableBatchNodesPublicIpAddress">True to remove the public IP address of the Batch node</param>
         /// <param name="batchNodesSubnetId">The subnet ID of the Batch VM in the pool</param>
         /// <param name="startTaskSasUrl">SAS URL for the start task</param>
         /// <param name="startTaskPath">Local path on the Azure Batch node for the script</param>
         /// <returns></returns>
-        public async Task CreateManualBatchPoolAsync(
+        public async Task<ManualBatchPoolCreationResult> CreateManualBatchPoolAsync(
             string poolName, 
             string vmSize, 
             bool isLowPriority, 
@@ -838,13 +872,15 @@ namespace TesApi.Web
             BatchNodeInfo nodeInfo,
             string dockerInDockerImageName, 
             string blobxferImageName, 
-            string identityResourceId, 
+            IEnumerable<string> identityResourceIds, 
             bool disableBatchNodesPublicIpAddress, 
             string batchNodesSubnetId,
             string startTaskSasUrl,
             string startTaskPath
             )
         {
+            var result = new ManualBatchPoolCreationResult();
+
             try
             {
                 var tokenCredentials = new TokenCredentials(await GetAzureAccessTokenAsync());
@@ -859,21 +895,22 @@ namespace TesApi.Web
 
                 Microsoft.Azure.Management.Batch.Models.StartTask startTask = null;
 
-                //if (useStartTask)
-                //{
-                //    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
-                //    {
-                //        // Pool StartTask: install Docker as start task if it's not already
-                //        CommandLine = $"/bin/sh {startTaskPath}",
-                //        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
-                //        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
-                //    };
-                //}
+                if (!string.IsNullOrWhiteSpace(startTaskSasUrl) && !string.IsNullOrWhiteSpace(startTaskPath))
+                {
+                    startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
+                    {
+                        CommandLine = $"/bin/sh {startTaskPath}",
+                        UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
+                        ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
+                    };
+                }
 
                 var containerRegistryInfo = await GetContainerRegistryInfoAsync(executorImage);
 
                 if (containerRegistryInfo is not null)
                 {
+                    result.PoolHasContainerConfig = true;
+
                     var containerRegistryMgmt = new Microsoft.Azure.Management.Batch.Models.ContainerRegistry(
                         userName: containerRegistryInfo.Username,
                         registryServer: containerRegistryInfo.RegistryServer,
@@ -933,10 +970,7 @@ namespace TesApi.Web
                     Identity = new Microsoft.Azure.Management.Batch.Models.BatchPoolIdentity
                     {
                         Type = Microsoft.Azure.Management.Batch.Models.PoolIdentityType.UserAssigned,
-                        UserAssignedIdentities = new Dictionary<string, Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities>
-                        {
-                            [identityResourceId] = new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities()
-                        }
+                        UserAssignedIdentities = identityResourceIds.ToDictionary(x => x, x => new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities())
                     },
                     StartTask = startTask
                 };
@@ -954,6 +988,7 @@ namespace TesApi.Web
                 logger.LogInformation($"Creating manual batch pool named {poolName} with vmSize {vmSize} and low priority {isLowPriority}");
                 var pool = await batchManagementClient.Pool.CreateAsync(batchResourceGroupName, batchAccountName, poolInfo.Name, poolInfo);
                 logger.LogInformation($"Successfully created manual batch pool named {poolName} with vmSize {vmSize} and low priority {isLowPriority}");
+                return result;
             }
             catch (Exception exc)
             {

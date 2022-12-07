@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -102,10 +102,8 @@ namespace TesApi.Web
 
             foreach (var jobId in jobsToDelete)
             {
-                logger.LogInformation($"Job Id to delete: {jobId}");
-
                 var tesTaskId = jobId.Split(new[] { '-' })[0];
-                logger.LogInformation($"TES task Id to delete: {tesTaskId}");
+                logger.LogInformation($"TES task: {tesTaskId} deleting Batch Job ID: {jobId}");
 
                 TesTask tesTask = null;
 
@@ -121,14 +119,11 @@ namespace TesApi.Web
 
                         try
                         {
-                            if (tesTask.Resources?.ContainsBackendParameterValue(TesResources.SupportedBackendParameters.workflow_execution_identity) == true)
-                            {
-                                await azureProxy.DeleteBatchPoolIfExistsAsync(tesTaskId, cancellationToken);
-                            }
+                            await azureProxy.DeleteBatchPoolIfExistsAsync(tesTaskId, cancellationToken);
                         }
                         catch (Exception exc)
                         {
-                            logger.LogError(exc, $"Exception in DeleteOldBatchJobs when attempting to delete the manual batch pool {tesTaskId}");
+                            logger.LogError(exc, $"TES task: {tesTaskId} Exception in DeleteOldBatchJobs when attempting to delete the manual batch pool");
                             // Do not rethrow
                         }
                     }

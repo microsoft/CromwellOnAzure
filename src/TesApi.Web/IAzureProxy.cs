@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -54,7 +54,7 @@ namespace TesApi.Web
         /// <summary>
         /// Creates a Pool in Azure Batch that is NOT an AutoPool
         /// </summary>
-        Task CreateManualBatchPoolAsync(
+        Task<ManualBatchPoolCreationResult> CreateManualBatchPoolAsync(
             string poolName,
             string vmSize,
             bool isLowPriority,
@@ -62,7 +62,7 @@ namespace TesApi.Web
             BatchNodeInfo nodeInfo,
             string dockerInDockerImageName,
             string blobxferImageName,
-            string identityResourceId,
+            IEnumerable<string> identityResourceId,
             bool disableBatchNodesPublicIpAddress,
             string batchNodesSubnetId,
             string startTaskSasUrl,
@@ -142,6 +142,13 @@ namespace TesApi.Web
         /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
         /// <returns>Blob content</returns>
         Task<string> DownloadBlobAsync(Uri blobAbsoluteUri);
+
+        /// <summary>
+        /// Check if a blob exists.
+        /// </summary>
+        /// <param name="blobAbsoluteUri">Absolute Blob URI</param>
+        /// <returns>Blob exists boolean.</returns>
+        Task<bool> BlobExistsAsync(Uri blobAbsoluteUri);
 
         /// <summary>
         /// Gets the list of blobs in the given directory

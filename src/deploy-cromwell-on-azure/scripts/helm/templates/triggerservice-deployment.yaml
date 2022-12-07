@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: triggerservice
+    aadpodidbinding: {{ .Values.identity.name }}
+  name: triggerservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: triggerservice
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        io.kompose.service: triggerservice
+        aadpodidbinding: {{ .Values.identity.name }}
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/triggerservice: runtime/default
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        supplementalGroups: [1000]
+      containers:
+        - env:
+            - name: DefaultStorageAccountName
+              value: {{ .Values.persistence.storageAccount }}
+            - name: AzureServicesAuthConnectionString
+              value: {{ .Values.config.azureServicesAuthConnectionString }}
+            - name: ApplicationInsightsAccountName
+              value: {{ .Values.config.applicationInsightsAccountName }}
+            - name: CosmosDbAccountName
+              value: {{ .Values.config.cosmosDbAccountName }}
+          image: {{ .Values.images.triggerservice }}
+          name: triggerservice
+          resources:
+            requests:
+              cpu: "0.5"
+              memory: "256Mi"
+            limits:
+              cpu: "2.0"
+              memory: "1024Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+      restartPolicy: Always
+status: {}

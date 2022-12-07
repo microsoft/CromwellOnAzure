@@ -96,14 +96,14 @@ namespace TesApi.Web
 
                 .AddSwaggerGen(c =>
                 {
-                    c.SwaggerDoc("0.3.0", new OpenApiInfo
+                    c.SwaggerDoc("0.3.2", new OpenApiInfo
                     {
-                        Version = "0.3.0",
+                        Version = "0.3.2",
                         Title = "Task Execution Service",
-                        Description = "Task Execution Service (ASP.NET Core 3.1)",
+                        Description = "Task Execution Service (ASP.NET Core 6.0)",
                         Contact = new OpenApiContact()
                         {
-                            Name = "Microsoft Genomics",
+                            Name = "Microsoft Biomedical Platforms and Genomics",
                             Url = new Uri("https://github.com/microsoft/CromwellOnAzure")
                         },
                     });
@@ -127,7 +127,11 @@ namespace TesApi.Web
 
                         if (instrumentationKey is not null)
                         {
-                            return s.AddApplicationInsightsTelemetry(instrumentationKey);
+                            var connectionString = $"InstrumentationKey={instrumentationKey}";
+                            return s.AddApplicationInsightsTelemetry(options =>
+                                {
+                                    options.ConnectionString = connectionString;
+                                });
                         }
 
                         return s;

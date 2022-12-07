@@ -30,6 +30,7 @@ namespace TesApi.Tests
             // Assert
             azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchPoolIfExistsAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
@@ -46,6 +47,8 @@ namespace TesApi.Tests
             azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId2", It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchPoolIfExistsAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchPoolIfExistsAsync("tesTaskId2", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
@@ -61,6 +64,7 @@ namespace TesApi.Tests
             // Assert
             azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchPoolIfExistsAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
@@ -76,6 +80,7 @@ namespace TesApi.Tests
             // Assert
             azureProxy.Verify(i => i.ListOrphanedJobsToDeleteAsync(minJobAge, It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.Verify(i => i.DeleteBatchJobAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
+            azureProxy.Verify(i => i.DeleteBatchPoolIfExistsAsync("tesTaskId1", It.IsAny<System.Threading.CancellationToken>()));
             azureProxy.VerifyNoOtherCalls();
         }
 
