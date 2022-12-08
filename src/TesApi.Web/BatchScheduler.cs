@@ -891,7 +891,7 @@ namespace TesApi.Web
                 {
                     startTask = new Microsoft.Azure.Batch.StartTask
                     {
-                        CommandLine = $"sudo /bin/sh {batchStartTaskLocalPathOnBatchNode}",
+                        CommandLine = $"/usr/bin/env {batchStartTaskLocalPathOnBatchNode}",
                         UserIdentity = new UserIdentity(new AutoUserSpecification(elevationLevel: ElevationLevel.Admin, scope: AutoUserScope.Pool)),
                         ResourceFiles = new List<ResourceFile> { ResourceFile.FromUrl(scriptSasUrl, batchStartTaskLocalPathOnBatchNode) }
                     };
