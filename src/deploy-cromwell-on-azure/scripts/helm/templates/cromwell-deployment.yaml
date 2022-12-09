@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: cromwell
+    aadpodidbinding: {{ .Values.identity.name }}
+  name: cromwell
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: cromwell
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: cromwell
+        aadpodidbinding: {{ .Values.identity.name }}
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/cromwell: runtime/default
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        supplementalGroups: [1000]
+      containers:
+        - args:
+            -  java -Djava.io.tmpdir=/cromwell-tmp/ -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server
+          command:
+            - /bin/sh
+            - -c
+          image: {{ .Values.images.cromwell }}
+          name: cromwell
+          stdin: true
+          tty: true
+          ports:
+            - containerPort: {{ .Values.service.cromwellPort }}
+          resources:
+            requests:
+              cpu: "1.0"
+              memory: "1024Mi"
+            limits:
+              cpu: "8.0"
+              memory: "4096Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - mountPath: /cromwell-tmp
+              name: cromwell-tmp-claim
+{{- range .Values.defaultContainers }}
+            - mountPath: {{.}}
+              name: {{.}}-claim1
+{{- end }}
+{{- range .Values.externalContainers }}
+            - mountPath: /{{.accountName}}/{{.containerName}}
+              name: {{.accountName}}-{{.containerName}}-claim1
+{{- end }}
+{{- range .Values.externalSasContainers }}
+            - mountPath: /{{.accountName}}/{{.containerName}}
+              name: {{.accountName}}-{{.containerName}}-claim1
+{{- end }}
+      restartPolicy: Always
+      volumes:
+        - name: cromwell-tmp-claim
+          persistentVolumeClaim:
+            claimName: cromwell-tmp-claim
+{{- range .Values.defaultContainers }}
+        - name: {{.}}-claim1
+          persistentVolumeClaim:
+            claimName: {{.}}-claim1
+{{- end }}
+{{- range .Values.externalContainers }}
+        - name: {{.accountName}}-{{.containerName}}-claim1
+          persistentVolumeClaim:
+            claimName: {{.accountName}}-{{.containerName}}-claim1
+{{- end }}
+{{- range .Values.externalSasContainers }}
+        - name: {{.accountName}}-{{.containerName}}-claim1
+          persistentVolumeClaim:
+            claimName: {{.accountName}}-{{.containerName}}-claim1
+{{- end }}
+status: {}

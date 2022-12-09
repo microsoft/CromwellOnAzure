@@ -1,0 +1,73 @@
+﻿service:
+  tesPort: 80
+  cromwellPort: 8000
+
+config:
+  coaNamespace: RUNTIME_PARAMETER
+  resourceGroup: RUNTIME_PARAMETER
+  azureServicesAuthConnectionString: RUNTIME_PARAMETER
+  applicationInsightsAccountName: RUNTIME_PARAMETER
+  cosmosDbAccountName: RUNTIME_PARAMETER
+  azureOfferDurableId: MS-AZR-0003p
+  batchAccountName: RUNTIME_PARAMETER
+  batchNodesSubnetId: RUNTIME_PARAMETER
+  blobxferImageName: RUNTIME_PARAMETER
+  disableBatchNodesPublicIpAddress: RUNTIME_PARAMETER
+  disableBatchScheduling: RUNTIME_PARAMETER
+  dockerInDockerImageName: RUNTIME_PARAMETER
+  usePreemptibleVmsOnly: RUNTIME_PARAMETER
+  batchImageOffer: RUNTIME_PARAMETER
+  batchImagePublisher: RUNTIME_PARAMETER
+  batchImageSku: RUNTIME_PARAMETER
+  batchImageVersion: RUNTIME_PARAMETER
+  batchNodeAgentSkuId: RUNTIME_PARAMETER
+  marthaUrl: RUNTIME_PARAMETER
+  marthaKeyVaultName: RUNTIME_PARAMETER
+  marthaSecretName: RUNTIME_PARAMETER
+  globalStartTaskPath: /configuration/start-task.sh
+  batchManagedIdentity:
+
+images:
+  cromwell: RUNTIME_PARAMETER
+  tes: RUNTIME_PARAMETER
+  triggerservice: RUNTIME_PARAMETER
+
+defaultContainers:
+  - configuration
+  - cromwell-executions
+  - cromwell-workflow-logs
+  - inputs
+  - outputs
+
+internalContainersMIAuth:
+#  - accountName: storageAccount
+#    containerName: dataset1
+#    resourceGroup: resourceGroup1    
+
+internalContainersKeyVaultAuth:
+#  - accountName: storageAccount
+#    containerName: dataset1
+#    keyVaultURL: 
+#    keyVaultSecretName:
+
+externalContainers:
+#  - accountName: storageAccount
+#    accountKey: <key>
+#    containerName: dataset1
+#    resourceGroup: resourceGroup1
+
+externalSasContainers:
+  - accountName: datasettestinputs
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Public example, not confidential")]
+    sasToken: "sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D"
+    containerName: dataset
+
+persistence:
+  blobPvcSize: 32Gi
+  cromwellTmpSize: 32Gi
+  storageAccount: RUNTIME_PARAMETER
+
+identity:
+  name: RUNTIME_PARAMETER
+  resourceId: RUNTIME_PARAMETER
+  clientId: RUNTIME_PARAMETER

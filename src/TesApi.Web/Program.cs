@@ -30,7 +30,6 @@ namespace TesApi.Web
         /// <returns><see cref="IWebHostBuilder"/></returns>
         public static IWebHostBuilder CreateWebHostBuilder(string[] args)
             => WebHost.CreateDefaultBuilder<Startup>(args)
-                .UseUrls("http://0.0.0.0:80/")
                 .ConfigureAppConfiguration((context, config) =>
                 {
                     config.AddEnvironmentVariables(); // For Docker-Compose
@@ -47,7 +46,15 @@ namespace TesApi.Web
 
                             if (instrumentationKey is not null)
                             {
-                                logging.AddApplicationInsights(instrumentationKey);
+                                var connectionString = $"InstrumentationKey={instrumentationKey}";
+                                logging.AddApplicationInsights(
+                                    configuration =>
+                                    {
+                                        configuration.ConnectionString = connectionString;
+                                    },
+                                    options =>
+                                    {
+                                    });
                             }
                         }
                         else

@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: tes
+    aadpodidbinding: {{ .Values.identity.name }}
+  name: tes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: tes
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: tes
+        aadpodidbinding: {{ .Values.identity.name }}
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/tes: runtime/default
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        supplementalGroups: [1000]
+      containers:
+        - env:
+            - name: ASPNETCORE_URLS
+              value: http://0.0.0.0:{{ .Values.service.tesPort }}/
+            - name: DefaultStorageAccountName
+              value: {{ .Values.persistence.storageAccount }}
+            - name: AzureServicesAuthConnectionString
+              value: {{ .Values.config.azureServicesAuthConnectionString }}
+            - name: ApplicationInsightsAccountName
+              value: {{ .Values.config.applicationInsightsAccountName }}
+            - name: CosmosDbAccountName
+              value: {{ .Values.config.cosmosDbAccountName }}
+            - name: AzureOfferDurableId
+              value: {{ .Values.config.azureOfferDurableId }}
+            - name: BatchAccountName
+              value: {{ .Values.config.batchAccountName }}
+            - name: BatchNodesSubnetId
+              value: {{ .Values.config.batchNodesSubnetId }}
+            - name: BlobxferImageName
+              value: {{ .Values.config.blobxferImageName }}
+            - name: DisableBatchNodesPublicIpAddress
+              value: {{ .Values.config.disableBatchNodesPublicIpAddress | quote }}
+            - name: DisableBatchScheduling
+              value: {{ .Values.config.disableBatchScheduling | quote }}
+            - name: DockerInDockerImageName
+              value: {{ .Values.config.dockerInDockerImageName }}
+            - name: BatchImageOffer
+              value: {{ .Values.config.batchImageOffer }}
+            - name: BatchImagePublisher
+              value: {{ .Values.config.batchImagePublisher }}
+            - name: BatchImageSku
+              value: {{ .Values.config.batchImageSku }}
+            - name: BatchImageVersion
+              value: {{ .Values.config.batchImageVersion }}
+            - name: BatchNodeAgentSkuId
+              value: {{ .Values.config.batchNodeAgentSkuId }}
+            - name: MarthaUrl
+              value: {{ .Values.config.marthaUrl }}
+            - name: MarthaKeyVaultName
+              value: {{ .Values.config.marthaKeyVaultName }}
+            - name: MarthaSecretName
+              value: {{ .Values.config.marthaSecretName }}
+            - name: UsePreemptibleVmsOnly
+              value: {{ .Values.config.usePreemptibleVmsOnly | quote}}
+            - name: GlobalStartTaskPath
+              value: {{ .Values.config.globalStartTaskPath }}
+            - name: GlobalManagedIdentity
+              value: {{ .Values.config.batchManagedIdentity }}
+            - name: ExternalStorageContainers
+{{- $containers  := list -}}
+{{- range .Values.externalSasContainers }}
+{{- $containers = append $containers (printf "https://%s.blob.core.windows.net/%s?%s" .accountName .containerName .sasToken) -}}
+{{- end }}
+              value: {{ join ";" $containers}}
+          image: {{ .Values.images.tes }}
+          name: tes
+          ports:
+            - containerPort: {{ .Values.service.tesPort }}
+          resources:
+            requests:
+              cpu: "1.5"
+              memory: "3072Mi"
+            limits:
+              cpu: "8.0"
+              memory: "8192Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              add:
+                - NET_BIND_SERVICE
+status: {}
