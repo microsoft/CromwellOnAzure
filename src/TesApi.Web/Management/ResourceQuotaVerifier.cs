@@ -11,7 +11,7 @@ namespace TesApi.Web.Management;
 
 
 /// <summary>
-/// Contains logic that verifies if the batch account can fulfill the compute requirements using quota information.
+/// Contains logic that verifies if the batch account can fulfill the compute requirements using quota and sizing information.
 /// </summary>
 public class ResourceQuotaVerifier : IResourceQuotaVerifier
 {
@@ -19,6 +19,8 @@ public class ResourceQuotaVerifier : IResourceQuotaVerifier
     private readonly IAzureProxy azureProxy;
     private readonly ILogger logger;
     private readonly IResourceQuotaProvider resourceQuotaProvider;
+    private readonly IBatchSkuInformationProvider batchSkuInformationProvider;
+    private readonly string region;
 
 
     /// <summary>
@@ -26,11 +28,25 @@ public class ResourceQuotaVerifier : IResourceQuotaVerifier
     /// </summary>
     /// <param name="azureProxy"></param>
     /// <param name="resourceQuotaProvider"></param>
+    /// <param name="batchSkuInformationProvider"></param>
     /// <param name="logger"></param>
-    public ResourceQuotaVerifier(IAzureProxy azureProxy, IResourceQuotaProvider resourceQuotaProvider, ILogger logger)
+    /// <param name="region"></param>
+    public ResourceQuotaVerifier(IAzureProxy azureProxy, IResourceQuotaProvider resourceQuotaProvider,
+        IBatchSkuInformationProvider batchSkuInformationProvider, string region, ILogger logger)
     {
+        ArgumentNullException.ThrowIfNull(azureProxy);
+        ArgumentNullException.ThrowIfNull(resourceQuotaProvider);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(batchSkuInformationProvider);
+        if (String.IsNullOrEmpty(region))
+        {
+            throw new ArgumentException("Invalid region. The value is null or empty.", nameof(region));
+        }
+
+        this.region = region;
         this.azureProxy = azureProxy;
         this.logger = logger;
+        this.batchSkuInformationProvider = batchSkuInformationProvider;
         this.resourceQuotaProvider = resourceQuotaProvider;
     }
 
@@ -54,7 +70,7 @@ public class ResourceQuotaVerifier : IResourceQuotaVerifier
             if (batchQuotas == null)
             {
                 throw new InvalidOperationException(
-                    "Could not obtain quota information from the management service. The return value was null");
+                    "Could not obtain quota information from the management service. The return value is null");
             }
         }
         catch (Exception e)
@@ -107,7 +123,7 @@ public class ResourceQuotaVerifier : IResourceQuotaVerifier
         var activeJobsCount = azureProxy.GetBatchActiveJobCount();
         var activePoolsCount = azureProxy.GetBatchActivePoolCount();
         var activeNodeCountByVmSize = azureProxy.GetBatchActiveNodeCountByVmSize().ToList();
-        var virtualMachineInfoList = await azureProxy.GetVmSizesAndPricesAsync();
+        var virtualMachineInfoList = await batchSkuInformationProvider.GetVmSizesAndPricesAsync(region);
 
         var totalCoresInUse = activeNodeCountByVmSize
             .Sum(x =>

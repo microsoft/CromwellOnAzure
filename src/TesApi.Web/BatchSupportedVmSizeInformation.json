@@ -1,0 +1,2152 @@
+[
+  {
+    "VmSize": "Standard_A2_v2",
+    "VmFamily": "standardAv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 4,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 20,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_A2m_v2",
+    "VmFamily": "standardAv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 20,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_A4_v2",
+    "VmFamily": "standardAv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 40,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_A4m_v2",
+    "VmFamily": "standardAv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 40,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_A8_v2",
+    "VmFamily": "standardAv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 80,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_A8m_v2",
+    "VmFamily": "standardAv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 80,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D1_v2",
+    "VmFamily": "standardDv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 3.5,
+    "NumberOfCores": 1,
+    "ResourceDiskSizeInGB": 50,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_D11_v2",
+    "VmFamily": "standardDv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 14,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 100,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D12_v2",
+    "VmFamily": "standardDv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 28,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 200,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D13_v2",
+    "VmFamily": "standardDv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 56,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D14_v2",
+    "VmFamily": "standardDv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 112,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 800,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_D15_v2",
+    "VmFamily": "standardDv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 140,
+    "NumberOfCores": 20,
+    "ResourceDiskSizeInGB": 1000,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_D16_v3",
+    "VmFamily": "standardDv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D16a_v4",
+    "VmFamily": "standardDAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D16ads_v5",
+    "VmFamily": "standardDADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D16as_v4",
+    "VmFamily": "standardDASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 128,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D16d_v4",
+    "VmFamily": "standardDDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D16d_v5",
+    "VmFamily": "standardDDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D16ds_v4",
+    "VmFamily": "standardDDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D16ds_v5",
+    "VmFamily": "standardDDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D16s_v3",
+    "VmFamily": "standardDSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 128,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D2_v2",
+    "VmFamily": "standardDv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 7,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 100,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D2_v3",
+    "VmFamily": "standardDv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 50,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_D2a_v4",
+    "VmFamily": "standardDAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 50,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_D2ads_v5",
+    "VmFamily": "standardDADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 75,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_D2as_v4",
+    "VmFamily": "standardDASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 16,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_D2d_v4",
+    "VmFamily": "standardDDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 75,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_D2d_v5",
+    "VmFamily": "standardDDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 75,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_D2ds_v4",
+    "VmFamily": "standardDDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 75,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_D2ds_v5",
+    "VmFamily": "standardDDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 75,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_D2s_v3",
+    "VmFamily": "standardDSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 16,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_D3_v2",
+    "VmFamily": "standardDv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 14,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 200,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D32_v3",
+    "VmFamily": "standardDv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D32a_v4",
+    "VmFamily": "standardDAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D32ads_v5",
+    "VmFamily": "standardDADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D32as_v4",
+    "VmFamily": "standardDASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 256,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D32d_v4",
+    "VmFamily": "standardDDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D32d_v5",
+    "VmFamily": "standardDDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D32ds_v4",
+    "VmFamily": "standardDDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D32ds_v5",
+    "VmFamily": "standardDDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D32s_v3",
+    "VmFamily": "standardDSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 256,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D4_v2",
+    "VmFamily": "standardDv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 28,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D4_v3",
+    "VmFamily": "standardDv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 100,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D48_v3",
+    "VmFamily": "standardDv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 192,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D48a_v4",
+    "VmFamily": "standardDAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 192,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D48ads_v5",
+    "VmFamily": "standardDADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 192,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D48as_v4",
+    "VmFamily": "standardDASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 192,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 384,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D48d_v4",
+    "VmFamily": "standardDDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 192,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D48d_v5",
+    "VmFamily": "standardDDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 192,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D48ds_v4",
+    "VmFamily": "standardDDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 192,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D48ds_v5",
+    "VmFamily": "standardDDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 192,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D48s_v3",
+    "VmFamily": "standardDSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 192,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 384,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D4a_v4",
+    "VmFamily": "standardDAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 100,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D4ads_v5",
+    "VmFamily": "standardDADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 150,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D4as_v4",
+    "VmFamily": "standardDASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 32,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D4d_v4",
+    "VmFamily": "standardDDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 150,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D4d_v5",
+    "VmFamily": "standardDDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 150,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D4ds_v4",
+    "VmFamily": "standardDDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 150,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D4ds_v5",
+    "VmFamily": "standardDDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 150,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D4s_v3",
+    "VmFamily": "standardDSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 32,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_D5_v2",
+    "VmFamily": "standardDv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 56,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 800,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_D64_v3",
+    "VmFamily": "standardDv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 1600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D64a_v4",
+    "VmFamily": "standardDAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 1600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D64ads_v5",
+    "VmFamily": "standardDADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D64as_v4",
+    "VmFamily": "standardDASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 512,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D64d_v4",
+    "VmFamily": "standardDDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D64d_v5",
+    "VmFamily": "standardDDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D64ds_v4",
+    "VmFamily": "standardDDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D64ds_v5",
+    "VmFamily": "standardDDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D64s_v3",
+    "VmFamily": "standardDSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 512,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D8_v3",
+    "VmFamily": "standardDv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 200,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D8a_v4",
+    "VmFamily": "standardDAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 200,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D8ads_v5",
+    "VmFamily": "standardDADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 300,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D8as_v4",
+    "VmFamily": "standardDASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 64,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D8d_v4",
+    "VmFamily": "standardDDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 300,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D8d_v5",
+    "VmFamily": "standardDDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 300,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D8ds_v4",
+    "VmFamily": "standardDDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 300,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D8ds_v5",
+    "VmFamily": "standardDDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 300,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D8s_v3",
+    "VmFamily": "standardDSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 64,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_D96a_v4",
+    "VmFamily": "standardDAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 96,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D96ads_v5",
+    "VmFamily": "standardDADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 96,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D96as_v4",
+    "VmFamily": "standardDASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 96,
+    "ResourceDiskSizeInGB": 768,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D96d_v5",
+    "VmFamily": "standardDDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 96,
+    "ResourceDiskSizeInGB": 3600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_D96ds_v5",
+    "VmFamily": "standardDDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 96,
+    "ResourceDiskSizeInGB": 3600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_DS1_v2",
+    "VmFamily": "standardDSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 3.5,
+    "NumberOfCores": 1,
+    "ResourceDiskSizeInGB": 7,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_DS11_v2",
+    "VmFamily": "standardDSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 14,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 28,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_DS12_v2",
+    "VmFamily": "standardDSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 28,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 56,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_DS13_v2",
+    "VmFamily": "standardDSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 56,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 112,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_DS14_v2",
+    "VmFamily": "standardDSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 112,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 224,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_DS15_v2",
+    "VmFamily": "standardDSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 140,
+    "NumberOfCores": 20,
+    "ResourceDiskSizeInGB": 280,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_DS2_v2",
+    "VmFamily": "standardDSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 7,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 14,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_DS3_v2",
+    "VmFamily": "standardDSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 14,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 28,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_DS4_v2",
+    "VmFamily": "standardDSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 28,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 56,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_DS5_v2",
+    "VmFamily": "standardDSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 56,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 112,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_E16_v3",
+    "VmFamily": "standardEv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E16a_v4",
+    "VmFamily": "standardEAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E16ads_v5",
+    "VmFamily": "standardEADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E16as_v4",
+    "VmFamily": "standardEASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 256,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E16d_v4",
+    "VmFamily": "standardEDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E16d_v5",
+    "VmFamily": "standardEDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E16ds_v4",
+    "VmFamily": "standardEDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E16ds_v5",
+    "VmFamily": "standardEDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E16s_v3",
+    "VmFamily": "standardESv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 256,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E2_v3",
+    "VmFamily": "standardEv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 50,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_E20a_v4",
+    "VmFamily": "standardEAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 160,
+    "NumberOfCores": 20,
+    "ResourceDiskSizeInGB": 500,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E20ads_v5",
+    "VmFamily": "standardEADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 160,
+    "NumberOfCores": 20,
+    "ResourceDiskSizeInGB": 750,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E20as_v4",
+    "VmFamily": "standardEASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 160,
+    "NumberOfCores": 20,
+    "ResourceDiskSizeInGB": 320,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E20d_v4",
+    "VmFamily": "standardEDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 160,
+    "NumberOfCores": 20,
+    "ResourceDiskSizeInGB": 750,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E20d_v5",
+    "VmFamily": "standardEDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 160,
+    "NumberOfCores": 20,
+    "ResourceDiskSizeInGB": 750,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E20ds_v4",
+    "VmFamily": "standardEDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 160,
+    "NumberOfCores": 20,
+    "ResourceDiskSizeInGB": 750,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E20ds_v5",
+    "VmFamily": "standardEDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 160,
+    "NumberOfCores": 20,
+    "ResourceDiskSizeInGB": 750,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E2a_v4",
+    "VmFamily": "standardEAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 50,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_E2ads_v5",
+    "VmFamily": "standardEADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 75,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_E2as_v4",
+    "VmFamily": "standardEASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 32,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_E2d_v4",
+    "VmFamily": "standardEDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 75,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_E2d_v5",
+    "VmFamily": "standardEDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 75,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_E2ds_v4",
+    "VmFamily": "standardEDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 75,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_E2ds_v5",
+    "VmFamily": "standardEDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 75,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_E2s_v3",
+    "VmFamily": "standardESv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 32,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_E32_v3",
+    "VmFamily": "standardEv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E32a_v4",
+    "VmFamily": "standardEAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E32ads_v5",
+    "VmFamily": "standardEADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E32as_v4",
+    "VmFamily": "standardEASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 512,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E32d_v4",
+    "VmFamily": "standardEDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E32d_v5",
+    "VmFamily": "standardEDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E32ds_v4",
+    "VmFamily": "standardEDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E32ds_v5",
+    "VmFamily": "standardEDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E32s_v3",
+    "VmFamily": "standardESv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 512,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E4_v3",
+    "VmFamily": "standardEv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 100,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_E48_v3",
+    "VmFamily": "standardEv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E48a_v4",
+    "VmFamily": "standardEAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1200,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E48ads_v5",
+    "VmFamily": "standardEADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E48as_v4",
+    "VmFamily": "standardEASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 768,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E48d_v4",
+    "VmFamily": "standardEDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E48d_v5",
+    "VmFamily": "standardEDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E48ds_v4",
+    "VmFamily": "standardEDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E48ds_v5",
+    "VmFamily": "standardEDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 1800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E48s_v3",
+    "VmFamily": "standardESv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 768,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E4a_v4",
+    "VmFamily": "standardEAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 100,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_E4ads_v5",
+    "VmFamily": "standardEADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 150,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_E4as_v4",
+    "VmFamily": "standardEASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 64,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_E4d_v4",
+    "VmFamily": "standardEDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 150,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_E4d_v5",
+    "VmFamily": "standardEDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 150,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_E4ds_v4",
+    "VmFamily": "standardEDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 150,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_E4ds_v5",
+    "VmFamily": "standardEDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 150,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_E4s_v3",
+    "VmFamily": "standardESv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 64,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_E64_v3",
+    "VmFamily": "standardEv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 432,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 1600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E64a_v4",
+    "VmFamily": "standardEAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 512,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 1600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E64ads_v5",
+    "VmFamily": "standardEADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 512,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E64as_v4",
+    "VmFamily": "standardEASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 512,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 864,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E64d_v4",
+    "VmFamily": "standardEDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 504,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E64d_v5",
+    "VmFamily": "standardEDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 512,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E64ds_v4",
+    "VmFamily": "standardEDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 504,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E64ds_v5",
+    "VmFamily": "standardEDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 512,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E64i_v3",
+    "VmFamily": "standardEIv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 432,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 1600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E64s_v3",
+    "VmFamily": "standardESv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 432,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 864,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E8_v3",
+    "VmFamily": "standardEv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 200,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_E80ids_v4",
+    "VmFamily": "standardXEIDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 504,
+    "NumberOfCores": 80,
+    "ResourceDiskSizeInGB": 4260,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_E8a_v4",
+    "VmFamily": "standardEAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 200,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_E8ads_v5",
+    "VmFamily": "standardEADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 300,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_E8as_v4",
+    "VmFamily": "standardEASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 128,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_E8d_v4",
+    "VmFamily": "standardEDv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 300,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_E8d_v5",
+    "VmFamily": "standardEDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 300,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_E8ds_v4",
+    "VmFamily": "standardEDSv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 300,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_E8ds_v5",
+    "VmFamily": "standardEDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 300,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_E8s_v3",
+    "VmFamily": "standardESv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 128,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_E96a_v4",
+    "VmFamily": "standardEAv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 672,
+    "NumberOfCores": 96,
+    "ResourceDiskSizeInGB": 2400,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E96ads_v5",
+    "VmFamily": "standardEADSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 672,
+    "NumberOfCores": 96,
+    "ResourceDiskSizeInGB": 3600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E96as_v4",
+    "VmFamily": "standardEASv4Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 672,
+    "NumberOfCores": 96,
+    "ResourceDiskSizeInGB": 1344,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E96d_v5",
+    "VmFamily": "standardEDv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 672,
+    "NumberOfCores": 96,
+    "ResourceDiskSizeInGB": 3600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_E96ds_v5",
+    "VmFamily": "standardEDSv5Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 672,
+    "NumberOfCores": 96,
+    "ResourceDiskSizeInGB": 3600,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_F16s_v2",
+    "VmFamily": "standardFSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 32,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 128,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_F2s_v2",
+    "VmFamily": "standardFSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 4,
+    "NumberOfCores": 2,
+    "ResourceDiskSizeInGB": 16,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_F32s_v2",
+    "VmFamily": "standardFSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 256,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_F48s_v2",
+    "VmFamily": "standardFSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 96,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 384,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_F4s_v2",
+    "VmFamily": "standardFSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 8,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 32,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_F64s_v2",
+    "VmFamily": "standardFSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 512,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_F72s_v2",
+    "VmFamily": "standardFSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 144,
+    "NumberOfCores": 72,
+    "ResourceDiskSizeInGB": 576,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_F8s_v2",
+    "VmFamily": "standardFSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 16,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 64,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_HB120-16rs_v3",
+    "VmFamily": "standardHBv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 448,
+    "NumberOfCores": 120,
+    "ResourceDiskSizeInGB": 480,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_HB120-32rs_v3",
+    "VmFamily": "standardHBv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 448,
+    "NumberOfCores": 120,
+    "ResourceDiskSizeInGB": 480,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_HB120-64rs_v3",
+    "VmFamily": "standardHBv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 448,
+    "NumberOfCores": 120,
+    "ResourceDiskSizeInGB": 480,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_HB120-96rs_v3",
+    "VmFamily": "standardHBv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 448,
+    "NumberOfCores": 120,
+    "ResourceDiskSizeInGB": 480,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_HB120rs_v2",
+    "VmFamily": "standardHBrsv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 456,
+    "NumberOfCores": 120,
+    "ResourceDiskSizeInGB": 480,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_HB120rs_v3",
+    "VmFamily": "standardHBv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 448,
+    "NumberOfCores": 120,
+    "ResourceDiskSizeInGB": 480,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_HB60rs",
+    "VmFamily": "standardHBSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 228,
+    "NumberOfCores": 60,
+    "ResourceDiskSizeInGB": 700,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_HC44rs",
+    "VmFamily": "standardHCSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 352,
+    "NumberOfCores": 44,
+    "ResourceDiskSizeInGB": 700,
+    "MaxDataDiskCount": 4
+  },
+  {
+    "VmSize": "Standard_L16s_v2",
+    "VmFamily": "standardLSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 128,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 160,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_L32s_v2",
+    "VmFamily": "standardLSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 320,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_L48s_v2",
+    "VmFamily": "standardLSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 384,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 480,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_L64s_v2",
+    "VmFamily": "standardLSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 512,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 640,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_L80s_v2",
+    "VmFamily": "standardLSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 640,
+    "NumberOfCores": 80,
+    "ResourceDiskSizeInGB": 800,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_L8s_v2",
+    "VmFamily": "standardLSv2Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 64,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 80,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_M128",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 2000,
+    "NumberOfCores": 128,
+    "ResourceDiskSizeInGB": 16000,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_M128m",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 3800,
+    "NumberOfCores": 128,
+    "ResourceDiskSizeInGB": 16000,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_M128ms",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 3800,
+    "NumberOfCores": 128,
+    "ResourceDiskSizeInGB": 4000,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_M128s",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 2000,
+    "NumberOfCores": 128,
+    "ResourceDiskSizeInGB": 4000,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_M16ms",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 437.5,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 500,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_M32ls",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 256,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1000,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_M32ms",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 875,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1000,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_M32ts",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 192,
+    "NumberOfCores": 32,
+    "ResourceDiskSizeInGB": 1000,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_M64",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 1000,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 8000,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_M64ls",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 512,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2000,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_M64m",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 1750,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 8000,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_M64ms",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 1750,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2000,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_M64s",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 1024,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2048,
+    "MaxDataDiskCount": 64
+  },
+  {
+    "VmSize": "Standard_M8ms",
+    "VmFamily": "standardMSFamily",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 218.75,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 250,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_NC16as_T4_v3",
+    "VmFamily": "Standard NCASv3_T4 Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 110,
+    "NumberOfCores": 16,
+    "ResourceDiskSizeInGB": 352,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_NC4as_T4_v3",
+    "VmFamily": "Standard NCASv3_T4 Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 28,
+    "NumberOfCores": 4,
+    "ResourceDiskSizeInGB": 176,
+    "MaxDataDiskCount": 8
+  },
+  {
+    "VmSize": "Standard_NC64as_T4_v3",
+    "VmFamily": "Standard NCASv3_T4 Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 440,
+    "NumberOfCores": 64,
+    "ResourceDiskSizeInGB": 2816,
+    "MaxDataDiskCount": 32
+  },
+  {
+    "VmSize": "Standard_NC6s_v3",
+    "VmFamily": "standardNCSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 112,
+    "NumberOfCores": 6,
+    "ResourceDiskSizeInGB": 336,
+    "MaxDataDiskCount": 12
+  },
+  {
+    "VmSize": "Standard_NC8as_T4_v3",
+    "VmFamily": "Standard NCASv3_T4 Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 56,
+    "NumberOfCores": 8,
+    "ResourceDiskSizeInGB": 352,
+    "MaxDataDiskCount": 16
+  },
+  {
+    "VmSize": "Standard_NV12s_v3",
+    "VmFamily": "standardNVSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 112,
+    "NumberOfCores": 12,
+    "ResourceDiskSizeInGB": 336,
+    "MaxDataDiskCount": 12
+  },
+  {
+    "VmSize": "Standard_NV24s_v3",
+    "VmFamily": "standardNVSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 224,
+    "NumberOfCores": 24,
+    "ResourceDiskSizeInGB": 672,
+    "MaxDataDiskCount": 24
+  },
+  {
+    "VmSize": "Standard_NV48s_v3",
+    "VmFamily": "standardNVSv3Family",
+    "LowPriority": false,
+    "PricePerHour": null,
+    "MemoryInGB": 448,
+    "NumberOfCores": 48,
+    "ResourceDiskSizeInGB": 2948,
+    "MaxDataDiskCount": 32
+  }
+]
