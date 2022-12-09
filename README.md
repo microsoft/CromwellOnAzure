@@ -4,10 +4,7 @@
 Cromwell on Azure configures all Azure resources needed to run workflows through Cromwell on the Azure cloud, and uses the [GA4GH TES](https://cromwell.readthedocs.io/en/develop/backends/TES/) backend for orchestrating the tasks that create a workflow. The installation sets up a VM host to run the Cromwell server and uses Azure Batch to spin up virtual machines that run each task in a workflow. Cromwell workflows can be written using either the [WDL](https://github.com/openwdl/wdl) or the [CWL](https://www.commonwl.org/) scripting languages. To see examples of WDL scripts - see this ['Learn WDL'](https://github.com/openwdl/learn-wdl) repository on GitHub. To see examples of CWL scripts - see this ['CWL search result'](https://dockstore.org/search?descriptorType=CWL&searchMode=files) on Dockstore.<br />
 
 ### Latest release
- * [Release 3.2.0](https://github.com/microsoft/CromwellOnAzure/releases/tag/3.2.0)<br/>
- [Release notes for version 3.2.0](docs/release-notes/3.2.0.md)
- 
-Check the "Update Instructions" section in the version 3.2.0 [release notes](docs/release-notes/3.2.0.md/#update-instructions) to learn how to update an existing Cromwell on Azure deployment to version 3.2.0. You can customize some parameters when updating. Please [see these customization instructions](docs/troubleshooting-guide.md/#Customize-your-Cromwell-on-Azure-deployment), specifically the "Used by update" and "Comment" columns in the table.<br/>
+ * https://github.com/microsoft/CromwellOnAzure/releases
 
 #### Getting started
  * Deploy Cromwell on Azure now using this [guide](#Deploy-your-instance-of-Cromwell-on-Azure)<br/>
@@ -197,7 +194,7 @@ Other WDL examples on Cromwell on Azure:
 
 [Genomics Data Analysis with Jupyter Notebooks on Azure](https://github.com/microsoft/genomicsnotebook)<br/>
 
-### How to build the deployment executable yourself
+## How to build the deployment executable yourself
 
 #### Building on Linux
 *Preqrequisites*:<br/>
