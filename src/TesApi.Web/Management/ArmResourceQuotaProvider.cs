@@ -17,11 +17,11 @@ public class ArmResourceQuotaProvider : IResourceQuotaProvider
     /// <summary>
     /// Azure proxy instance
     /// </summary>
-    protected readonly IAzureProxy azureProxy;
+    private readonly IAzureProxy azureProxy;
     /// <summary>
     /// Logger instance.
     /// </summary>
-    protected readonly ILogger logger;
+    private readonly ILogger logger;
 
 
     /// <summary>
