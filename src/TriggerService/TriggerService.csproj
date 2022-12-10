@@ -21,9 +21,9 @@
 
 
   <ItemGroup>
+    <ProjectReference Include="..\..\ga4gh-tes\src\Tes\Tes.csproj" />
     <ProjectReference Include="..\Common\Common.csproj" />
     <ProjectReference Include="..\CromwellApiClient\CromwellApiClient.csproj" />
-    <ProjectReference Include="..\Tes\Tes.csproj" />
   </ItemGroup>
 
 </Project>

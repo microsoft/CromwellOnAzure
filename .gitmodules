@@ -1,0 +1,3 @@
+[submodule "ga4gh-tes"]
+	path = ga4gh-tes
+	url = https://github.com/microsoft/ga4gh-tes.git
