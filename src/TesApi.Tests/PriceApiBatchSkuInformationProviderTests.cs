@@ -21,6 +21,7 @@ namespace TesApi.Tests
         {
             pricingApiClient = new PriceApiClient();
             appCacheMock = new Mock<IAppCache>();
+            loggerMock = new Mock<ILogger>();
             provider = new PriceApiBatchSkuInformationProvider(pricingApiClient,
                 loggerMock.Object);
         }

@@ -39,10 +39,10 @@ namespace TesApi.Web.Management
             }
         }
 
-        public IAsyncEnumerable<PricingItem> GetAllPricingInformationForLinuxAndNonSpotVmsAsync(string region)
+        public IAsyncEnumerable<PricingItem> GetAllPricingInformationForNonWindowsAndNonSpotVmsAsync(string region)
         {
             return GetAllPricingInformationAsync(region)
-                .WhereAwait(p => ValueTask.FromResult(p.productName.Contains(" Linux") && !p.productName.Contains(" Spot")));
+                .WhereAwait(p => ValueTask.FromResult(!p.productName.Contains(" Windows") && !p.meterName.Contains(" Spot")));
         }
 
         public async Task<RetailPricingData> GetPricingInformationPageAsync(int skip, string region)

@@ -37,13 +37,13 @@ namespace TesApi.Tests
         }
 
         [TestMethod]
-        public async Task GetAllPricingInformationForLinuxAndNonSpotVmsAsync_ReturnsOnlyLinuxAndNonSpotInstances()
+        public async Task GetAllPricingInformationForNonWindowsAndNonSpotVmsAsync_ReturnsOnlyNonWindowsAndNonSpotInstances()
         {
-            var pages = await pricingApiClient.GetAllPricingInformationForLinuxAndNonSpotVmsAsync("westus2").ToListAsync();
+            var pages = await pricingApiClient.GetAllPricingInformationForNonWindowsAndNonSpotVmsAsync("westus2").ToListAsync();
 
             Assert.IsTrue(pages.Count > 0);
-            Assert.IsTrue(pages.Count(r => r.productName.Contains(" Linux")) == pages.Count());
-            Assert.IsTrue(pages.Any(r => !r.productName.Contains(" Spot")));
+            Assert.IsFalse(pages.Any(r => r.productName.Contains(" Windows")));
+            Assert.IsFalse(pages.Any(r => r.productName.Contains(" Spot")));
 
         }
     }
