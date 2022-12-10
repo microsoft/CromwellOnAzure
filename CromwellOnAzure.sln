@@ -24,7 +24,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "src\Common\Common
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tests", "src\Common.Tests\Common.Tests.csproj", "{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tes", "ga4gh-tes\src\Tes\Tes.csproj", "{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tes", "src\ga4gh-tes\src\Tes\Tes.csproj", "{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
