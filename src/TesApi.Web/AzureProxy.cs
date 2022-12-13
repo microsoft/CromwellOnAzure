@@ -24,6 +24,7 @@ using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
@@ -31,7 +32,15 @@ using Newtonsoft.Json.Linq;
 using Polly;
 using Polly.Retry;
 using Tes.Models;
+using TesApi.Web.Management.Configuration;
+using CloudTask = Microsoft.Azure.Batch.CloudTask;
+using ComputeNodeState = Microsoft.Azure.Batch.Common.ComputeNodeState;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
+using JobState = Microsoft.Azure.Batch.Common.JobState;
+using OnAllTasksComplete = Microsoft.Azure.Batch.Common.OnAllTasksComplete;
+using PoolInformation = Microsoft.Azure.Batch.PoolInformation;
+using TaskExecutionInformation = Microsoft.Azure.Batch.TaskExecutionInformation;
+using TaskState = Microsoft.Azure.Batch.Common.TaskState;
 
 namespace TesApi.Web
 {
@@ -59,28 +68,77 @@ namespace TesApi.Web
         private readonly string batchAccountName;
 
 
+        ///// <summary>
+        ///// The constructor
+        ///// </summary>
+        ///// <param name="batchAccountName">Batch account name</param>
+        ///// <param name="azureOfferDurableId">Azure offer id</param>
+        ///// <param name="logger">The logger</param>
+        //public AzureProxy(string batchAccountName, string azureOfferDurableId, ILogger logger)
+        //{
+        //    this.logger = logger;
+        //    this.batchAccountName = batchAccountName;
+        //    var (SubscriptionId, ResourceGroupName, Location, BatchAccountEndpoint) = FindBatchAccountAsync(batchAccountName).Result;
+        //    batchResourceGroupName = ResourceGroupName;
+        //    subscriptionId = SubscriptionId;
+        //    location = Location;
+        //    batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{BatchAccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
+
+        //    getBatchAccountFunc = async () =>
+        //        await new BatchManagementClient(new TokenCredentials(await GetAzureAccessTokenAsync())) { SubscriptionId = SubscriptionId }
+        //            .BatchAccount
+        //            .GetAsync(ResourceGroupName, batchAccountName);
+
+        //    this.azureOfferDurableId = azureOfferDurableId;
+
+        //    if (!AzureRegionUtils.TryGetBillingRegionName(location, out billingRegionName))
+        //    {
+        //        logger.LogWarning($"Azure ARM location '{location}' does not have a corresponding Azure Billing Region.  Prices from the fallback billing region '{DefaultAzureBillingRegionName}' will be used instead.");
+        //        billingRegionName = DefaultAzureBillingRegionName;
+        //    }
+        //}
+
         /// <summary>
-        /// The constructor
+        /// Constructor of AzureProxy
         /// </summary>
-        /// <param name="batchAccountName">Batch account name</param>
-        /// <param name="azureOfferDurableId">Azure offer id</param>
-        /// <param name="logger">The logger</param>
-        public AzureProxy(string batchAccountName, string azureOfferDurableId, ILogger logger)
+        /// <param name="batchAccountOptions"></param>
+        /// <param name="logger"></param>
+        /// <exception cref="InvalidOperationException"></exception>
+        public AzureProxy(IOptions<BatchAccountOptions> batchAccountOptions, ILogger<AzureProxy> logger)
         {
+
+            ArgumentNullException.ThrowIfNull(batchAccountOptions);
+            ArgumentNullException.ThrowIfNull(logger);
+
+            if (string.IsNullOrWhiteSpace(batchAccountOptions.Value.AccountName))
+            {
+                //TODO: check if there's a better exception for this scenario or we need to create a custom one.
+                throw new InvalidOperationException("The batch account name is missing from the the configuration.");
+            }
+
             this.logger = logger;
-            this.batchAccountName = batchAccountName;
-            var (SubscriptionId, ResourceGroupName, Location, BatchAccountEndpoint) = FindBatchAccountAsync(batchAccountName).Result;
-            batchResourceGroupName = ResourceGroupName;
-            subscriptionId = SubscriptionId;
-            location = Location;
-            batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{BatchAccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
 
-            getBatchAccountFunc = async () =>
-                await new BatchManagementClient(new TokenCredentials(await GetAzureAccessTokenAsync())) { SubscriptionId = SubscriptionId }
-                    .BatchAccount
-                    .GetAsync(ResourceGroupName, batchAccountName);
+            if (string.IsNullOrWhiteSpace(batchAccountOptions.Value.AppKey))
+            {
+                //If the key is provided assume we won't use ARM and the information will be provided via config
+                batchClient = BatchClient.Open(new BatchSharedKeyCredentials(batchAccountOptions.Value.BaseUrl,
+                    batchAccountOptions.Value.AccountName, batchAccountOptions.Value.AppKey));
+                location = batchAccountOptions.Value.Region;
+                subscriptionId = batchAccountOptions.Value.SubscriptionId;
+                batchResourceGroupName = batchAccountOptions.Value.ResourceGroup;
+            }
+            else
+            {
+                this.batchAccountName = batchAccountOptions.Value.AccountName;
+                var (SubscriptionId, ResourceGroupName, Location, BatchAccountEndpoint) = FindBatchAccountAsync(batchAccountName).Result;
+                batchResourceGroupName = ResourceGroupName;
+                subscriptionId = SubscriptionId;
+                location = Location;
+                batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{BatchAccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
 
-            this.azureOfferDurableId = azureOfferDurableId;
+            }
+
+            azureOfferDurableId = batchAccountOptions.Value.AzureOfferDurableId;
 
             if (!AzureRegionUtils.TryGetBillingRegionName(location, out billingRegionName))
             {

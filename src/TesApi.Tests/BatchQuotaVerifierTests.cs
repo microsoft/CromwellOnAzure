@@ -5,37 +5,45 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Tes.Models;
 using TesApi.Web;
 using TesApi.Web.Management;
+using TesApi.Web.Management.Configuration;
 
 namespace TesApi.Tests;
 
 [TestClass]
-public class ResourceQuotaVerifierTests
+public class BatchQuotaVerifierTests
 {
 
-    private ResourceQuotaVerifier resourceQuotaVerifier;
+    private BatchQuotaVerifier batchQuotaVerifier;
     private Mock<IResourceQuotaProvider> quotaProvider;
     private Mock<IAzureProxy> azureProxy;
-    private Mock<ILogger> logger;
+    private Mock<ILogger<BatchQuotaVerifier>> logger;
     private Mock<IBatchSkuInformationProvider> skuInfoProvider;
+    private Mock<IOptions<BatchAccountOptions>> accountOptions;
 
     private const string Region = "eastus";
+    private BatchAccountOptions batchAccountOptions;
     private List<VirtualMachineInformation> vmSizeAndPriceList;
 
-    public ResourceQuotaVerifierTests() { }
+    public BatchQuotaVerifierTests() { }
 
     [TestInitialize]
     public void BeforeEach()
     {
         azureProxy = new Mock<IAzureProxy>();
-        logger = new Mock<ILogger>();
+        logger = new Mock<ILogger<BatchQuotaVerifier>>();
         quotaProvider = new Mock<IResourceQuotaProvider>();
         skuInfoProvider = new Mock<IBatchSkuInformationProvider>();
-        resourceQuotaVerifier = new ResourceQuotaVerifier(azureProxy.Object, quotaProvider.Object, skuInfoProvider.Object, Region, logger.Object);
+        batchAccountOptions = new BatchAccountOptions() { Region = Region };
+        accountOptions = new Mock<IOptions<BatchAccountOptions>>();
+        accountOptions.Setup(o => o.Value).Returns(batchAccountOptions);
+
+        batchQuotaVerifier = new BatchQuotaVerifier(azureProxy.Object, quotaProvider.Object, skuInfoProvider.Object, accountOptions.Object, logger.Object);
 
     }
 
@@ -49,7 +57,7 @@ public class ResourceQuotaVerifierTests
         quotaProvider.Setup(p => p.GetBatchAccountQuotaInformationAsync(It.IsAny<VirtualMachineInformation>()))
             .ReturnsAsync(batch);
 
-        await resourceQuotaVerifier.CheckBatchAccountQuotasAsync(vmInfo);
+        await batchQuotaVerifier.CheckBatchAccountQuotasAsync(vmInfo);
 
         logger.Verify(l => l.LogError(It.IsAny<string>(), It.IsAny<Exception>()), Times.Once);
 
@@ -88,7 +96,7 @@ public class ResourceQuotaVerifierTests
         azureProxy.Setup(p => p.GetBatchActivePoolCount()).Returns(activePoolCount);
         skuInfoProvider.Setup(p => p.GetVmSizesAndPricesAsync(Region)).ReturnsAsync(CreateBatchSupportedVmSkuList(10));
 
-        await resourceQuotaVerifier.CheckBatchAccountQuotasAsync(vmInfo);
+        await batchQuotaVerifier.CheckBatchAccountQuotasAsync(vmInfo);
 
     }
 

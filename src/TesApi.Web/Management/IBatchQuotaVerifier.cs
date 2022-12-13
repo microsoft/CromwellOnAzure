@@ -6,7 +6,7 @@ namespace TesApi.Web.Management
     /// <summary>
     /// Provides the ability to verify if the quota is available for a given SKU
     /// </summary>
-    public interface IResourceQuotaVerifier
+    public interface IBatchQuotaVerifier
     {
         /// <summary>
         /// Checks if the current quota allows fullfiment of the requested VM SKU. 

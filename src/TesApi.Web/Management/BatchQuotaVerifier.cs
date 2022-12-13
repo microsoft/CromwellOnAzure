@@ -5,7 +5,9 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Tes.Models;
+using TesApi.Web.Management.Configuration;
 
 namespace TesApi.Web.Management;
 
@@ -13,7 +15,7 @@ namespace TesApi.Web.Management;
 /// <summary>
 /// Contains logic that verifies if the batch account can fulfill the compute requirements using quota and sizing information.
 /// </summary>
-public class ResourceQuotaVerifier : IResourceQuotaVerifier
+public class BatchQuotaVerifier : IBatchQuotaVerifier
 {
     private const string AzureSupportUrl = $"https://portal.azure.com/#blade/Microsoft_Azure_Support/HelpAndSupportBlade/newsupportrequest";
     private readonly IAzureProxy azureProxy;
@@ -24,26 +26,23 @@ public class ResourceQuotaVerifier : IResourceQuotaVerifier
 
 
     /// <summary>
-    /// Constructor of BaseResourceQuotaVerifier
+    /// Constructor of BatchQuotaVerifier
     /// </summary>
     /// <param name="azureProxy"></param>
     /// <param name="resourceQuotaProvider"></param>
     /// <param name="batchSkuInformationProvider"></param>
+    /// <param name="options"></param>
     /// <param name="logger"></param>
-    /// <param name="region"></param>
-    public ResourceQuotaVerifier(IAzureProxy azureProxy, IResourceQuotaProvider resourceQuotaProvider,
-        IBatchSkuInformationProvider batchSkuInformationProvider, string region, ILogger logger)
+    public BatchQuotaVerifier(IAzureProxy azureProxy, IResourceQuotaProvider resourceQuotaProvider,
+        IBatchSkuInformationProvider batchSkuInformationProvider, IOptions<BatchAccountOptions> options, ILogger<BatchQuotaVerifier> logger)
     {
         ArgumentNullException.ThrowIfNull(azureProxy);
         ArgumentNullException.ThrowIfNull(resourceQuotaProvider);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(batchSkuInformationProvider);
-        if (String.IsNullOrEmpty(region))
-        {
-            throw new ArgumentException("Invalid region. The value is null or empty.", nameof(region));
-        }
+        ArgumentNullException.ThrowIfNull(options);
 
-        this.region = region;
+        this.region = options.Value.Region;
         this.azureProxy = azureProxy;
         this.logger = logger;
         this.batchSkuInformationProvider = batchSkuInformationProvider;

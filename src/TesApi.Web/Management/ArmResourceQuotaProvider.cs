@@ -29,7 +29,7 @@ public class ArmResourceQuotaProvider : IResourceQuotaProvider
     /// </summary>
     /// <param name="azureProxy"></param>
     /// <param name="logger"></param>
-    public ArmResourceQuotaProvider(IAzureProxy azureProxy, ILogger logger)
+    public ArmResourceQuotaProvider(IAzureProxy azureProxy, ILogger<ArmResourceQuotaProvider> logger)
     {
         this.azureProxy = azureProxy;
         this.logger = logger;

@@ -1,6 +1,5 @@
 ﻿using System.Linq;
 using System.Threading.Tasks;
-using LazyCache;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -12,16 +11,14 @@ namespace TesApi.Tests
     public class PriceApiBatchSkuInformationProviderTests
     {
         private PriceApiClient pricingApiClient;
-        private Mock<IAppCache> appCacheMock;
-        private Mock<ILogger> loggerMock;
+        private Mock<ILogger<PriceApiBatchSkuInformationProvider>> loggerMock;
         private PriceApiBatchSkuInformationProvider provider;
 
         [TestInitialize]
         public void Initialize()
         {
             pricingApiClient = new PriceApiClient();
-            appCacheMock = new Mock<IAppCache>();
-            loggerMock = new Mock<ILogger>();
+            loggerMock = new Mock<ILogger<PriceApiBatchSkuInformationProvider>>();
             provider = new PriceApiBatchSkuInformationProvider(pricingApiClient,
                 loggerMock.Object);
         }

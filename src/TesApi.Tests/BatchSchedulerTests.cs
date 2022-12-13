@@ -15,6 +15,7 @@ using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
@@ -22,6 +23,7 @@ using Tes.Extensions;
 using Tes.Models;
 using TesApi.Web;
 using TesApi.Web.Management;
+using TesApi.Web.Management.Configuration;
 
 namespace TesApi.Tests
 {
@@ -30,6 +32,15 @@ namespace TesApi.Tests
     {
         private static readonly Regex downloadFilesBlobxferRegex = new(@"path='([^']*)' && url='([^']*)' && blobxfer download");
         private static readonly Regex downloadFilesWgetRegex = new(@"path='([^']*)' && url='([^']*)' && mkdir .* wget");
+        private static Mock<IOptions<BatchAccountOptions>> optionsMock;
+
+        [TestInitialize]
+        public void Initialize()
+        {
+            optionsMock = new Mock<IOptions<BatchAccountOptions>>();
+            optionsMock.Setup(o => o.Value).Returns(new BatchAccountOptions() { Region = "eastus" });
+
+        }
 
         [TestCategory("TES 1.1")]
         [TestMethod]
@@ -99,14 +110,14 @@ namespace TesApi.Tests
             task.Resources.Preemptible = preemptible;
             task.Resources.BackendParameters = backendParameters;
 
-            var logger = new Mock<ILogger>().Object;
+            var logger = new Mock<ILogger<ArmResourceQuotaProvider>>().Object;
 
             var batchScheduler = new BatchScheduler(
-                new Mock<ILogger>().Object,
+                new Mock<ILogger<BatchScheduler>>().Object,
                 GetMockConfig(),
                 new CachingWithRetriesAzureProxy(proxy, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions())))),
-                new StorageAccessProvider(new Mock<ILogger>().Object, GetMockConfig(), proxy),
-                new ResourceQuotaVerifier(proxy, new ArmResourceQuotaProvider(proxy, logger), new ArmBatchSkuInformationProvider(proxy), "eastus", logger));
+                new StorageAccessProvider(new Mock<ILogger<StorageAccessProvider>>().Object, GetMockConfig(), proxy),
+                new BatchQuotaVerifier(proxy, new ArmResourceQuotaProvider(proxy, new Mock<ILogger<ArmResourceQuotaProvider>>().Object), new ArmBatchSkuInformationProvider(proxy), optionsMock.Object, new Mock<ILogger<BatchQuotaVerifier>>().Object));
 
             var size = await batchScheduler.GetVmSizeAsync(task);
             Assert.AreEqual(vmSize, size.VmSize);
@@ -864,11 +875,16 @@ namespace TesApi.Tests
         private static async Task<(string JobId, CloudTask CloudTask, PoolInformation PoolInformation)> ProcessTesTaskAndGetBatchJobArgumentsAsync(TesTask tesTask, IConfiguration configuration, Mock<IAzureProxy> azureProxy)
         {
             var batchScheduler = new BatchScheduler(
-                new Mock<ILogger>().Object,
+                new Mock<ILogger<BatchScheduler>>().Object,
                 configuration,
                 new CachingWithRetriesAzureProxy(azureProxy.Object, new CachingService(new MemoryCacheProvider(new MemoryCache(new MemoryCacheOptions())))),
-                new StorageAccessProvider(new Mock<ILogger>().Object, configuration, azureProxy.Object),
-                new ResourceQuotaVerifier(azureProxy.Object, new ArmResourceQuotaProvider(azureProxy.Object, new Mock<ILogger>().Object), new ArmBatchSkuInformationProvider(azureProxy.Object), "eastus", new Mock<ILogger>().Object)
+                new StorageAccessProvider(new Mock<ILogger<StorageAccessProvider>>().Object, configuration, azureProxy.Object),
+                new BatchQuotaVerifier(azureProxy.Object,
+                    new ArmResourceQuotaProvider(azureProxy.Object,
+                        new Mock<ILogger<ArmResourceQuotaProvider>>().Object),
+                    new ArmBatchSkuInformationProvider(azureProxy.Object),
+                    optionsMock.Object,
+                    new Mock<ILogger<BatchQuotaVerifier>>().Object)
             );
 
             await batchScheduler.ProcessTesTaskAsync(tesTask);

@@ -16,7 +16,7 @@ namespace TesApi.Web.Management
         private readonly IAppCache appCache;
         private readonly ILogger logger;
 
-        public PriceApiBatchSkuInformationProvider(IAppCache appCache, PriceApiClient priceApiClient, ILogger logger)
+        public PriceApiBatchSkuInformationProvider(IAppCache appCache, PriceApiClient priceApiClient, ILogger<PriceApiBatchSkuInformationProvider> logger)
         {
             ArgumentNullException.ThrowIfNull(priceApiClient);
             ArgumentNullException.ThrowIfNull(logger);
@@ -26,7 +26,7 @@ namespace TesApi.Web.Management
             this.logger = logger;
         }
 
-        public PriceApiBatchSkuInformationProvider(PriceApiClient priceApiClient, ILogger logger) : this(null,
+        public PriceApiBatchSkuInformationProvider(PriceApiClient priceApiClient, ILogger<PriceApiBatchSkuInformationProvider> logger) : this(null,
             priceApiClient, logger)
         {
         }

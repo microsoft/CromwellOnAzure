@@ -44,7 +44,7 @@ namespace TesApi.Web
         private readonly IAzureProxy azureProxy;
         private readonly IStorageAccessProvider storageAccessProvider;
         private readonly IEnumerable<string> allowedVmSizes;
-        private readonly IResourceQuotaVerifier quotaVerifier;
+        private readonly IBatchQuotaVerifier quotaVerifier;
         private readonly List<TesTaskStateTransition> tesTaskStateTransitions;
         private readonly bool usePreemptibleVmsOnly;
         private readonly string batchNodesSubnetId;
@@ -67,8 +67,8 @@ namespace TesApi.Web
         /// <param name="configuration">Configuration <see cref="IConfiguration"/></param>
         /// <param name="azureProxy">Azure proxy <see cref="IAzureProxy"/></param>
         /// <param name="storageAccessProvider">Storage access provider <see cref="IStorageAccessProvider"/></param>
-        /// <param name="quotaVerifier">Quota verifier <see cref="IResourceQuotaVerifier"/>></param>
-        public BatchScheduler(ILogger logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, IResourceQuotaVerifier quotaVerifier)
+        /// <param name="quotaVerifier">Quota verifier <see cref="IBatchQuotaVerifier"/>></param>
+        public BatchScheduler(ILogger<BatchScheduler> logger, IConfiguration configuration, IAzureProxy azureProxy, IStorageAccessProvider storageAccessProvider, IBatchQuotaVerifier quotaVerifier)
         {
             this.logger = logger;
             this.azureProxy = azureProxy;
