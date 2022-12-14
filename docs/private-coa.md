@@ -124,7 +124,7 @@ The following are instructions on how to setup a virtual network, and azure cont
 ### 4. Provision Azure Container Registry
 
     ```
-    az acr create --resource-group $resource_group_name --name $mycontainerregistry --sku Basic
+    az acr create --resource-group $resource_group_name --name $mycontainerregistry --sku Premium
     az acr login --name $mycontainerregistry
     
     az acr import \
@@ -141,6 +141,8 @@ The following are instructions on how to setup a virtual network, and azure cont
       --name $mycontainerregistry \
       --source mcr.microsoft.com/mirror/docker/library/ubuntu:22.04 \
       --image ubuntu:22.04
+    
+    az acr update --name $mycontainerregistry --public-network-enabled false
     ```
 
 ### 5. Run the deployer.
