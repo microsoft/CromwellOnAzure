@@ -560,6 +560,9 @@ namespace TesApi.Web
             "Standard_NC64as_T4_v3",
             "Standard_NC6s_v3",
             "Standard_NC8as_T4_v3",
+            "Standard_NP10s",
+            "Standard_NP20s",
+            "Standard_NP40s",
             "Standard_NV12s_v3",
             "Standard_NV24s_v3",
             "Standard_NV48s_v3"
