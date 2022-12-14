@@ -164,8 +164,8 @@ The following are instructions on how to setup a virtual network, and azure cont
         --PrivateNetworking true \
         --BatchNodesSubnetId $batchsubnetid \
         --DisableBatchNodesPublicIpAddress true \
-        --DockerInDockerImageName "$mycontainerregistry.azurecr.io/docker" \
-        --BlobxferImageName "$mycontainerregistry.azurecr.io/blobxfer" \
+        --DockerInDockerImageName "$mycontainerregistry.azurecr.io/docker:v1" \
+        --BlobxferImageName "$mycontainerregistry.azurecr.io/blobxfer:v1" \
         --ResourceGroupName $resource_group_name \
         --VnetName $vnet_name \
         --VnetResourceGroupName $resource_group_name \
