@@ -209,12 +209,12 @@ rm packages-microsoft-prod.deb
 sudo apt-get update && \
 sudo apt-get install -y apt-transport-https && \
 sudo apt-get update && \
-sudo apt-get install -y dotnet-sdk-6.0
+sudo apt-get install -y dotnet-sdk-7.0
 ```
 
 #### Building on Windows
 *Preqrequisites*:<br/>
-.NET 6 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
+.NET 7 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
 
 *Recommended*:<br/>
 VS 2022
