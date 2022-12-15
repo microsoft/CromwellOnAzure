@@ -7,7 +7,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 		CodeCoverage.runsettings = CodeCoverage.runsettings
 		src\CommonAssemblyInfo.cs = src\CommonAssemblyInfo.cs
-		src\Dockerfile-Tes = src\Dockerfile-Tes
 		src\Dockerfile-TriggerService = src\Dockerfile-TriggerService
 	EndProjectSection
 EndProject
@@ -17,19 +16,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "deploy-cromwell-on-azure", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "deploy-cromwell-on-azure.Tests", "src\deploy-cromwell-on-azure.Tests\deploy-cromwell-on-azure.Tests.csproj", "{6D39219A-8391-40C6-B755-AAB9D42B6DED}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TesApi.Web", "src\TesApi.Web\TesApi.Web.csproj", "{80BB1AF3-4789-4CF6-ABF3-EB2195838730}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TesApi.Tests", "src\TesApi.Tests\TesApi.Tests.csproj", "{DF9A590B-20EC-4245-ADD2-6B4C4C29B680}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TriggerService", "src\TriggerService\TriggerService.csproj", "{BB61BF85-0DE4-469B-85D4-3744E1B03F89}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tes", "src\Tes\Tes.csproj", "{63C91E1C-640C-4281-8388-971908009CAE}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TriggerService.Tests", "src\TriggerService.Tests\TriggerService.Tests.csproj", "{6AE9D93D-FBFA-4B94-8046-CDF10886F15B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "src\Common\Common.csproj", "{1D5F3C4A-5A69-4A86-BF80-D075DBDD0307}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tests", "src\Common.Tests\Common.Tests.csproj", "{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tes", "src\ga4gh-tes\src\Tes\Tes.csproj", "{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -49,22 +44,10 @@ Global
 		{6D39219A-8391-40C6-B755-AAB9D42B6DED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6D39219A-8391-40C6-B755-AAB9D42B6DED}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6D39219A-8391-40C6-B755-AAB9D42B6DED}.Release|Any CPU.Build.0 = Release|Any CPU
-		{80BB1AF3-4789-4CF6-ABF3-EB2195838730}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{80BB1AF3-4789-4CF6-ABF3-EB2195838730}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{80BB1AF3-4789-4CF6-ABF3-EB2195838730}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{80BB1AF3-4789-4CF6-ABF3-EB2195838730}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DF9A590B-20EC-4245-ADD2-6B4C4C29B680}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DF9A590B-20EC-4245-ADD2-6B4C4C29B680}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DF9A590B-20EC-4245-ADD2-6B4C4C29B680}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DF9A590B-20EC-4245-ADD2-6B4C4C29B680}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BB61BF85-0DE4-469B-85D4-3744E1B03F89}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BB61BF85-0DE4-469B-85D4-3744E1B03F89}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BB61BF85-0DE4-469B-85D4-3744E1B03F89}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BB61BF85-0DE4-469B-85D4-3744E1B03F89}.Release|Any CPU.Build.0 = Release|Any CPU
-		{63C91E1C-640C-4281-8388-971908009CAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{63C91E1C-640C-4281-8388-971908009CAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{63C91E1C-640C-4281-8388-971908009CAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{63C91E1C-640C-4281-8388-971908009CAE}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6AE9D93D-FBFA-4B94-8046-CDF10886F15B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6AE9D93D-FBFA-4B94-8046-CDF10886F15B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6AE9D93D-FBFA-4B94-8046-CDF10886F15B}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -77,6 +60,10 @@ Global
 		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1DCBB10C-1667-4B38-9FA8-E42F6AED87CA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
