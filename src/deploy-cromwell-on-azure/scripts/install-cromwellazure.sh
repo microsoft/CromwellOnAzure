@@ -34,6 +34,29 @@ function wait_for_apt_locks() {
     done
 }
 
+function containsElement () { for e in "${@:2}"; do [[ "${e//\"/}" = "$1" ]] && return 0; done; return 1; }
+
+function appendKeyValueList()
+{
+    IFS="="
+    while read -r name value
+    do
+       if [[ "$name" == "$1" ]]; then
+          IFS=' '; arrIN=(${value:1:-1}); IFS="=";
+
+          if ! containsElement "$2" ${arrIN[@]}; then
+             echo "$name=\"${value:1:-1} $2\""
+          else
+             echo "$name=$value"
+          fi
+       else
+          echo "$name=$value"
+       fi
+
+    done < <(printf '%s\n' "$3")
+    IFS=" "
+}
+
 write_log "Verifying that no other package updates are in progress"
 wait_for_apt_locks
 
@@ -87,6 +110,14 @@ if [ ! -L "/cromwellazure" ]; then
     write_log "Creating symlink /cromwellazure -> /data/cromwellazure"
     sudo ln -s /data/cromwellazure /cromwellazure
 fi
+
+# Prevent blobfuse mounts from being indexed by mlocation https://github.com/Azure/azure-storage-fuse/wiki/Blobfuse-Troubleshoot-FAQ#common-problems-after-a-successful-mount
+config=$(cat /etc/updatedb.conf)
+config=$(appendKeyValueList "PRUNEPATHS" "/mnt" "$config")
+config=$(appendKeyValueList "PRUNEFS" "blobfuse" "$config")
+config=$(appendKeyValueList "PRUNEFS" "blobfuse2" "$config")
+config=$(appendKeyValueList "PRUNEFS" "fuse" "$config")
+printf '%s\n' "$config" > /etc/updatedb.conf
 
 write_log "Disabling the Docker service, because the cromwellazure service is responsible for starting Docker"
 sudo systemctl disable docker
