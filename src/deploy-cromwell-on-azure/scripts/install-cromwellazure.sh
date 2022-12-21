@@ -34,6 +34,48 @@ function wait_for_apt_locks() {
     done
 }
 
+# Takes a two parameters, a value to look for in $1 and an array to check in $2
+# Loop over the array, ignoring quotes for the array value and compare to the supplied value.
+# Ignores quotes so "/mnt" will still match /mnt. 
+# If the value is found, break and return 0(True), else return 1(False) at the end.
+function containsElement () { for e in "${@:2}"; do [[ "${e//\"/}" = "$1" ]] && return 0; done; return 1; }
+
+
+# Function that takes a multiline string of the format key="value1 value2 value3" on each line, key value, and new list value.
+# Append the new value to the end of the list for specified key, if it does not already exist. 
+# Parameter $1 Key value
+# Parameter $2 New list value
+# Parameter $3 File string
+# Returns: Original string, with new value added to the appropriate key list if not already present. 
+function appendKeyValueList()
+{
+    # Read through each line of the file, splitting the line on the '=' character into name and value variables.
+    IFS="="
+    while read -r name value
+    do
+       # Check if the key matches. 
+       if [[ "$name" == "$1" ]]; then
+          # Parse the value list, into an array.
+          # The string values at the start and end of list will get " characters attached. 
+          # Doing "value:1:-1" ignores the first and last characters to strip the quotes. 
+          IFS=' '; arrIN=(${value:1:-1}); IFS="=";
+
+          # Check if the array already contains out new value, if not, add it to the list inside the quotes.
+          if ! containsElement "$2" ${arrIN[@]}; then
+             echo "$name=\"${value:1:-1} $2\""
+          # If the array contains our new value, print the original line. 
+          else
+             echo "$name=$value"
+          fi
+       # Line doesn't contain the key we are looking for so reprint the original line.
+       else
+          echo "$name=$value"
+       fi
+    # Directs the string in variable $3 into our loop. 
+    done < <(printf '%s\n' "$3")
+    IFS=" "
+}
+
 write_log "Verifying that no other package updates are in progress"
 wait_for_apt_locks
 
@@ -87,6 +129,16 @@ if [ ! -L "/cromwellazure" ]; then
     write_log "Creating symlink /cromwellazure -> /data/cromwellazure"
     sudo ln -s /data/cromwellazure /cromwellazure
 fi
+
+# Prevent blobfuse mounts from being indexed by mlocation https://github.com/Azure/azure-storage-fuse/wiki/Blobfuse-Troubleshoot-FAQ#common-problems-after-a-successful-mount
+# Load config variable with the contents of /etc/updatedb.conf
+# Add each new value to the appropriate section of the file. 
+config=$(cat /etc/updatedb.conf)
+config=$(appendKeyValueList "PRUNEPATHS" "/mnt" "$config")
+config=$(appendKeyValueList "PRUNEFS" "blobfuse" "$config")
+config=$(appendKeyValueList "PRUNEFS" "blobfuse2" "$config")
+config=$(appendKeyValueList "PRUNEFS" "fuse" "$config")
+printf '%s\n' "$config" > /etc/updatedb.conf
 
 write_log "Disabling the Docker service, because the cromwellazure service is responsible for starting Docker"
 sudo systemctl disable docker
