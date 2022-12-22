@@ -33,6 +33,7 @@ namespace TriggerService
             var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(Environment.GetEnvironmentVariable("ApplicationInsightsAccountName"));
             var defaultStorageAccountName = Environment.GetEnvironmentVariable("DefaultStorageAccountName");
             var cosmosDbAccountName = Environment.GetEnvironmentVariable("CosmosDbAccountName");
+            var postgreSqlServerName = Environment.GetEnvironmentVariable("PostgreSqlServerName");
             var cromwellUrl = ConfigurationManager.AppSettings.Get("CromwellUrl");
 
             var serviceCollection = new ServiceCollection()
@@ -63,19 +64,27 @@ namespace TriggerService
 
             (var storageAccounts, var storageAccount) = await AzureStorage.GetStorageAccountsUsingMsiAsync(defaultStorageAccountName);
 
-            (var cosmosDbEndpoint, var cosmosDbKey) = await GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
+            (var cosmosDbEndpoint, var cosmosDbKey) = (postgreSqlServerName is null) ? await GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName) : (null, null);
+
+            IRepository<TesTask> database = (postgreSqlServerName is null)
+                ? new CosmosDbRepository<TesTask>(
+                        cosmosDbEndpoint,
+                        cosmosDbKey,
+                        Constants.CosmosDbDatabaseId,
+                        Constants.CosmosDbContainerId,
+                        Constants.CosmosDbPartitionId)
+                : new TesTaskPostgreSqlRepository(
+                        Environment.GetEnvironmentVariable("PostgreSqlServerName"),
+                        Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin"),
+                        Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName"),
+                        Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword"));
 
             var environment = new CromwellOnAzureEnvironment(
-                serviceProvider.GetRequiredService<ILoggerFactory>(),
-                storageAccount,
-                new CromwellApiClient.CromwellApiClient(cromwellUrl),
-                new CosmosDbRepository<TesTask>(
-                    cosmosDbEndpoint, 
-                    cosmosDbKey, 
-                    Constants.CosmosDbDatabaseId, 
-                    Constants.CosmosDbContainerId, 
-                    Constants.CosmosDbPartitionId),
-                storageAccounts);
+                    serviceProvider.GetRequiredService<ILoggerFactory>(),
+                    storageAccount,
+                    new CromwellApiClient.CromwellApiClient(cromwellUrl),
+                    database,
+                    storageAccounts);
 
             serviceCollection.AddSingleton(s => new TriggerEngine(s.GetRequiredService<ILoggerFactory>(), environment, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(30)));
             serviceProvider = serviceCollection.BuildServiceProvider();
