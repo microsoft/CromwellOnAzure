@@ -28,10 +28,10 @@ using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Tes.Models;
-using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 using Polly;
 using Polly.Retry;
+using Tes.Models;
+using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TesApi.Web
 {
@@ -75,14 +75,14 @@ namespace TesApi.Web
             location = Location;
             batchClient = BatchClient.Open(new BatchTokenCredentials($"https://{BatchAccountEndpoint}", () => GetAzureAccessTokenAsync("https://batch.core.windows.net/")));
 
-            getBatchAccountFunc = async () => 
+            getBatchAccountFunc = async () =>
                 await new BatchManagementClient(new TokenCredentials(await GetAzureAccessTokenAsync())) { SubscriptionId = SubscriptionId }
                     .BatchAccount
                     .GetAsync(ResourceGroupName, batchAccountName);
 
             this.azureOfferDurableId = azureOfferDurableId;
 
-            if (! AzureRegionUtils.TryGetBillingRegionName(location, out billingRegionName))
+            if (!AzureRegionUtils.TryGetBillingRegionName(location, out billingRegionName))
             {
                 logger.LogWarning($"Azure ARM location '{location}' does not have a corresponding Azure Billing Region.  Prices from the fallback billing region '{DefaultAzureBillingRegionName}' will be used instead.");
                 billingRegionName = DefaultAzureBillingRegionName;
@@ -260,7 +260,7 @@ namespace TesApi.Web
             try
             {
                 logger.LogInformation($"TES task: {cloudTask.Id} adding task to job.");
-                job = await batchRaceConditionJobNotFoundRetryPolicy.ExecuteAsync(() => 
+                job = await batchRaceConditionJobNotFoundRetryPolicy.ExecuteAsync(() =>
                     batchClient.JobOperations.GetJobAsync(job.Id));
 
                 await job.AddTaskAsync(cloudTask);
@@ -737,21 +737,27 @@ namespace TesApi.Web
                 .Where(m => m["MeterCategory"].ToString() == "Virtual Machines" && m["MeterStatus"].ToString() == "Active" && m["MeterRegion"].ToString().Equals(billingRegionName, StringComparison.OrdinalIgnoreCase))
                 .Select(m => new { MeterName = m["MeterName"].ToString(), MeterSubCategory = m["MeterSubCategory"].ToString(), MeterRate = m["MeterRates"]["0"].ToString() })
                 .Where(m => !m.MeterSubCategory.Contains("Windows"))
-                .Select(m => new { 
+                .Select(m => new
+                {
                     MeterName = m.MeterName.Replace(" Low Priority", string.Empty, StringComparison.OrdinalIgnoreCase),
                     m.MeterSubCategory,
-                    MeterRate = decimal.Parse(m.MeterRate), 
-                    IsLowPriority = m.MeterName.Contains(" Low Priority", StringComparison.OrdinalIgnoreCase) })
+                    MeterRate = decimal.Parse(m.MeterRate),
+                    IsLowPriority = m.MeterName.Contains(" Low Priority", StringComparison.OrdinalIgnoreCase)
+                })
                 .ToList();
 
             return supportedVmSizes
-                .Select(v => new {
+                .Select(v => new
+                {
                     v.VmSize,
-                    RateCardMeters = rateCardMeters.Where(m => m.MeterName.Equals(v.MeterName, StringComparison.OrdinalIgnoreCase) && m.MeterSubCategory.Equals(v.MeterSubCategory, StringComparison.OrdinalIgnoreCase)) })
-                .Select(v => new VmPrice {
+                    RateCardMeters = rateCardMeters.Where(m => m.MeterName.Equals(v.MeterName, StringComparison.OrdinalIgnoreCase) && m.MeterSubCategory.Equals(v.MeterSubCategory, StringComparison.OrdinalIgnoreCase))
+                })
+                .Select(v => new VmPrice
+                {
                     VmSize = v.VmSize,
                     PricePerHourDedicated = v.RateCardMeters.FirstOrDefault(m => !m.IsLowPriority)?.MeterRate,
-                    PricePerHourLowPriority = v.RateCardMeters.FirstOrDefault(m => m.IsLowPriority)?.MeterRate })
+                    PricePerHourLowPriority = v.RateCardMeters.FirstOrDefault(m => m.IsLowPriority)?.MeterRate
+                })
                 .Where(v => v.PricePerHourDedicated is not null);
         }
 
@@ -767,13 +773,15 @@ namespace TesApi.Web
 
             var vmSizesAvailableAtLocation = (await azureClient.WithSubscription(subscriptionId).ComputeSkus.ListbyRegionAndResourceTypeAsync(Region.Create(location), ComputeResourceType.VirtualMachines))
                 .Select(vm => new { VmSize = vm.Name.Value, VmFamily = vm.Inner.Family, Capabilities = vm.Capabilities.ToDictionary(c => c.Name, c => c.Value) })
-                .Select(vm => new {
+                .Select(vm => new
+                {
                     VmSize = vm.VmSize,
                     VmFamily = vm.VmFamily,
                     NumberOfCores = int.Parse(vm.Capabilities.GetValueOrDefault("vCPUsAvailable", vm.Capabilities["vCPUs"])),
                     MemoryGiB = double.Parse(vm.Capabilities["MemoryGB"]),
                     DiskGiB = ConvertMiBToGiB(int.Parse(vm.Capabilities["MaxResourceVolumeMB"])),
-                    MaxDataDiskCount = int.Parse(vm.Capabilities.GetValueOrDefault("MaxDataDiskCount", "0")) });
+                    MaxDataDiskCount = int.Parse(vm.Capabilities.GetValueOrDefault("MaxDataDiskCount", "0"))
+                });
 
             IEnumerable<VmPrice> vmPrices;
 
@@ -811,7 +819,7 @@ namespace TesApi.Web
                         PricePerHour = vmPrice.PricePerHourDedicated
                     });
 
-                    if(vmPrice.LowPriorityAvailable)
+                    if (vmPrice.LowPriorityAvailable)
                     {
                         vmInfos.Add(new VirtualMachineInformation
                         {
@@ -865,15 +873,15 @@ namespace TesApi.Web
         /// <param name="startTaskPath">Local path on the Azure Batch node for the script</param>
         /// <returns></returns>
         public async Task<ManualBatchPoolCreationResult> CreateManualBatchPoolAsync(
-            string poolName, 
-            string vmSize, 
-            bool isLowPriority, 
-            string executorImage, 
+            string poolName,
+            string vmSize,
+            bool isLowPriority,
+            string executorImage,
             BatchNodeInfo nodeInfo,
-            string dockerInDockerImageName, 
-            string blobxferImageName, 
-            IEnumerable<string> identityResourceIds, 
-            bool disableBatchNodesPublicIpAddress, 
+            string dockerInDockerImageName,
+            string blobxferImageName,
+            IEnumerable<string> identityResourceIds,
+            bool disableBatchNodesPublicIpAddress,
             string batchNodesSubnetId,
             string startTaskSasUrl,
             string startTaskPath
@@ -899,7 +907,7 @@ namespace TesApi.Web
                 {
                     startTask = new Microsoft.Azure.Management.Batch.Models.StartTask
                     {
-                        CommandLine = $"/bin/sh {startTaskPath}",
+                        CommandLine = $"/usr/bin/env {startTaskPath}",
                         UserIdentity = new Microsoft.Azure.Management.Batch.Models.UserIdentity(null, new Microsoft.Azure.Management.Batch.Models.AutoUserSpecification(elevationLevel: Microsoft.Azure.Management.Batch.Models.ElevationLevel.Admin, scope: Microsoft.Azure.Management.Batch.Models.AutoUserScope.Pool)),
                         ResourceFiles = new List<Microsoft.Azure.Management.Batch.Models.ResourceFile> { new Microsoft.Azure.Management.Batch.Models.ResourceFile(null, null, startTaskSasUrl, null, startTaskPath) }
                     };
@@ -958,7 +966,7 @@ namespace TesApi.Web
                         {
                             TargetDedicatedNodes = isLowPriority ? 0 : 1,
                             TargetLowPriorityNodes = isLowPriority ? 1 : 0,
-                            ResizeTimeout = TimeSpan.FromMinutes(30), 
+                            ResizeTimeout = TimeSpan.FromMinutes(30),
                             // TODO does this do anything with fixed scale settings?
                             NodeDeallocationOption = Microsoft.Azure.Management.Batch.Models.ComputeNodeDeallocationOption.TaskCompletion
                         }

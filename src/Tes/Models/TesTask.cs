@@ -27,9 +27,8 @@ namespace Tes.Models
     public partial class TesTask : IEquatable<TesTask>
     {
         public TesTask()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+
         /// <summary>
         /// Task identifier assigned by the server.
         /// </summary>
@@ -116,7 +115,7 @@ namespace Tes.Models
         /// <returns>String presentation of the object</returns>
         public override string ToString()
 
-            =>  new StringBuilder()
+            => new StringBuilder()
                 .Append("class TesTask {\n")
                 .Append("  Id: ").Append(Id).Append('\n')
                 .Append("  State: ").Append(State).Append('\n')

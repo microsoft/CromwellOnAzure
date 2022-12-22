@@ -27,9 +27,7 @@ namespace Tes.Models
     public partial class TesServiceInfo : IEquatable<TesServiceInfo>
     {
         public TesServiceInfo()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
         /// <summary>
         /// Returns the name of the service, e.g. \&quot;ohsu-compbio-funnel\&quot;.

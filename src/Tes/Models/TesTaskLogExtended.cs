@@ -106,7 +106,7 @@ namespace Tes.Models
         {
             foreach (var property in propertiesBackedByMetadata.Where(prop => prop.PropertyInfo.ReflectedType == typeof(T)))
             {
-                if(this.TryGetMetadataValue(property.MetadataKey, property.PropertyInfo.PropertyType, out var metadataValue))
+                if (this.TryGetMetadataValue(property.MetadataKey, property.PropertyInfo.PropertyType, out var metadataValue))
                 {
                     property.PropertyInfo.SetValue(obj, metadataValue);
                 }
@@ -120,7 +120,7 @@ namespace Tes.Models
         /// <returns>Populated object</returns>
         private bool TryGetObjectFromMetadata<T>(out T obj) where T : new()
         {
-            if(this.Metadata is null)
+            if (this.Metadata is null)
             {
                 obj = default;
                 return false;

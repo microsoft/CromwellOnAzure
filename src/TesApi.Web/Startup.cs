@@ -3,7 +3,6 @@
 
 using System;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using Common;
 using LazyCache;
@@ -118,7 +117,7 @@ namespace TesApi.Web
                 .AddHostedService<DeleteOrphanedAutoPoolsHostedService>()
                 .AddHostedService<RefreshVMSizesAndPricesHostedService>()
 
-            // Configure AppInsights Azure Service when in PRODUCTION environment
+                // Configure AppInsights Azure Service when in PRODUCTION environment
                 .IfThenElse(hostingEnvironment.IsProduction(),
                     s =>
                     {

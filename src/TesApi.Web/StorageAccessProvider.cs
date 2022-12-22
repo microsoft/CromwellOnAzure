@@ -41,7 +41,8 @@ namespace TesApi.Web
             logger.LogInformation($"DefaultStorageAccountName: {defaultStorageAccountName}");
 
             externalStorageContainers = configuration["ExternalStorageContainers"]?.Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(uri => {
+                .Select(uri =>
+                {
                     if (StorageAccountUrlSegments.TryCreate(uri, out var s))
                     {
                         return new ExternalStorageContainerInfo { BlobEndpoint = s.BlobEndpoint, AccountName = s.AccountName, ContainerName = s.ContainerName, SasToken = s.SasToken };

@@ -83,7 +83,7 @@ namespace TesApi.Tests
             var cachingRepository = new CachingWithRetriesRepository<TesTask>(repository.Object);
             var tesTask = new TesTask { Id = "updateItem" };
 
-            Expression <Func<TesTask, bool>> predicate = t => t.State == TesState.QUEUEDEnum
+            Expression<Func<TesTask, bool>> predicate = t => t.State == TesState.QUEUEDEnum
                        || t.State == TesState.INITIALIZINGEnum
                        || t.State == TesState.RUNNINGEnum
                        || (t.State == TesState.CANCELEDEnum && t.IsCancelRequested);

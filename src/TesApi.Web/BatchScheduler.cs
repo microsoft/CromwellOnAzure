@@ -148,10 +148,10 @@ namespace TesApi.Web
             }
 
             async Task DeleteBatchJobAndSetTaskStateAsync(TesTask tesTask, TesState newTaskState, CombinedBatchTaskInfo batchInfo)
-            { 
+            {
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
-                SetTaskStateAndLog(tesTask, newTaskState, batchInfo); 
+                SetTaskStateAndLog(tesTask, newTaskState, batchInfo);
             }
             Task DeleteBatchJobAndSetTaskExecutorErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.EXECUTORERROREnum, batchInfo);
             Task DeleteBatchJobAndSetTaskSystemErrorAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo) => DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.SYSTEMERROREnum, batchInfo);
@@ -161,10 +161,10 @@ namespace TesApi.Web
                 : DeleteBatchJobAndSetTaskStateAsync(tesTask, TesState.QUEUEDEnum, batchInfo);
 
             async Task CancelTaskAsync(TesTask tesTask, CombinedBatchTaskInfo batchInfo)
-            { 
+            {
                 await this.azureProxy.DeleteBatchJobAsync(tesTask.Id);
                 await azureProxy.DeleteBatchPoolIfExistsAsync(tesTask.Id);
-                tesTask.IsCancelRequested = false; 
+                tesTask.IsCancelRequested = false;
             }
 
             tesTaskStateTransitions = new List<TesTaskStateTransition>()
@@ -232,7 +232,7 @@ namespace TesApi.Web
                 logger.LogInformation(msg);
                 onlyLogBatchTaskStateOnce.Add(msg);
             }
-                   
+
             var tesTaskChanged = await HandleTesTaskTransitionAsync(tesTask, combinedBatchTaskInfo);
             return tesTaskChanged;
         }
@@ -328,7 +328,7 @@ namespace TesApi.Web
                 PoolInformation poolInformation = null;
 
                 var identities = new List<string>();
-                
+
                 if (!string.IsNullOrWhiteSpace(globalManagedIdentity))
                 {
                     identities.Add(globalManagedIdentity);
@@ -344,7 +344,7 @@ namespace TesApi.Web
                 if (identities.Count > 0)
                 {
                     // Only create manual pool if an identity was specified
-                    
+
                     // By default, the pool will have the same name/ID as the job
                     var poolName = jobId;
                     string startTaskSasUrl = null;
@@ -647,7 +647,7 @@ namespace TesApi.Web
             var executionDirectoryUri = new Uri(await this.storageAccessProvider.MapLocalPathToSasUrlAsync(cromwellExecutionDirectoryPath, getContainerSas: true));
             var blobsInExecutionDirectory = (await azureProxy.ListBlobsAsync(executionDirectoryUri)).Where(b => !b.EndsWith($"/{CromwellScriptFileName}")).Where(b => !b.Contains($"/{BatchExecutionDirectoryName}"));
             var additionalInputFiles = blobsInExecutionDirectory.Select(b => $"{CromwellPathPrefix}{b}").Select(b => new TesInput { Content = null, Path = b, Url = b, Name = Path.GetFileName(b), Type = TesFileType.FILEEnum });
-            
+
             var filesToDownload = await Task.WhenAll(
                 inputFiles
                 .Where(f => f?.Url?.StartsWith("drs://", StringComparison.OrdinalIgnoreCase) != true) // do not attempt to download DRS input files since the cromwell-drs-localizer will
@@ -659,14 +659,16 @@ namespace TesApi.Web
 
             // Using --include and not using --no-recursive as a workaround for https://github.com/Azure/blobxfer/issues/123
             var downloadFilesScriptContent = "total_bytes=0 && "
-                + string.Join(" && ", filesToDownload.Select(f => {
+                + string.Join(" && ", filesToDownload.Select(f =>
+                {
                     var setVariables = $"path='{f.Path}' && url='{f.Url}'";
 
                     var downloadSingleFile = f.Url.Contains(".blob.core.")
                         ? $"blobxfer download --storage-url \"$url\" --local-path \"$path\" --chunk-size-bytes 104857600 --rename --include '{StorageAccountUrlSegments.Create(f.Url).BlobName}'"
                         : "mkdir -p $(dirname \"$path\") && wget -O \"$path\" \"$url\"";
 
-                    return $"{setVariables} && {downloadSingleFile} && {exitIfDownloadedFileIsNotFound} && {incrementTotalBytesTransferred}"; }))
+                    return $"{setVariables} && {downloadSingleFile} && {exitIfDownloadedFileIsNotFound} && {incrementTotalBytesTransferred}";
+                }))
                 + $" && echo FileDownloadSizeInBytes=$total_bytes >> {metricsPath}";
 
             var downloadFilesScriptPath = $"{batchExecutionDirectoryPath}/{DownloadFilesScriptFileName}";
@@ -682,7 +684,8 @@ namespace TesApi.Web
             // Syntax is: If file or directory doesn't exist, run a noop (":") operator, otherwise run the upload command:
             // { if not exists do nothing else upload; } && { ... }
             var uploadFilesScriptContent = "total_bytes=0 && "
-                + string.Join(" && ", filesToUpload.Select(f => {
+                + string.Join(" && ", filesToUpload.Select(f =>
+                {
                     var setVariables = $"path='{f.Path}' && url='{f.Url}'";
                     var blobxferCommand = $"blobxfer upload --storage-url \"$url\" --local-path \"$path\" --one-shot-bytes 104857600 {(f.Type == TesFileType.FILEEnum ? "--rename --no-recursive" : string.Empty)}";
 
@@ -760,7 +763,7 @@ namespace TesApi.Web
             sb.AppendLine($"write_ts DownloadEnd && \\");
             sb.AppendLine($"chmod -R o+rwx /mnt{cromwellPathPrefixWithoutEndSlash} && \\");
             sb.AppendLine($"write_ts ExecutorStart && \\");
-            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{ string.Join(" && ", executor.Command.Skip(1))}\" && \\");
+            sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint= --workdir / {executor.Image} {executor.Command[0]} -c \"{string.Join(" && ", executor.Command.Skip(1))}\" && \\");
             sb.AppendLine($"write_ts ExecutorEnd && \\");
             sb.AppendLine($"write_ts UploadStart && \\");
             sb.AppendLine($"docker run --rm {volumeMountsOption} --entrypoint=/bin/sh {blobxferImageName} {uploadFilesScriptPath} && \\");
@@ -882,7 +885,7 @@ namespace TesApi.Web
                 nodeAgentSkuId: batchNodeInfo.BatchNodeAgentSkuId);
 
             StartTask startTask = null;
-            
+
             if (!string.IsNullOrWhiteSpace(globalStartTaskPath))
             {
                 var scriptSasUrl = await this.storageAccessProvider.MapLocalPathToSasUrlAsync(globalStartTaskPath);
@@ -1074,7 +1077,7 @@ namespace TesApi.Web
         /// <returns>The virtual machine info</returns>
         public async Task<VirtualMachineInformation> GetVmSizeAsync(TesTask tesTask, bool forcePreemptibleVmsOnly = false)
         {
-            bool allowedVmSizesFilter(VirtualMachineInformation vm) => allowedVmSizes is null || ! allowedVmSizes.Any() || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) || allowedVmSizes.Contains(vm.VmFamily, StringComparer.OrdinalIgnoreCase);
+            bool allowedVmSizesFilter(VirtualMachineInformation vm) => allowedVmSizes is null || !allowedVmSizes.Any() || allowedVmSizes.Contains(vm.VmSize, StringComparer.OrdinalIgnoreCase) || allowedVmSizes.Contains(vm.VmFamily, StringComparer.OrdinalIgnoreCase);
 
             var tesResources = tesTask.Resources;
 
@@ -1153,7 +1156,7 @@ namespace TesApi.Web
             {
                 return selectedVm;
             }
-           
+
             if (!eligibleVms.Any())
             {
                 noVmFoundMessage += $" There are no VM sizes that match the requirements. Review the task resources.";
@@ -1220,7 +1223,7 @@ namespace TesApi.Web
                     {
                         var metrics = DelimitedTextToDictionary(metricsContent.Trim());
 
-                        var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKiB", out var diskSizeInKiB)  ? diskSizeInKiB / kiBInGB : (double?)null;
+                        var diskSizeInGB = TryGetValueAsDouble(metrics, "DiskSizeInKiB", out var diskSizeInKiB) ? diskSizeInKiB / kiBInGB : (double?)null;
                         var diskUsedInGB = TryGetValueAsDouble(metrics, "DiskUsedInKiB", out var diskUsedInKiB) ? diskUsedInKiB / kiBInGB : (double?)null;
 
                         batchNodeMetrics = new BatchNodeMetrics
@@ -1234,12 +1237,12 @@ namespace TesApi.Web
                             FileUploadDurationInSeconds = GetDurationInSeconds(metrics, "UploadStart", "UploadEnd"),
                             FileUploadSizeInGB = TryGetValueAsDouble(metrics, "FileUploadSizeInBytes", out var fileUploadSizeInBytes) ? fileUploadSizeInBytes / bytesInGB : (double?)null,
                             DiskUsedInGB = diskUsedInGB,
-                            DiskUsedPercent = diskUsedInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsedInGB / diskSizeInGB * 100 ) : null,
+                            DiskUsedPercent = diskUsedInGB.HasValue && diskSizeInGB.HasValue && diskSizeInGB > 0 ? (float?)(diskUsedInGB / diskSizeInGB * 100) : null,
                             VmCpuModelName = metrics.GetValueOrDefault("VmCpuModelName")
                         };
 
                         taskStartTime = TryGetValueAsDateTimeOffset(metrics, "BlobXferPullStart", out var startTime) ? (DateTimeOffset?)startTime : null;
-                        taskEndTime = TryGetValueAsDateTimeOffset(metrics, "UploadEnd", out var endTime) ? (DateTimeOffset?)endTime: null;
+                        taskEndTime = TryGetValueAsDateTimeOffset(metrics, "UploadEnd", out var endTime) ? (DateTimeOffset?)endTime : null;
                     }
                     catch (Exception ex)
                     {

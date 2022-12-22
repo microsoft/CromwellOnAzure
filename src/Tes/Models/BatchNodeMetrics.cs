@@ -1,4 +1,4 @@
-﻿namespace Tes.Models
+namespace Tes.Models
 {
     /// <summary>
     /// Contains task execution metrics when task is handled by Azure Batch 

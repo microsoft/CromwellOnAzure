@@ -139,7 +139,7 @@ namespace TesApi.Web
         public Task UploadBlobAsync(Uri blobAbsoluteUri, string content) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.UploadBlobAsync(blobAbsoluteUri, content));
 
         /// <inheritdoc/>
-        public Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName) =>  azureProxy.GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
+        public Task<(string, string)> GetCosmosDbEndpointAndKeyAsync(string cosmosDbAccountName) => azureProxy.GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
 
         /// <inheritdoc/>
         public Task UploadBlobFromFileAsync(Uri blobAbsoluteUri, string filePath) => asyncRetryPolicy.ExecuteAsync(() => azureProxy.UploadBlobFromFileAsync(blobAbsoluteUri, filePath));

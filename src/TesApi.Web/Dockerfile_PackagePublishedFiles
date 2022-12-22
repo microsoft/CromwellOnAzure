@@ -6,7 +6,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:6.0
 WORKDIR /app
 COPY . ./
 RUN apt update && apt full-upgrade -y && apt autoremove -y
-RUN apt install -y postgresql-client 
+RUN apt install -y postgresql-client
 RUN adduser --home /home/tes -u 1000 tes
 RUN apt install -y libcap2-bin
 RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/share/dotnet/dotnet

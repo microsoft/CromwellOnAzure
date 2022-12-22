@@ -138,7 +138,7 @@ namespace TesApi.Web
                     MemoryInGiB = v.VmInfoWithDedicatedPrice.MemoryInGB?.ToString(),
                     NumberOfCores = v.VmInfoWithDedicatedPrice.NumberOfCores.ToString(),
                     ResourceDiskSizeInGiB = v.VmInfoWithDedicatedPrice.ResourceDiskSizeInGB.ToString(),
-                    DedicatedQuota = batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced 
+                    DedicatedQuota = batchAccountQuotas.DedicatedCoreQuotaPerVMFamilyEnforced
                         ? batchAccountQuotas.DedicatedCoreQuotaPerVMFamily.FirstOrDefault(q => q.Name.Equals(v.VmInfoWithDedicatedPrice.VmFamily, StringComparison.OrdinalIgnoreCase))?.CoreQuota.ToString() ?? "N/A"
                         : batchAccountQuotas.DedicatedCoreQuota.ToString()
                 });
@@ -156,7 +156,7 @@ namespace TesApi.Web
             var dedicatedQuotaColumnWidth = vmInfosAsStrings.Max(v => v.DedicatedQuota.Length);
 
             var fixedWidthVmInfos = vmInfosAsStrings.Select(v => $"{v.VmSize.PadRight(sizeColWidth)} {v.VmFamily.PadRight(seriesColWidth)} {v.PricePerHourDedicated.PadLeft(priceDedicatedColumnWidth)}  {v.PricePerHourLowPri.PadLeft(priceLowPriColumnWidth)}  {v.MemoryInGiB.PadLeft(memoryColumnWidth)}  {v.NumberOfCores.PadLeft(coresColumnWidth)}  {v.ResourceDiskSizeInGiB.PadLeft(diskColumnWidth)}  {v.DedicatedQuota.PadLeft(dedicatedQuotaColumnWidth)}");
-            
+
             return string.Join('\n', fixedWidthVmInfos);
         }
     }
