@@ -105,7 +105,7 @@ namespace CromwellOnAzureDeployer
             var configurationProperties = typeof(UserAccessibleConfiguration).GetTypeInfo().DeclaredProperties.Select(p => p.Name).ToList();
 
             var invalidArguments = configurationSource.Providers
-                .SelectMany(p => p.GetChildKeys(new List<string>(), null))
+                .SelectMany(p => p.GetChildKeys(Enumerable.Empty<string>(), null))
                 .Where(k => !configurationProperties.Contains(k, StringComparer.OrdinalIgnoreCase));
 
             if (invalidArguments.Any())

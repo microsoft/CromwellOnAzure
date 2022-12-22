@@ -487,7 +487,7 @@ namespace CromwellOnAzureDeployer
                             });
                         }
 
-                        if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() && postgreSqlFlexServer == null)
+                        if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() && postgreSqlFlexServer is null)
                         {
                             postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
                         }
@@ -538,7 +538,7 @@ namespace CromwellOnAzureDeployer
                                 var clientId = managedIdentity.ClientId;
                                 var settings = ConfigureSettings(clientId);
 
-                                if (aksCluster == null && !configuration.ManualHelmDeployment)
+                                if (aksCluster is null && !configuration.ManualHelmDeployment)
                                 {
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
@@ -589,7 +589,7 @@ namespace CromwellOnAzureDeployer
 
                         await compute;
 
-                        if (compute.Exception != null)
+                        if (compute.Exception is not null)
                         {
                             throw compute.Exception;
                         }
@@ -901,35 +901,35 @@ namespace CromwellOnAzureDeployer
 
             var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
 
-            if (installedVersion == null)
+            if (installedVersion is null)
             {
                 // If upgrading from pre-2.1 version, patch the installed Cromwell configuration file (disable call caching and default to preemptible)
                 await PatchCromwellConfigurationFileV200Async(storageAccount);
                 await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
             }
 
-            if (installedVersion == null || installedVersion < new Version(2, 1))
+            if (installedVersion is null || installedVersion < new Version(2, 1))
             {
                 await PatchContainersToMountFileV210Async(storageAccount, managedIdentity.Name);
             }
 
-            if (installedVersion == null || installedVersion < new Version(2, 2))
+            if (installedVersion is null || installedVersion < new Version(2, 2))
             {
                 await PatchContainersToMountFileV220Async(storageAccount);
             }
 
-            if (installedVersion == null || installedVersion < new Version(2, 4))
+            if (installedVersion is null || installedVersion < new Version(2, 4))
             {
                 await PatchContainersToMountFileV240Async(storageAccount);
                 await PatchAccountNamesFileV240Async(sshConnectionInfo, managedIdentity);
             }
 
-            if (installedVersion == null || installedVersion < new Version(2, 5))
+            if (installedVersion is null || installedVersion < new Version(2, 5))
             {
                 await MitigateChaosDbV250Async(cosmosDb);
             }
 
-            if (installedVersion == null || installedVersion < new Version(3, 0))
+            if (installedVersion is null || installedVersion < new Version(3, 0))
             {
                 await PatchCromwellConfigurationFileV300Async(storageAccount);
                 await AddNewSettingsV300Async(sshConnectionInfo);
@@ -2585,7 +2585,7 @@ namespace CromwellOnAzureDeployer
 
             var vmSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
 
-            if (vmSubnet == null)
+            if (vmSubnet is null)
             {
                 throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.VmSubnetName}'");
             }
@@ -2595,7 +2595,7 @@ namespace CromwellOnAzureDeployer
 
             if (configuration.ProvisionPostgreSqlOnAzure == true)
             {
-                if (postgreSqlSubnet == null)
+                if (postgreSqlSubnet is null)
                 {
                     throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.PostgreSqlSubnetName}'");
                 }
@@ -2782,9 +2782,9 @@ namespace CromwellOnAzureDeployer
                 ValidateDependantFeature(configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault(), nameof(configuration.CrossSubscriptionAKSDeployment), configuration.UseAks, nameof(configuration.UseAks));
             }
 
-            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTesImagePath != null, nameof(configuration.CustomTesImagePath));
-            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTriggerServiceImagePath != null, nameof(configuration.CustomTriggerServiceImagePath));
-            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomCromwellImagePath != null, nameof(configuration.CustomCromwellImagePath));
+            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTesImagePath is not null, nameof(configuration.CustomTesImagePath));
+            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTriggerServiceImagePath is not null, nameof(configuration.CustomTriggerServiceImagePath));
+            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomCromwellImagePath is not null, nameof(configuration.CustomCromwellImagePath));
 
             if (configuration.UseAks)
             {

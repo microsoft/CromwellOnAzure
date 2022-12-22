@@ -172,7 +172,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var line = await reader.ReadLineAsync();
 
-                    while (line != null)
+                    while (line is not null)
                     {
                         if (configuration.DebugLogging)
                         {
@@ -186,7 +186,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var line = await reader.ReadLineAsync();
 
-                    while (line != null)
+                    while (line is not null)
                     {
                         if (configuration.DebugLogging)
                         {
@@ -215,7 +215,7 @@ namespace CromwellOnAzureDeployer
                 }
             });
 
-            if (result.Outcome != OutcomeType.Successful && result.FinalException != null)
+            if (result.Outcome != OutcomeType.Successful && result.FinalException is not null)
             {
                 throw result.FinalException;
             }
@@ -356,7 +356,7 @@ namespace CromwellOnAzureDeployer
             {
                 var line = (await process.StandardOutput.ReadLineAsync())?.Trim();
 
-                while (line != null)
+                while (line is not null)
                 {
                     if (configuration.DebugLogging)
                     {
@@ -372,7 +372,7 @@ namespace CromwellOnAzureDeployer
             {
                 var line = (await process.StandardError.ReadLineAsync())?.Trim();
 
-                while (line != null)
+                while (line is not null)
                 {
                     if (configuration.DebugLogging)
                     {

@@ -23,6 +23,8 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task TriggerEngineRunsAndOnlyLogsAvailabilityOncePerSystemUponAvailableStateAsync()
         {
+            // TODO - this test still occasionally fails on this: Assert.IsTrue(availableLines.Count == 4);
+            // and results in availableLines.Count = 3
             var loggerFactory = new TestLoggerFake();
             var environment = new Mock<ICromwellOnAzureEnvironment>();
             var logger = loggerFactory.CreateLogger<TriggerEngineTests>();
