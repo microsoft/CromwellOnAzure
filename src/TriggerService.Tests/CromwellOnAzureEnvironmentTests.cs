@@ -3,16 +3,16 @@
 
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Linq;
+using System.Threading.Tasks;
 using CromwellApiClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
-using Tes.Repository;
 using Tes.Models;
+using Tes.Repository;
 
 namespace TriggerService.Tests
 {
@@ -31,9 +31,7 @@ namespace TriggerService.Tests
         private readonly string fakeAzureWdlWithSas = @"https://fake.azure.storage.account/{azureName}/test.wdl?sp=r&st=2019-12-18T18:55:41Z&se=2019-12-19T02:55:41Z&spr=https&sv=2019-02-02&sr=b&sig=EMJyBMOxdG2NvBqiwUsg71ZdYqwqMWda9242KU43%2F5Y%3D";
 
         public CromwellOnAzureEnvironmentTests()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
         [TestMethod]
         public async Task GetBlobFileNameAndDataWithDefaultStorageAccountUsingUrl()
@@ -77,7 +75,7 @@ namespace TriggerService.Tests
 
             var storages = Enumerable.Repeat(MockAzureStorage(defaultAuthority), 1).Append(MockAzureStorage(accountAuthority));
 
-            var processedWorkflowItem  = await GetBlobFileNameAndDataUsingMocksAsync(url, defaultAuthority, storages);
+            var processedWorkflowItem = await GetBlobFileNameAndDataUsingMocksAsync(url, defaultAuthority, storages);
 
             Assert.AreEqual(azureName, processedWorkflowItem.Filename, "azureName compared with Filename");
             Assert.IsNotNull(processedWorkflowItem.Data, "data");
@@ -224,7 +222,7 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_NoInput()
         {
-            var triggerFileContent = 
+            var triggerFileContent =
                 @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
@@ -238,7 +236,7 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_SingleInput()
         {
-            var triggerFileContent = 
+            var triggerFileContent =
                 @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
@@ -252,7 +250,7 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_MultiInput()
         {
-            var triggerFileContent = 
+            var triggerFileContent =
                 @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrls"":" + JsonConvert.SerializeObject(fakeAzureInputs) + @",
@@ -266,7 +264,7 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_CombinedInputs()
         {
-            var triggerFileContent = 
+            var triggerFileContent =
                 @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
@@ -281,7 +279,7 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_SingleInputWithNull()
         {
-            var triggerFileContent = 
+            var triggerFileContent =
                 @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":""" + fakeAzureInput + @""",
@@ -311,7 +309,7 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task ProcessBlobTrigger_AllInputsNull()
         {
-            var triggerFileContent = 
+            var triggerFileContent =
                 @"{
                     ""WorkflowUrl"":""" + fakeAzureWdl + @""",
                     ""WorkflowInputsUrl"":null,
@@ -396,7 +394,7 @@ namespace TriggerService.Tests
         private static void VerifyPostFiles(ProcessedTriggerInfo processedTriggerInfo)
         {
             var files = RetrievePostFiles(processedTriggerInfo);
-         
+
             Assert.AreEqual(processedTriggerInfo.WorkflowInputs.Count + 1, files.Count, "unexpected number of files");
 
             Assert.AreEqual("workflowSource", files[0].ParameterName, $"unexpected ParameterName for the 0th file");
