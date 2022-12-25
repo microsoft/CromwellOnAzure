@@ -126,14 +126,16 @@ namespace CromwellOnAzureDeployer
         private bool isResourceGroupCreated { get; set; }
         private KubernetesManager kubernetesManager {get; set;}
         private IKubernetes kubernetesClient { get; set; }
+        private AzureEnvironment azEnv { get; set; }
 
         public Deployer(Configuration configuration)
         {
             this.configuration = configuration;
         }
 
-        public async Task<int> DeployAsync()
+        public async Task<int> DeployAsync(AzureEnvironment env)
         {
+            this.azEnv = env;
             var mainTimer = Stopwatch.StartNew();
 
             try
@@ -141,11 +143,12 @@ namespace CromwellOnAzureDeployer
                 ValidateInitialCommandLineArgsAsync();
 
                 ConsoleEx.WriteLine("Running...");
+                ConsoleEx.WriteLine($"Current Azure Environment: {this.azEnv.Name}");
 
                 await ValidateTokenProviderAsync();
 
-                tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
-                azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
+                tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider(this.azEnv.ResourceManagerEndpoint), null, this.azEnv.AuthenticationEndpoint);
+                azureCredentials = new AzureCredentials(tokenCredentials, null, null, this.azEnv);
                 azureClient = GetAzureClient(azureCredentials);
                 azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                 subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
@@ -156,7 +159,7 @@ namespace CromwellOnAzureDeployer
 
                 if (configuration.UseAks)
                 {
-                    kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
+                    kubernetesManager = new KubernetesManager(this.azEnv, configuration, azureCredentials, cts);
                 }
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
@@ -1301,7 +1304,7 @@ namespace CromwellOnAzureDeployer
                 () => UploadFilesToVirtualMachineAsync(
                     sshConnectionInfo,
                     new[] {
-                        (Utility.GetFileContent("scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true),
+                        (UpdateCloudNameInStartup("scripts", "startup.sh"), $"{CromwellAzureRootDir}/startup.sh", true),
                         (Utility.GetFileContent("scripts", "wait-for-it.sh"), $"{CromwellAzureRootDir}/wait-for-it/wait-for-it.sh", true),
                         (Utility.GetFileContent("scripts", "install-cromwellazure.sh"), $"{CromwellAzureRootDir}/install-cromwellazure.sh", true),
                         (Utility.GetFileContent("scripts", "mount_containers.sh"), $"{CromwellAzureRootDir}/mount_containers.sh", true),
@@ -1309,7 +1312,7 @@ namespace CromwellOnAzureDeployer
                         (Utility.GetFileContent("scripts", "env-03-external-images.txt"), $"{CromwellAzureRootDir}/env-03-external-images.txt", false),
                         (Utility.GetFileContent("scripts", "docker-compose.yml"), $"{CromwellAzureRootDir}/docker-compose.yml", false),
                         (Utility.GetFileContent("scripts", "cromwellazure.service"), "/lib/systemd/system/cromwellazure.service", false),
-                        (Utility.GetFileContent("scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true)
+                        (UpdateBlobEndPointInMountBlobFuse(configuration.StorageAccountName, "scripts", "mount.blobfuse"), "/usr/sbin/mount.blobfuse", true)
                     }.Concat(!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault()
                         ? new[] {
                         (Utility.GetFileContent("scripts", "env-12-local-my-sql-db.txt"), $"{CromwellAzureRootDir}/env-12-local-my-sql-db.txt", false),
@@ -1343,6 +1346,16 @@ namespace CromwellOnAzureDeployer
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
         {
             var env04SettingsContent = Utility.GetFileContent("scripts", "env-04-settings.txt");
+
+            //Set Azure Environment.
+            if (env04SettingsContent.IndexOf("<<AzureEnvName>>") > 0)
+            {
+                env04SettingsContent = env04SettingsContent.Replace("<<AzureEnvName>>", this.azEnv.Name);
+            }
+            else
+            {
+                env04SettingsContent += "\r\nAzureEnvName=" + this.azEnv.Name;
+            }
 
             if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
             {
@@ -1559,7 +1572,7 @@ namespace CromwellOnAzureDeployer
             {
                 try
                 {
-                    var client = new BatchManagementClient(tokenCredentials) { SubscriptionId = s };
+                    var client = new BatchManagementClient(new Uri(this.azEnv.ResourceManagerEndpoint), tokenCredentials) { SubscriptionId = s };
                     return await client.BatchAccount.ListAsync();
                 }
                 catch (Exception e)
@@ -1591,7 +1604,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task CreateDefaultStorageContainersAsync(IStorageAccount storageAccount)
         {
-            var blobClient = await GetBlobClientAsync(storageAccount);
+            var blobClient = await GetBlobClientAsync(this.azEnv, storageAccount);
 
             var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
             await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
@@ -1826,7 +1839,8 @@ namespace CromwellOnAzureDeployer
                 .WithSize(configuration.VmSize)
                 .WithExistingUserAssignedManagedServiceIdentity(managedIdentity);
 
-            return Execute($"Creating Linux VM: {configuration.VmName}...", () => vmDefinitionPart2.CreateAsync(cts.Token));
+            // return Execute($"Creating Linux VM: {configuration.VmName}...", () => vmDefinitionPart2.CreateAsync(cts.Token));
+            return Execute($"Creating Linux VM: {configuration.VmName}.{configuration.RegionName}.cloudapp.{this.azEnv.ResourceManagerEndpoint.Replace("https://management.", string.Empty)}\r\nUserName:{configuration.VmUsername}\r\nPassword:{configuration.VmPassword}", () => vmDefinitionPart2.CreateAsync(cts.Token));
         }
 
         private Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet)> CreateVnetAndSubnetsAsync(IResourceGroup resourceGroup)
@@ -2089,9 +2103,9 @@ namespace CromwellOnAzureDeployer
 
                     async ValueTask<string> GetUserObjectId()
                     {
-                        const string graphUri = "https://graph.windows.net";
-                        var credentials = new AzureCredentials(default, new TokenCredentials(new RefreshableAzureServiceTokenProvider(graphUri)), tenantId, AzureEnvironment.AzureGlobalCloud);
-                        using GraphRbacManagementClient rbacClient = new(Configure().WithEnvironment(AzureEnvironment.AzureGlobalCloud).WithCredentials(credentials).WithBaseUri(graphUri).Build()) { TenantID = tenantId };
+                        string graphUri = this.azEnv.GraphEndpoint;
+                        var credentials = new AzureCredentials(default, new TokenCredentials(new RefreshableAzureServiceTokenProvider(this.azEnv.ResourceManagerEndpoint, null, graphUri)), tenantId, this.azEnv);
+                        using GraphRbacManagementClient rbacClient = new(Configure().WithEnvironment(this.azEnv).WithCredentials(credentials).WithBaseUri(graphUri).Build()) { TenantID = tenantId };
                         credentials.InitializeServiceClient(rbacClient);
                         return (await rbacClient.SignedInUser.GetAsync()).ObjectId;
                     }
@@ -2138,7 +2152,7 @@ namespace CromwellOnAzureDeployer
         private Task<BatchAccount> CreateBatchAccountAsync(string storageAccountId)
             => Execute(
                 $"Creating Batch Account: {configuration.BatchAccountName}...",
-                () => new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
+                () => new BatchManagementClient(new Uri(this.azEnv.ResourceManagerEndpoint), tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
                     .BatchAccount
                     .CreateAsync(
                         configuration.ResourceGroupName,
@@ -2241,7 +2255,7 @@ namespace CromwellOnAzureDeployer
                         (Utility.ConfigReplaceTextItemBase)new Utility.ConfigReplaceRegExItemText(@"^(\s*call-caching\s*{[^}]*enabled\s*[=:]{1}\s*)(true)$", "$1false", RegexOptions.Multiline),
                         // Add "preemptible: true" to default-runtime-attributes element, if preemptible is not already present
                         new Utility.ConfigReplaceRegExItemEvaluator(@"(?![\s\S]*preemptible)^(\s*default-runtime-attributes\s*{)([^}]*$)(\s*})$", match => $"{match.Groups[1].Value}{match.Groups[2].Value}\n          preemptible: true{match.Groups[3].Value}", RegexOptions.Multiline),
-                    }, (await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cts)) ?? Utility.GetFileContent("scripts", CromwellConfigurationFileName)));
+                    }, (await DownloadTextFromStorageAccountAsync(this.azEnv, storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cts)) ?? Utility.GetFileContent("scripts", CromwellConfigurationFileName)));
                 });
 
         private Task PatchContainersToMountFileV210Async(IStorageAccount storageAccount, string managedIdentityName)
@@ -2249,7 +2263,7 @@ namespace CromwellOnAzureDeployer
                 $"Adding public datasettestinputs/dataset container to '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
+                    var containersToMountText = await DownloadTextFromStorageAccountAsync(this.azEnv, storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
 
                     if (containersToMountText is not null)
                     {
@@ -2275,7 +2289,7 @@ namespace CromwellOnAzureDeployer
                 $"Commenting out msgenpublicdata/inputs in '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container. It will be removed in v2.3...",
                 async () =>
                 {
-                    var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
+                    var containersToMountText = await DownloadTextFromStorageAccountAsync(this.azEnv, storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
 
                     if (containersToMountText is not null)
                     {
@@ -2290,7 +2304,7 @@ namespace CromwellOnAzureDeployer
                 $"Removing reference to msgenpublicdata/inputs in '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
+                    var containersToMountText = await DownloadTextFromStorageAccountAsync(this.azEnv, storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
 
                     if (containersToMountText is not null)
                     {
@@ -2317,7 +2331,7 @@ namespace CromwellOnAzureDeployer
                 $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cts);
+                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(this.azEnv, storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cts);
                     var tesBackendParametersRegex = new Regex(@"^(\s*endpoint.*)([\s\S]*)", RegexOptions.Multiline);
 
                     // Add "use_tes_11_preview_backend_parameters = true" to TES config, after endpoint setting, if use_tes_11_preview_backend_parameters is not already present
@@ -2334,7 +2348,7 @@ namespace CromwellOnAzureDeployer
                 $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cts);
+                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(this.azEnv, storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cts);
                     var akkaHttpRegex = new Regex(@"(\s*akka\.http\.host-connection-pool\.pool-implementation.*$)", RegexOptions.Multiline);
                     cromwellConfigText = akkaHttpRegex.Replace(cromwellConfigText, match => string.Empty);
 
@@ -2363,7 +2377,7 @@ namespace CromwellOnAzureDeployer
                 $"Patching '{AllowedVmSizesFileName}' in '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    var allowedVmSizesText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, cts);
+                    var allowedVmSizesText = await DownloadTextFromStorageAccountAsync(this.azEnv, storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, cts);
 
                     allowedVmSizesText = allowedVmSizesText
                         .Replace("Azure VM sizes used", "Azure VM sizes/families used")
@@ -2486,14 +2500,26 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException($"If ResourceGroupName is provided, the resource group must already exist.", displayExample: false);
             }
 
-            var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
+            var token = await new AzureServiceTokenProvider("RunAs=Developer;DeveloperTool=AzureCli", this.azEnv.AuthenticationEndpoint).GetAccessTokenAsync(this.azEnv.ResourceManagerEndpoint);
             var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
 
-            var currentPrincipalSubscriptionRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
-                .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
-                .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
+            IEnumerable<string> currentPrincipalSubscriptionRoleIds = null;
+            if (this.azEnv == AzureEnvironment.AzureChinaCloud)
+            {
+                // At China Mooncake, this API does not support scope. Don't know why.
+                currentPrincipalSubscriptionRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}", new ODataQuery<RoleAssignmentFilter>($"")))
+                    .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
+                    .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
+            }
+            else
+            {
+                currentPrincipalSubscriptionRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
+                    .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
+                    .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
+            }
 
-            var isuserAccessAdministrator = currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId);
+            var isuserAccessAdministrator = currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId) ||
+                currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId); // China Mooncake don't return userAccessAdministratorRoleId, have to compare with ownerRoleId.
 
             if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && isuserAccessAdministrator))
             {
@@ -2634,8 +2660,8 @@ namespace CromwellOnAzureDeployer
 
         private async Task ValidateBatchAccountQuotaAsync()
         {
-            var accountQuota = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.Location.GetQuotasAsync(configuration.RegionName)).AccountQuota;
-            var existingBatchAccountCount = (await new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).AsEnumerable().Count(b => b.Location.Equals(configuration.RegionName));
+            var accountQuota = (await new BatchManagementClient(new Uri(this.azEnv.ResourceManagerEndpoint), tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.Location.GetQuotasAsync(configuration.RegionName)).AccountQuota;
+            var existingBatchAccountCount = (await new BatchManagementClient(new Uri(this.azEnv.ResourceManagerEndpoint), tokenCredentials) { SubscriptionId = configuration.SubscriptionId }.BatchAccount.ListAsync()).AsEnumerable().Count(b => b.Location.Equals(configuration.RegionName));
 
             if (existingBatchAccountCount >= accountQuota)
             {
@@ -2663,9 +2689,9 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private static async Task<BlobServiceClient> GetBlobClientAsync(IStorageAccount storageAccount)
+        private static async Task<BlobServiceClient> GetBlobClientAsync(AzureEnvironment env, IStorageAccount storageAccount)
             => new(
-                new Uri($"https://{storageAccount.Name}.blob.core.windows.net"),
+                new Uri($"https://{storageAccount.Name}" + env.GetBlobEndPointSuffix()),
                 new StorageSharedKeyCredential(
                     storageAccount.Name,
                     (await storageAccount.GetKeysAsync())[0].Value));
@@ -2674,7 +2700,7 @@ namespace CromwellOnAzureDeployer
         {
             try
             {
-                await Execute("Retrieving Azure management token...", () => new AzureServiceTokenProvider("RunAs=Developer; DeveloperTool=AzureCli").GetAccessTokenAsync("https://management.azure.com/"));
+                await Execute("Retrieving Azure management token...", () => new AzureServiceTokenProvider("RunAs=Developer; DeveloperTool=AzureCli", this.azEnv.AuthenticationEndpoint).GetAccessTokenAsync(this.azEnv.ResourceManagerEndpoint));
             }
             catch (AzureServiceTokenProviderException ex)
             {
@@ -2922,12 +2948,12 @@ namespace CromwellOnAzureDeployer
             await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, $"{testDirectoryName}/{inputFileName}", inputFileContent);
             await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, $"new/{id}.json", JsonConvert.SerializeObject(workflowTrigger, Formatting.Indented));
 
-            return await IsWorkflowSuccessfulAfterLongPollingAsync(storageAccount, WorkflowsContainerName, id);
+            return await IsWorkflowSuccessfulAfterLongPollingAsync(this.azEnv, storageAccount, WorkflowsContainerName, id);
         }
 
-        private static async Task<bool> IsWorkflowSuccessfulAfterLongPollingAsync(IStorageAccount storageAccount, string containerName, Guid id)
+        private static async Task<bool> IsWorkflowSuccessfulAfterLongPollingAsync(AzureEnvironment env, IStorageAccount storageAccount, string containerName, Guid id)
         {
-            var container = (await GetBlobClientAsync(storageAccount)).GetBlobContainerClient(containerName);
+            var container = (await GetBlobClientAsync(env, storageAccount)).GetBlobContainerClient(containerName);
 
             while (true)
             {
@@ -3067,20 +3093,20 @@ namespace CromwellOnAzureDeployer
             sshClient.Disconnect();
         }
 
-        public static async Task<string> DownloadTextFromStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, CancellationTokenSource cts)
+        public static async Task<string> DownloadTextFromStorageAccountAsync(AzureEnvironment env, IStorageAccount storageAccount, string containerName, string blobName, CancellationTokenSource cts)
         {
-            var blobClient = await GetBlobClientAsync(storageAccount);
+            var blobClient = await GetBlobClientAsync(env, storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
             return (await container.GetBlobClient(blobName).DownloadContentAsync(cts.Token)).Value.Content.ToString();
         }
 
         private async Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
-            => await UploadTextToStorageAccountAsync(storageAccount, containerName, blobName, content, cts.Token);
+            => await UploadTextToStorageAccountAsync(this.azEnv, storageAccount, containerName, blobName, content, cts.Token);
 
-        public static async Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content, CancellationToken token)
+        public static async Task UploadTextToStorageAccountAsync(AzureEnvironment env, IStorageAccount storageAccount, string containerName, string blobName, string content, CancellationToken token)
         {
-            var blobClient = await GetBlobClientAsync(storageAccount);
+            var blobClient = await GetBlobClientAsync(env, storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
             await container.CreateIfNotExistsAsync();
@@ -3099,6 +3125,20 @@ namespace CromwellOnAzureDeployer
             var pathComponents = path.TrimEnd(dirSeparator).Split(dirSeparator);
 
             return string.Join(dirSeparator, pathComponents.Take(pathComponents.Length - 1));
+        }
+
+        private string UpdateBlobEndPointInMountBlobFuse(string storageAccountName, params string[] pathComponentsRelativeToAppBase)
+        {
+            var content = Utility.GetFileContent(pathComponentsRelativeToAppBase);
+            content = content.Replace("<<BLOB_ENDPOINT>>", storageAccountName + this.azEnv.GetBlobEndPointSuffix());
+            return content;
+        }
+
+        private string UpdateCloudNameInStartup(params string[] pathComponentsRelativeToAppBase)
+        {
+            var content = Utility.GetFileContent(pathComponentsRelativeToAppBase);
+            content = content.Replace("<<CLOUDNAME>>", this.azEnv.Name == "AzureGlobalCloud" ? "AzureCloud" : this.azEnv.Name);
+            return content;
         }
 
         private class ValidationException : Exception

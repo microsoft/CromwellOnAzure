@@ -26,9 +26,11 @@ namespace TriggerService
         private readonly CloudBlobClient blobClient;
         private readonly HttpClient httpClient;
         private readonly HashSet<string> createdContainers = new HashSet<string>();
+        private readonly AzureEnvironment azEnv;
 
-        public AzureStorage(CloudStorageAccount account, HttpClient httpClient)
+        public AzureStorage(AzureEnvironment env, CloudStorageAccount account, HttpClient httpClient)
         {
+            this.azEnv = env;
             ServicePointManager.DefaultConnectionLimit = Environment.ProcessorCount * 8;
             ServicePointManager.Expect100Continue = false;
 
@@ -43,12 +45,12 @@ namespace TriggerService
         public string AccountName { get; }
         public string AccountAuthority => account.BlobStorageUri.PrimaryUri.Authority;
 
-        public static async Task<string> GetAppInsightsInstrumentationKeyAsync(string appInsightsApplicationId)
+        public static async Task<string> GetAppInsightsInstrumentationKeyAsync(AzureEnvironment env, string appInsightsApplicationId)
         {
-            var azureClient = await GetAzureManagementClientAsync();
+            var azureClient = await GetAzureManagementClientAsync(env);
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
 
-            var credentials = new TokenCredentials(await GetAzureAccessTokenAsync());
+            var credentials = new TokenCredentials(await GetAzureAccessTokenAsync(env));
 
             foreach (var subscriptionId in subscriptionIds)
             {
@@ -162,11 +164,12 @@ namespace TriggerService
         /// <summary>
         /// Gets an authenticated Azure Client instance
         /// </summary>
+        /// <param name="env">Azure Environment</param>
         /// <returns>An authenticated Azure Client instance</returns>
-        private static async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync()
+        private static async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync(AzureEnvironment env)
         {
-            var accessToken = await GetAzureAccessTokenAsync();
-            var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, AzureEnvironment.AzureGlobalCloud);
+            var accessToken = await GetAzureAccessTokenAsync(env);
+            var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, env);
             var azureClient = FluentAzure.Authenticate(azureCredentials);
 
             return azureClient;
@@ -198,15 +201,15 @@ namespace TriggerService
             return blobList;
         }
 
-        public static async Task<(IEnumerable<IAzureStorage>, IAzureStorage)> GetStorageAccountsUsingMsiAsync(string accountName)
+        public static async Task<(IEnumerable<IAzureStorage>, IAzureStorage)> GetStorageAccountsUsingMsiAsync(AzureEnvironment env, string accountName)
         {
             IAzureStorage defaultAzureStorage = default;
-            (var accounts, var defaultAccount) = await GetCloudStorageAccountsUsingMsiAsync(accountName);
+            (var accounts, var defaultAccount) = await GetCloudStorageAccountsUsingMsiAsync(env, accountName);
             return (accounts.Select(GetAzureStorage).ToList(), defaultAzureStorage ?? throw new Exception($"Azure Storage account with name: {accountName} not found in list of {accounts.Count} storage accounts."));
 
             IAzureStorage GetAzureStorage(CloudStorageAccount cloudStorage)
             {
-                var azureStorage = new AzureStorage(cloudStorage, new HttpClient());
+                var azureStorage = new AzureStorage(env, cloudStorage, new HttpClient());
                 if (cloudStorage.Equals(defaultAccount))
                 {
                     defaultAzureStorage = azureStorage;
@@ -215,17 +218,17 @@ namespace TriggerService
             }
         }
 
-        private static async Task<(IList<CloudStorageAccount>, CloudStorageAccount)> GetCloudStorageAccountsUsingMsiAsync(string accountName)
+        private static async Task<(IList<CloudStorageAccount>, CloudStorageAccount)> GetCloudStorageAccountsUsingMsiAsync(AzureEnvironment env, string accountName)
         {
             CloudStorageAccount defaultAccount = default;
-            var accounts = await GetAccessibleStorageAccountsAsync();
+            var accounts = await GetAccessibleStorageAccountsAsync(env);
             return (await Task.WhenAll(accounts.Select(GetCloudAccountFromStorageAccountInfo)), defaultAccount ?? throw new Exception($"Azure Storage account with name: {accountName} not found in list of {accounts.Count} storage accounts."));
 
             async Task<CloudStorageAccount> GetCloudAccountFromStorageAccountInfo(StorageAccountInfo account)
             {
-                var key = await GetStorageAccountKeyAsync(account);
+                var key = await GetStorageAccountKeyAsync(env, account);
                 var storageCredentials = new Microsoft.WindowsAzure.Storage.Auth.StorageCredentials(account.Name, key);
-                var storageAccount = new CloudStorageAccount(storageCredentials, true);
+                var storageAccount = new CloudStorageAccount(storageCredentials, env.StorageEndpointSuffix, true);
                 if (account.Name == accountName)
                 {
                     defaultAccount = storageAccount;
@@ -234,12 +237,13 @@ namespace TriggerService
             }
         }
 
-        private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
-            => new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
+        private static Task<string> GetAzureAccessTokenAsync(AzureEnvironment env)
+            => new AzureServiceTokenProvider("RunAs=App", env.AuthenticationEndpoint).GetAccessTokenAsync(env.ResourceManagerEndpoint);
+            //=> new AzureServiceTokenProvider("RunAs=Developer;DeveloperTool=AzureCli", env.AuthenticationEndpoint).GetAccessTokenAsync(env.ResourceManagerEndpoint);
 
-        private static async Task<List<StorageAccountInfo>> GetAccessibleStorageAccountsAsync()
+        private static async Task<List<StorageAccountInfo>> GetAccessibleStorageAccountsAsync(AzureEnvironment env)
         {
-            var azureClient = await GetAzureManagementClientAsync();
+            var azureClient = await GetAzureManagementClientAsync(env);
 
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
 
@@ -251,9 +255,9 @@ namespace TriggerService
                 .ToList();
         }
 
-        private static async Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
+        private static async Task<string> GetStorageAccountKeyAsync(AzureEnvironment env, StorageAccountInfo storageAccountInfo)
         {
-            var azureClient = await GetAzureManagementClientAsync();
+            var azureClient = await GetAzureManagementClientAsync(env);
             var storageAccount = await azureClient.WithSubscription(storageAccountInfo.SubscriptionId).StorageAccounts.GetByIdAsync(storageAccountInfo.Id);
 
             return (await storageAccount.GetKeysAsync())[0].Value;

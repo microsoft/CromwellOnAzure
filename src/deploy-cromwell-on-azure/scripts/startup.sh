@@ -41,6 +41,9 @@ if [[ -v "kv['PostgreSqlServerName']" ]] ; then
     db_server_name=${kv["PostgreSqlServerName"]}
 fi
 
+az cloud set -n <<CLOUDNAME>>
+write_log "Set Azure cloud environment completed..."
+
 write_log "Checking account access (this could take awhile due to role assignment propagation delay)..."
 
 while :

@@ -3,6 +3,8 @@
 
 using System;
 using System.Threading.Tasks;
+using Common;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
 
 namespace CromwellOnAzureDeployer
 {
@@ -31,8 +33,13 @@ namespace CromwellOnAzureDeployer
             {
                 PrintWelcomeScreen();
             }
-
-            Environment.Exit(await new Deployer(configuration).DeployAsync());
+            if(!AzureEnvironmentExtension.IsAvailableEnvironmentName(configuration.AzureName))
+            {
+                Console.WriteLine($"Specified cloud {configuration.AzureName} does not exist.");
+                return;
+            }
+            AzureEnvironment env = AzureEnvironment.FromName(configuration.AzureName);
+            Environment.Exit(await new Deployer(configuration).DeployAsync(env));
         }
 
         private static void PrintWelcomeScreen()

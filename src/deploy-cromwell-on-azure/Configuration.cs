@@ -89,6 +89,7 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlServerName { get; set; }
         public bool UsePostgreSqlSingleServer { get; set; } = false;
         public string KeyVaultName { get; set; }
+        public string AzureName { get; set; } = "AzureGlobalCloud";
 
         public static Configuration BuildConfiguration(string[] args)
         {

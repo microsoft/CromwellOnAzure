@@ -59,7 +59,8 @@ Download the required executable from [Releases](https://github.com/microsoft/Cr
       1. This string will be used to prefix the name of your Cromwell on Azure resource group and associated resources. If not specified, the default value of "coa" followed by random characters is used as a prefix for the resource group and all Azure resources created for your Cromwell on Azure instance. After installation, you can search for your resources using the `MainIdentifierPrefix` value.<br/>
    1. `ResourceGroupName` (*optional*, **required** when you only have owner-level access of the *resource group*)
       1. Specifies the name of a pre-existing resource group that you wish to deploy into.
-      
+      1. Specifies the name of a pre-existing resource group that you wish to deploy into.
+   1. `AzureName` (*optional*, **required** when you only deploy services on sovereign cloud like AzureChinaCloud)
 Run the following at the command line or terminal after navigating to where your executable is saved:
 ```
 .\deploy-cromwell-on-azure.exe --SubscriptionId <Your subscription ID> --RegionName <Your region> --MainIdentifierPrefix <Your string> 
@@ -68,6 +69,13 @@ Run the following at the command line or terminal after navigating to where your
 **Example:**
 ```
 .\deploy-cromwell-on-azure.exe --SubscriptionId 00000000-0000-0000-0000-000000000000 --RegionName westus2 --MainIdentifierPrefix coa 
+```
+
+**Sovereign Cloud deployment example:**
+```
+az cloud set -n AzureChinaCloud
+
+.\deploy-cromwell-on-azure.exe --SubscriptionId 00000000-0000-0000-0000-000000000000 --RegionName chinanorth3 --MainIdentifierPrefix coa --AzureName AzureChinaCloud
 ```
 
 A [test workflow](#Hello-World-WDL-test) is run to ensure successful deployment. If your [Batch account does not have enough resource quotas](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas), you will see the error while deploying. You can request more quotas by following [these instructions](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#increase-a-quota).

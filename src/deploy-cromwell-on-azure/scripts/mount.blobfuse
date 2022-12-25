@@ -33,6 +33,9 @@ tmp_dir="/mnt/blobfusetmp/$account_name/$container_name"
 rm -rf $tmp_dir
 mkdir -p $tmp_dir
 
+# Setting endpoint for compitable sovereign cloud
+export AZURE_STORAGE_BLOB_ENDPOINT=<<BLOB_ENDPOINT>>
+
 if [[ $account_key != "" ]]; then
     export AZURE_STORAGE_ACCOUNT=$account_name
     export AZURE_STORAGE_ACCESS_KEY=$account_key

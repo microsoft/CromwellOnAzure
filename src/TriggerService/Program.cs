@@ -30,7 +30,21 @@ namespace TriggerService
 
         private static async Task InitAndRunAsync()
         {
-            var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(Environment.GetEnvironmentVariable("ApplicationInsightsAccountName"));
+            var AzureEnvName = Environment.GetEnvironmentVariable("AzureEnvName");
+            if (string.IsNullOrWhiteSpace(AzureEnvName))
+            {
+                AzureEnvName = "AzureGlobalCloud";
+            }
+
+            if (!AzureEnvironmentExtension.IsAvailableEnvironmentName(AzureEnvName))
+            {
+                Console.Write($"Specified Azure cloud: {AzureEnvName} does not exist.");
+                return;
+            }
+
+            AzureEnvironment env = AzureEnvironment.FromName(AzureEnvName);
+
+            var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(env, Environment.GetEnvironmentVariable("ApplicationInsightsAccountName"));
             var defaultStorageAccountName = Environment.GetEnvironmentVariable("DefaultStorageAccountName");
             var cosmosDbAccountName = Environment.GetEnvironmentVariable("CosmosDbAccountName");
             var cromwellUrl = ConfigurationManager.AppSettings.Get("CromwellUrl");
@@ -61,7 +75,7 @@ namespace TriggerService
 
             var serviceProvider = serviceCollection.BuildServiceProvider();
 
-            (var storageAccounts, var storageAccount) = await AzureStorage.GetStorageAccountsUsingMsiAsync(defaultStorageAccountName);
+            (var storageAccounts, var storageAccount) = await AzureStorage.GetStorageAccountsUsingMsiAsync(env, defaultStorageAccountName);
 
             (var cosmosDbEndpoint, var cosmosDbKey) = await GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
 

@@ -11,3 +11,4 @@ MarthaKeyVaultName=
 MarthaSecretName=
 GlobalStartTaskPath=/configuration/start-task.sh
 GlobalManagedIdentity=
+AzureEnvName=<<AzureEnvName>>
