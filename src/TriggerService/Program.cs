@@ -20,6 +20,14 @@ namespace TriggerService
 {
     internal class Program
     {
+        static readonly string connectionString =
+            $"Server={Environment.GetEnvironmentVariable("PostgreSqlServerName")}; " +
+            $"User Id={Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin")}.postgres.database.azure.com; " +
+            $"Database={Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName")}; " +
+            $"Port={Environment.GetEnvironmentVariable("PostgreSqlTesDatabasePort")}; " +
+            $"Password={Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword")}; " +
+            $"SSLMode=Prefer";
+
         public Program()
         {
             Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
@@ -27,13 +35,6 @@ namespace TriggerService
 
         static readonly Func<RepositoryDb> createDbContext = () =>
         {
-            var connectionString =
-                    $"Server={Environment.GetEnvironmentVariable("PostgreSqlServerName")}; " +
-                    $"User Id={Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin")}.postgres.database.azure.com; " +
-                    $"Database={Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName")}; " +
-                    $"Port={Environment.GetEnvironmentVariable("PostgreSqlTesDatabasePort")}; " +
-                    $"Password={Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword")}; " +
-                    $"SSLMode=Prefer";
             return new RepositoryDb(connectionString);
         };
 

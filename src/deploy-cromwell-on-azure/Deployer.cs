@@ -1382,7 +1382,7 @@ namespace CromwellOnAzureDeployer
                     new Utility.ConfigReplaceTextItem("{PostgreSqlCromwellUserPassword}", configuration.PostgreSqlCromwellUserPassword),
                     new Utility.ConfigReplaceTextItem("{PostgreSqlTesUserLogin}", configuration.PostgreSqlTesUserLogin),
                     new Utility.ConfigReplaceTextItem("{PostgreSqlTesUserPassword}", configuration.PostgreSqlTesUserPassword),
-                    new Utility.ConfigReplaceTextItem("{PostgreSqlTesDatabasePort}", configuration.PostgreSqlTesDatabasePort),
+                    new Utility.ConfigReplaceTextItem("{PostgreSqlTesDatabasePort}", configuration.PostgreSqlTesDatabasePort.ToString()),
                 }, "scripts", "env-13-postgre-sql-db.txt"),
                 $"{CromwellAzureRootDir}/env-13-postgre-sql-db.txt", false));
             }

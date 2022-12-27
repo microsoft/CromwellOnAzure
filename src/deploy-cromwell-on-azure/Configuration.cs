@@ -25,7 +25,7 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlVersion { get; set; } = "11";
         public string DefaultPostgreSqlSubnetName { get; set; } = "sqlsubnet";
         public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
-        public string PostgreSqlTesDatabasePort { get; set; } = "5432";
+        public int PostgreSqlTesDatabasePort { get; set; } = 5432;
     }
 
     public abstract class UserAccessibleConfiguration
