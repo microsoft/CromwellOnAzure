@@ -25,6 +25,24 @@ namespace TriggerService
             Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
         }
 
+        static readonly Func<RepositoryDb> createDbContext = () =>
+        {
+            var connectionString =
+                    $"Server={Environment.GetEnvironmentVariable("PostgreSqlServerName")}; " +
+                    $"User Id={Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin")}.postgres.database.azure.com; " +
+                    $"Database={Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName")}; " +
+                    $"Port={Environment.GetEnvironmentVariable("PostgreSqlTesDatabasePort")}; " +
+                    $"Password={Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword")}; " +
+                    $"SSLMode=Prefer";
+            return new RepositoryDb(connectionString);
+        };
+
+        private static async Task InitializeDbAsync()
+        {
+            using var dbContext = createDbContext();
+            await dbContext.Database.EnsureCreatedAsync();
+        }
+
         public static async Task Main()
             => await InitAndRunAsync();
 
@@ -66,6 +84,11 @@ namespace TriggerService
 
             (var cosmosDbEndpoint, var cosmosDbKey) = (postgreSqlServerName is null) ? await GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName) : (null, null);
 
+            if (postgreSqlServerName is not null)
+            {
+                await InitializeDbAsync();
+            }
+
             IRepository<TesTask> database = (postgreSqlServerName is null)
                 ? new CosmosDbRepository<TesTask>(
                         cosmosDbEndpoint,
@@ -73,18 +96,7 @@ namespace TriggerService
                         Constants.CosmosDbDatabaseId,
                         Constants.CosmosDbContainerId,
                         Constants.CosmosDbPartitionId)
-                : new TesTaskPostgreSqlRepository(() =>
-                {
-                    var connectionString =
-                        String.Format(
-                            "Server={0}; User Id={1}.postgres.database.azure.com; Database={2}; Port={3}; Password={4}; SSLMode=Prefer",
-                            Environment.GetEnvironmentVariable("PostgreSqlServerName"),
-                            Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin"),
-                            Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName"),
-                            5432,
-                            Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword"));
-                    return new RepositoryDb(connectionString);
-                });
+                : new TesTaskPostgreSqlRepository(createDbContext);
 
             var environment = new CromwellOnAzureEnvironment(
                     serviceProvider.GetRequiredService<ILoggerFactory>(),
