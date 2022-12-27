@@ -73,11 +73,18 @@ namespace TriggerService
                         Constants.CosmosDbDatabaseId,
                         Constants.CosmosDbContainerId,
                         Constants.CosmosDbPartitionId)
-                : new TesTaskPostgreSqlRepository(
-                        Environment.GetEnvironmentVariable("PostgreSqlServerName"),
-                        Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin"),
-                        Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName"),
-                        Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword"));
+                : new TesTaskPostgreSqlRepository(() =>
+                {
+                    var connectionString =
+                        String.Format(
+                            "Server={0}; User Id={1}.postgres.database.azure.com; Database={2}; Port={3}; Password={4}; SSLMode=Prefer",
+                            Environment.GetEnvironmentVariable("PostgreSqlServerName"),
+                            Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin"),
+                            Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName"),
+                            5432,
+                            Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword"));
+                    return new RepositoryDb(connectionString);
+                });
 
             var environment = new CromwellOnAzureEnvironment(
                     serviceProvider.GetRequiredService<ILoggerFactory>(),
