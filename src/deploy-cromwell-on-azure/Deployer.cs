@@ -293,20 +293,26 @@ namespace CromwellOnAzureDeployer
 
                         configuration.BatchAccountName = batchAccountName;
 
-                        if (!accountNames.TryGetValue("CosmosDbAccountName", out var cosmosDbAccountName))
+                        // Don't try to get a PostgreSql Server (IN PROGRESS) or CosmosDb if the other is specified. 
+                        accountNames.TryGetValue("PostgreSqlServerName", out var postgreSqlServerName);
+                        if (postgreSqlServerName is null)
                         {
-                            throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
+                            if (!accountNames.TryGetValue("CosmosDbAccountName", out var cosmosDbAccountName))
+                            {
+                                throw new ValidationException($"Could not retrieve the CosmosDb account name from virtual machine {configuration.VmName}.");
+                            }
+                            cosmosDb = await GetExistingCosmosDbAccountAsync(cosmosDbAccountName)
+                                ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName}");
+
+                            configuration.CosmosDbAccountName = cosmosDbAccountName;
+                        }
+                        else
+                        {
+                            configuration.PostgreSqlServerName = accountNames.GetValueOrDefault("PostgreSqlServerName");
+                            //postgreSqlFlexServer = GetExistingPostgresqlService(postgreSqlServerName); // TODO: Get existing postgresql server
                         }
 
-                        cosmosDb = await GetExistingCosmosDbAccountAsync(cosmosDbAccountName)
-                            ?? throw new ValidationException($"CosmosDb account {cosmosDbAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName}");
-
-                        configuration.CosmosDbAccountName = cosmosDbAccountName;
-
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
-                        // Note: Current behavior is to block switching from Docker MySQL to Azure PostgreSql on Update.
-                        // However we do ancitipate including this change, this code is here to facilitate this future behavior.
-                        configuration.PostgreSqlServerName = accountNames.GetValueOrDefault("PostgreSqlServerName");
 
                         if (existingAksCluster is not null)
                         {
@@ -357,7 +363,6 @@ namespace CromwellOnAzureDeployer
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
                         var keyVault = await ValidateAndGetExistingKeyVault();
 
-                        // Configuration preferences not currently settable by user.
                         if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName) && configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                         {
                             configuration.PostgreSqlServerName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
@@ -509,11 +514,6 @@ namespace CromwellOnAzureDeployer
                                 appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId);
                                 await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
                             }),
-                            Task.Run(async () =>
-                            {
-                                cosmosDb ??= await CreateCosmosDbAsync();
-                                await AssignVmAsContributorToCosmosDb(managedIdentity, cosmosDb);
-                            }),
                             Task.Run(async () => {
                                 if (configuration.ProvisionPostgreSqlOnAzure == true)
                                 {
@@ -525,6 +525,11 @@ namespace CromwellOnAzureDeployer
                                     {
                                         postgreSqlFlexServer ??= await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlFlexManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone);
                                     }
+                                }
+                                else
+                                {
+                                    cosmosDb ??= await CreateCosmosDbAsync();
+                                    await AssignVmAsContributorToCosmosDb(managedIdentity, cosmosDb);
                                 }
                             })
                         });
@@ -986,15 +991,15 @@ namespace CromwellOnAzureDeployer
 
             if (installedVersion is null)
             {
+                var provisionPostgreSqlOnAzure = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault();
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "CosmosDbAccountName", configuration.CosmosDbAccountName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "CosmosDbAccountName", provisionPostgreSqlOnAzure ? string.Empty : configuration.CosmosDbAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ManagedIdentityClientId", managedIdentityClientId, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "AzureServicesAuthConnectionString", managedIdentityClientId, s => $"RunAs=App;AppId={s}", ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "KeyVaultName", configuration.KeyVaultName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "AksCoANamespace", configuration.AksCoANamespace, ignoreDefaults: true);
-                var provisionPostgreSqlOnAzure = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault();
                 UpdateSetting(settings, defaults, "CrossSubscriptionAKSDeployment", configuration.CrossSubscriptionAKSDeployment);
                 UpdateSetting(settings, defaults, "PostgreSqlServerName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlServerName : string.Empty, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlDatabaseName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellDatabaseName : string.Empty, ignoreDefaults: true);
@@ -1356,7 +1361,7 @@ namespace CromwellOnAzureDeployer
                 (Utility.PersonalizeContent(new []
                 {
                     new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
-                    new Utility.ConfigReplaceTextItem("{CosmosDbAccountName}", configuration.CosmosDbAccountName),
+                    new Utility.ConfigReplaceTextItem("{CosmosDbAccountName}", configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? String.Empty : configuration.CosmosDbAccountName),
                     new Utility.ConfigReplaceTextItem("{BatchAccountName}", configuration.BatchAccountName),
                     new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
                     new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
