@@ -71,6 +71,11 @@ services:
       - DefaultStorageAccountName=$DefaultStorageAccountName
       - CosmosDbAccountName=$CosmosDbAccountName
       - ApplicationInsightsAccountName=$ApplicationInsightsAccountName
+      - PostgreSqlServerName=$PostgreSqlServerName
+      - PostgreSqlTesDatabaseName=$PostgreSqlTesDatabaseName
+      - PostgreSqlTesUserLogin=$PostgreSqlTesUserLogin
+      - PostgreSqlTesUserPassword=$PostgreSqlTesUserPassword
+      - PostgreSqlTesDatabasePort=PostgreSqlTesDatabasePort
       - AzureServicesAuthConnectionString=RunAs=App;AppId=$ManagedIdentityClientId
     depends_on:
       - "cromwell"

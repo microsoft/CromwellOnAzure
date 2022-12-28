@@ -83,14 +83,14 @@ namespace TriggerService
 
             (var storageAccounts, var storageAccount) = await AzureStorage.GetStorageAccountsUsingMsiAsync(defaultStorageAccountName);
 
-            (var cosmosDbEndpoint, var cosmosDbKey) = (postgreSqlServerName is null) ? await GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName) : (null, null);
+            (var cosmosDbEndpoint, var cosmosDbKey) = (string.IsNullOrWhiteSpace(postgreSqlServerName)) ? await GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName) : (null, null);
 
-            if (postgreSqlServerName is not null)
+            if (!string.IsNullOrWhiteSpace(postgreSqlServerName))
             {
                 await InitializeDbAsync();
             }
 
-            IRepository<TesTask> database = (postgreSqlServerName is null)
+            IRepository<TesTask> database = (string.IsNullOrWhiteSpace(postgreSqlServerName))
                 ? new CosmosDbRepository<TesTask>(
                         cosmosDbEndpoint,
                         cosmosDbKey,
