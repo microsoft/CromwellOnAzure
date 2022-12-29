@@ -75,7 +75,7 @@ services:
       - PostgreSqlTesDatabaseName=$PostgreSqlTesDatabaseName
       - PostgreSqlTesUserLogin=$PostgreSqlTesUserLogin
       - PostgreSqlTesUserPassword=$PostgreSqlTesUserPassword
-      - PostgreSqlTesDatabasePort=PostgreSqlTesDatabasePort
+      - PostgreSqlTesDatabasePort=$PostgreSqlTesDatabasePort
       - AzureServicesAuthConnectionString=RunAs=App;AppId=$ManagedIdentityClientId
     depends_on:
       - "cromwell"
