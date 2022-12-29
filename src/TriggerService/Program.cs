@@ -24,7 +24,8 @@ namespace TriggerService
             $"Server={Environment.GetEnvironmentVariable("PostgreSqlServerName")}; " +
             $"User Id={Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin")}.postgres.database.azure.com; " +
             $"Database={Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName")}; " +
-            $"Port={int.Parse(Environment.GetEnvironmentVariable("PostgreSqlTesDatabasePort"))}; " +
+            $"Port=5432; " +
+            //$"Port={Environment.GetEnvironmentVariable("PostgreSqlTesDatabasePort")}; " +
             $"Password={Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword")}; " +
             $"SSLMode=Prefer";
 
