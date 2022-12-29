@@ -20,11 +20,11 @@ namespace TriggerService
 {
     internal class Program
     {
-        static readonly string connectionString =
+        static readonly string postgresConnectionString =
             $"Server={Environment.GetEnvironmentVariable("PostgreSqlServerName")}; " +
             $"User Id={Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin")}.postgres.database.azure.com; " +
             $"Database={Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName")}; " +
-            $"Port={Environment.GetEnvironmentVariable("PostgreSqlTesDatabasePort")}; " +
+            $"Port={int.Parse(Environment.GetEnvironmentVariable("PostgreSqlTesDatabasePort"))}; " +
             $"Password={Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword")}; " +
             $"SSLMode=Prefer";
 
@@ -35,7 +35,7 @@ namespace TriggerService
 
         static readonly Func<RepositoryDb> createDbContext = () =>
         {
-            return new RepositoryDb(connectionString);
+            return new RepositoryDb(postgresConnectionString);
         };
 
         private static async Task InitializeDbAsync()
