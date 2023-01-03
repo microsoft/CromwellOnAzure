@@ -24,6 +24,8 @@ config:
   marthaUrl: RUNTIME_PARAMETER
   marthaKeyVaultName: RUNTIME_PARAMETER
   marthaSecretName: RUNTIME_PARAMETER
+  globalStartTaskPath: /configuration/start-task.sh
+  batchManagedIdentity:
 
 images:
   cromwell: RUNTIME_PARAMETER
@@ -40,12 +42,12 @@ defaultContainers:
 internalContainersMIAuth:
 #  - accountName: storageAccount
 #    containerName: dataset1
-#    resourceGroup: resourceGroup1    
+#    resourceGroup: resourceGroup1
 
 internalContainersKeyVaultAuth:
 #  - accountName: storageAccount
 #    containerName: dataset1
-#    keyVaultURL: 
+#    keyVaultURL:
 #    keyVaultSecretName:
 
 externalContainers:

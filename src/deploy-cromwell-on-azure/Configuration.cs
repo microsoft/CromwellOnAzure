@@ -26,7 +26,7 @@ namespace CromwellOnAzureDeployer
         public string DefaultPostgreSqlSubnetName { get; set; } = "sqlsubnet";
         public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
     }
-    
+
     public abstract class UserAccessibleConfiguration
     {
         public string SubscriptionId { get; set; }
@@ -59,7 +59,7 @@ namespace CromwellOnAzureDeployer
         public string AksClusterName { get; set; }
         public string AksCoANamespace { get; set; } = "coa";
         public bool ManualHelmDeployment { get; set; }
-        public string HelmBinaryPath { get; set; } = "C:\\ProgramData\\chocolatey\\bin\\helm.exe";
+        public string HelmBinaryPath { get; set; } = OperatingSystem.IsWindows() ? @"C:\ProgramData\chocolatey\bin\helm.exe" : "/usr/local/bin/helm";
         public int AksPoolSize { get; set; } = 2;
         public bool? CrossSubscriptionAKSDeployment { get; set; } = null;
         public bool Silent { get; set; }
@@ -105,7 +105,7 @@ namespace CromwellOnAzureDeployer
             var configurationProperties = typeof(UserAccessibleConfiguration).GetTypeInfo().DeclaredProperties.Select(p => p.Name).ToList();
 
             var invalidArguments = configurationSource.Providers
-                .SelectMany(p => p.GetChildKeys(new List<string>(), null))
+                .SelectMany(p => p.GetChildKeys(Enumerable.Empty<string>(), null))
                 .Where(k => !configurationProperties.Contains(k, StringComparer.OrdinalIgnoreCase));
 
             if (invalidArguments.Any())

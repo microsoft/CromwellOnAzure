@@ -17,7 +17,14 @@ spec:
       labels:
         io.kompose.service: cromwell
         aadpodidbinding: {{ .Values.identity.name }}
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/cromwell: runtime/default
     spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        supplementalGroups: [1000]
       containers:
         - args:
             -  java -Djava.io.tmpdir=/cromwell-tmp/ -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server
@@ -30,7 +37,15 @@ spec:
           tty: true
           ports:
             - containerPort: {{ .Values.service.cromwellPort }}
-          resources: {}
+          resources:
+            requests:
+              cpu: "1.0"
+              memory: "1024Mi"
+            limits:
+              cpu: "8.0"
+              memory: "4096Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
           volumeMounts:
             - mountPath: /cromwell-tmp
               name: cromwell-tmp-claim

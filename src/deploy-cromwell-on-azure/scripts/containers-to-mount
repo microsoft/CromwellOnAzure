@@ -1,4 +1,4 @@
-﻿# This file lists blob containers that will be mounted to the Cromwell host, so they are available for WDL commands that access the files from the Cromwell host.
+# This file lists blob containers that will be mounted to the Cromwell host, so they are available for WDL commands that access the files from the Cromwell host.
 
 # Accepted formats are:
 # 1. Blob container URL with SAS, for cases where CoA VM does not have access to the storage account (containers from other Azure tenants).
