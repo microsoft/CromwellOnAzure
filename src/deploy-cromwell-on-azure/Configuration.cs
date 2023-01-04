@@ -56,7 +56,7 @@ namespace CromwellOnAzureDeployer
         public string LogAnalyticsArmId { get; set; }
         public string ApplicationInsightsAccountName { get; set; }
         public string VmName { get; set; }
-        public bool UseAks { get; set; }
+        public bool UseAks { get; set; } = true;
         public string AksClusterName { get; set; }
         public string AksCoANamespace { get; set; } = "coa";
         public bool ManualHelmDeployment { get; set; }
@@ -86,7 +86,7 @@ namespace CromwellOnAzureDeployer
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool? KeepSshPortOpen { get; set; } = null;
         public bool DebugLogging { get; set; } = false;
-        public bool? ProvisionPostgreSqlOnAzure { get; set; } = null;
+        public bool? ProvisionPostgreSqlOnAzure { get; set; } = true;
         public string PostgreSqlServerName { get; set; }
         public bool UsePostgreSqlSingleServer { get; set; } = false;
         public string KeyVaultName { get; set; }
