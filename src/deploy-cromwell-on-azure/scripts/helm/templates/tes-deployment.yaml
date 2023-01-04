@@ -39,7 +39,7 @@ spec:
               value: {{ .Values.config.cosmosDbAccountName }}
             - name: AzureOfferDurableId
               value: {{ .Values.config.azureOfferDurableId }}
-            - name: BatchAccountName
+            - name: BatchAccount_AccountName
               value: {{ .Values.config.batchAccountName }}
             - name: BatchNodesSubnetId
               value: {{ .Values.config.batchNodesSubnetId }}
