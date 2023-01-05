@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace CromwellOnAzureDeployer
 {
@@ -85,6 +86,43 @@ namespace CromwellOnAzureDeployer
 
         public static string DictionaryToDelimitedText(Dictionary<string, string> dictionary, string fieldDelimiter = "=", string rowDelimiter = "\n")
             => string.Join(rowDelimiter, dictionary.Select(kv => $"{kv.Key}{fieldDelimiter}{kv.Value}"));
+
+        /// <summary>
+        /// Writes all embedded resource files that start with pathComponentsRelativeToAppBase to the output base path,
+        /// and creates subdirectories
+        /// </summary>
+        /// <param name="outputBasePath">The base path to create the subdirectories and write the files</param>
+        /// <param name="pathComponentsRelativeToAppBase">The path components relative to the app base to write</param>
+        /// <returns></returns>
+        public static async Task WriteEmbeddedFilesAsync(string outputBasePath, params string[] pathComponentsRelativeToAppBase)
+        {
+            var assembly = typeof(Deployer).Assembly;
+            var resourceNames = assembly.GetManifestResourceNames();
+
+            // Assembly is renamed by the build process, so get it from the first resource name
+            var firstResourceName = resourceNames.First();
+            var assemblyName = firstResourceName.Substring(0, firstResourceName.IndexOf('.'));
+            var componentSubstring = $"{assemblyName}.{string.Join(".", pathComponentsRelativeToAppBase)}";
+
+            foreach (var file in resourceNames.Where(r => r.StartsWith(componentSubstring)))
+            {
+                var content = (await new StreamReader(assembly.GetManifestResourceStream(file)).ReadToEndAsync()).Replace("\r\n", "\n");
+                var pathSeparatedByPeriods = file.Replace(componentSubstring, "").TrimStart('.');
+                var outputPath = Path.Join(outputBasePath, pathSeparatedByPeriods);
+                var lastPeriodBeforeFilename = pathSeparatedByPeriods.LastIndexOf('.', pathSeparatedByPeriods.LastIndexOf('.') - 1);
+
+                if (lastPeriodBeforeFilename > 0)
+                {
+                    // There are subdirectories present
+                    var subdirectories = pathSeparatedByPeriods.Substring(0, lastPeriodBeforeFilename).Replace('.', Path.DirectorySeparatorChar);
+                    var filename = pathSeparatedByPeriods.Substring(lastPeriodBeforeFilename + 1);
+                    outputPath = Path.Join(outputBasePath, subdirectories, filename);
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+                await File.WriteAllTextAsync(outputPath, content);
+            }
+        }
 
         public static string GetFileContent(params string[] pathComponentsRelativeToAppBase)
         {

@@ -38,16 +38,16 @@ namespace CromwellApiClient
             => await GetAsync<GetLogsResponse>($"/{id}/logs");
 
         public async Task<GetOutputsResponse> GetOutputsAsync(Guid id)
-            => new GetOutputsResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json") };
+            => new() { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json") };
 
         public async Task<GetMetadataResponse> GetMetadataAsync(Guid id)
-            => new GetMetadataResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json") };
+            => new() { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json") };
 
         public async Task<GetStatusResponse> GetStatusAsync(Guid id)
             => await GetAsync<GetStatusResponse>($"/{id}/status");
 
         public async Task<GetTimingResponse> GetTimingAsync(Guid id)
-            => new GetTimingResponse { Id = id, Html = await GetAsyncWithMediaType($"/{id}/timing", "text/html") };
+            => new() { Id = id, Html = await GetAsyncWithMediaType($"/{id}/timing", "text/html") };
 
         public async Task<PostAbortResponse> PostAbortAsync(Guid id)
             => await PostAsync<PostAbortResponse>($"/{id}/abort", id);
@@ -91,23 +91,23 @@ namespace CromwellApiClient
             byte[] workflowLabelData = null)
         {
             var files = new List<FileToPost> {
-                new FileToPost(workflowSourceFilename, workflowSourceData, "workflowSource", removeTabs: true)
+                new(workflowSourceFilename, workflowSourceData, "workflowSource", removeTabs: true)
             };
 
             for (var i = 0; i < workflowInputsFilename.Count; i++)
             {
                 var parameterName = i == 0 ? "workflowInputs" : "workflowInputs_" + (i + 1);
-                files.Add(new FileToPost(workflowInputsFilename[i], workflowInputsData[i], parameterName, removeTabs: true));
+                files.Add(new(workflowInputsFilename[i], workflowInputsData[i], parameterName, removeTabs: true));
             }
 
             if (workflowOptionsFilename is not null && workflowOptionsData is not null)
             {
-                files.Add(new FileToPost(workflowOptionsFilename, workflowOptionsData, "workflowOptions", removeTabs: true));
+                files.Add(new(workflowOptionsFilename, workflowOptionsData, "workflowOptions", removeTabs: true));
             }
 
             if (workflowDependenciesFilename is not null && workflowDependenciesData is not null)
             {
-                files.Add(new FileToPost(workflowDependenciesFilename, workflowDependenciesData, "workflowDependencies"));
+                files.Add(new(workflowDependenciesFilename, workflowDependenciesData, "workflowDependencies"));
             }
 
             if (workflowLabelFilename is not null && workflowLabelData is not null)
@@ -164,11 +164,11 @@ namespace CromwellApiClient
 
                 var request = new HttpRequestMessage()
                 {
-                    RequestUri = new Uri(url),
+                    RequestUri = new(url),
                     Method = HttpMethod.Get,
                 };
 
-                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(mediaType));
+                request.Headers.Accept.Add(new(mediaType));
                 response = await httpClient.SendAsync(request);
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync();
@@ -198,7 +198,7 @@ namespace CromwellApiClient
             try
             {
                 url = GetApiUrl(path);
-                var content = new FormUrlEncodedContent(new[] { new KeyValuePair<string, string>("id", id.ToString()) });
+                var content = new FormUrlEncodedContent(new KeyValuePair<string, string>[] { new("id", id.ToString()) });
                 response = await httpClient.PostAsync(url, content);
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsAsync<T>();

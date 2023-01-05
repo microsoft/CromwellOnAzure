@@ -98,7 +98,7 @@ namespace TriggerService
                 .Where(blob => blob.Properties.LastModified.HasValue)
                 .Select(blob => new TriggerFile { Uri = blob.Uri.AbsoluteUri, ContainerName = WorkflowsContainerName, Name = blob.Name, LastModified = blob.Properties.LastModified.Value });
         }
-		
+
         /// <inheritdoc />
         public async Task<string> UploadFileTextAsync(string content, string container, string blobName)
         {
