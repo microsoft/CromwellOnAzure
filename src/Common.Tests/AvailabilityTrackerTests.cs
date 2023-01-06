@@ -63,7 +63,9 @@ namespace Common.Tests
             }
 
             Task<bool> cromwellIsAvailable()
-                => Task.FromResult(true);
+            {
+                return Task.FromResult(true);
+            }
 
             await availabilityTracker.WaitForAsync(availableAfter3Tries, TimeSpan.FromMilliseconds(1), "Test", msg => stdOut.Add(msg));
 

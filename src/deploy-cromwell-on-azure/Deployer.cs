@@ -312,8 +312,7 @@ namespace CromwellOnAzureDeployer
                         {
                             if (accountNames.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
                             {
-                                bool.TryParse(crossSubscriptionAKSDeployment, out var parsed);
-                                configuration.CrossSubscriptionAKSDeployment = parsed;
+                                configuration.CrossSubscriptionAKSDeployment = bool.TryParse(crossSubscriptionAKSDeployment, out var parsed) ? parsed : null;
                             }
 
                             if (accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
@@ -483,7 +482,7 @@ namespace CromwellOnAzureDeployer
                                 keyVault ??= await CreateKeyVaultAsync(configuration.KeyVaultName, managedIdentity, vnetAndSubnet.Value.vmSubnet);
                                 keyVaultUri = keyVault.Properties.VaultUri;
                                 var keys = await storageAccount.GetKeysAsync();
-                                await SetStorageKeySecret(keyVaultUri, StorageAccountKeySecretName, keys.First().Value);
+                                await SetStorageKeySecret(keyVaultUri, StorageAccountKeySecretName, keys[0].Value);
                             });
                         }
 
@@ -760,6 +759,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task<FlexibleServerModel.Server> GetExistingPostgresqlService(string serverName)
         {
+            var regex = new Regex(@"\s+");
             return (await Task.WhenAll(subscriptionIds.Select(async s =>
             {
                 try
@@ -775,7 +775,7 @@ namespace CromwellOnAzureDeployer
             })))
                 .Where(a => a is not null)
                 .SelectMany(a => a)
-                .SingleOrDefault(a => a.Name.Equals(serverName, StringComparison.OrdinalIgnoreCase) && Regex.Replace(a.Location, @"\s+", "").Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
+                .SingleOrDefault(a => a.Name.Equals(serverName, StringComparison.OrdinalIgnoreCase) && regex.Replace(a.Location, "").Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase));
         }
 
         private async Task<ManagedCluster> GetExistingAKSClusterAsync(string aksClusterName)
@@ -929,10 +929,12 @@ namespace CromwellOnAzureDeployer
                 await MitigateChaosDbV250Async(cosmosDb);
             }
 
+            var newSettingsAdded = false;
             if (installedVersion is null || installedVersion < new Version(3, 0))
             {
                 await PatchCromwellConfigurationFileV300Async(storageAccount);
-                await AddNewSettingsV300Async(sshConnectionInfo);
+                await AddNewSettingsAsync(sshConnectionInfo);
+                newSettingsAdded = true;
                 await UpgradeBlobfuseV300Async(sshConnectionInfo);
                 await DisableDockerServiceV300Async(sshConnectionInfo);
 
@@ -943,14 +945,33 @@ namespace CromwellOnAzureDeployer
 
             if (installedVersion is null || installedVersion < new Version(3, 1))
             {
+                if (!newSettingsAdded)
+                {
+                    await AddNewSettingsAsync(sshConnectionInfo);
+                    newSettingsAdded = true;
+                }
                 await PatchCromwellConfigurationFileV310Async(storageAccount);
             }
 
             if (installedVersion is null || installedVersion < new Version(3, 2))
             {
+                if (!newSettingsAdded)
+                {
+                    await AddNewSettingsAsync(sshConnectionInfo);
+                    newSettingsAdded = true;
+                }
                 await PatchAllowedVmSizesFileV320Async(storageAccount);
                 await PatchMySqlDbRootPasswordV320Async(sshConnectionInfo);
             }
+
+            //if (installedVersion is null || installedVersion < new Version(4, 0))
+            //{
+            //    if (!newSettingsAdded) // Migrations from 3.1 to 3.2 may not have added the new global start-task settings
+            //    {
+            //        await AddNewSettingsAsync(sshConnectionInfo);
+            //        newSettingsAdded = true;
+            //    }
+            //}
         }
 
         private static Dictionary<string, string> GetDefaultValues(string[] files)
@@ -994,7 +1015,8 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "AzureServicesAuthConnectionString", managedIdentityClientId, s => $"RunAs=App;AppId={s}", ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "KeyVaultName", configuration.KeyVaultName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "AksCoANamespace", configuration.AksCoANamespace, ignoreDefaults: true);
-                var provisionPostgreSqlOnAzure = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault();
+                UpdateSetting(settings, defaults, "ProvisionPostgreSqlOnAzure", configuration.ProvisionPostgreSqlOnAzure, ignoreDefaults: true);
+                var provisionPostgreSqlOnAzure = bool.TryParse(settings["ProvisionPostgreSqlOnAzure"], out var _provisionPostgreSqlOnAzure) && _provisionPostgreSqlOnAzure;
                 UpdateSetting(settings, defaults, "CrossSubscriptionAKSDeployment", configuration.CrossSubscriptionAKSDeployment);
                 UpdateSetting(settings, defaults, "PostgreSqlServerName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlServerName : string.Empty, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlDatabaseName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellDatabaseName : string.Empty, ignoreDefaults: true);
@@ -1985,9 +2007,9 @@ namespace CromwellOnAzureDeployer
                     }
 
                     var commands = new List<string[]> {
-                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:5432:{configuration.PostgreSqlCromwellDatabaseName}:{username}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" },
-                        new string[] { "chmod", "0600", "/home/tes/.pgpass" },
-                        new string[] { "/usr/bin/psql", "-h", serverPath, "-U", username, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", initScript }
+                        new[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:5432:{configuration.PostgreSqlCromwellDatabaseName}:{username}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" },
+                        new[] { "chmod", "0600", "/home/tes/.pgpass" },
+                        new[] { "/usr/bin/psql", "-h", serverPath, "-U", username, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", initScript }
                     };
 
                     await kubernetesManager.ExecuteCommandsOnPodAsync(kubernetesClient, "tes", commands);
@@ -2301,6 +2323,10 @@ namespace CromwellOnAzureDeployer
                     await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.DictionaryToDelimitedText(accountNames), $"{CromwellAzureRootDir}/env-01-account-names.txt", false));
                 });
 
+        private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
+            => await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)...",
+                () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
+
         private Task PatchCromwellConfigurationFileV300Async(IStorageAccount storageAccount)
             => Execute(
                 $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
@@ -2317,6 +2343,14 @@ namespace CromwellOnAzureDeployer
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
                 });
+
+        private async Task UpgradeBlobfuseV300Async(ConnectionInfo sshConnectionInfo)
+            => await Execute("Upgrading blobfuse to 1.4.3...",
+                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo apt-get update ; sudo apt-get --only-upgrade install blobfuse=1.4.3"));
+
+        private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
+            => await Execute("Disabling auto-start of Docker service...",
+                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
 
         private Task PatchCromwellConfigurationFileV310Async(IStorageAccount storageAccount)
             => Execute(
@@ -2362,7 +2396,7 @@ namespace CromwellOnAzureDeployer
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, allowedVmSizesText);
                 });
 
-        private Task AddNewSettingsV300Async(ConnectionInfo sshConnectionInfo)
+        private Task AddNewSettingsAsync(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Adding new settings to 'env-04-settings.txt' file on the VM...",
                 async () =>
@@ -2384,18 +2418,6 @@ namespace CromwellOnAzureDeployer
                             (newFileContent, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
                         });
                 });
-
-        private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
-            => await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)...",
-                () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
-
-        private async Task UpgradeBlobfuseV300Async(ConnectionInfo sshConnectionInfo)
-            => await Execute("Upgrading blobfuse to 1.4.3...",
-                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo apt-get update ; sudo apt-get --only-upgrade install blobfuse=1.4.3"));
-
-        private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
-            => await Execute("Disabling auto-start of Docker service...",
-                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
 
         private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
         {
@@ -3072,7 +3094,7 @@ namespace CromwellOnAzureDeployer
             var blobClient = await GetBlobClientAsync(storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
-            await container.CreateIfNotExistsAsync();
+            await container.CreateIfNotExistsAsync(cancellationToken: token);
             await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, token);
         }
 
