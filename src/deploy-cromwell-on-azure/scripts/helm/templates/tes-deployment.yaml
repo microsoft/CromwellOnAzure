@@ -35,12 +35,12 @@ spec:
               value: {{ .Values.config.azureServicesAuthConnectionString }}
             - name: ApplicationInsightsAccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
-            - name: CosmosDbAccountName
-              value: {{ .Values.config.cosmosDbAccountName }}
+            - name: CosmosDb__AccountName
+              value: {{ .Values.config.cosmosDb__accountName }}
             - name: AzureOfferDurableId
               value: {{ .Values.config.azureOfferDurableId }}
-            - name: BatchAccount_AccountName
-              value: {{ .Values.config.batchAccountName }}
+            - name: BatchAccount__AccountName
+              value: {{ .Values.config.batchAccount__accountName }}
             - name: BatchNodesSubnetId
               value: {{ .Values.config.batchNodesSubnetId }}
             - name: BlobxferImageName
