@@ -930,6 +930,7 @@ namespace CromwellOnAzureDeployer
             }
 
             var newSettingsAdded = false;
+
             if (installedVersion is null || installedVersion < new Version(3, 0))
             {
                 await PatchCromwellConfigurationFileV300Async(storageAccount);
