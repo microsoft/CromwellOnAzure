@@ -987,8 +987,8 @@ namespace CromwellOnAzureDeployer
             if (installedVersion is null)
             {
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "CosmosDb__AccountName", configuration.CosmosDbAccountName, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "BatchAccount__AccountName", configuration.BatchAccountName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "CosmosDbAccountName", configuration.CosmosDbAccountName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ManagedIdentityClientId", managedIdentityClientId, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "AzureServicesAuthConnectionString", managedIdentityClientId, s => $"RunAs=App;AppId={s}", ignoreDefaults: true);

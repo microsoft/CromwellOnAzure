@@ -269,8 +269,8 @@ namespace CromwellOnAzureDeployer
             values.Config["cromwellOnAzureVersion"] = settings["CromwellOnAzureVersion"];
             values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
             values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
-            values.Config["cosmosDb__accountName"] = settings["CosmosDbAccountName"];
-            values.Config["batchAccount__accountName"] = settings["BatchAccountName"];
+            values.Config["cosmosDbAccountName"] = settings["CosmosDbAccountName"];
+            values.Config["batchAccountName"] = settings["BatchAccountName"];
             values.Config["batchNodesSubnetId"] = settings["BatchNodesSubnetId"];
             values.Config["coaNamespace"] = settings["AksCoANamespace"];
             values.Config["disableBatchNodesPublicIpAddress"] = settings["DisableBatchNodesPublicIpAddress"];
@@ -304,8 +304,8 @@ namespace CromwellOnAzureDeployer
                 ["CromwellOnAzureVersion"] = values.Config["cromwellOnAzureVersion"],
                 ["AzureServicesAuthConnectionString"] = values.Config["azureServicesAuthConnectionString"],
                 ["ApplicationInsightsAccountName"] = values.Config["applicationInsightsAccountName"],
-                ["CosmosDbAccountName"] = values.Config["cosmosDb__accountName"],
-                ["BatchAccountName"] = values.Config["batchAccount__accountName"],
+                ["CosmosDbAccountName"] = values.Config["cosmosDbAccountName"],
+                ["BatchAccountName"] = values.Config["batchAccountName"],
                 ["BatchNodesSubnetId"] = values.Config["batchNodesSubnetId"],
                 ["AksCoANamespace"] = values.Config["coaNamespace"],
                 ["DisableBatchNodesPublicIpAddress"] = values.Config["disableBatchNodesPublicIpAddress"],

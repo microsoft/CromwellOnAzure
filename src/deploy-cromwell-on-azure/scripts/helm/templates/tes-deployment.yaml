@@ -36,11 +36,11 @@ spec:
             - name: ApplicationInsightsAccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
             - name: CosmosDb__AccountName
-              value: {{ .Values.config.cosmosDb__accountName }}
+              value: {{ .Values.config.cosmosDbAccountName }}
             - name: AzureOfferDurableId
               value: {{ .Values.config.azureOfferDurableId }}
             - name: BatchAccount__AccountName
-              value: {{ .Values.config.batchAccount__accountName }}
+              value: {{ .Values.config.batchAccountName }}
             - name: BatchNodesSubnetId
               value: {{ .Values.config.batchNodesSubnetId }}
             - name: BlobxferImageName
