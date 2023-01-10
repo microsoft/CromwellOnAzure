@@ -138,21 +138,25 @@ namespace CromwellOnAzureDeployer
 
             try
             {
-                ValidateInitialCommandLineArgsAsync();
+                ValidateInitialCommandLineArgs();
 
                 ConsoleEx.WriteLine("Running...");
 
                 await ValidateTokenProviderAsync();
 
-                tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
-                azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
-                azureClient = GetAzureClient(azureCredentials);
-                azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
-                subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
-                resourceManagerClient = GetResourceManagerClient(azureCredentials);
-                networkManagementClient = new Microsoft.Azure.Management.Network.NetworkManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
-                postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 1200 };
-                postgreSqlSingleManagementClient = new SingleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 1200 };
+                await Execute("Connecting to Azure Services...", async () =>
+                {
+                    tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
+                    azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
+                    azureClient = GetAzureClient(azureCredentials);
+                    azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
+                    subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
+                    resourceManagerClient = GetResourceManagerClient(azureCredentials);
+                    networkManagementClient = new Microsoft.Azure.Management.Network.NetworkManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+                    postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 1200 };
+                    postgreSqlSingleManagementClient = new SingleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 1200 };
+
+                });
 
                 if (configuration.UseAks)
                 {
@@ -188,16 +192,87 @@ namespace CromwellOnAzureDeployer
 
                         ConsoleEx.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
-                        var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
-                        configuration.UseAks = existingAksCluster is not null;
+                        ManagedCluster existingAksCluster = default;
 
+                        if (!string.IsNullOrWhiteSpace(configuration.AksClusterName))
+                        {
+                            existingAksCluster = (await GetExistingAKSClusterAsync(configuration.AksClusterName))
+                                ?? throw new ValidationException($"AKS cluster {configuration.AksClusterName} does not exist in region {configuration.RegionName} or is not accessible to the current user.", displayExample: false);
+                        }
+                        else
+                        {
+                            using var client = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+                            var aksClusters = (await client.ManagedClusters.ListByResourceGroupAsync(configuration.ResourceGroupName)).ToList();
+
+                            existingAksCluster = aksClusters.Count switch
+                            {
+                                0 => null,
+                                1 => aksClusters.Single(),
+                                _ => !configuration.UseAks ? null : throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple AKS clusters. {nameof(configuration.AksClusterName)} must be provided.", displayExample: false),
+                            };
+
+                            configuration.AksClusterName = existingAksCluster?.Name;
+                        }
+
+                        var existingVms = (await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName)).ToList();
+
+                        if (!string.IsNullOrWhiteSpace(configuration.VmName))
+                        {
+                            linuxVm = existingVms.FirstOrDefault(vm => vm.Name.Equals(configuration.VmName, StringComparison.OrdinalIgnoreCase))
+                                ?? throw new ValidationException($"Virtual machine {configuration.VmName} does not exist in resource group {configuration.ResourceGroupName}.", displayExample: false);
+                        }
+                        else
+                        {
+                            linuxVm = existingVms.Count switch
+                            {
+                                0 => null,
+                                1 => existingVms.Single(),
+                                _ => configuration.UseAks ? null : throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. {nameof(configuration.AksClusterName)} must be provided.", displayExample: false),
+                            };
+
+                            configuration.VmName = linuxVm.Name;
+                        }
+
+                        switch ((configuration.UseAks, existingAksCluster is not null, linuxVm is not null))
+                        {
+                            // UseAks was not enabled in Configuration
+                            case (false, false, false): // Nothing found
+                                throw new ValidationException($"Neither a virtual machine nor an AKS cluster was found in resource group {configuration.ResourceGroupName} or it is not accessible to the current user.");
+
+                            case (false, false, true): // only VM found
+                                break;
+
+                            case (false, true, false): // only AKS found
+                                configuration.UseAks = true;
+                                kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
+                                break;
+
+                            case (false, true, true): // both found
+                                existingAksCluster = null;
+                                break;
+
+                            // UseAks was enabled in Configuration
+                            case (true, false, false): // Nothing found
+                            case (true, false, true):  // only VM found
+                                throw new ValidationException($"No AKS cluster was found in resource group {configuration.ResourceGroupName} or it is not accessible to the current user.");
+
+                            case (true, true, false): // only AKS found
+                                break;
+
+                            case (true, true, true): // both found
+                                linuxVm = null;
+                                break;
+                        }
+
+                        ValidateInitialCommandLineArgs(true);
                         Dictionary<string, string> accountNames = null;
+
                         if (configuration.UseAks)
                         {
                             if (!string.IsNullOrEmpty(configuration.StorageAccountName))
                             {
                                 storageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName)
-                                    ?? throw new ValidationException($"Storage account {configuration.StorageAccountName}, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+                                    ?? throw new ValidationException($"Storage account {configuration.StorageAccountName} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
                             }
                             else
                             {
@@ -219,33 +294,6 @@ namespace CromwellOnAzureDeployer
                         }
                         else
                         {
-                            var existingVms = await azureSubscriptionClient.VirtualMachines.ListByResourceGroupAsync(configuration.ResourceGroupName);
-
-                            if (!existingVms.Any())
-                            {
-                                throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any virtual machines.");
-                            }
-
-                            if (existingVms.Count() > 1 && string.IsNullOrWhiteSpace(configuration.VmName))
-                            {
-                                throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. {nameof(configuration.VmName)} must be provided.");
-                            }
-
-                            if (!string.IsNullOrWhiteSpace(configuration.VmName))
-                            {
-                                linuxVm = existingVms.FirstOrDefault(vm => vm.Name.Equals(configuration.VmName, StringComparison.OrdinalIgnoreCase));
-
-                                if (linuxVm is null)
-                                {
-                                    throw new ValidationException($"Virtual machine {configuration.VmName} does not exist in resource group {configuration.ResourceGroupName}.");
-                                }
-                            }
-                            else
-                            {
-                                linuxVm = existingVms.Single();
-                            }
-
-                            configuration.VmName = linuxVm.Name;
                             configuration.RegionName = linuxVm.RegionName;
                             configuration.PrivateNetworking = linuxVm.GetPrimaryPublicIPAddress() is null;
                             networkSecurityGroup = (await azureSubscriptionClient.NetworkSecurityGroups.ListByResourceGroupAsync(configuration.ResourceGroupName)).FirstOrDefault(g => g.NetworkInterfaceIds.Contains(linuxVm.GetPrimaryNetworkInterface().Id));
@@ -308,7 +356,7 @@ namespace CromwellOnAzureDeployer
                         // However we do ancitipate including this change, this code is here to facilitate this future behavior.
                         configuration.PostgreSqlServerName = accountNames.GetValueOrDefault("PostgreSqlServerName");
 
-                        if (existingAksCluster is not null)
+                        if (configuration.UseAks)
                         {
                             if (accountNames.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
                             {
@@ -632,15 +680,15 @@ namespace CromwellOnAzureDeployer
                 }
                 finally
                 {
-                    if (!configuration.KeepSshPortOpen.GetValueOrDefault())
-                    {
-                        await DisableSsh(networkSecurityGroup);
-                    }
-
-                    if (configuration.UseAks)
-                    {
-                        kubernetesManager.DeleteTempFiles();
-                    }
+                    await Task.WhenAll(
+                        new Task(() => kubernetesManager?.DeleteTempFiles()),
+                        new Task(async () =>
+                        {
+                            if (!configuration.KeepSshPortOpen.GetValueOrDefault())
+                            {
+                                await DisableSsh(networkSecurityGroup);
+                            }
+                        }));
                 }
 
                 batchAccount = await GetExistingBatchAccountAsync(configuration.BatchAccountName);
@@ -2697,7 +2745,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private void ValidateInitialCommandLineArgsAsync()
+        private void ValidateInitialCommandLineArgs(bool updateAksKnown = false)
         {
             void ThrowIfProvidedForUpdate(object attributeValue, string attributeName)
             {
@@ -2785,9 +2833,16 @@ namespace CromwellOnAzureDeployer
             ThrowIfNotProvidedForInstall(configuration.RegionName, nameof(configuration.RegionName));
 
             ThrowIfNotProvidedForUpdate(configuration.ResourceGroupName, nameof(configuration.ResourceGroupName));
-            ThrowIfEitherNotProvidedForUpdate(configuration.VmPassword, nameof(configuration.VmPassword), configuration.AksClusterName, nameof(configuration.AksClusterName));
 
-            ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
+            if (updateAksKnown)
+            {
+                ThrowIfEitherNotProvidedForUpdate(configuration.VmPassword, nameof(configuration.VmPassword), configuration.AksClusterName, nameof(configuration.AksClusterName));
+            }
+            else
+            {
+                ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
+            }
+
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
             ThrowIfProvidedForUpdate(configuration.CosmosDbAccountName, nameof(configuration.CosmosDbAccountName));
             ThrowIfProvidedForUpdate(configuration.CrossSubscriptionAKSDeployment, nameof(configuration.CrossSubscriptionAKSDeployment));
