@@ -681,8 +681,8 @@ namespace CromwellOnAzureDeployer
                 finally
                 {
                     await Task.WhenAll(
-                        new Task(() => kubernetesManager?.DeleteTempFiles()),
-                        new Task(async () =>
+                        Task.Run(() => kubernetesManager?.DeleteTempFiles()),
+                        Task.Run(async () =>
                         {
                             if (!configuration.KeepSshPortOpen.GetValueOrDefault())
                             {
