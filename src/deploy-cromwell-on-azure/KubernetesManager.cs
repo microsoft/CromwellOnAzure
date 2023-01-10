@@ -298,6 +298,11 @@ namespace CromwellOnAzureDeployer
             values.Images["triggerservice"] = settings["TriggerServiceImageName"];
             values.Images["cromwell"] = settings["CromwellImageName"];
             values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
+            values.Database["postgreSqlServerName"] = settings["PostgreSqlServerName"];
+            values.Database["postgreSqlTesDatabaseName"] = settings["PostgreSqlTesDatabaseName"];
+            values.Database["postgreSqlTesDatabasePort"] = settings["PostgreSqlTesDatabasePort"];
+            values.Database["postgreSqlTesUserLogin"] = settings["PostgreSqlTesUserLogin"];
+            values.Database["postgreSqlTesUserPassword"] = settings["PostgreSqlTesUserPassword"];
         }
 
         private static Dictionary<string, string> ValuesToSettings(HelmValues values)
@@ -334,6 +339,11 @@ namespace CromwellOnAzureDeployer
             settings["TriggerServiceImageName"] = values.Images["triggerservice"];
             settings["CromwellImageName"] = values.Images["cromwell"];
             settings["DefaultStorageAccountName"] = values.Persistence["storageAccount"];
+            settings["PostgreSqlServerName"] = values.Database["postgreSqlServerName"];
+            settings["PostgreSqlTesDatabaseName"] = values.Database["postgreSqlTesDatabaseName"];
+            settings["PostgreSqlTesDatabasePort"] = values.Database["postgreSqlTesDatabasePort"];
+            settings["PostgreSqlTesUserLogin"] = values.Database["postgreSqlTesUserLogin"];
+            settings["PostgreSqlTesUserPassword"] = values.Database["postgreSqlTesUserPassword"];
             return settings;
         }
 
@@ -427,6 +437,7 @@ namespace CromwellOnAzureDeployer
         {
             public Dictionary<string, string> Service { get; set; }
             public Dictionary<string, string> Config { get; set; }
+            public Dictionary<string, string> Database { get; set; }
             public Dictionary<string, string> Images { get; set; }
             public List<string> DefaultContainers { get; set; }
             public List<Dictionary<string, string>> InternalContainersMIAuth { get; set; }

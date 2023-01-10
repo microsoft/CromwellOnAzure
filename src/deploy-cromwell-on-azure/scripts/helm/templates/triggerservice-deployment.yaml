@@ -26,6 +26,16 @@ spec:
         supplementalGroups: [1000]
       containers:
         - env:
+            - name: PostgreSqlServerName
+              value: {{ .Values.database.postgreSqlServerName }}
+            - name: PostgreSqlTesDatabaseName
+              value: {{ .Values.database.postgreSqlTesDatabaseName }}
+            - name: PostgreSqlTesDatabasePort
+              value: {{ .Values.database.postgreSqlTesDatabasePort | quote }}
+            - name: PostgreSqlTesUserLogin
+              value: {{ .Values.database.postgreSqlTesUserLogin }}
+            - name: PostgreSqlTesUserPassword
+              value: {{ .Values.database.postgreSqlTesUserPassword }}
             - name: DefaultStorageAccountName
               value: {{ .Values.persistence.storageAccount }}
             - name: AzureServicesAuthConnectionString
