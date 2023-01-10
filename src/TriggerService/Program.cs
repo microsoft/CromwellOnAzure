@@ -34,7 +34,7 @@ namespace TriggerService
             var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(Environment.GetEnvironmentVariable("ApplicationInsightsAccountName"));
             var defaultStorageAccountName = Environment.GetEnvironmentVariable("DefaultStorageAccountName");
             var cosmosDbAccountName = Environment.GetEnvironmentVariable("CosmosDbAccountName");
-            var postgreSqlServerName = Environment.GetEnvironmentVariable("PostgreSqlServerName");
+            
             var cromwellUrl = ConfigurationManager.AppSettings.Get("CromwellUrl");
 
             var serviceCollection = new ServiceCollection()
@@ -67,27 +67,14 @@ namespace TriggerService
 
             IRepository<TesTask> database = null;
 
-            if (!string.IsNullOrWhiteSpace(postgreSqlServerName))
-            {
-                string postgresConnectionString = new ConnectionStringUtility().GetPostgresConnectionString(
-                    postgreSqlServerName: Environment.GetEnvironmentVariable("PostgreSqlServerName"),
-                    postgreSqlTesDatabaseName: Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName"),
-                    postgreSqlTesDatabasePort: Environment.GetEnvironmentVariable("PostgreSqlTesDatabasePort"),
-                    postgreSqlTesUserLogin: Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin"),
-                    postgreSqlTesUserPassword: Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword"));
+            string postgresConnectionString = new ConnectionStringUtility().GetPostgresConnectionString(
+                postgreSqlServerName: Environment.GetEnvironmentVariable("PostgreSqlServerName"),
+                postgreSqlTesDatabaseName: Environment.GetEnvironmentVariable("PostgreSqlTesDatabaseName"),
+                postgreSqlTesDatabasePort: Environment.GetEnvironmentVariable("PostgreSqlTesDatabasePort"),
+                postgreSqlTesUserLogin: Environment.GetEnvironmentVariable("PostgreSqlTesUserLogin"),
+                postgreSqlTesUserPassword: Environment.GetEnvironmentVariable("PostgreSqlTesUserPassword"));
 
-                database = new TesTaskPostgreSqlRepository(postgresConnectionString);
-            }
-            else
-            {
-                (var cosmosDbEndpoint, var cosmosDbKey) = await GetCosmosDbEndpointAndKeyAsync(cosmosDbAccountName);
-                database = new CosmosDbRepository<TesTask>(
-                        cosmosDbEndpoint,
-                        cosmosDbKey,
-                        Constants.CosmosDbDatabaseId,
-                        Constants.CosmosDbContainerId,
-                        Constants.CosmosDbPartitionId);
-            }
+            database = new TesTaskPostgreSqlRepository(postgresConnectionString);
 
             var environment = new CromwellOnAzureEnvironment(
                     serviceProvider.GetRequiredService<ILoggerFactory>(),
