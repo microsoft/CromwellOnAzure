@@ -23,7 +23,7 @@ using Polly.Retry;
 namespace CromwellOnAzureDeployer
 {
     /// <summary>
-    /// Class to hold all the kubernetes specific deployer logic. 
+    /// Class to hold all the kubernetes specific deployer logic.
     /// </summary>
     internal class KubernetesManager
     {
@@ -89,19 +89,17 @@ namespace CromwellOnAzureDeployer
             {
                 await ExecHelmProcessAsync($"repo add blob-csi-driver {BlobCsiRepo}");
             }
-            
+
             await ExecHelmProcessAsync($"repo update");
             await ExecHelmProcessAsync($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig {kubeConfigPath}");
             await ExecHelmProcessAsync($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig {kubeConfigPath}");
         }
 
         public async Task DeployHelmChartToClusterAsync()
-        {
             // https://helm.sh/docs/helm/helm_upgrade/
             // The chart argument can be either: a chart reference('example/mariadb'), a path to a chart directory, a packaged chart, or a fully qualified URL
-            await ExecHelmProcessAsync($"upgrade --install cromwellonazure ./helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace",
+            => await ExecHelmProcessAsync($"upgrade --install cromwellonazure ./helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace",
                 workingDirectory: workingDirectoryTemp);
-        }
 
         public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
         {
@@ -174,7 +172,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var line = await reader.ReadLineAsync();
 
-                    while (line != null)
+                    while (line is not null)
                     {
                         if (configuration.DebugLogging)
                         {
@@ -188,7 +186,7 @@ namespace CromwellOnAzureDeployer
                 {
                     var line = await reader.ReadLineAsync();
 
-                    while (line != null)
+                    while (line is not null)
                     {
                         if (configuration.DebugLogging)
                         {
@@ -208,7 +206,7 @@ namespace CromwellOnAzureDeployer
             }
 
             // Pod Exec can fail even after the pod is marked ready.
-            // Retry on WebSocketExceptions for up to 40 secs. 
+            // Retry on WebSocketExceptions for up to 40 secs.
             var result = await KubeExecRetryPolicy.ExecuteAndCaptureAsync(async () =>
             {
                 foreach (var command in commands)
@@ -217,7 +215,7 @@ namespace CromwellOnAzureDeployer
                 }
             });
 
-            if (result.Outcome != OutcomeType.Successful && result.FinalException != null)
+            if (result.Outcome != OutcomeType.Successful && result.FinalException is not null)
             {
                 throw result.FinalException;
             }
@@ -236,7 +234,7 @@ namespace CromwellOnAzureDeployer
             await UpgradeValuesYamlAsync(storageAccount, settings);
             await DeployHelmChartToClusterAsync();
         }
-        
+
         public void DeleteTempFiles()
         {
             if (Directory.Exists(workingDirectoryTemp))
@@ -369,7 +367,7 @@ namespace CromwellOnAzureDeployer
             {
                 var line = (await process.StandardOutput.ReadLineAsync())?.Trim();
 
-                while (line != null)
+                while (line is not null)
                 {
                     if (configuration.DebugLogging)
                     {
@@ -385,7 +383,7 @@ namespace CromwellOnAzureDeployer
             {
                 var line = (await process.StandardError.ReadLineAsync())?.Trim();
 
-                while (line != null)
+                while (line is not null)
                 {
                     if (configuration.DebugLogging)
                     {
@@ -419,11 +417,11 @@ namespace CromwellOnAzureDeployer
             var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
             var deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
 
-            var result = await WorkloadReadyRetryPolicy.ExecuteAndCaptureAsync(async () => 
+            var result = await WorkloadReadyRetryPolicy.ExecuteAndCaptureAsync(async () =>
             {
                 deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
                 deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
-                
+
                 if ((deployment?.Status?.ReadyReplicas ?? 0) < 1)
                 {
                     throw new Exception("Workload not ready.");
