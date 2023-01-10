@@ -25,4 +25,4 @@ services:
     restart: unless-stopped
   cromwell:
     depends_on:
-      - "mysqldb" 
+      - "mysqldb"

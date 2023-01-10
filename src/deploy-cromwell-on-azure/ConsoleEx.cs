@@ -8,7 +8,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,9 +39,9 @@ namespace CromwellOnAzureDeployer
                     return;
                 }
 
-                sizeIfNotResized = new Size(Console.BufferWidth, Console.BufferHeight);
+                sizeIfNotResized = new(Console.BufferWidth, Console.BufferHeight);
 
-                writer = new Writer(Console.Out);
+                writer = new(Console.Out);
                 Console.SetOut(writer);
 
                 // Possible extension point: use a version of Writer that colorizes StdError
@@ -259,9 +258,9 @@ namespace CromwellOnAzureDeployer
 
                         if (endPos.X == Console.BufferWidth && !terminateLine) // Cursor is left at the last glyph written instead of right after the last glyph written when that last glyph is written into the right-most column.
                         {
-                            endPos = new Point(0, endPos.Y + 1);
-                            AppendPoint = new Point(0, AppendPoint.Value.Y + 1);
-                            finalPos = new Point(0, finalPos.Y + 1);
+                            endPos = new(0, endPos.Y + 1);
+                            AppendPoint = new(0, AppendPoint.Value.Y + 1);
+                            finalPos = new(0, finalPos.Y + 1);
                         }
 
                         offset += (terminateLine ? new Size(0, endPos.Y + 1) : new Size(endPos)) - new Size(terminateLine ? 0 : finalPos.X, finalPos.Y);
@@ -320,7 +319,7 @@ namespace CromwellOnAzureDeployer
             }
 
             public override ValueTask DisposeAsync()
-                => new(Task.WhenAll(new Task[]
+                => new(Task.WhenAll(new[]
                 {
                     SystemWriter.DisposeAsync().AsTask(),
                     base.DisposeAsync().AsTask()

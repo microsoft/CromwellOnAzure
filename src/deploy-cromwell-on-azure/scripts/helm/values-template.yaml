@@ -49,12 +49,12 @@ defaultContainers:
 internalContainersMIAuth:
 #  - accountName: storageAccount
 #    containerName: dataset1
-#    resourceGroup: resourceGroup1    
+#    resourceGroup: resourceGroup1
 
 internalContainersKeyVaultAuth:
 #  - accountName: storageAccount
 #    containerName: dataset1
-#    keyVaultURL: 
+#    keyVaultURL:
 #    keyVaultSecretName:
 
 externalContainers:
