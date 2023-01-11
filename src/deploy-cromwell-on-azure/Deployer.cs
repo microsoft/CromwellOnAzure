@@ -230,7 +230,7 @@ namespace CromwellOnAzureDeployer
                                 _ => configuration.UseAks ? null : throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple virtual machines. {nameof(configuration.AksClusterName)} must be provided.", displayExample: false),
                             };
 
-                            configuration.VmName = linuxVm.Name;
+                            configuration.VmName = linuxVm?.Name;
                         }
 
                         switch ((configuration.UseAks, existingAksCluster is not null, linuxVm is not null))
@@ -383,6 +383,7 @@ namespace CromwellOnAzureDeployer
                             var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
                             var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
 
+                            kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
                             await kubernetesManager.UpgradeAKSDeploymentAsync(
                                 settings,
                                 storageAccount);
@@ -2878,7 +2879,7 @@ namespace CromwellOnAzureDeployer
                 {
                     configuration.ProvisionPostgreSqlOnAzure = true;
                 }
-                else if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                else
                 {
                     ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
                 }
