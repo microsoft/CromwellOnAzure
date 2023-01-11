@@ -16,8 +16,8 @@ namespace Common
         public int? CromwellResultCode { get; set; }
 
         public bool ShouldSerializeSystemLogs() => SystemLogs?.Count > 0;
-        public bool ShouldSerializeStdOut() => StdOut is object;
-        public bool ShouldSerializeStdErr() => StdErr is object;
-        public bool ShouldSerializeCromwellResultCode() => CromwellResultCode is object;
+        public bool ShouldSerializeStdOut() => StdOut is not null;
+        public bool ShouldSerializeStdErr() => StdErr is not null;
+        public bool ShouldSerializeCromwellResultCode() => CromwellResultCode is not null;
     }
 }

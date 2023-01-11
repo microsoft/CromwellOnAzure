@@ -125,7 +125,7 @@ namespace TriggerService.Tests
 
             if (subdomainEndIndex > 0)
             {
-                accountName = accountAuthority.Substring(0, subdomainEndIndex);
+                accountName = accountAuthority[..subdomainEndIndex];
             }
 
             azStorageMock.SetupGet(az => az.AccountName).Returns(accountName);
@@ -142,10 +142,7 @@ namespace TriggerService.Tests
 
             var cosmosdbRepositoryMock = new Mock<IRepository<TesTask>>();
 
-            if (azureStorages is null)
-            {
-                azureStorages = Enumerable.Repeat(MockAzureStorage(accountAuthority), 1);
-            }
+            azureStorages ??= Enumerable.Repeat(MockAzureStorage(accountAuthority), 1);
 
             var environment = new CromwellOnAzureEnvironment(
                 serviceProvider.GetRequiredService<ILoggerFactory>(),
