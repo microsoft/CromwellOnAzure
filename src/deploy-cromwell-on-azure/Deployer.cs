@@ -158,11 +158,6 @@ namespace CromwellOnAzureDeployer
 
                 });
 
-                if (configuration.UseAks)
-                {
-                    kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
-                }
-
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
                 IResourceGroup resourceGroup = null;
@@ -244,7 +239,6 @@ namespace CromwellOnAzureDeployer
 
                             case (false, true, false): // only AKS found
                                 configuration.UseAks = true;
-                                kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
                                 break;
 
                             case (false, true, true): // both found
@@ -269,6 +263,7 @@ namespace CromwellOnAzureDeployer
 
                         if (configuration.UseAks)
                         {
+                            kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
                             if (!string.IsNullOrEmpty(configuration.StorageAccountName))
                             {
                                 storageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName)
@@ -396,6 +391,11 @@ namespace CromwellOnAzureDeployer
 
                     if (!configuration.Update)
                     {
+                        if (configuration.UseAks)
+                        {
+                            kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
+                        }
+
                         ValidateRegionName(configuration.RegionName);
                         ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
@@ -2764,13 +2764,13 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-            void ThrowIfEitherNotProvidedForUpdate(string attributeValue1, string attributeName1, string attributeValue2, string attributeName2)
-            {
-                if (configuration.Update && string.IsNullOrWhiteSpace(attributeValue1) && string.IsNullOrWhiteSpace(attributeValue2))
-                {
-                    throw new ValidationException($"Either {attributeName1} or {attributeName2} is required for update.", false);
-                }
-            }
+            //void ThrowIfEitherNotProvidedForUpdate(string attributeValue1, string attributeName1, string attributeValue2, string attributeName2)
+            //{
+            //    if (configuration.Update && string.IsNullOrWhiteSpace(attributeValue1) && string.IsNullOrWhiteSpace(attributeValue2))
+            //    {
+            //        throw new ValidationException($"Either {attributeName1} or {attributeName2} is required for update.", false);
+            //    }
+            //}
 
             void ThrowIfNotProvided(string attributeValue, string attributeName)
             {
@@ -2837,7 +2837,10 @@ namespace CromwellOnAzureDeployer
 
             if (updateAksKnown)
             {
-                ThrowIfEitherNotProvidedForUpdate(configuration.VmPassword, nameof(configuration.VmPassword), configuration.AksClusterName, nameof(configuration.AksClusterName));
+                if (!configuration.UseAks)
+                {
+                    ThrowIfNotProvidedForUpdate(configuration.VmPassword, nameof(configuration.VmPassword));
+                }
             }
             else
             {
