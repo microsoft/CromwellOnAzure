@@ -8,8 +8,8 @@ services:
     environment:
       - ASPNETCORE_URLS=http://0.0.0.0:80/
       - DefaultStorageAccountName=$DefaultStorageAccountName
-      - CosmosDbAccountName=$CosmosDbAccountName
-      - BatchAccountName=$BatchAccountName
+      - CosmosDb__AccountName=$CosmosDbAccountName
+      - BatchAccount__AccountName=$BatchAccountName
       - ApplicationInsightsAccountName=$ApplicationInsightsAccountName
       - AzureServicesAuthConnectionString=RunAs=App;AppId=$ManagedIdentityClientId
       - UsePreemptibleVmsOnly=$UsePreemptibleVmsOnly
