@@ -372,6 +372,11 @@ namespace CromwellOnAzureDeployer
                             managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
+                            if (accountNames.TryGetValue("Name", out var name))
+                            {
+                                configuration.Name = name;
+                            }
+
                             // Override any configuration that is used by the update.
                             var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccount);
                             var versionString = aksValues["CromwellOnAzureVersion"];
@@ -1000,6 +1005,7 @@ namespace CromwellOnAzureDeployer
                     await AddNewSettingsAsync(sshConnectionInfo);
                     newSettingsAdded = true;
                 }
+
                 await PatchCromwellConfigurationFileV310Async(storageAccount);
             }
 
@@ -1010,18 +1016,21 @@ namespace CromwellOnAzureDeployer
                     await AddNewSettingsAsync(sshConnectionInfo);
                     newSettingsAdded = true;
                 }
+
                 await PatchAllowedVmSizesFileV320Async(storageAccount);
                 await PatchMySqlDbRootPasswordV320Async(sshConnectionInfo);
             }
 
-            //if (installedVersion is null || installedVersion < new Version(4, 0))
-            //{
-            //    if (!newSettingsAdded) // Migrations from 3.1 to 3.2 may not have added the new global start-task settings
-            //    {
-            //        await AddNewSettingsAsync(sshConnectionInfo);
-            //        newSettingsAdded = true;
-            //    }
-            //}
+            if (installedVersion is null || installedVersion < new Version(4, 0))
+            {
+                if (!newSettingsAdded) // Migrations from 3.1 to 3.2 may not have added the new global start-task settings
+                {
+                    await AddNewSettingsAsync(sshConnectionInfo);
+                    newSettingsAdded = true;
+                }
+
+                await PatchContainersAddJobPreparationScriptV400Async(storageAccount);
+            }
         }
 
         private static Dictionary<string, string> GetDefaultValues(string[] files)
@@ -1057,6 +1066,7 @@ namespace CromwellOnAzureDeployer
 
             if (installedVersion is null)
             {
+                UpdateSetting(settings, defaults, "Name", configuration.Name, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "CosmosDbAccountName", configuration.CosmosDbAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
@@ -1415,6 +1425,7 @@ namespace CromwellOnAzureDeployer
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
         {
             var env04SettingsContent = Utility.GetFileContent("scripts", "env-04-settings.txt");
+            env04SettingsContent = env04SettingsContent.Replace("{DefaultName}", configuration.Name);
 
             if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
             {
@@ -1676,6 +1687,7 @@ namespace CromwellOnAzureDeployer
                 {
                     await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
                     await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
+                    await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/job-prep.sh", Utility.GetFileContent("scripts", "job-prep.sh"));
                 });
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
@@ -2446,6 +2458,11 @@ namespace CromwellOnAzureDeployer
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, allowedVmSizesText);
                 });
 
+        private Task PatchContainersAddJobPreparationScriptV400Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Adding job scripts...",
+                () => UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/job-prep.sh", Utility.GetFileContent("scripts", "job-prep.sh")));
+
         private Task AddNewSettingsAsync(ConnectionInfo sshConnectionInfo)
             => Execute(
                 $"Adding new settings to 'env-04-settings.txt' file on the VM...",
@@ -2454,6 +2471,7 @@ namespace CromwellOnAzureDeployer
                     var existingFileContent = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
                     var existingSettings = Utility.DelimitedTextToDictionary(existingFileContent.Output.Trim());
                     var newSettings = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-04-settings.txt"));
+                    newSettings["Name"] = configuration.Name;
 
                     foreach (var key in newSettings.Keys.Except(existingSettings.Keys))
                     {
