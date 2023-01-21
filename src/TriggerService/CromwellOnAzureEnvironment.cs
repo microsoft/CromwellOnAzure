@@ -11,10 +11,19 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Common;
 using CromwellApiClient;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
+using Microsoft.Azure.Services.AppAuthentication;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.Rest;
 using Newtonsoft.Json;
 using Tes.Models;
 using Tes.Repository;
+using Tes.Utilities;
+using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 [assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace TriggerService
@@ -28,18 +37,87 @@ namespace TriggerService
         private IAzureStorage storage { get; set; }
         internal ICromwellApiClient cromwellApiClient { get; set; }
         private readonly List<IAzureStorage> storageAccounts;
-        private readonly ILogger<AzureStorage> logger;
+        private readonly ILogger<CromwellOnAzureEnvironment> logger;
         private readonly IRepository<TesTask> tesTaskRepository;
+        private readonly AvailabilityTracker cromwellAvailability = new();
+        private readonly AvailabilityTracker azStorageAvailability = new();
+        private readonly TimeSpan mainInterval;
+        private readonly TimeSpan availabilityCheckInterval;
+        private IConfiguration Configuration { get; }
 
-        public CromwellOnAzureEnvironment(ILoggerFactory loggerFactory, IAzureStorage storage, ICromwellApiClient cromwellApiClient, IRepository<TesTask> tesTaskRepository, IEnumerable<IAzureStorage> storages)
+        public CromwellOnAzureEnvironment(IConfiguration configuration, IOptions<TriggerServiceOptions> triggerServiceOptions, IOptions<PostgreSqlOptions> postgreSqlOptions, ILogger<CromwellOnAzureEnvironment> logger, IAzureStorage storage, ICromwellApiClient cromwellApiClient, IRepository<TesTask> tesTaskRepository, IEnumerable<IAzureStorage> storages)
         {
+            this.Configuration = configuration;
             this.storage = storage;
             this.storageAccounts = storages.ToList();
             this.cromwellApiClient = cromwellApiClient;
-            this.logger = loggerFactory.CreateLogger<AzureStorage>();
-            this.tesTaskRepository = tesTaskRepository;
+            this.logger = logger;
             logger.LogInformation($"Cromwell URL: {cromwellApiClient.GetUrl()}");
+
+            (var tempStorageAccounts, var tempStorage) = AzureStorage.GetStorageAccountsUsingMsiAsync(triggerServiceOptions.Value.DefaultStorageAccountName).Result;
+            this.storage = tempStorage;
+            this.storageAccounts = tempStorageAccounts.ToList();
+
+            string postgresConnectionString = new ConnectionStringUtility()
+                .GetPostgresConnectionString(postgreSqlOptions);
+
+            this.tesTaskRepository = new TesTaskPostgreSqlRepository(postgresConnectionString);
         }
+        public void ConfigureServices(IServiceCollection services)
+            => services
+                .Configure<TriggerServiceOptions>(Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName))
+                .AddSingleton(RunAsync);
+
+        public async Task RunAsync()
+        {
+            logger.LogInformation("Trigger Service successfully started.");
+
+            await Task.WhenAll(
+                RunContinuouslyAsync(UpdateExistingWorkflowsAsync, nameof(UpdateExistingWorkflowsAsync)),
+                RunContinuouslyAsync(ProcessAndAbortWorkflowsAsync, nameof(ProcessAndAbortWorkflowsAsync)));
+        }
+
+
+        private async Task RunContinuouslyAsync(Func<Task> task, string description)
+        {
+            while (true)
+            {
+                try
+                {
+                    await Task.WhenAll(
+                        cromwellAvailability.WaitForAsync(
+                            () => IsCromwellAvailableAsync(),
+                            availabilityCheckInterval,
+                            Constants.CromwellSystemName,
+                            msg => logger.LogInformation(msg)),
+                        azStorageAvailability.WaitForAsync(
+                            () => IsAzureStorageAvailableAsync(),
+                            availabilityCheckInterval,
+                            "Azure Storage",
+                            msg => logger.LogInformation(msg)));
+
+                    await task.Invoke();
+                    await Task.Delay(mainInterval);
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError(exc, $"RunContinuously exception for {description}");
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                }
+            }
+        }
+        private static async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync()
+        {
+            var accessToken = await GetAzureAccessTokenAsync();
+            var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, AzureEnvironment.AzureGlobalCloud);
+            var azureClient = FluentAzure.Authenticate(azureCredentials);
+
+            return azureClient;
+        }
+
+        private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
+    => new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
+
 
         public async Task<bool> IsCromwellAvailableAsync()
         {
