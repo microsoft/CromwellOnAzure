@@ -25,23 +25,33 @@ namespace TriggerService
                 })
                 .ConfigureLogging(async (context, logging) =>
                     {
+                        logging.AddConsole();
                         var options = new TriggerServiceOptions();
                         context.Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName).Bind(options);
+
+                        if (string.IsNullOrWhiteSpace(options.ApplicationInsightsAccountName))
+                        {
+                            return;
+                        }
+
                         Console.WriteLine($"ApplicationInsightsAccountName: {options.ApplicationInsightsAccountName}");
                         var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(options.ApplicationInsightsAccountName);
 
-                        if (!string.IsNullOrWhiteSpace(instrumentationKey))
+                        if (string.IsNullOrWhiteSpace(instrumentationKey))
                         {
-                            logging.AddApplicationInsights(
-                                configuration =>
-                                {
-                                    configuration.ConnectionString = $"InstrumentationKey={instrumentationKey}";
-                                },
-                                options =>
-                                {
-                                    options.TrackExceptionsAsExceptionTelemetry = false;
-                                });
+                            return;
                         }
+
+                        logging.AddApplicationInsights(
+                            configuration =>
+                            {
+                                configuration.ConnectionString = $"InstrumentationKey={instrumentationKey}";
+                            },
+                            options =>
+                            {
+                                options.TrackExceptionsAsExceptionTelemetry = false;
+                            });
+
                     })
                 .ConfigureServices((hostBuilderContext, serviceCollection) =>
                 {
