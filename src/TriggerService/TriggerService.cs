@@ -21,60 +21,36 @@ namespace TriggerService
                 .ConfigureAppConfiguration((context, config) =>
                 {
                     config.AddEnvironmentVariables();
+                    config.AddJsonFile("appsettings.json");
                 })
                 .ConfigureLogging(async (context, logging) =>
                     {
-                        try
-                        {
-                            if (context.HostingEnvironment.IsProduction())
-                            {
-                                var applicationInsightsAccountName = context.Configuration["ApplicationInsightsAccountName"];
-                                Console.WriteLine($"ApplicationInsightsAccountName: {applicationInsightsAccountName}");
-                                var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(Environment.GetEnvironmentVariable("ApplicationInsightsAccountName"));
+                        var options = new TriggerServiceOptions();
+                        context.Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName).Bind(options);
+                        Console.WriteLine($"ApplicationInsightsAccountName: {options.ApplicationInsightsAccountName}");
+                        var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(options.ApplicationInsightsAccountName);
 
-                                if (instrumentationKey is not null)
+                        if (!string.IsNullOrWhiteSpace(instrumentationKey))
+                        {
+                            logging.AddApplicationInsights(
+                                configuration =>
                                 {
-                                    var connectionString = $"InstrumentationKey={instrumentationKey}";
-                                    logging.AddApplicationInsights(
-                                        configuration =>
-                                        {
-                                            configuration.ConnectionString = connectionString;
-                                        },
-                                        options =>
-                                        {
-                                            options.TrackExceptionsAsExceptionTelemetry = false;
-                                        });
-                                }
-                            }
-                            else
-                            {
-                                logging.AddApplicationInsights();
-                                logging.AddConsole();
-                            }
-
-                            //// Optional: Apply filters to configure LogLevel Trace or above is sent to
-                            //// ApplicationInsights for all categories.
-                            //logging.AddFilter<ApplicationInsightsLoggerProvider>("System", LogLevel.Warning);
-
-                            //// Additional filtering For category starting in "Microsoft",
-                            //// only Warning or above will be sent to Application Insights.
-                            //logging.AddFilter<ApplicationInsightsLoggerProvider>("Microsoft", LogLevel.Warning);
-
-                            //// The following configures LogLevel Information or above to be sent to
-                            //// Application Insights for categories starting with "TesApi".
-                            //logging.AddFilter<ApplicationInsightsLoggerProvider>("TesApi", LogLevel.Information);
-                        }
-                        catch (Exception exc)
-                        {
-                            Console.WriteLine($"Exception while configuring logging: {exc}");
-                            throw;
+                                    configuration.ConnectionString = $"InstrumentationKey={instrumentationKey}";
+                                },
+                                options =>
+                                {
+                                    options.TrackExceptionsAsExceptionTelemetry = false;
+                                });
                         }
                     })
-                .ConfigureServices(services =>
+                .ConfigureServices((hostBuilderContext, serviceCollection) =>
                 {
-                    services.AddTransient<ICromwellApiClient, CromwellApiClient.CromwellApiClient>();
-                    services.AddHostedService<TriggerHostedService>();
+                    serviceCollection.Configure<CromwellApiClientOptions>(hostBuilderContext.Configuration.GetSection(CromwellApiClientOptions.CromwellApiClientOptionsSectionName));
+                    serviceCollection.Configure<TriggerServiceOptions>(hostBuilderContext.Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName));
+                    serviceCollection.AddTransient<ICromwellApiClient, CromwellApiClient.CromwellApiClient>();
+                    serviceCollection.AddHostedService<TriggerHostedService>();
                 })
-                .Build().RunAsync();
+                .Build()
+                .RunAsync();
     }
 }

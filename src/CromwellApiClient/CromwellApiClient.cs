@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -23,6 +22,8 @@ namespace CromwellApiClient
 
         public CromwellApiClient(IOptions<CromwellApiClientOptions> cromwellApiClientOptions)
         {
+            ArgumentException.ThrowIfNullOrEmpty(cromwellApiClientOptions.Value.BaseUrl, nameof(cromwellApiClientOptions.Value.BaseUrl));
+
             Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
             if (string.IsNullOrWhiteSpace(cromwellApiClientOptions.Value.BaseUrl))
