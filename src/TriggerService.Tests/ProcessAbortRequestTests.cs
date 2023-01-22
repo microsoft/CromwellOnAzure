@@ -83,7 +83,7 @@ namespace TriggerService.Tests
                     newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
                 });
 
-            var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
 
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
 

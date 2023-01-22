@@ -26,7 +26,7 @@ namespace TriggerService.Tests
             // TODO - this test still occasionally fails on this: Assert.IsTrue(availableLines.Count == 4);
             // and results in availableLines.Count = 3
             var loggerFactory = new TestLoggerFake();
-            var environment = new Mock<ICromwellOnAzureEnvironment>();
+            var environment = new Mock<ITriggerHostedService>();
             var logger = loggerFactory.CreateLogger<TriggerEngineTests>();
 
             environment.Setup(x => x.ProcessAndAbortWorkflowsAsync()).Returns(() =>
@@ -53,7 +53,7 @@ namespace TriggerService.Tests
                 return Task.FromResult(isCromwellAvailable);
             });
 
-            var engine = new TriggerEngine(loggerFactory, environment.Object, TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(25));
+            var engine = new TriggerHostedService(loggerFactory, environment.Object, TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(25));
             var task = Task.Run(() => engine.RunAsync());
             await Task.Delay(TimeSpan.FromSeconds(2));
 

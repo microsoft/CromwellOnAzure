@@ -133,7 +133,7 @@ namespace TriggerService.Tests
             return azStorageMock.Object;
         }
 
-        private CromwellOnAzureEnvironment SetCromwellOnAzureEnvironment(string accountAuthority, IEnumerable<IAzureStorage> azureStorages = default)
+        private TriggerHostedService SetCromwellOnAzureEnvironment(string accountAuthority, IEnumerable<IAzureStorage> azureStorages = default)
         {
             var serviceCollection = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder.AddConsole());
@@ -147,7 +147,14 @@ namespace TriggerService.Tests
                 azureStorages = Enumerable.Repeat(MockAzureStorage(accountAuthority), 1);
             }
 
-            var environment = new CromwellOnAzureEnvironment(
+            //var environment = new TriggerHostedService(
+            //    serviceProvider.GetRequiredService<ILoggerFactory>(),
+            //    azureStorages.First(),
+            //    new CromwellApiClient.CromwellApiClient("http://cromwell:8000"),
+            //    cosmosdbRepositoryMock.Object,
+            //    azureStorages);
+
+            var environment = new TriggerHostedService(
                 serviceProvider.GetRequiredService<ILoggerFactory>(),
                 azureStorages.First(),
                 new CromwellApiClient.CromwellApiClient("http://cromwell:8000"),
@@ -157,7 +164,7 @@ namespace TriggerService.Tests
             return environment;
         }
 
-        private async Task<(ProcessedTriggerInfo, CromwellOnAzureEnvironment)> ProcessBlobTriggerWithMocksAsync(string triggerData)
+        private async Task<(ProcessedTriggerInfo, TriggerHostedService)> ProcessBlobTriggerWithMocksAsync(string triggerData)
         {
             var environment = SetCromwellOnAzureEnvironment("fake");
             var processedTriggerInfo = await environment.ProcessBlobTrigger(triggerData);

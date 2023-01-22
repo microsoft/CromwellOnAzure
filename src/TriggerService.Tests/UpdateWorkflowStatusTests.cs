@@ -395,7 +395,7 @@ namespace TriggerService.Tests
                 .Setup(r => r.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()))
                 .Returns(Task.FromResult(tesTasks));
 
-            var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient.Object, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient.Object, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
 
             await cromwellOnAzureEnvironment.UpdateWorkflowStatusesAsync();
 

@@ -88,7 +88,7 @@ namespace TriggerService.Tests
                     newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
                 });
 
-            var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
 
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
 
@@ -146,7 +146,7 @@ namespace TriggerService.Tests
                 .Setup(az => az.DeleteBlobIfExistsAsync(It.IsAny<string>(), $"new/Sample.json"))
                 .Callback(() => deleted = true);
 
-            var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient.Object, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient.Object, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
 
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
 

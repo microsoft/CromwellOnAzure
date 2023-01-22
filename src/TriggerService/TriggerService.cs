@@ -11,9 +11,9 @@ using Microsoft.Extensions.Logging;
 
 namespace TriggerService
 {
-    internal class Program
+    internal class TriggerService
     {
-        public Program()
+        public TriggerService()
             => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
         public static async Task Main()
@@ -73,7 +73,7 @@ namespace TriggerService
                 .ConfigureServices(services =>
                 {
                     services.AddTransient<ICromwellApiClient, CromwellApiClient.CromwellApiClient>();
-                    services.AddHostedService<CromwellOnAzureEnvironment>();
+                    services.AddHostedService<TriggerHostedService>();
                 })
                 .Build().RunAsync();
     }
