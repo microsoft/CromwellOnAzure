@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading.Tasks;
+using CromwellApiClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -71,7 +72,8 @@ namespace TriggerService
                     })
                 .ConfigureServices(services =>
                 {
-                    services.AddSingleton<ICromwellOnAzureEnvironment, CromwellOnAzureEnvironment>();
+                    services.AddTransient<ICromwellApiClient, CromwellApiClient.CromwellApiClient>();
+                    services.AddHostedService<CromwellOnAzureEnvironment>();
                 })
                 .Build().RunAsync();
     }
