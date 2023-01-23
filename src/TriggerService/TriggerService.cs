@@ -39,7 +39,7 @@ namespace TriggerService
 
                         if (string.IsNullOrWhiteSpace(instrumentationKey))
                         {
-                            return;
+                            throw new Exception($"No instrumentation key found for {options.ApplicationInsightsAccountName}, does this service have Contributor access or equivalent to {options.ApplicationInsightsAccountName}?");
                         }
 
                         logging.AddApplicationInsights(
