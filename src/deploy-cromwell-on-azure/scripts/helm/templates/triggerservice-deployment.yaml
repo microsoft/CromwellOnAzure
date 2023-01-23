@@ -42,8 +42,6 @@ spec:
               value: {{ .Values.config.azureServicesAuthConnectionString }}
             - name: ApplicationInsightsAccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
-            - name: CosmosDbAccountName
-              value: {{ .Values.config.cosmosDbAccountName }}
           image: {{ .Values.images.triggerservice }}
           name: triggerservice
           resources:

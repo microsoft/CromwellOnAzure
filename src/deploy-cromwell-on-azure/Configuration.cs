@@ -52,7 +52,6 @@ namespace CromwellOnAzureDeployer
         public string BatchAccountName { get; set; }
         public string StorageAccountName { get; set; }
         public string NetworkSecurityGroupName { get; set; }
-        public string CosmosDbAccountName { get; set; }
         public string LogAnalyticsArmId { get; set; }
         public string ApplicationInsightsAccountName { get; set; }
         public string VmName { get; set; }

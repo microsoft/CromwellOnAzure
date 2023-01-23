@@ -7,7 +7,6 @@ config:
   resourceGroup: RUNTIME_PARAMETER
   azureServicesAuthConnectionString: RUNTIME_PARAMETER
   applicationInsightsAccountName: RUNTIME_PARAMETER
-  cosmosDbAccountName: RUNTIME_PARAMETER
   azureOfferDurableId: MS-AZR-0003p
   batchAccountName: RUNTIME_PARAMETER
   batchNodesSubnetId: RUNTIME_PARAMETER

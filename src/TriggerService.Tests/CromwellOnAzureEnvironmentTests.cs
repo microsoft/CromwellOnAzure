@@ -140,7 +140,7 @@ namespace TriggerService.Tests
 
             var serviceProvider = serviceCollection.BuildServiceProvider();
 
-            var cosmosdbRepositoryMock = new Mock<IRepository<TesTask>>();
+            //var cosmosdbRepositoryMock = new Mock<IRepository<TesTask>>();
 
             if (azureStorages is null)
             {
