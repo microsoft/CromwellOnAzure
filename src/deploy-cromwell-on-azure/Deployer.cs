@@ -735,15 +735,14 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "KeyVaultName", configuration.KeyVaultName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "AksCoANamespace", configuration.AksCoANamespace, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "CrossSubscriptionAKSDeployment", configuration.CrossSubscriptionAKSDeployment);
-                UpdateSetting(settings, defaults, "PostgreSqlServerName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlServerName : string.Empty, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "PostgreSqlDatabaseName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellDatabaseName : string.Empty, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "PostgreSqlUserLogin", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellUserLogin : string.Empty, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "PostgreSqlUserPassword", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellUserPassword : string.Empty, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlServerName", configuration.PostgreSqlServerName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlServerNameSuffix", configuration.PostgreSqlServerNameSuffix, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlServerPort", configuration.PostgreSqlServerPort.ToString(), ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlServerSslMode", configuration.PostgreSqlServerSslMode, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlTesDatabaseName", configuration.PostgreSqlTesDatabaseName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlTesDatabaseUserLogin", GetFormattedPostgresqlUser(), ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlTesDatabaseUserPassword", configuration.PostgreSqlTesUserPassword, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "UsePostgreSqlSingleServer", provisionPostgreSqlOnAzure ? configuration.UsePostgreSqlSingleServer.ToString() : string.Empty, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "PostgreSqlTesDatabaseName", provisionPostgreSqlOnAzure ? configuration.PostgreSqlTesDatabaseName : string.Empty, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "PostgreSqlTesUserLogin", GetFormattedPostgresqlUser(), ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "PostgreSqlTesUserPassword", provisionPostgreSqlOnAzure ? configuration.PostgreSqlTesUserPassword : string.Empty, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "PostgreSqlTesDatabasePort", provisionPostgreSqlOnAzure ? configuration.PostgreSqlTesDatabasePort.ToString() : string.Empty, ignoreDefaults: true);
             }
 
             //if (installedVersion < new Version(3, 3))

@@ -295,53 +295,54 @@ namespace CromwellOnAzureDeployer
             values.Images["triggerservice"] = settings["TriggerServiceImageName"];
             values.Images["cromwell"] = settings["CromwellImageName"];
             values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
-            values.Database["postgreSqlServerName"] = settings["PostgreSqlServerName"];
-            values.Database["postgreSqlTesDatabaseName"] = settings["PostgreSqlTesDatabaseName"];
-            values.Database["postgreSqlTesDatabasePort"] = settings["PostgreSqlTesDatabasePort"];
-            values.Database["postgreSqlTesUserLogin"] = settings["PostgreSqlTesUserLogin"];
-            values.Database["postgreSqlTesUserPassword"] = settings["PostgreSqlTesUserPassword"];
+            values.TesDatabase["postgreSqlServerName"] = settings["PostgreSqlServerName"];
+            values.TesDatabase["postgreSqlServerNameSuffix"] = settings["PostgreSqlServerNameSuffix"];
+            values.TesDatabase["postgreSqlServerPort"] = settings["PostgreSqlServerPort"];
+            values.TesDatabase["postgreSqlServerSslMode"] = settings["PostgreSqlServerSslMode"];
+            // Note: Notice "Tes" is omitted from the property name since it's now in the TesDatabase section
+            values.TesDatabase["postgreSqlDatabaseName"] = settings["PostgreSqlTesDatabaseName"];
+            values.TesDatabase["postgreSqlDatabaseUserLogin"] = settings["PostgreSqlTesDatabaseUserLogin"];
+            values.TesDatabase["postgreSqlDatabaseUserPassword"] = settings["PostgreSqlTesDatabaseUserPassword"];
         }
 
         private static Dictionary<string, string> ValuesToSettings(HelmValues values)
-        {
-            var settings = new Dictionary<string, string>();
-            settings["CromwellOnAzureVersion"] = values.Config["cromwellOnAzureVersion"];
-            settings["AzureServicesAuthConnectionString"] = values.Config["azureServicesAuthConnectionString"];
-            settings["ApplicationInsightsAccountName"] = values.Config["applicationInsightsAccountName"];
-            settings["BatchAccountName"] = values.Config["batchAccountName"];
-            settings["BatchNodesSubnetId"] = values.Config["batchNodesSubnetId"];
-            settings["AksCoANamespace"] = values.Config["coaNamespace"];
-            settings["DisableBatchNodesPublicIpAddress"] = values.Config["disableBatchNodesPublicIpAddress"];
-            settings["DisableBatchScheduling"] = values.Config["disableBatchScheduling"];
-            settings["UsePreemptibleVmsOnly"] = values.Config["usePreemptibleVmsOnly"];
-            settings["BlobxferImageName"] = values.Config["blobxferImageName"];
-            settings["DockerInDockerImageName"] = values.Config["dockerInDockerImageName"];
-            settings["BatchImageOffer"] = values.Config["batchImageOffer"];
-            settings["BatchImagePublisher"] = values.Config["batchImagePublisher"];
-            settings["BatchImageSku"] = values.Config["batchImageSku"];
-            settings["BatchImageVersion"] = values.Config["batchImageVersion"];
-            settings["BatchNodeAgentSkuId"] = values.Config["batchNodeAgentSkuId"];
-            settings["MarthaUrl"] = values.Config["marthaUrl"];
-            settings["MarthaKeyVaultName"] = values.Config["marthaKeyVaultName"];
-            settings["MarthaSecretName"] = values.Config["marthaSecretName"];
-            settings["CrossSubscriptionAKSDeployment"] = values.Config["crossSubscriptionAKSDeployment"];
-            settings["PostgreSqlServerName"] = values.Config["postgreSqlServerName"];
-            settings["PostgreSqlDatabaseName"] = values.Config["postgreSqlDatabaseName"];
-            settings["PostgreSqlUserLogin"] = values.Config["postgreSqlUserLogin"];
-            settings["PostgreSqlUserPassword"] = values.Config["postgreSqlUserPassword"];
-            settings["UsePostgreSqlSingleServer"] = values.Config["usePostgreSqlSingleServer"];
-            settings["ManagedIdentityClientId"] = values.Identity["clientId"];
-            settings["TesImageName"] = values.Images["tes"];
-            settings["TriggerServiceImageName"] = values.Images["triggerservice"];
-            settings["CromwellImageName"] = values.Images["cromwell"];
-            settings["DefaultStorageAccountName"] = values.Persistence["storageAccount"];
-            settings["PostgreSqlServerName"] = values.Database["postgreSqlServerName"];
-            settings["PostgreSqlTesDatabaseName"] = values.Database["postgreSqlTesDatabaseName"];
-            settings["PostgreSqlTesDatabasePort"] = values.Database["postgreSqlTesDatabasePort"];
-            settings["PostgreSqlTesUserLogin"] = values.Database["postgreSqlTesUserLogin"];
-            settings["PostgreSqlTesUserPassword"] = values.Database["postgreSqlTesUserPassword"];
-            return settings;
-        }
+            => new()
+            {
+                ["CromwellOnAzureVersion"] = values.Config["cromwellOnAzureVersion"],
+                ["AzureServicesAuthConnectionString"] = values.Config["azureServicesAuthConnectionString"],
+                ["ApplicationInsightsAccountName"] = values.Config["applicationInsightsAccountName"],
+                ["BatchAccountName"] = values.Config["batchAccountName"],
+                ["BatchNodesSubnetId"] = values.Config["batchNodesSubnetId"],
+                ["AksCoANamespace"] = values.Config["coaNamespace"],
+                ["DisableBatchNodesPublicIpAddress"] = values.Config["disableBatchNodesPublicIpAddress"],
+                ["DisableBatchScheduling"] = values.Config["disableBatchScheduling"],
+                ["UsePreemptibleVmsOnly"] = values.Config["usePreemptibleVmsOnly"],
+                ["BlobxferImageName"] = values.Config["blobxferImageName"],
+                ["DockerInDockerImageName"] = values.Config["dockerInDockerImageName"],
+                ["BatchImageOffer"] = values.Config["batchImageOffer"],
+                ["BatchImagePublisher"] = values.Config["batchImagePublisher"],
+                ["BatchImageSku"] = values.Config["batchImageSku"],
+                ["BatchImageVersion"] = values.Config["batchImageVersion"],
+                ["BatchNodeAgentSkuId"] = values.Config["batchNodeAgentSkuId"],
+                ["MarthaUrl"] = values.Config["marthaUrl"],
+                ["MarthaKeyVaultName"] = values.Config["marthaKeyVaultName"],
+                ["MarthaSecretName"] = values.Config["marthaSecretName"],
+                ["CrossSubscriptionAKSDeployment"] = values.Config["crossSubscriptionAKSDeployment"],
+                ["UsePostgreSqlSingleServer"] = values.Config["usePostgreSqlSingleServer"],
+                ["ManagedIdentityClientId"] = values.Identity["clientId"],
+                ["TesImageName"] = values.Images["tes"],
+                ["TriggerServiceImageName"] = values.Images["triggerservice"],
+                ["CromwellImageName"] = values.Images["cromwell"],
+                ["DefaultStorageAccountName"] = values.Persistence["storageAccount"],
+                ["PostgreSqlServerName"] = values.TesDatabase["postgreSqlServerName"],
+                ["PostgreSqlServerNameSuffix"] = values.TesDatabase["postgreSqlServerNameSuffix"],
+                ["PostgreSqlServerPort"] = values.TesDatabase["postgreSqlServerPort"],
+                ["PostgreSqlServerSslMode"] = values.TesDatabase["postgreSqlServerSslMode"],
+                ["PostgreSqlTesDatabaseName"] = values.TesDatabase["postgreSqlTesDatabaseName"],
+                ["PostgreSqlTesDatabaseUserLogin"] = values.TesDatabase["postgreSqlTesDatabaseUserLogin"],
+                ["PostgreSqlTesDatabaseUserPassword"] = values.TesDatabase["postgreSqlTesDatabaseUserPassword"],
+            };
+        
 
         private async Task<string> ExecHelmProcessAsync(string command, string workingDirectory = null, bool throwOnNonZeroExitCode = true)
         {
@@ -433,7 +434,7 @@ namespace CromwellOnAzureDeployer
         {
             public Dictionary<string, string> Service { get; set; }
             public Dictionary<string, string> Config { get; set; }
-            public Dictionary<string, string> Database { get; set; }
+            public Dictionary<string, string> TesDatabase { get; set; }
             public Dictionary<string, string> Images { get; set; }
             public List<string> DefaultContainers { get; set; }
             public List<Dictionary<string, string>> InternalContainersMIAuth { get; set; }

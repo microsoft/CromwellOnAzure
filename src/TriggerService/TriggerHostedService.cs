@@ -41,9 +41,9 @@ namespace TriggerService
         private readonly TimeSpan availabilityCheckInterval;
 
         public TriggerHostedService(
-            IOptions<TriggerServiceOptions> triggerServiceOptions, 
-            IOptions<PostgreSqlOptions> postgreSqlOptions, 
             ILogger<TriggerHostedService> logger,
+            IOptions<TriggerServiceOptions> triggerServiceOptions, 
+            IOptions<PostgreSqlOptions> postgreSqlOptions,
             ICromwellApiClient cromwellApiClient)
         {
             mainInterval = TimeSpan.FromMilliseconds(triggerServiceOptions.Value.MainRunIntervalMilliseconds);
