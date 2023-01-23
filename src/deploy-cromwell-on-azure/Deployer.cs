@@ -164,7 +164,6 @@ namespace CromwellOnAzureDeployer
                 SingleServerModel.Server postgreSqlSingleServer = null;
                 IStorageAccount storageAccount = null;
                 var keyVaultUri = string.Empty;
-                INetworkSecurityGroup networkSecurityGroup = null;
                 IIdentity managedIdentity = null;
                 IPrivateDnsZone postgreSqlDnsZone = null;
 
