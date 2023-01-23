@@ -338,9 +338,10 @@ namespace CromwellOnAzureDeployer
                 ["PostgreSqlServerNameSuffix"] = values.TesDatabase["postgreSqlServerNameSuffix"],
                 ["PostgreSqlServerPort"] = values.TesDatabase["postgreSqlServerPort"],
                 ["PostgreSqlServerSslMode"] = values.TesDatabase["postgreSqlServerSslMode"],
-                ["PostgreSqlTesDatabaseName"] = values.TesDatabase["postgreSqlTesDatabaseName"],
-                ["PostgreSqlTesDatabaseUserLogin"] = values.TesDatabase["postgreSqlTesDatabaseUserLogin"],
-                ["PostgreSqlTesDatabaseUserPassword"] = values.TesDatabase["postgreSqlTesDatabaseUserPassword"],
+                // Note: Notice "Tes" is added to the property name since it's coming from the TesDatabase section
+                ["PostgreSqlTesDatabaseName"] = values.TesDatabase["postgreSqlDatabaseName"],
+                ["PostgreSqlTesDatabaseUserLogin"] = values.TesDatabase["postgreSqlDatabaseUserLogin"],
+                ["PostgreSqlTesDatabaseUserPassword"] = values.TesDatabase["postgreSqlDatabaseUserPassword"],
             };
         
 
