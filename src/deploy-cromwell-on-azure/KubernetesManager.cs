@@ -436,6 +436,7 @@ namespace CromwellOnAzureDeployer
             public Dictionary<string, string> Service { get; set; }
             public Dictionary<string, string> Config { get; set; }
             public Dictionary<string, string> TesDatabase { get; set; }
+            public Dictionary<string, string> CromwellDatabase { get; set; }
             public Dictionary<string, string> Images { get; set; }
             public List<string> DefaultContainers { get; set; }
             public List<Dictionary<string, string>> InternalContainersMIAuth { get; set; }

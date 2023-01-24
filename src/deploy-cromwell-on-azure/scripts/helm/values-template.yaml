@@ -26,7 +26,7 @@ config:
   globalStartTaskPath: /configuration/start-task.sh
   batchManagedIdentity:
 
-tesdatabase:
+tesDatabase:
   postgreSqlServerName: RUNTIME_PARAMETER
   postgreSqlServerNameSuffix: RUNTIME_PARAMETER
   postgreSqlServerPort: RUNTIME_PARAMETER
@@ -35,7 +35,7 @@ tesdatabase:
   postgreSqlDatabaseUserLogin: RUNTIME_PARAMETER
   postgreSqlDatabaseUserPassword: RUNTIME_PARAMETER
 
-cromwelldatabase:
+cromwellDatabase:
   postgreSqlServerName: RUNTIME_PARAMETER
   postgreSqlServerNameSuffix: RUNTIME_PARAMETER
   postgreSqlServerPort: RUNTIME_PARAMETER
