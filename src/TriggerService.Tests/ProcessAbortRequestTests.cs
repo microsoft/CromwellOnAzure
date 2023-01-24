@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Common;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
@@ -83,7 +84,14 @@ namespace TriggerService.Tests
                     newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
                 });
 
-            var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            var logger = new Mock<ILogger<TriggerHostedService>>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>().Object;
+            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
+            var cromwellApiClient2 = new Mock<ICromwellApiClient>().Object;
+
+            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions, postgreSqlOptions, cromwellApiClient2);
+
+            //var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
 
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
 

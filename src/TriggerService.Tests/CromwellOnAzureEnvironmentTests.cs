@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using CromwellApiClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
@@ -154,12 +156,12 @@ namespace TriggerService.Tests
             //    cosmosdbRepositoryMock.Object,
             //    azureStorages);
 
-            var environment = new TriggerHostedService(
-                serviceProvider.GetRequiredService<ILoggerFactory>(),
-                azureStorages.First(),
-                new CromwellApiClient.CromwellApiClient("http://cromwell:8000"),
-                cosmosdbRepositoryMock.Object,
-                azureStorages);
+            var logger = new Mock<ILogger<TriggerHostedService>>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>().Object;
+            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
+            var cromwellApiClient = new Mock<ICromwellApiClient>().Object;
+
+            var environment = new TriggerHostedService(logger, triggerServiceOptions, postgreSqlOptions, cromwellApiClient);
 
             return environment;
         }

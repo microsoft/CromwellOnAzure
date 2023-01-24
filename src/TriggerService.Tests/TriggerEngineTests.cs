@@ -5,9 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CromwellApiClient;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using Tes.Models;
 
 namespace TriggerService.Tests
 {
@@ -53,8 +56,15 @@ namespace TriggerService.Tests
                 return Task.FromResult(isCromwellAvailable);
             });
 
-            var engine = new TriggerHostedService(loggerFactory, environment.Object, TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(25));
-            var task = Task.Run(() => engine.RunAsync());
+            var logger2 = new Mock<ILogger<TriggerHostedService>>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>().Object;
+            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
+            var cromwellApiClient2 = new Mock<ICromwellApiClient>().Object;
+
+            var triggerHostedService = new TriggerHostedService(logger2, triggerServiceOptions, postgreSqlOptions, cromwellApiClient2);
+
+            //var engine = new TriggerHostedService(loggerFactory, environment.Object, TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(25));
+            _ = Task.Run(() => triggerHostedService.StartAsync(new System.Threading.CancellationToken()));
             await Task.Delay(TimeSpan.FromSeconds(2));
 
             isStorageAvailable = true;
