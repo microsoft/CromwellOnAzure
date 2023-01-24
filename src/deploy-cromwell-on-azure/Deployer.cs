@@ -148,10 +148,9 @@ namespace CromwellOnAzureDeployer
                 postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 1200 };
                 postgreSqlSingleManagementClient = new SingleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 1200 };
 
-                if (configuration.UseAks)
-                {
-                    kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
-                }
+
+                kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
+                
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
 
@@ -179,7 +178,6 @@ namespace CromwellOnAzureDeployer
                         ConsoleEx.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
                         var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
-                        configuration.UseAks = existingAksCluster is not null;
 
                         Dictionary<string, string> accountNames = null;
 
@@ -209,12 +207,12 @@ namespace CromwellOnAzureDeployer
 
                         if (!accountNames.Any())
                         {
-                            throw new ValidationException($"Could not retrieve account names from virtual machine {configuration.VmName}.");
+                            throw new ValidationException($"Could not retrieve account names");
                         }
 
                         if (!accountNames.TryGetValue("BatchAccountName", out var batchAccountName))
                         {
-                            throw new ValidationException($"Could not retrieve the Batch account name from virtual machine {configuration.VmName}.");
+                            throw new ValidationException($"Could not retrieve the Batch account name");
                         }
 
                         batchAccount = await GetExistingBatchAccountAsync(batchAccountName)
@@ -293,24 +291,9 @@ namespace CromwellOnAzureDeployer
                             configuration.StorageAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 24);
                         }
 
-                        if (string.IsNullOrWhiteSpace(configuration.NetworkSecurityGroupName))
-                        {
-                            configuration.NetworkSecurityGroupName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}", 15);
-                        }
-
                         if (string.IsNullOrWhiteSpace(configuration.ApplicationInsightsAccountName))
                         {
                             configuration.ApplicationInsightsAccountName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                        }
-
-                        if (string.IsNullOrWhiteSpace(configuration.VmName))
-                        {
-                            configuration.VmName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 25);
-                        }
-
-                        if (string.IsNullOrWhiteSpace(configuration.VmPassword))
-                        {
-                            configuration.VmPassword = Utility.GeneratePassword();
                         }
 
                         if (string.IsNullOrWhiteSpace(configuration.AksClusterName))
@@ -459,7 +442,7 @@ namespace CromwellOnAzureDeployer
 
                         if (configuration.ProvisionPostgreSqlOnAzure == true)
                         {
-                            if (configuration.UseAks && !configuration.ManualHelmDeployment)
+                            if (!configuration.ManualHelmDeployment)
                             {
                                 await ExecuteQueriesOnAzurePostgreSQLDbFromK8();
                             }
@@ -1727,13 +1710,6 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-            void ThrowIfEitherNotProvidedForUpdate(string attributeValue1, string attributeName1, string attributeValue2, string attributeName2)
-            {
-                if (configuration.Update && string.IsNullOrWhiteSpace(attributeValue1) && string.IsNullOrWhiteSpace(attributeValue2))
-                {
-                    throw new ValidationException($"Either {attributeName1} or {attributeName2} is required for update.", false);
-                }
-            }
 
             void ThrowIfNotProvided(string attributeValue, string attributeName)
             {
@@ -1768,22 +1744,6 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-            void ValidateDependantFeature(bool feature1Enabled, string feature1Name, bool feature2Enabled, string feature2Name)
-            {
-                if (feature1Enabled && !feature2Enabled)
-                {
-                    throw new ValidationException($"{feature2Name} must be enabled to use flag {feature1Name}");
-                }
-            }
-
-            void ThrowIfBothProvided(bool feature1Enabled, string feature1Name, bool feature2Enabled, string feature2Name)
-            {
-                if (feature1Enabled && feature2Enabled)
-                {
-                    throw new ValidationException($"{feature2Name} is incompatible with {feature1Name}");
-                }
-            }
-
             void ValidateHelmInstall(string helmPath, string featureName)
             {
                 if (!File.Exists(helmPath))
@@ -1797,7 +1757,6 @@ namespace CromwellOnAzureDeployer
             ThrowIfNotProvidedForInstall(configuration.RegionName, nameof(configuration.RegionName));
 
             ThrowIfNotProvidedForUpdate(configuration.ResourceGroupName, nameof(configuration.ResourceGroupName));
-            ThrowIfEitherNotProvidedForUpdate(configuration.VmPassword, nameof(configuration.VmPassword), configuration.AksClusterName, nameof(configuration.AksClusterName));
 
             ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
@@ -1811,34 +1770,17 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
 
-            if (!configuration.Update)
+            ThrowIfNotProvidedForUpdate(configuration.AksClusterName, nameof(configuration.AksClusterName));
+
+            if (!configuration.ManualHelmDeployment)
             {
-                ValidateDependantFeature(configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault(), nameof(configuration.CrossSubscriptionAKSDeployment), configuration.UseAks, nameof(configuration.UseAks));
+                ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
             }
 
-            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTesImagePath is not null, nameof(configuration.CustomTesImagePath));
-            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomTriggerServiceImagePath is not null, nameof(configuration.CustomTriggerServiceImagePath));
-            ThrowIfBothProvided(configuration.UseAks, nameof(configuration.UseAks), configuration.CustomCromwellImagePath is not null, nameof(configuration.CustomCromwellImagePath));
-
-            if (configuration.UseAks)
+            if (configuration.ProvisionPostgreSqlOnAzure is null)
             {
-                ThrowIfNotProvidedForUpdate(configuration.AksClusterName, nameof(configuration.AksClusterName));
-
-                if (!configuration.ManualHelmDeployment)
-                {
-                    ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), !string.IsNullOrWhiteSpace(configuration.HelmBinaryPath), nameof(configuration.HelmBinaryPath));
-                    ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
-                }
-
-                if (configuration.ProvisionPostgreSqlOnAzure is null)
-                {
-                    configuration.ProvisionPostgreSqlOnAzure = true;
-                }
-                else if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
-                {
-                    ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
-                }
-            }
+                configuration.ProvisionPostgreSqlOnAzure = true;
+            }            
         }
 
         private static void DisplayBillingReaderInsufficientAccessLevelWarning()
