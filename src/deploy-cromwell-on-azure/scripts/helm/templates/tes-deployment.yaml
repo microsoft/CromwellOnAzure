@@ -28,19 +28,19 @@ spec:
       containers:
         - env:
             - name: TesPostgreSql__PostgreSqlServerName
-              value: {{ .Values.tesdatabase.postgreSqlServerName }}
+              value: {{ .Values.tesDatabase.postgreSqlServerName }}
             - name: TesPostgreSql__PostgreSqlServerNameSuffix
-              value: {{ .Values.tesdatabase.postgreSqlServerNameSuffix }}
+              value: {{ .Values.tesDatabase.postgreSqlServerNameSuffix }}
             - name: TesPostgreSql__PostgreSqlServerSslMode
-              value: {{ .Values.tesdatabase.postgreSqlServerSslMode }}
+              value: {{ .Values.tesDatabase.postgreSqlServerSslMode }}
             - name: TesPostgreSql__PostgreSqlServerPort
-              value: {{ .Values.tesdatabase.postgreSqlServerPort | quote }}
+              value: {{ .Values.tesDatabase.postgreSqlServerPort | quote }}
             - name: TesPostgreSql__PostgreSqlDatabaseName
-              value: {{ .Values.tesdatabase.postgreSqlDatabaseName }}
+              value: {{ .Values.tesDatabase.postgreSqlDatabaseName }}
             - name: TesPostgreSql__PostgreSqlDatabaseUserLogin
-              value: {{ .Values.tesdatabase.postgreSqlDatabaseUserLogin }}
+              value: {{ .Values.tesDatabase.postgreSqlDatabaseUserLogin }}
             - name: TesPostgreSql__PostgreSqlDatabaseUserPassword
-              value: {{ .Values.tesdatabase.postgreSqlDatabaseUserPassword }}
+              value: {{ .Values.tesDatabase.postgreSqlDatabaseUserPassword }}
             - name: ASPNETCORE_URLS
               value: http://0.0.0.0:{{ .Values.service.tesPort }}/
             - name: DefaultStorageAccountName
