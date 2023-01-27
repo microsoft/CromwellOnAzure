@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Common;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -89,15 +90,36 @@ namespace TriggerService.Tests
                     newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
                 });
 
-            var logger = new Mock<ILogger<TriggerHostedService>>().Object;
-            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>().Object;
-            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
-            var cromwellApiClient2 = new Mock<ICromwellApiClient>().Object;
+            var logger = new NullLogger<TriggerHostedService>();
+            var optionsMock = new Mock<IOptions<TriggerServiceOptions>>();
 
-            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions, postgreSqlOptions, cromwellApiClient2);
+            optionsMock.Setup(o => o.Value).Returns(new TriggerServiceOptions()
+            {
+                DefaultStorageAccountName = "fakestorage",
+                ApplicationInsightsAccountName = "fakeappinsights"
+            });
 
+            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>();
 
-            //var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            postgreSqlOptions.Setup(o => o.Value).Returns(new PostgreSqlOptions
+            {
+                PostgreSqlServerName = "fakeserver",
+                PostgreSqlDatabaseUserLogin = "fakeuser",
+                PostgreSqlDatabaseUserPassword = "fake987",
+            });
+            var tesTaskRepository = new Mock<IRepository<TesTask>>().Object;
+            var storageUtility = new Mock<IAzureStorageUtility>();
+
+            storageUtility
+                .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
+
+            var cromwellOnAzureEnvironment = new TriggerHostedService(
+                logger,
+                optionsMock.Object,
+                cromwellApiClient,
+                tesTaskRepository,
+                storageUtility.Object);
 
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
 
@@ -156,11 +178,28 @@ namespace TriggerService.Tests
                 .Callback(() => deleted = true);
 
             var logger = new Mock<ILogger<TriggerHostedService>>().Object;
-            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>();
+
+            triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
+            {
+                DefaultStorageAccountName = "fakestorage",
+                ApplicationInsightsAccountName = "fakeappinsights"
+            });
             var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
             var cromwellApiClient2 = new Mock<ICromwellApiClient>().Object;
+            var tesTaskRepository = new Mock<IRepository<TesTask>>().Object;
+            var storageUtility = new Mock<IAzureStorageUtility>();
 
-            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions, postgreSqlOptions, cromwellApiClient2);
+            storageUtility
+                .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
+
+            var cromwellOnAzureEnvironment = new TriggerHostedService(
+                logger,
+                triggerServiceOptions.Object, 
+                cromwellApiClient2, 
+                tesTaskRepository, 
+                storageUtility.Object);
 
 
             //var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient.Object, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));

@@ -18,7 +18,6 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Tes.Models;
 using Tes.Repository;
-using Tes.Utilities;
 
 [assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace TriggerService
@@ -42,9 +41,10 @@ namespace TriggerService
 
         public TriggerHostedService(
             ILogger<TriggerHostedService> logger,
-            IOptions<TriggerServiceOptions> triggerServiceOptions, 
-            IOptions<PostgreSqlOptions> postgreSqlOptions,
-            ICromwellApiClient cromwellApiClient)
+            IOptions<TriggerServiceOptions> triggerServiceOptions,
+            ICromwellApiClient cromwellApiClient,
+            IRepository<TesTask> tesTaskRepository,
+            IAzureStorageUtility azureStorageUtility)
         {
             mainInterval = TimeSpan.FromMilliseconds(triggerServiceOptions.Value.MainRunIntervalMilliseconds);
             availabilityCheckInterval = TimeSpan.FromMilliseconds(triggerServiceOptions.Value.AvailabilityCheckIntervalMilliseconds);
@@ -52,14 +52,9 @@ namespace TriggerService
             this.logger = logger;
             logger.LogInformation($"Cromwell URL: {cromwellApiClient.GetUrl()}");
 
-            (var tempStorageAccounts, var tempStorage) = AzureStorage.GetStorageAccountsUsingMsiAsync(triggerServiceOptions.Value.DefaultStorageAccountName).Result;
-            storage = tempStorage;
-            storageAccounts = tempStorageAccounts.ToList();
+            (storageAccounts, storage) = azureStorageUtility.GetStorageAccountsUsingMsiAsync(triggerServiceOptions.Value.DefaultStorageAccountName).Result;
 
-            string postgresConnectionString = new ConnectionStringUtility()
-                .GetPostgresConnectionString(postgreSqlOptions);
-
-            tesTaskRepository = new TesTaskPostgreSqlRepository(postgresConnectionString);
+            this.tesTaskRepository = tesTaskRepository;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)

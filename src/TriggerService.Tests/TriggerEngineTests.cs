@@ -5,12 +5,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Common;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using Newtonsoft.Json;
 using Tes.Models;
+using Tes.Repository;
 
 namespace TriggerService.Tests
 {
@@ -57,11 +60,43 @@ namespace TriggerService.Tests
             });
 
             var logger2 = new Mock<ILogger<TriggerHostedService>>().Object;
-            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>();
+
+            triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
+            {
+                DefaultStorageAccountName = "fakestorage",
+                ApplicationInsightsAccountName = "fakeappinsights"
+            });
+
             var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
             var cromwellApiClient2 = new Mock<ICromwellApiClient>().Object;
+            var tesTaskRepository = new Mock<IRepository<TesTask>>().Object;
+            var azureStorage = new Mock<IAzureStorage>();
 
-            var triggerHostedService = new TriggerHostedService(logger2, triggerServiceOptions, postgreSqlOptions, cromwellApiClient2);
+            azureStorage
+                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New))
+                .Returns(Task.FromResult(new[] {
+                    new TriggerFile {
+                        Uri = $"http://tempuri.org/workflows/new/Sample.json",
+                        ContainerName = "workflows",
+                        Name = $"new/Sample.json",
+                        LastModified = DateTimeOffset.UtcNow } }.AsEnumerable()));
+
+            azureStorage.Setup(x => x.IsAvailableAsync())
+                .Returns(() =>
+                {
+                    logger.LogInformation("IsAzureStorageAvailableAsync");
+                    var localBool = isStorageAvailable;
+                    return Task.FromResult(localBool);
+                });
+
+            var storageUtility = new Mock<IAzureStorageUtility>();
+
+            storageUtility
+                .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
+
+            var triggerHostedService = new TriggerHostedService(logger2, triggerServiceOptions.Object, cromwellApiClient2, tesTaskRepository, storageUtility.Object); 
 
             //var engine = new TriggerHostedService(loggerFactory, environment.Object, TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(25));
             _ = Task.Run(() => triggerHostedService.StartAsync(new System.Threading.CancellationToken()));

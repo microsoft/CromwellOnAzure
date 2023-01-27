@@ -8,6 +8,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Tes.Models;
+using Tes.Repository;
+using Tes.Utilities;
 
 namespace TriggerService
 {
@@ -57,7 +60,10 @@ namespace TriggerService
                 {
                     serviceCollection.Configure<CromwellApiClientOptions>(hostBuilderContext.Configuration.GetSection(CromwellApiClientOptions.CromwellApiClientOptionsSectionName));
                     serviceCollection.Configure<TriggerServiceOptions>(hostBuilderContext.Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName));
-                    serviceCollection.AddTransient<ICromwellApiClient, CromwellApiClient.CromwellApiClient>();
+                    serviceCollection.Configure<PostgreSqlOptions>(hostBuilderContext.Configuration.GetSection(PostgreSqlOptions.GetConfigurationSectionName("Tes")));
+                    serviceCollection.AddSingleton<ICromwellApiClient, CromwellApiClient.CromwellApiClient>();
+                    serviceCollection.AddSingleton<IRepository<TesTask>>();
+                    serviceCollection.AddSingleton<IAzureStorageUtility>();
                     serviceCollection.AddHostedService<TriggerHostedService>();
                 })
                 .Build()

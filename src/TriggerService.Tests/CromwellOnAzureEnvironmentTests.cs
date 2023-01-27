@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CromwellApiClient;
+using Microsoft.Azure.Management.AppService.Fluent.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -157,11 +158,18 @@ namespace TriggerService.Tests
             //    azureStorages);
 
             var logger = new Mock<ILogger<TriggerHostedService>>().Object;
-            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>().Object;
             var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
             var cromwellApiClient = new Mock<ICromwellApiClient>().Object;
+            var repository = new Mock<IRepository<TesTask>>().Object;
+            var storageUtility = new Mock<IAzureStorageUtility>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>();
 
-            var environment = new TriggerHostedService(logger, triggerServiceOptions, postgreSqlOptions, cromwellApiClient);
+            triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
+            {
+                DefaultStorageAccountName = "fakestorage",
+                ApplicationInsightsAccountName = "fakeappinsights"
+            });
+            var environment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository, storageUtility);
 
             return environment;
         }
