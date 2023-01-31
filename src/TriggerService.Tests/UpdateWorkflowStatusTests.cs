@@ -412,9 +412,6 @@ namespace TriggerService.Tests
                 .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
             var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient.Object, repository.Object, storageUtility.Object);
 
-
-            //var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient.Object, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
-
             await cromwellOnAzureEnvironment.UpdateWorkflowStatusesAsync();
 
             return (newTriggerName, newTriggerContent);

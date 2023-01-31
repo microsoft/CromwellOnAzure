@@ -35,7 +35,6 @@ namespace TriggerService.Tests
                 .Returns(Task.FromResult(new PostWorkflowResponse { Id = workflowId }));
 
             var (newTriggerName, newTriggerContent) = await ProcessNewWorkflowAsync(cromwellApiClient.Object);
-
             Assert.AreEqual($"inprogress/Sample.{workflowId}.json", newTriggerName);
         }
 
@@ -50,7 +49,6 @@ namespace TriggerService.Tests
                 .Throws(new Exception("Error submitting new workflow"));
 
             var (newTriggerName, newTriggerContent) = await ProcessNewWorkflowAsync(cromwellApiClient.Object);
-
             Assert.IsTrue(newTriggerName.StartsWith("failed/"));
             Assert.AreEqual("ErrorSubmittingWorkflowToCromwell", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReason);
             Assert.AreEqual("Error submitting new workflow", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReasonDetail);
@@ -201,11 +199,7 @@ namespace TriggerService.Tests
                 tesTaskRepository, 
                 storageUtility.Object);
 
-
-            //var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient.Object, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
-
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
-
             Assert.IsTrue(newTriggerName.StartsWith("failed/"));
             Assert.IsTrue(deleted);
             Assert.IsFalse(triesToPost);

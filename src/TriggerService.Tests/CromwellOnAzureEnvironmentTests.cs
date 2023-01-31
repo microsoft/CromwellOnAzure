@@ -6,10 +6,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CromwellApiClient;
-using Microsoft.Azure.Management.AppService.Fluent.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -40,12 +38,11 @@ namespace TriggerService.Tests
         public async Task GetBlobFileNameAndDataWithDefaultStorageAccountUsingUrl()
         {
             var accountAuthority = new Uri(fakeAzureWdl).Authority;
-
             var processedWorkflowItem = await GetBlobFileNameAndDataUsingMocksAsync(fakeAzureWdl, accountAuthority);
-
             Assert.AreEqual(azureName, processedWorkflowItem.Filename, "azureName compared with Filename");
             Assert.IsNotNull(processedWorkflowItem.Data, "data");
             Assert.AreEqual(blobData.Length, processedWorkflowItem.Data.Length, "unexpected length of Data");
+
             for (var i = 0; i < blobData.Length; i++)
             {
                 Assert.AreEqual(blobData[i], processedWorkflowItem.Data[i], $"unexpected value of Data[{i}]");
@@ -57,12 +54,11 @@ namespace TriggerService.Tests
         {
             var accountAuthority = "fake";
             var url = $"/{accountAuthority}/test/test.wdl";
-
             var processedWorkflowItem = await GetBlobFileNameAndDataUsingMocksAsync(url, accountAuthority);
-
             Assert.AreEqual(azureName, processedWorkflowItem.Filename, "azureName compared with Filename");
             Assert.IsNotNull(processedWorkflowItem.Data, "data");
             Assert.AreEqual(blobData.Length, processedWorkflowItem.Data.Length, "unexpected length of Data");
+
             for (var i = 0; i < blobData.Length; i++)
             {
                 Assert.AreEqual(blobData[i], processedWorkflowItem.Data[i], $"unexpected value of Data[{i}]");
@@ -75,14 +71,12 @@ namespace TriggerService.Tests
             var defaultAuthority = "fake";
             var accountAuthority = "alternate";
             var url = $"/{accountAuthority}/test/test.wdl";
-
             var storages = Enumerable.Repeat(MockAzureStorage(defaultAuthority), 1).Append(MockAzureStorage(accountAuthority));
-
             var processedWorkflowItem = await GetBlobFileNameAndDataUsingMocksAsync(url, defaultAuthority, storages);
-
             Assert.AreEqual(azureName, processedWorkflowItem.Filename, "azureName compared with Filename");
             Assert.IsNotNull(processedWorkflowItem.Data, "data");
             Assert.AreEqual(blobData.Length, processedWorkflowItem.Data.Length, "unexpected length of Data");
+
             for (var i = 0; i < blobData.Length; i++)
             {
                 Assert.AreEqual(blobData[i], processedWorkflowItem.Data[i], $"unexpected value of Data[{i}]");
@@ -93,12 +87,11 @@ namespace TriggerService.Tests
         public async Task GetBlobFileNameAndDataWithDefaultStorageAccountWithSasToken()
         {
             var accountAuthority = new Uri(fakeAzureWdlWithSas).Authority;
-
             var processedWorkflowItem = await GetBlobFileNameAndDataUsingMocksAsync(fakeAzureWdlWithSas, accountAuthority);
-
             Assert.AreEqual(azureName, processedWorkflowItem.Filename, "azureName compared with Filename");
             Assert.IsNotNull(processedWorkflowItem.Data, "data");
             Assert.AreEqual(httpClientData.Length, processedWorkflowItem.Data.Length, "unexpected length of Data");
+
             for (var i = 0; i < httpClientData.Length; i++)
             {
                 Assert.AreEqual(httpClientData[i], processedWorkflowItem.Data[i], $"unexpected value of Data[{i}]");
@@ -111,7 +104,6 @@ namespace TriggerService.Tests
         private IAzureStorage MockAzureStorage(string accountAuthority)
         {
             var azStorageMock = new Mock<IAzureStorage>();
-
 
             azStorageMock.Setup(az => az
                 .DownloadBlockBlobAsync(It.IsAny<string>()))
@@ -143,25 +135,21 @@ namespace TriggerService.Tests
 
             var serviceProvider = serviceCollection.BuildServiceProvider();
 
-            //var cosmosdbRepositoryMock = new Mock<IRepository<TesTask>>();
-
             if (azureStorages is null)
             {
                 azureStorages = Enumerable.Repeat(MockAzureStorage(accountAuthority), 1);
             }
 
-            //var environment = new TriggerHostedService(
-            //    serviceProvider.GetRequiredService<ILoggerFactory>(),
-            //    azureStorages.First(),
-            //    new CromwellApiClient.CromwellApiClient("http://cromwell:8000"),
-            //    cosmosdbRepositoryMock.Object,
-            //    azureStorages);
-
             var logger = new Mock<ILogger<TriggerHostedService>>().Object;
             var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
             var cromwellApiClient = new Mock<ICromwellApiClient>().Object;
             var repository = new Mock<IRepository<TesTask>>().Object;
-            var storageUtility = new Mock<IAzureStorageUtility>().Object;
+            var storageUtility = new Mock<IAzureStorageUtility>();
+
+            storageUtility
+                .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult((azureStorages.ToList(), azureStorages.First())));
+
             var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>();
 
             triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
@@ -169,7 +157,7 @@ namespace TriggerService.Tests
                 DefaultStorageAccountName = "fakestorage",
                 ApplicationInsightsAccountName = "fakeappinsights"
             });
-            var environment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository, storageUtility);
+            var environment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository, storageUtility.Object);
 
             return environment;
         }
@@ -349,10 +337,8 @@ namespace TriggerService.Tests
         {
             Assert.AreEqual(azureName, processedTriggerInfo.WorkflowSource.Filename, "comparing azureName to workflowSourceFilename");
             AssertBytesEqual(processedTriggerInfo.WorkflowSource.Data, httpClientData, "workflowSourceData");
-
             AssertNamesEqual(processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(), inputFilesCount, azureName, "workflowInputsFilenames");
             AssertBytesEqual(processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(), inputFilesCount, httpClientData, "workflowInputsData");
-
             AssertExtraDataNull(processedTriggerInfo);
         }
 
