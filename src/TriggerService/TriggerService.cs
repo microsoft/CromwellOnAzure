@@ -10,7 +10,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Tes.Models;
 using Tes.Repository;
-using Tes.Utilities;
 
 namespace TriggerService
 {
