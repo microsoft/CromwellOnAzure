@@ -33,7 +33,7 @@ namespace TriggerService.Tests
             // and results in availableLines.Count = 3
             var loggerFactory = new TestLoggerFake();
             var environment = new Mock<ITriggerHostedService>();
-            var logger = loggerFactory.CreateLogger<TriggerEngineTests>();
+            var logger = loggerFactory.CreateLogger<TriggerHostedService>();
 
             environment.Setup(x => x.ProcessAndAbortWorkflowsAsync()).Returns(() =>
             {
@@ -59,7 +59,6 @@ namespace TriggerService.Tests
                 return Task.FromResult(isCromwellAvailable);
             });
 
-            var logger2 = new Mock<ILogger<TriggerHostedService>>().Object;
             var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>();
 
             triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
@@ -69,7 +68,7 @@ namespace TriggerService.Tests
             });
 
             var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
-            var cromwellApiClient2 = new Mock<ICromwellApiClient>().Object;
+            var cromwellApiClient = new Mock<ICromwellApiClient>().Object;
             var tesTaskRepository = new Mock<IRepository<TesTask>>().Object;
             var azureStorage = new Mock<IAzureStorage>();
 
@@ -96,7 +95,7 @@ namespace TriggerService.Tests
                 .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
                 .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
 
-            var triggerHostedService = new TriggerHostedService(logger2, triggerServiceOptions.Object, cromwellApiClient2, tesTaskRepository, storageUtility.Object); 
+            var triggerHostedService = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, tesTaskRepository, storageUtility.Object); 
 
             //var engine = new TriggerHostedService(loggerFactory, environment.Object, TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(25));
             _ = Task.Run(() => triggerHostedService.StartAsync(new System.Threading.CancellationToken()));
