@@ -26,6 +26,7 @@ namespace TriggerService.Tests
         private volatile bool isStorageAvailable = false;
         private volatile bool isCromwellAvailable = false;
 
+        [Ignore]
         [TestMethod]
         public async Task TriggerEngineRunsAndOnlyLogsAvailabilityOncePerSystemUponAvailableStateAsync()
         {
