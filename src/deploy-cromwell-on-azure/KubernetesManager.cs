@@ -286,15 +286,14 @@ namespace CromwellOnAzureDeployer
             values.Config["marthaKeyVaultName"] = settings["MarthaKeyVaultName"];
             values.Config["marthaSecretName"] = settings["MarthaSecretName"];
             values.Config["crossSubscriptionAKSDeployment"] = settings["CrossSubscriptionAKSDeployment"];
-            values.Config["postgreSqlServerName"] = settings["PostgreSqlServerName"];
-            values.Config["postgreSqlDatabaseName"] = settings["PostgreSqlDatabaseName"];
-            values.Config["postgreSqlUserLogin"] = settings["PostgreSqlUserLogin"];
-            values.Config["postgreSqlUserPassword"] = settings["PostgreSqlUserPassword"];
             values.Config["usePostgreSqlSingleServer"] = settings["UsePostgreSqlSingleServer"];
+
             values.Images["tes"] = settings["TesImageName"];
             values.Images["triggerservice"] = settings["TriggerServiceImageName"];
             values.Images["cromwell"] = settings["CromwellImageName"];
+
             values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
+
             values.TesDatabase["postgreSqlServerName"] = settings["PostgreSqlServerName"];
             values.TesDatabase["postgreSqlServerNameSuffix"] = settings["PostgreSqlServerNameSuffix"];
             values.TesDatabase["postgreSqlServerPort"] = settings["PostgreSqlServerPort"];
@@ -303,6 +302,15 @@ namespace CromwellOnAzureDeployer
             values.TesDatabase["postgreSqlDatabaseName"] = settings["PostgreSqlTesDatabaseName"];
             values.TesDatabase["postgreSqlDatabaseUserLogin"] = settings["PostgreSqlTesDatabaseUserLogin"];
             values.TesDatabase["postgreSqlDatabaseUserPassword"] = settings["PostgreSqlTesDatabaseUserPassword"];
+
+            values.CromwellDatabase["postgreSqlServerName"] = settings["PostgreSqlServerName"];
+            values.CromwellDatabase["postgreSqlServerNameSuffix"] = settings["PostgreSqlServerNameSuffix"];
+            values.CromwellDatabase["postgreSqlServerPort"] = settings["PostgreSqlServerPort"];
+            values.CromwellDatabase["postgreSqlServerSslMode"] = settings["PostgreSqlServerSslMode"];
+            // Note: Notice "Cromwell" is omitted from the property name since it's now in the TesDatabase section
+            values.CromwellDatabase["postgreSqlDatabaseName"] = settings["PostgreSqlCromwellDatabaseName"];
+            values.CromwellDatabase["postgreSqlDatabaseUserLogin"] = settings["PostgreSqlCromwellDatabaseUserLogin"];
+            values.CromwellDatabase["postgreSqlDatabaseUserPassword"] = settings["PostgreSqlCromwellDatabaseUserPassword"];
         }
 
         private static Dictionary<string, string> ValuesToSettings(HelmValues values)
@@ -334,14 +342,22 @@ namespace CromwellOnAzureDeployer
                 ["TriggerServiceImageName"] = values.Images["triggerservice"],
                 ["CromwellImageName"] = values.Images["cromwell"],
                 ["DefaultStorageAccountName"] = values.Persistence["storageAccount"],
+                
+                // This is only defined once, so use the TesDatabase values
                 ["PostgreSqlServerName"] = values.TesDatabase["postgreSqlServerName"],
                 ["PostgreSqlServerNameSuffix"] = values.TesDatabase["postgreSqlServerNameSuffix"],
                 ["PostgreSqlServerPort"] = values.TesDatabase["postgreSqlServerPort"],
                 ["PostgreSqlServerSslMode"] = values.TesDatabase["postgreSqlServerSslMode"],
+
                 // Note: Notice "Tes" is added to the property name since it's coming from the TesDatabase section
                 ["PostgreSqlTesDatabaseName"] = values.TesDatabase["postgreSqlDatabaseName"],
                 ["PostgreSqlTesDatabaseUserLogin"] = values.TesDatabase["postgreSqlDatabaseUserLogin"],
                 ["PostgreSqlTesDatabaseUserPassword"] = values.TesDatabase["postgreSqlDatabaseUserPassword"],
+
+                // Note: Notice "Cromwell" is added to the property name since it's coming from the TesDatabase section
+                ["PostgreSqlCromwellDatabaseName"] = values.CromwellDatabase["postgreSqlDatabaseName"],
+                ["PostgreSqlCromwellDatabaseUserLogin"] = values.CromwellDatabase["postgreSqlDatabaseUserLogin"],
+                ["PostgreSqlCromwellDatabaseUserPassword"] = values.CromwellDatabase["postgreSqlDatabaseUserPassword"],
             };
         
 

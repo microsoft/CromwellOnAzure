@@ -1,4 +1,7 @@
-﻿namespace TriggerService
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+namespace TriggerService
 {
     public class TriggerServiceOptions
     {
