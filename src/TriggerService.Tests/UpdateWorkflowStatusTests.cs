@@ -397,12 +397,20 @@ namespace TriggerService.Tests
                 .Returns(Task.FromResult(tesTasks));
 
             var logger = new Mock<ILogger<TriggerHostedService>>().Object;
-            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>();
+
+            triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
+            {
+                DefaultStorageAccountName = "fakestorage",
+                ApplicationInsightsAccountName = "fakeappinsights"
+            });
             var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
-            var cromwellApiClient2 = new Mock<ICromwellApiClient>().Object;
-            var tesTaskRepository = new Mock<IRepository<TesTask>>().Object;
-            var storageUtility = new Mock<IAzureStorageUtility>().Object;
-            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions, cromwellApiClient2, tesTaskRepository, storageUtility);
+            var storageUtility = new Mock<IAzureStorageUtility>();
+
+            storageUtility
+                .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
+            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient.Object, repository.Object, storageUtility.Object);
 
 
             //var cromwellOnAzureEnvironment = new TriggerHostedService(loggerFactory.Object, azureStorage.Object, cromwellApiClient.Object, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
