@@ -20,31 +20,31 @@ namespace TriggerService
 
         public static async Task Main()
             => await Host.CreateDefaultBuilder()
-                .ConfigureAppConfiguration((context, config) =>
+                .ConfigureAppConfiguration((hostBuilderContext, configurationBuilder) =>
                 {
-                    config.AddJsonFile("appsettings.json");
-                    config.AddEnvironmentVariables();
+                    configurationBuilder.AddJsonFile("appsettings.json");
+                    configurationBuilder.AddEnvironmentVariables();
                 })
-                .ConfigureLogging(async (context, logging) =>
+                .ConfigureLogging(async (hostBuilderContext, loggingBuilder) =>
                     {
-                        logging.AddConsole();
-                        var options = new TriggerServiceOptions();
-                        context.Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName).Bind(options);
+                        loggingBuilder.AddConsole();
+                        var triggerServiceOptions = new TriggerServiceOptions();
+                        hostBuilderContext.Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName).Bind(triggerServiceOptions);
 
-                        if (string.IsNullOrWhiteSpace(options.ApplicationInsightsAccountName))
+                        if (string.IsNullOrWhiteSpace(triggerServiceOptions.ApplicationInsightsAccountName))
                         {
                             return;
                         }
 
-                        Console.WriteLine($"ApplicationInsightsAccountName: {options.ApplicationInsightsAccountName}");
-                        var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(options.ApplicationInsightsAccountName);
+                        Console.WriteLine($"ApplicationInsightsAccountName: {triggerServiceOptions.ApplicationInsightsAccountName}");
+                        var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(triggerServiceOptions.ApplicationInsightsAccountName);
 
                         if (string.IsNullOrWhiteSpace(instrumentationKey))
                         {
-                            throw new Exception($"No instrumentation key found for {options.ApplicationInsightsAccountName}, does this service have Contributor access or equivalent to {options.ApplicationInsightsAccountName}?");
+                            throw new Exception($"No instrumentation key found for {triggerServiceOptions.ApplicationInsightsAccountName}, does this service have Contributor access or equivalent to {triggerServiceOptions.ApplicationInsightsAccountName}?");
                         }
 
-                        logging.AddApplicationInsights(
+                        loggingBuilder.AddApplicationInsights(
                             configuration =>
                             {
                                 configuration.ConnectionString = $"InstrumentationKey={instrumentationKey}";
