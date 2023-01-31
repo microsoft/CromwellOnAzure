@@ -720,13 +720,13 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "PostgreSqlServerPort", configuration.PostgreSqlServerPort.ToString(), ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlServerSslMode", configuration.PostgreSqlServerSslMode, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlTesDatabaseName", configuration.PostgreSqlTesDatabaseName, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "PostgreSqlTesDatabaseUserLogin", GetFormattedPostgresqlUser(), ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlTesDatabaseUserLogin", GetFormattedPostgresqlUser(isCromwellPostgresUser: false), ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlTesDatabaseUserPassword", configuration.PostgreSqlTesUserPassword, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseName", configuration.PostgreSqlCromwellDatabaseName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseUserLogin", GetFormattedPostgresqlUser(isCromwellPostgresUser: true), ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseUserPassword", configuration.PostgreSqlCromwellUserPassword, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "UsePostgreSqlSingleServer", provisionPostgreSqlOnAzure ? configuration.UsePostgreSqlSingleServer.ToString() : string.Empty, ignoreDefaults: true);
             }
-
-            //if (installedVersion < new Version(3, 3))
-            //{ }
 
             BackFillSettings(settings, defaults);
             return settings;
@@ -1177,21 +1177,18 @@ namespace CromwellOnAzureDeployer
                     return (vnet, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value);
                 });
 
-        private string GetFormattedPostgresqlUser()
+        private string GetFormattedPostgresqlUser(bool isCromwellPostgresUser)
         {
-            if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
-            {
-                return string.Empty;
-            }
+            string user = isCromwellPostgresUser ?
+                configuration.PostgreSqlCromwellUserLogin :
+                configuration.PostgreSqlTesUserLogin;
 
             if (configuration.UsePostgreSqlSingleServer)
             {
-                return $"{configuration.PostgreSqlTesUserLogin}@{configuration.PostgreSqlServerName}";
+                return $"{user}@{configuration.PostgreSqlServerName}";
             }
-            else
-            {
-                return configuration.PostgreSqlTesUserLogin;
-            }
+
+            return user;
         }
 
         private string GetCreateCromwellUserString()
