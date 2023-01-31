@@ -61,8 +61,8 @@ namespace TriggerService
                     serviceCollection.Configure<TriggerServiceOptions>(hostBuilderContext.Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName));
                     serviceCollection.Configure<PostgreSqlOptions>(hostBuilderContext.Configuration.GetSection(PostgreSqlOptions.GetConfigurationSectionName("Tes")));
                     serviceCollection.AddSingleton<ICromwellApiClient, CromwellApiClient.CromwellApiClient>();
-                    serviceCollection.AddSingleton<IRepository<TesTask>>();
-                    serviceCollection.AddSingleton<IAzureStorageUtility>();
+                    serviceCollection.AddSingleton<IRepository<TesTask>, TesTaskPostgreSqlRepository>();
+                    serviceCollection.AddSingleton<IAzureStorageUtility, AzureStorageUtility>();
                     serviceCollection.AddHostedService<TriggerHostedService>();
                 })
                 .Build()
