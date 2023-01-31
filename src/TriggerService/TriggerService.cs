@@ -22,8 +22,8 @@ namespace TriggerService
             => await Host.CreateDefaultBuilder()
                 .ConfigureAppConfiguration((context, config) =>
                 {
-                    config.AddEnvironmentVariables();
                     config.AddJsonFile("appsettings.json");
+                    config.AddEnvironmentVariables();
                 })
                 .ConfigureLogging(async (context, logging) =>
                     {
