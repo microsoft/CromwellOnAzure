@@ -307,7 +307,7 @@ namespace CromwellOnAzureDeployer
             values.CromwellDatabase["postgreSqlServerNameSuffix"] = settings["PostgreSqlServerNameSuffix"];
             values.CromwellDatabase["postgreSqlServerPort"] = settings["PostgreSqlServerPort"];
             values.CromwellDatabase["postgreSqlServerSslMode"] = settings["PostgreSqlServerSslMode"];
-            // Note: Notice "Cromwell" is omitted from the property name since it's now in the TesDatabase section
+            // Note: Notice "Cromwell" is omitted from the property name since it's now in the CromwellDatabase section
             values.CromwellDatabase["postgreSqlDatabaseName"] = settings["PostgreSqlCromwellDatabaseName"];
             values.CromwellDatabase["postgreSqlDatabaseUserLogin"] = settings["PostgreSqlCromwellDatabaseUserLogin"];
             values.CromwellDatabase["postgreSqlDatabaseUserPassword"] = settings["PostgreSqlCromwellDatabaseUserPassword"];
