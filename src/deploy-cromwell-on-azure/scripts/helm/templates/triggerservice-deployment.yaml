@@ -26,16 +26,20 @@ spec:
         supplementalGroups: [1000]
       containers:
         - env:
-            - name: PostgreSqlServerName
-              value: {{ .Values.database.postgreSqlServerName }}
-            - name: PostgreSqlTesDatabaseName
-              value: {{ .Values.database.postgreSqlTesDatabaseName }}
-            - name: PostgreSqlTesDatabasePort
-              value: {{ .Values.database.postgreSqlTesDatabasePort | quote }}
-            - name: PostgreSqlTesUserLogin
-              value: {{ .Values.database.postgreSqlTesUserLogin }}
-            - name: PostgreSqlTesUserPassword
-              value: {{ .Values.database.postgreSqlTesUserPassword }}
+            - name: TesPostgreSql__PostgreSqlServerName
+              value: {{ .Values.tesDatabase.postgreSqlServerName }}
+            - name: TesPostgreSql__PostgreSqlServerNameSuffix
+              value: {{ .Values.tesDatabase.postgreSqlServerNameSuffix }}
+            - name: TesPostgreSql__PostgreSqlServerSslMode
+              value: {{ .Values.tesDatabase.postgreSqlServerSslMode }}
+            - name: TesPostgreSql__PostgreSqlServerPort
+              value: {{ .Values.tesDatabase.postgreSqlServerPort | quote }}
+            - name: TesPostgreSql__PostgreSqlDatabaseName
+              value: {{ .Values.tesDatabase.postgreSqlDatabaseName }}
+            - name: TesPostgreSql__PostgreSqlDatabaseUserLogin
+              value: {{ .Values.tesDatabase.postgreSqlDatabaseUserLogin }}
+            - name: TesPostgreSql__PostgreSqlDatabaseUserPassword
+              value: {{ .Values.tesDatabase.postgreSqlDatabaseUserPassword }}
             - name: DefaultStorageAccountName
               value: {{ .Values.persistence.storageAccount }}
             - name: AzureServicesAuthConnectionString
