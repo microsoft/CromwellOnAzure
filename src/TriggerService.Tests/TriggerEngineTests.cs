@@ -64,7 +64,9 @@ namespace TriggerService.Tests
             triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
             {
                 DefaultStorageAccountName = "fakestorage",
-                ApplicationInsightsAccountName = "fakeappinsights"
+                ApplicationInsightsAccountName = "fakeappinsights",
+                AvailabilityCheckIntervalMilliseconds = 25,
+                MainRunIntervalMilliseconds = 25
             });
 
             var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
@@ -99,24 +101,32 @@ namespace TriggerService.Tests
 
             //var engine = new TriggerHostedService(loggerFactory, environment.Object, TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(25));
             _ = Task.Run(() => triggerHostedService.StartAsync(new System.Threading.CancellationToken()));
+
+
             await Task.Delay(TimeSpan.FromSeconds(2));
+            var availableLines = loggerFactory.TestLogger.LogLines.Where(line => line.Contains("is available", StringComparison.OrdinalIgnoreCase)).ToList();
+            Console.WriteLine($"1: availableLines.Count: {availableLines.Count}");
 
             isStorageAvailable = true;
             isCromwellAvailable = true;
             await Task.Delay(TimeSpan.FromSeconds(2));
+
+            availableLines = loggerFactory.TestLogger.LogLines.Where(line => line.Contains("is available", StringComparison.OrdinalIgnoreCase)).ToList();
+            Console.WriteLine($"2: availableLines.Count: {availableLines.Count}");
 
             isStorageAvailable = false;
             isCromwellAvailable = false;
             await Task.Delay(TimeSpan.FromSeconds(2));
 
+            availableLines = loggerFactory.TestLogger.LogLines.Where(line => line.Contains("is available", StringComparison.OrdinalIgnoreCase)).ToList();
+            Console.WriteLine($"3: availableLines.Count: {availableLines.Count}");
+
             isStorageAvailable = true;
             isCromwellAvailable = true;
             await Task.Delay(TimeSpan.FromSeconds(2));
 
-            var lines = loggerFactory.TestLogger.LogLines;
-            var availableLines = lines.Where(line => line.Contains("is available", StringComparison.OrdinalIgnoreCase)).ToList();
-
-            Console.WriteLine($"availableLines.Count: {availableLines.Count}");
+            availableLines = loggerFactory.TestLogger.LogLines.Where(line => line.Contains("is available", StringComparison.OrdinalIgnoreCase)).ToList();
+            Console.WriteLine($"4: availableLines.Count: {availableLines.Count}");
 
             foreach (var line in availableLines)
             {
