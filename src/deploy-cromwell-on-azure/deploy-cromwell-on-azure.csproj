@@ -52,8 +52,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
+    <ProjectReference Include="..\ga4gh-tes\src\CommonUtilities\CommonUtilities.csproj" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <EmbeddedResource Include="scripts\containers-to-mount" />
     <EmbeddedResource Include="scripts\allowed-vm-sizes" />
