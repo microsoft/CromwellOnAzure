@@ -990,7 +990,7 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{ManagedIdentityName}", managedIdentityName)
                     }, "scripts", ContainersToMountFileName));
 
-                    // Configure Cromwell config file for Docker Mysql or PostgreSQL on Azure.
+                    // Configure Cromwell config file for PostgreSQL on Azure.
                     if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
                     {
                         await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
@@ -1000,17 +1000,6 @@ namespace CromwellOnAzureDeployer
                             new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),
                             new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
                             new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
-                        }, "scripts", CromwellConfigurationFileName));
-                    }
-                    else
-                    {
-                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
-                        {
-                            new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:mysql://mysqldb/cromwell_db?useSSL=false&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true\""),
-                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", $"\"cromwell\""),
-                            new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"cromwell\""),
-                            new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"com.mysql.cj.jdbc.Driver\""),
-                        new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.MySQLProfile$\""),
                         }, "scripts", CromwellConfigurationFileName));
                     }
 
