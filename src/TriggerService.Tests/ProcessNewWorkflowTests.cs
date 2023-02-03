@@ -29,7 +29,7 @@ namespace TriggerService.Tests
             var cromwellApiClient = new Mock<ICromwellApiClient>();
 
             cromwellApiClient
-                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
+                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
                 .Returns(Task.FromResult(new PostWorkflowResponse { Id = workflowId }));
 
             var (newTriggerName, newTriggerContent) = await ProcessNewWorkflowAsync(cromwellApiClient.Object);
@@ -44,7 +44,7 @@ namespace TriggerService.Tests
             var cromwellApiClient = new Mock<ICromwellApiClient>();
 
             cromwellApiClient
-                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
+                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
                 .Throws(new Exception("Error submitting new workflow"));
 
             var (newTriggerName, newTriggerContent) = await ProcessNewWorkflowAsync(cromwellApiClient.Object);
@@ -105,7 +105,7 @@ namespace TriggerService.Tests
 
             var triesToPost = false;
             cromwellApiClient
-                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
+                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
                 .Callback(() => triesToPost = true)
                 .Throws(new Exception("Should never get here."));
 
