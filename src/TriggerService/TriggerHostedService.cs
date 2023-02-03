@@ -380,6 +380,7 @@ namespace TriggerService
                 a.ErrorContext.Handled = true;
             }
             });
+
             if (error is not null)
             {
                 newBlobText += "\nError(s): " + error switch
@@ -396,6 +397,7 @@ namespace TriggerService
                 workflowContentAction?.Invoke(workflow);
                 newBlobText = JsonConvert.SerializeObject(workflow, Formatting.Indented, jsonSerializerSettings);
             }
+
             await storage.UploadFileTextAsync(newBlobText, container, newBlobName);
             await storage.DeleteBlobIfExistsAsync(container, blobName);
         }
@@ -565,7 +567,7 @@ namespace TriggerService
         {
             var blobName = blobTriggerName[(currentState.ToString().Length + 1)..];
             var withoutExtension = Path.GetFileNameWithoutExtension(blobName);
-            return withoutExtension.Substring(0, withoutExtension.LastIndexOf('.'));
+            return withoutExtension[..withoutExtension.LastIndexOf('.')];
         }
 
         private static string GetBlobName(string url)

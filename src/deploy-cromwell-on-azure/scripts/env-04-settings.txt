@@ -1,11 +1,14 @@
 ﻿UsePreemptibleVmsOnly=false
 DisableBatchScheduling=false
 AzureOfferDurableId=MS-AZR-0003p
+UseLegacyBatchImplementationWithAutopools=false
 BatchImageOffer=ubuntu-hpc
 BatchImagePublisher=microsoft-dsvm
 BatchImageSku=2004
 BatchImageVersion=latest
 BatchNodeAgentSkuId=batch.node.ubuntu 20.04
+BatchPoolRotationForcedDays=7
+Name={DefaultName}
 MarthaUrl=
 MarthaKeyVaultName=
 MarthaSecretName=

@@ -285,6 +285,7 @@ namespace CromwellOnAzureDeployer
             values.Config["marthaUrl"] = settings["MarthaUrl"];
             values.Config["marthaKeyVaultName"] = settings["MarthaKeyVaultName"];
             values.Config["marthaSecretName"] = settings["MarthaSecretName"];
+            values.Config["name"] = settings["Name"];
             values.Config["crossSubscriptionAKSDeployment"] = settings["CrossSubscriptionAKSDeployment"];
             values.Config["usePostgreSqlSingleServer"] = settings["UsePostgreSqlSingleServer"];
 
@@ -335,6 +336,7 @@ namespace CromwellOnAzureDeployer
                 ["MarthaUrl"] = values.Config["marthaUrl"],
                 ["MarthaKeyVaultName"] = values.Config["marthaKeyVaultName"],
                 ["MarthaSecretName"] = values.Config["marthaSecretName"],
+                ["Name"] = values.Config["name"],
                 ["CrossSubscriptionAKSDeployment"] = values.Config["crossSubscriptionAKSDeployment"],
                 ["UsePostgreSqlSingleServer"] = values.Config["usePostgreSqlSingleServer"],
                 ["ManagedIdentityClientId"] = values.Identity["clientId"],
