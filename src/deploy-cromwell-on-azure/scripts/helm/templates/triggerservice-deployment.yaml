@@ -40,11 +40,11 @@ spec:
               value: {{ .Values.tesDatabase.postgreSqlDatabaseUserLogin }}
             - name: TesPostgreSql__PostgreSqlDatabaseUserPassword
               value: {{ .Values.tesDatabase.postgreSqlDatabaseUserPassword }}
-            - name: DefaultStorageAccountName
+            - name: TriggerService__DefaultStorageAccountName
               value: {{ .Values.persistence.storageAccount }}
-            - name: AzureServicesAuthConnectionString
+            - name: TriggerService__AzureServicesAuthConnectionString
               value: {{ .Values.config.azureServicesAuthConnectionString }}
-            - name: ApplicationInsightsAccountName
+            - name: TriggerService__ApplicationInsightsAccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
           image: {{ .Values.images.triggerservice }}
           name: triggerservice
