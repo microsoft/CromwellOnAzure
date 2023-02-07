@@ -86,6 +86,7 @@
 
   <ItemGroup>
     <Folder Include="Properties\PublishProfiles\" />
+    <Folder Include="scripts\aks\" />
   </ItemGroup>
 
 </Project>

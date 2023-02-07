@@ -77,31 +77,38 @@ namespace CromwellOnAzureDeployer
             return new Kubernetes(k8sClientConfiguration);
         }
 
-        public V1Deployment GetUbuntuDeployment()
+        public V1Deployment GetUbuntuDeploymentTemplate()
         {
-            return new V1Deployment
-            {
-                ApiVersion = "apps/v1",
-                Kind = "deployment",
-                Metadata = new V1ObjectMeta { Name = "ubuntu" },
-                Spec = new V1DeploymentSpec
-                {
-                    Replicas = 1,
-                    Template = new V1PodTemplateSpec
-                    {
-                        Spec = new V1PodSpec
-                        {
-                            Containers = new List<V1Container>{
-                                new V1Container {
-                                    Name = "ubuntu",
-                                    Image = "mcr.microsoft.com/mirror/docker/library/ubuntu:22.04",
-                                    Command = new List<string> { "/bin/bash", "-c", "--" },
-                                    Args = new List<string> { "while true; do sleep 30; done;" } }
-                            }
-                        }
-                    }
-                }
-            };
+            return KubernetesYaml.Deserialize<V1Deployment>(
+                """
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  creationTimestamp: null
+                  labels:
+                    io.kompose.service: ubuntu
+                  name: ubuntu
+                spec:
+                  replicas: 1
+                  selector:
+                    matchLabels:
+                      io.kompose.service: ubuntu
+                  strategy: {}
+                  template:
+                    metadata:
+                      creationTimestamp: null
+                      labels:
+                        io.kompose.service: ubuntu
+                    spec:
+                      containers:
+                        - name: ubuntu
+                          image: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                          command: [ "/bin/bash", "-c", "--" ]
+                          args: [ "while true; do sleep 30; done;" ]
+                          resources: {}
+                      restartPolicy: Always
+                status: {}
+                """);
         }
 
         public async Task DeployCoADependenciesAsync()

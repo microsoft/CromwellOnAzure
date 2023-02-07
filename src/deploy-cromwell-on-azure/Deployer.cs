@@ -438,7 +438,7 @@ namespace CromwellOnAzureDeployer
                             // Deploy an ubuntu pod to run PSQL commands, then delete it
                             const string deploymentName = "ubuntu";
                             const string deploymentNamespace = "default";
-                            var ubuntuDeployment = kubernetesManager.GetUbuntuDeployment();
+                            var ubuntuDeployment = kubernetesManager.GetUbuntuDeploymentTemplate();
                             await kubernetesClient.AppsV1.CreateNamespacedDeploymentAsync(ubuntuDeployment, deploymentNamespace);
                             await ExecuteQueriesOnAzurePostgreSQLDbFromK8(deploymentName, deploymentNamespace);
                             await kubernetesClient.AppsV1.DeleteNamespacedDeploymentAsync(deploymentName, deploymentNamespace);
@@ -1047,13 +1047,13 @@ namespace CromwellOnAzureDeployer
                 });
 
             await Execute(
-                $"Creating PostgreSQL cromwell database: {configuration.PostgreSqlCromwellDatabaseName}...",
+                $"Creating PostgreSQL Cromwell database: {configuration.PostgreSqlCromwellDatabaseName}...",
                 () => postgresManagementClient.Databases.CreateAsync(
                     configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlCromwellDatabaseName,
                     new FlexibleServerModel.Database()));
 
             await Execute(
-                $"Creating PostgreSQL tes database: {configuration.PostgreSqlTesDatabaseName}...",
+                $"Creating PostgreSQL TES database: {configuration.PostgreSqlTesDatabaseName}...",
                 () => postgresManagementClient.Databases.CreateAsync(
                     configuration.ResourceGroupName, configuration.PostgreSqlServerName, configuration.PostgreSqlTesDatabaseName,
                     new FlexibleServerModel.Database()));
