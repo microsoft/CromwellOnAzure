@@ -1521,6 +1521,15 @@ namespace CromwellOnAzureDeployer
                     DisplayBillingReaderInsufficientAccessLevelWarning();
                 }
             }
+
+            if (configuration.UsePostgreSqlSingleServer && int.Parse(configuration.PostgreSqlVersion) > 11)
+            {
+                // https://learn.microsoft.com/en-us/azure/postgresql/single-server/concepts-version-policy
+                ConsoleEx.WriteLine($"Warning: as of 2/7/2023, Azure Database for PostgreSQL Single Server only supports up to PostgreSQL version 11", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine($"{nameof(configuration.PostgreSqlVersion)} is currently set to {configuration.PostgreSqlVersion}", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine($"Deployment will continue but could fail; please consider including '--{nameof(configuration.PostgreSqlVersion)} 11'", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine("More info: https://learn.microsoft.com/en-us/azure/postgresql/single-server/concepts-version-policy");
+            }
         }
 
         private async Task<IStorageAccount> ValidateAndGetExistingStorageAccountAsync()

@@ -22,7 +22,7 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlSkuName { get; set; } = "Standard_B2s";
         public string PostgreSqlTier { get; set; } = "Burstable";
         public string DefaultVmSubnetName { get; set; } = "vmsubnet";
-        public string PostgreSqlVersion { get; set; } = "11";
+        public string PostgreSqlVersion { get; set; } = "14";
         public string DefaultPostgreSqlSubnetName { get; set; } = "sqlsubnet";
         public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
         public string Name { get; set; } = CreateNewName();
