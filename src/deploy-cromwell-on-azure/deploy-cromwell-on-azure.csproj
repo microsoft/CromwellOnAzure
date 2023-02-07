@@ -18,10 +18,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="scripts\helm\templates\ubuntu-deployment.yaml" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Include="..\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
   </ItemGroup>
 
@@ -68,7 +64,6 @@
     <EmbeddedResource Include="scripts\env-03-external-images.txt" />
     <EmbeddedResource Include="scripts\env-04-settings.txt" />
     <EmbeddedResource Include="scripts\env-13-postgre-sql-db.txt" />
-    <EmbeddedResource Include="scripts\helm\templates\ubuntu-deployment.yaml" />
     <EmbeddedResource Include="scripts\mount-data-disk.sh" />
     <EmbeddedResource Include="scripts\mount.blobfuse" />
     <EmbeddedResource Include="scripts\mount_containers.sh" />
