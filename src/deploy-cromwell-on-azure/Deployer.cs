@@ -434,15 +434,16 @@ namespace CromwellOnAzureDeployer
                         {
                             kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
                             await kubernetesManager.DeployCoADependenciesAsync();
-                            await kubernetesManager.DeployHelmChartToClusterAsync();
-                        }
 
-                        if (configuration.ProvisionPostgreSqlOnAzure == true)
-                        {
-                            if (!configuration.ManualHelmDeployment)
-                            {
-                                await ExecuteQueriesOnAzurePostgreSQLDbFromK8();
-                            }
+                            // Deploy an ubuntu pod to run PSQL commands, then delete it
+                            const string deploymentName = "ubuntu";
+                            const string deploymentNamespace = "default";
+                            var ubuntuDeploymentYaml = await kubernetesManager.GetDeploymentAsync(deploymentName);
+                            await kubernetesClient.AppsV1.CreateNamespacedDeploymentAsync(ubuntuDeploymentYaml, deploymentNamespace);
+                            await ExecuteQueriesOnAzurePostgreSQLDbFromK8(deploymentName, deploymentNamespace);
+                            await kubernetesClient.AppsV1.DeleteNamespacedDeploymentAsync(deploymentName, deploymentNamespace);
+
+                            await kubernetesManager.DeployHelmChartToClusterAsync();
                         }
                     }
 
@@ -1220,9 +1221,9 @@ namespace CromwellOnAzureDeployer
                     return dnsZone;
                 });
 
-        private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8()
+        private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8(string podName, string aksNamespace)
             => Execute(
-                $"Executing scripts on cromwell_db...",
+                $"Executing script to create users in tes_db and cromwell_db...",
                 async () => 
                 {
                     var cromwellScript = GetCreateCromwellUserString();
@@ -1236,14 +1237,16 @@ namespace CromwellOnAzureDeployer
                     }
 
                     var commands = new List<string[]> {
-                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:5432:{configuration.PostgreSqlCromwellDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" },
-                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:5432:{configuration.PostgreSqlTesDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} >> ~/.pgpass" },
-                        new string[] { "chmod", "0600", "/home/tes/.pgpass" },
+                        new string[] { "apt", "update" },
+                        new string[] { "apt", "install", "-y", "postgresql-client" },
+                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlCromwellDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" },
+                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlTesDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} >> ~/.pgpass" },
+                        new string[] { "bash", "-lic", "chmod 0600 ~/.pgpass" },
                         new string[] { "/usr/bin/psql", "-h", serverPath, "-U", adminUser, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", cromwellScript },
                         new string[] { "/usr/bin/psql", "-h", serverPath, "-U", adminUser, "-d", configuration.PostgreSqlTesDatabaseName, "-c", tesScript }
                     };
 
-                    await kubernetesManager.ExecuteCommandsOnPodAsync(kubernetesClient, "tes", commands);
+                    await kubernetesManager.ExecuteCommandsOnPodAsync(kubernetesClient, podName, commands, aksNamespace);
                 });
 
         private static async Task SetStorageKeySecret(string vaultUrl, string secretName, string secretValue)

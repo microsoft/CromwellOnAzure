@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using k8s;
+using k8s.Models;
 using Microsoft.Azure.Management.ContainerService;
 using Microsoft.Azure.Management.ContainerService.Fluent;
 using Microsoft.Azure.Management.Msi.Fluent;
@@ -29,7 +30,7 @@ namespace CromwellOnAzureDeployer
     {
         private static readonly AsyncRetryPolicy WorkloadReadyRetryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryAsync(12, retryAttempt => TimeSpan.FromSeconds(15));
+            .WaitAndRetryAsync(40, retryAttempt => TimeSpan.FromSeconds(15));
 
         private static readonly AsyncRetryPolicy KubeExecRetryPolicy = Policy
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
@@ -74,6 +75,12 @@ namespace CromwellOnAzureDeployer
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
             var k8sClientConfiguration = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
             return new Kubernetes(k8sClientConfiguration);
+        }
+
+        public async Task<V1Deployment> GetDeploymentAsync(string name)
+        {
+            var text = await File.ReadAllTextAsync(Path.Join(helmScriptsRootDirectory, "templates", $"{name}-deployment.yaml"));
+            return KubernetesYaml.Deserialize<V1Deployment>(text);
         }
 
         public async Task DeployCoADependenciesAsync()
@@ -164,7 +171,7 @@ namespace CromwellOnAzureDeployer
             return ValuesToSettings(values);
         }
 
-        public async Task ExecuteCommandsOnPodAsync(IKubernetes client, string podName, IEnumerable<string[]> commands)
+        public async Task ExecuteCommandsOnPodAsync(IKubernetes client, string podName, IEnumerable<string[]> commands, string aksNamespace)
         {
             var printHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
             {
@@ -197,10 +204,10 @@ namespace CromwellOnAzureDeployer
                 }
             });
 
-            var pods = await client.CoreV1.ListNamespacedPodAsync(configuration.AksCoANamespace);
+            var pods = await client.CoreV1.ListNamespacedPodAsync(aksNamespace);
             var workloadPod = pods.Items.Where(x => x.Metadata.Name.Contains(podName)).FirstOrDefault();
 
-            if (!await WaitForWorkloadAsync(client, podName, cts.Token))
+            if (!await WaitForWorkloadAsync(client, podName, aksNamespace, cts.Token))
             {
                 throw new Exception($"Timed out waiting for {podName} to start.");
             }
@@ -211,7 +218,7 @@ namespace CromwellOnAzureDeployer
             {
                 foreach (var command in commands)
                 {
-                    await client.NamespacedPodExecAsync(workloadPod.Metadata.Name, configuration.AksCoANamespace, podName, command, true, printHandler, CancellationToken.None);
+                    await client.NamespacedPodExecAsync(workloadPod.Metadata.Name, aksNamespace, podName, command, true, printHandler, CancellationToken.None);
                 }
             });
 
@@ -223,7 +230,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task WaitForCromwellAsync(IKubernetes client)
         {
-            if (!await WaitForWorkloadAsync(client, "cromwell", cts.Token))
+            if (!await WaitForWorkloadAsync(client, "cromwell", configuration.AksCoANamespace, cts.Token))
             {
                 throw new Exception("Timed out waiting for Cromwell to start.");
             }
@@ -430,14 +437,14 @@ namespace CromwellOnAzureDeployer
             return output;
         }
 
-        private async Task<bool> WaitForWorkloadAsync(IKubernetes client, string deploymentName, CancellationToken cancellationToken)
+        private async Task<bool> WaitForWorkloadAsync(IKubernetes client, string deploymentName, string aksNamespace, CancellationToken cancellationToken)
         {
-            var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
+            var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(aksNamespace, cancellationToken: cancellationToken);
             var deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
 
             var result = await WorkloadReadyRetryPolicy.ExecuteAndCaptureAsync(async () =>
             {
-                deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
+                deployments = await client.AppsV1.ListNamespacedDeploymentAsync(aksNamespace, cancellationToken: cancellationToken);
                 deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
 
                 if ((deployment?.Status?.ReadyReplicas ?? 0) < 1)
