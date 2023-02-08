@@ -53,14 +53,22 @@ spec:
               value: {{ .Values.config.dockerInDockerImageName }}
             - name: UseLegacyBatchImplementationWithAutopools
               value: {{ .Values.config.useLegacyBatchImplementationWithAutopools | quote }}
-            - name: BatchImageOffer
-              value: {{ .Values.config.batchImageOffer }}
-            - name: BatchImagePublisher
-              value: {{ .Values.config.batchImagePublisher }}
-            - name: BatchImageSku
-              value: {{ .Values.config.batchImageSku | quote }}
-            - name: BatchImageVersion
-              value: {{ .Values.config.batchImageVersion }}
+            - name: Gen2BatchImageOffer
+              value: {{ .Values.config.gen2BatchImageOffer }}
+            - name: Gen2BatchImagePublisher
+              value: {{ .Values.config.gen2BatchImagePublisher }}
+            - name: Gen2BatchImageSku
+              value: {{ .Values.config.gen2BatchImageSku | quote }}
+            - name: Gen2BatchImageVersion
+              value: {{ .Values.config.gen2BatchImageVersion }}
+            - name: Gen1BatchImageOffer
+              value: {{ .Values.config.gen1BatchImageOffer }}
+            - name: Gen1BatchImagePublisher
+              value: {{ .Values.config.gen1BatchImagePublisher }}
+            - name: Gen1BatchImageSku
+              value: {{ .Values.config.gen1BatchImageSku | quote }}
+            - name: Gen1BatchImageVersion
+              value: {{ .Values.config.gen1BatchImageVersion }}
             - name: BatchNodeAgentSkuId
               value: {{ .Values.config.batchNodeAgentSkuId }}
             - name: BatchPoolRotationForcedDays

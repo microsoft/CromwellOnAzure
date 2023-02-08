@@ -17,10 +17,14 @@ config:
   dockerInDockerImageName: RUNTIME_PARAMETER
   usePreemptibleVmsOnly: RUNTIME_PARAMETER
   useLegacyBatchImplementationWithAutopools: "False"
-  batchImageOffer: RUNTIME_PARAMETER
-  batchImagePublisher: RUNTIME_PARAMETER
-  batchImageSku: RUNTIME_PARAMETER
-  batchImageVersion: RUNTIME_PARAMETER
+  gen2BatchImageOffer: RUNTIME_PARAMETER
+  gen2BatchImagePublisher: RUNTIME_PARAMETER
+  gen2BatchImageSku: RUNTIME_PARAMETER
+  gen2BatchImageVersion: RUNTIME_PARAMETER
+  gen1BatchImageOffer: RUNTIME_PARAMETER
+  gen1BatchImagePublisher: RUNTIME_PARAMETER
+  gen1BatchImageSku: RUNTIME_PARAMETER
+  gen1BatchImageVersion: RUNTIME_PARAMETER
   batchNodeAgentSkuId: RUNTIME_PARAMETER
   batchPoolRotationForcedDays: "7"
   name: RUNTIME_PARAMETER
