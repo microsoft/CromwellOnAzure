@@ -1083,6 +1083,7 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "PostgreSqlUserLogin", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellUserLogin : string.Empty, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlUserPassword", provisionPostgreSqlOnAzure ? configuration.PostgreSqlCromwellUserPassword : string.Empty, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "UsePostgreSqlSingleServer", provisionPostgreSqlOnAzure ? configuration.UsePostgreSqlSingleServer.ToString() : string.Empty, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "IntegrationTestMode", configuration.IntegrationTestMode);
             }
 
             //if (installedVersion < new Version(3, 3))
@@ -1444,6 +1445,7 @@ namespace CromwellOnAzureDeployer
                     new Utility.ConfigReplaceTextItem("{ApplicationInsightsAccountName}", configuration.ApplicationInsightsAccountName),
                     new Utility.ConfigReplaceTextItem("{ManagedIdentityClientId}", managedIdentity.ClientId),
                     new Utility.ConfigReplaceTextItem("{PostgreSqlServerName}", configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? configuration.PostgreSqlServerName : String.Empty),
+                    new Utility.ConfigReplaceTextItem("{IntegrationTestMode}", configuration.IntegrationTestMode.ToString()),
                 }, "scripts", "env-01-account-names.txt"),
                 $"{CromwellAzureRootDir}/env-01-account-names.txt", false),
 
@@ -1687,7 +1689,6 @@ namespace CromwellOnAzureDeployer
                 {
                     await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "new/readme.txt", "Upload a trigger file to this virtual directory to create a new workflow. Additional information here: https://github.com/microsoft/CromwellOnAzure");
                     await UploadTextToStorageAccountAsync(storageAccount, WorkflowsContainerName, "abort/readme.txt", "Upload an empty file to this virtual directory to abort an existing workflow. The empty file's name shall be the Cromwell workflow ID you wish to cancel.  Additional information here: https://github.com/microsoft/CromwellOnAzure");
-                    await UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/job-prep.sh", Utility.GetFileContent("scripts", "job-prep.sh"));
                 });
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
@@ -2871,6 +2872,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.ProvisionPostgreSqlOnAzure, nameof(configuration.ProvisionPostgreSqlOnAzure));
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
+            ThrowIfProvidedForUpdate(configuration.IntegrationTestMode, nameof(configuration.IntegrationTestMode));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
             ThrowIfProvidedForUpdate(configuration.VnetResourceGroupName, nameof(configuration.VnetResourceGroupName));
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));

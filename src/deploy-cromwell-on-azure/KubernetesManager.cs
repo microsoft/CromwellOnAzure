@@ -276,6 +276,7 @@ namespace CromwellOnAzureDeployer
             values.Config["disableBatchNodesPublicIpAddress"] = settings["DisableBatchNodesPublicIpAddress"];
             values.Config["disableBatchScheduling"] = settings["DisableBatchScheduling"];
             values.Config["usePreemptibleVmsOnly"] = settings["UsePreemptibleVmsOnly"];
+            values.Config["integrationTestMode"] = settings["IntegrationTestMode"];
             values.Config["blobxferImageName"] = settings["BlobxferImageName"];
             values.Config["dockerInDockerImageName"] = settings["DockerInDockerImageName"];
             values.Config["batchImageOffer"] = settings["BatchImageOffer"];
@@ -312,6 +313,7 @@ namespace CromwellOnAzureDeployer
                 ["DisableBatchNodesPublicIpAddress"] = values.Config["disableBatchNodesPublicIpAddress"],
                 ["DisableBatchScheduling"] = values.Config["disableBatchScheduling"],
                 ["UsePreemptibleVmsOnly"] = values.Config["usePreemptibleVmsOnly"],
+                ["IntegrationTestMode"] = values.Config["integrationTestMode"],
                 ["BlobxferImageName"] = values.Config["blobxferImageName"],
                 ["DockerInDockerImageName"] = values.Config["dockerInDockerImageName"],
                 ["BatchImageOffer"] = values.Config["batchImageOffer"],

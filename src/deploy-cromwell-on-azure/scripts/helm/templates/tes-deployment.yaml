@@ -25,6 +25,7 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
         supplementalGroups: [1000]
+      terminationGracePeriodSeconds: 90
       containers:
         - env:
             - name: ASPNETCORE_URLS
@@ -53,6 +54,8 @@ spec:
               value: {{ .Values.config.dockerInDockerImageName }}
             - name: UseLegacyBatchImplementationWithAutopools
               value: {{ .Values.config.useLegacyBatchImplementationWithAutopools | quote }}
+            - name: IntegrationTestMode
+              value: {{ .Values.config.IntegrationTestMode | quote }}
             - name: BatchImageOffer
               value: {{ .Values.config.batchImageOffer }}
             - name: BatchImagePublisher

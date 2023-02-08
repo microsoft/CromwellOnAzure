@@ -1,5 +1,6 @@
 ﻿UsePreemptibleVmsOnly=false
 DisableBatchScheduling=false
+IntegrationTestMode={IntegrationTestMode}
 AzureOfferDurableId=MS-AZR-0003p
 UseLegacyBatchImplementationWithAutopools=false
 BatchImageOffer=ubuntu-hpc
