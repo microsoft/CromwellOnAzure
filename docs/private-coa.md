@@ -60,12 +60,18 @@ The following are instructions on how to setup a virtual network, and azure cont
     ```
     ssh azureuser@{public-ip}
     
+    
+    // Install AZ CLI
+    curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+    
+     // Login into Az
+    az login  
+    
     // Copy and paste all the environments variables such as $subscription from the other shell.
     batchsubnetid=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $vnet_name --name batchnodessubnet --query id --output tsv)
 
     
-    // Login into Az
-    az login  
+
     ```
   
 
