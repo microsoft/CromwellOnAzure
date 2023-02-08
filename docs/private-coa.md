@@ -153,8 +153,6 @@ The following are instructions on how to setup a virtual network, and azure cont
 
 ### 5. Run the deployer.
     ```
-    curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-    
     // Set environment variables for CoA
     version=3.1.0
     coa_identifier=coavsmmain
