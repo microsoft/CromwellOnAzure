@@ -14,6 +14,7 @@ The following are instructions on how to setup a virtual network, and azure cont
     cosmos_db_name=coacosmosdbjsaun123
     private_endpoint_name_cosmos=myprivateendpoint123cosmos
     private_endpoint_name_storage=myprivateendpoint123storage
+    private_endpoint_name_cr=myprivateendpoint123cr
     location=eastus
     failoverLocation=eastus2
     
@@ -149,6 +150,24 @@ The following are instructions on how to setup a virtual network, and azure cont
       --image ubuntu:22.04
     
     az acr update --name $mycontainerregistry --public-network-enabled false
+    
+    zoneName="privatelink.azurecr.io"
+
+    az network private-dns zone create --resource-group $resource_group_name \
+        --name  $zoneName
+
+    az network private-dns link vnet create --resource-group $resource_group_name \
+        --zone-name  $zoneName\
+        --name myzonelink \
+        --virtual-network $vnet_name \
+        --registration-enabled false 
+
+    az network private-endpoint dns-zone-group create \
+        --resource-group $resource_group_name \
+        --endpoint-name $private_endpoint_name_cr \
+        --name "MyPrivateZoneGroup" \
+        --private-dns-zone $zoneName \
+        --zone-name "myzone" 
     ```
 
 ### 5. Run the deployer.
