@@ -151,7 +151,19 @@ The following are instructions on how to setup a virtual network, and azure cont
     
     az acr update --name $mycontainerregistry --public-network-enabled false
     
-    zoneName="privatelink.azurecr.io"
+
+    
+    acrID="/subscriptions/$subscription/resourceGroups/$resource_group_name/providers/Microsoft.ContainerRegistry/registries/$mycontainerregistry"
+    MSYS_NO_PATHCONV=1 az network private-endpoint create \
+    --name $private_endpoint_name_cr \
+    --resource-group $resource_group_name \
+    --vnet-name $vnet_name  \
+    --subnet pesubnet \
+    --private-connection-resource-id $acrID \
+    --group-id "registry" \
+    --connection-name "myConnection"
+    
+     zoneName="privatelink.azurecr.io"
 
     az network private-dns zone create --resource-group $resource_group_name \
         --name  $zoneName
