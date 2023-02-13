@@ -224,6 +224,7 @@ The following are instructions on how to setup a virtual network, and azure cont
 ```
     // Add Network Contributor as Resource Group [issue 405](https://github.com/microsoft/CromwellOnAzure/issues/405)
     Add MI of CoA VM Network Contributor RBAC at the Resource Group it fixes this issues
+    Restart CoA VM
     
     //Update path of container in test.wdl ($storage_account_name/inputs.test.wdl)    
      docker: '$mycontainerregistry.azurecr.io/ubuntu:20.04'
