@@ -51,6 +51,8 @@ spec:
               value: {{ .Values.config.applicationInsightsAccountName }}
             - name: AzureOfferDurableId
               value: {{ .Values.config.azureOfferDurableId }}
+            - name: UseLegacyBatchImplementationWithAutopools
+              value: {{ .Values.config.useLegacyBatchImplementationWithAutopools | quote }}
             - name: BatchAccount__AccountName
               value: {{ .Values.config.batchAccountName }}
             - name: BatchNodesSubnetId
@@ -73,6 +75,10 @@ spec:
               value: {{ .Values.config.batchImageVersion }}
             - name: BatchNodeAgentSkuId
               value: {{ .Values.config.batchNodeAgentSkuId }}
+            - name: BatchPoolRotationForcedDays
+              value: {{ .Values.config.batchPoolRotationForcedDays | quote }}
+            - name: Name
+              value: {{ .Values.config.name }}
             - name: MarthaUrl
               value: {{ .Values.config.marthaUrl }}
             - name: MarthaKeyVaultName
