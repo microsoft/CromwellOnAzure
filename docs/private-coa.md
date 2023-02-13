@@ -46,8 +46,6 @@ The following are instructions on how to setup a virtual network, and azure cont
         --resource-group $resource_group_name \
         --vnet-name $vnet_name \
         --disable-private-link-service-network-policies true
-
-    batchsubnetid=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $vnet_name --name batchnodessubnet --query id --output tsv)
     ```
 
 ### 2. Provision a VM to run the CoA deployer. Since the CoA VM will not have direct internet access, we need to create a temporary jumpbox on the virtal network with a public IP address so the deployer can have ssh access to the CoA VM.
@@ -70,9 +68,6 @@ The following are instructions on how to setup a virtual network, and azure cont
     
     // Copy and paste all the environments variables such as $subscription from the other shell.
     batchsubnetid=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $vnet_name --name batchnodessubnet --query id --output tsv)
-
-    
-
     ```
   
 
@@ -131,13 +126,32 @@ The following are instructions on how to setup a virtual network, and azure cont
 ### 4. Provision Azure Container Registry
 
     ```
+    // Instal docker if not on machine
+    sudo apt  install docker.io
+    
     az acr create --resource-group $resource_group_name --name $mycontainerregistry --sku Premium
     az acr login --name $mycontainerregistry
     
-    az acr import \
-      --name $mycontainerregistry \
-      --source docker.io/library/docker:latest \
-      --image docker:v1
+    
+    // To account for dockerinDocker [issue 401](https://github.com/microsoft/CromwellOnAzure/issues/401)
+    // create docker file 
+    
+    
+    FROM docker.io/library/docker:latest
+    LABEL author="Venkat S. Malladi"
+
+    ENV DEBIAN_FRONTEND=noninteractive
+
+    RUN apk add grep
+    RUN apk add bash
+
+    sudo docker build -t $mycontainerregistry.azurecr.io/docker:v1 .
+    sudo docker push $mycontainerregistry.azurecr.io/docker:v1
+    
+    //az acr import \
+    //  --name $mycontainerregistry \
+     // --source docker.io/library/docker:latest \
+     // --image docker:v1
 
     az acr import \
       --name $mycontainerregistry \
@@ -150,7 +164,6 @@ The following are instructions on how to setup a virtual network, and azure cont
       --image ubuntu:22.04
     
     az acr update --name $mycontainerregistry --public-network-enabled false
-    
 
     
     acrID="/subscriptions/$subscription/resourceGroups/$resource_group_name/providers/Microsoft.ContainerRegistry/registries/$mycontainerregistry"
@@ -186,7 +199,7 @@ The following are instructions on how to setup a virtual network, and azure cont
     ```
     // Set environment variables for CoA
     version=3.1.0
-    coa_identifier=coavsmmain
+    coa_identifier=vsmp
     
     //Download the installer
     wget https://github.com/microsoft/CromwellOnAzure/releases/download/$version/deploy-cromwell-on-azure-linux
@@ -207,3 +220,23 @@ The following are instructions on how to setup a virtual network, and azure cont
         --VmSubnetName vmsubnet
     ```
 
+### 6. Update wdl and Managed identity access to run test workflow
+```
+    // Add Network Contributor as Resource Group [issue 405](https://github.com/microsoft/CromwellOnAzure/issues/405)
+    Add MI of CoA VM Network Contributor RBAC at the Resource Group it fixes this issues
+    
+    //Update path of container in test.wdl ($storage_account_name/inputs.test.wdl)    
+     docker: '$mycontainerregistry.azurecr.io/ubuntu:20.04'
+     
+     //Upload new trigger file to test.
+     
+     {
+    "WorkflowUrl": "/$storage_account_name/inputs/test/test.wdl",
+    "WorkflowInputsUrl": "/$storage_account_name/inputs/test/testInputs.json",
+    "WorkflowInputsUrls": null,
+    "WorkflowOptionsUrl": null,
+    "WorkflowDependenciesUrl": null,
+  }
+    ```
+    
+    
