@@ -19,7 +19,6 @@ using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Management.Storage.Fluent;
 using Polly;
 using Polly.Retry;
-using static CromwellOnAzureDeployer.Deployer;
 
 namespace CromwellOnAzureDeployer
 {
