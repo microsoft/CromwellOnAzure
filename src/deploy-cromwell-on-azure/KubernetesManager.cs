@@ -19,6 +19,7 @@ using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Management.Storage.Fluent;
 using Polly;
 using Polly.Retry;
+using static CromwellOnAzureDeployer.Deployer;
 
 namespace CromwellOnAzureDeployer
 {
@@ -101,7 +102,7 @@ namespace CromwellOnAzureDeployer
             => await ExecHelmProcessAsync($"upgrade --install cromwellonazure ./helm --kubeconfig {kubeConfigPath} --namespace {configuration.AksCoANamespace} --create-namespace",
                 workingDirectory: workingDirectoryTemp);
 
-        public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId)
+        public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId, List<MountableContainer> containersToMount)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(await File.ReadAllTextAsync(valuesTemplatePath));
             UpdateValuesFromSettings(values, settings);
@@ -144,15 +145,19 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
+            MergeContainers(containersToMount, values);
             var valuesString = KubernetesYaml.Serialize(values);
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
         }
 
-        public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings)
+        
+
+        public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
             UpdateValuesFromSettings(values, settings);
+            MergeContainers(containersToMount, values);
             var valuesString = KubernetesYaml.Serialize(values);
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
@@ -229,9 +234,9 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        public async Task UpgradeAKSDeploymentAsync(Dictionary<string, string> settings, IStorageAccount storageAccount)
+        public async Task UpgradeAKSDeploymentAsync(Dictionary<string, string> settings, IStorageAccount storageAccount, List<MountableContainer> containersToMount)
         {
-            await UpgradeValuesYamlAsync(storageAccount, settings);
+            await UpgradeValuesYamlAsync(storageAccount, settings, containersToMount);
             await DeployHelmChartToClusterAsync();
         }
 
@@ -262,6 +267,32 @@ namespace CromwellOnAzureDeployer
                 ConsoleEx.WriteLine(exc.ToString());
                 throw;
             }
+        }
+
+        private void MergeContainers(List<MountableContainer> containersToMount, HelmValues values)
+        {
+            if (containersToMount is null)
+            {
+                return;
+            }
+
+            HashSet<MountableContainer> internalContainersMIAuth = values.InternalContainersMIAuth.Select(x => new MountableContainer(x)).ToHashSet();
+            HashSet<MountableContainer> sasContainers = values.ExternalSasContainers.Select(x => new MountableContainer(x)).ToHashSet();
+
+            foreach (var container in containersToMount)
+            {
+                if (string.IsNullOrWhiteSpace(container.SasToken))
+                {
+                    internalContainersMIAuth.Add(container);
+                }
+                else
+                {
+                    sasContainers.Add(container);
+                }
+            }
+
+            values.InternalContainersMIAuth = internalContainersMIAuth.Select(x => x.ToDictionary()).ToList();
+            values.ExternalSasContainers = sasContainers.Select(x => x.ToDictionary()).ToList();
         }
 
         private static void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)

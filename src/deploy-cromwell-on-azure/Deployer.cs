@@ -176,6 +176,8 @@ namespace CromwellOnAzureDeployer
                 ConnectionInfo sshConnectionInfo = null;
                 IPrivateDnsZone postgreSqlDnsZone = null;
 
+                var containersToMount = await GetContainersToMount(configuration.ContainersToMountPath);
+
                 try
                 {
                     if (configuration.Update)
@@ -383,10 +385,12 @@ namespace CromwellOnAzureDeployer
                             var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
                             var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
 
+                            var containers = await GetContainersToMount(configuration.ContainersToMountPath);
                             kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
                             await kubernetesManager.UpgradeAKSDeploymentAsync(
                                 settings,
-                                storageAccount);
+                                storageAccount,
+                                containers);
                         }
                         else
                         {
@@ -596,7 +600,8 @@ namespace CromwellOnAzureDeployer
                                     await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                                 }
 
-                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity);
+                                var containersToMount = await GetContainersToMount(configuration.ContainersToMountPath);
+                                await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity, containersToMount);
 
                                 if (configuration.ManualHelmDeployment)
                                 {
@@ -2860,7 +2865,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
             ThrowIfProvidedForUpdate(configuration.CosmosDbAccountName, nameof(configuration.CosmosDbAccountName));
             ThrowIfProvidedForUpdate(configuration.CrossSubscriptionAKSDeployment, nameof(configuration.CrossSubscriptionAKSDeployment));
-            ThrowIfProvidedForUpdate(configuration.ProvisionPostgreSqlOnAzure, nameof(configuration.ProvisionPostgreSqlOnAzure));
+            //ThrowIfProvidedForUpdate(configuration.ProvisionPostgreSqlOnAzure, nameof(configuration.ProvisionPostgreSqlOnAzure));
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
@@ -3180,6 +3185,162 @@ namespace CromwellOnAzureDeployer
             var pathComponents = path.TrimEnd(dirSeparator).Split(dirSeparator);
 
             return string.Join(dirSeparator, pathComponents.Take(pathComponents.Length - 1));
+        }
+
+        public async Task<List<MountableContainer>> GetContainersToMount(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            var containers = new HashSet<MountableContainer>();
+            var exclusion = new HashSet<MountableContainer>();
+            var wildCardAccounts = new List<string>();
+            var contents = await File.ReadAllTextAsync(path);
+
+            foreach (var line in contents.Split("\n", StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (line.StartsWith("#"))
+                {
+                    continue;
+                }
+
+                if (line.StartsWith("-"))
+                {
+                    var parts = line.Trim('-').Split("/", StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        var storageAccount = await GetExistingStorageAccountAsync(parts[0]);
+                        exclusion.Add(new MountableContainer() { StorageAccount = parts[0], ContainerName = parts[1].Trim(), ResourceGroupName = storageAccount.ResourceGroupName });
+                    }
+                }
+
+                if (line.StartsWith("/"))
+                {
+                    var parts = line.Split("/", StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        if (string.Equals(parts[1].Trim(), "*"))
+                        {
+                            wildCardAccounts.Add(parts[0]);
+                        }
+                        else
+                        {
+                            var storageAccount = await GetExistingStorageAccountAsync(parts[0]);
+                            containers.Add(new MountableContainer() { StorageAccount = parts[0], ContainerName = parts[1].Trim(), ResourceGroupName = storageAccount.ResourceGroupName });
+                        }
+                    }
+                }
+
+                if (line.StartsWith("http"))
+                {
+                    var blobUrl = new BlobUriBuilder(new Uri(line));
+                    var blobHostStorageAccount = blobUrl.Host.Split(".").First();
+                    containers.Add(new MountableContainer()
+                    {
+                        StorageAccount = blobHostStorageAccount,
+                        ContainerName = blobUrl.BlobContainerName,
+                        SasToken = blobUrl.Sas.ToString()
+                    });
+                }
+            }
+
+            foreach (var accountName in wildCardAccounts)
+            {
+                var storageAccount = await GetExistingStorageAccountAsync(accountName);
+                var blobContainers = await storageAccount.Manager.BlobContainers.ListAsync(storageAccount.ResourceGroupName, storageAccount.Name);
+                foreach (var page in blobContainers)
+                {
+                    foreach (var container in page.Value.ToList())
+                    {
+                        containers.Add(new MountableContainer() { StorageAccount = accountName, ContainerName = container.Name, ResourceGroupName = storageAccount.ResourceGroupName });
+                    }
+                }
+            }
+
+            containers.ExceptWith(exclusion);
+            return containers.ToList();
+        }
+
+        public class MountableContainer
+        {
+            public string StorageAccount { get; set; }
+            public string ContainerName { get; set; }
+            public string SasToken { get; set; }
+            public string ResourceGroupName { get; set; }
+
+            public MountableContainer() { }
+
+            public MountableContainer(Dictionary<string, string> dictionary)
+            {
+                if (dictionary.ContainsKey("accountName"))
+                {
+                    StorageAccount = dictionary["accountName"];
+                }
+
+                if (dictionary.ContainsKey("containerName"))
+                {
+                    ContainerName = dictionary["containerName"];
+                }
+
+                if (dictionary.ContainsKey("resourceGroup"))
+                {
+                    ResourceGroupName = dictionary["resourceGroup"];
+                }
+
+                if (dictionary.ContainsKey("sasToken"))
+                {
+                    SasToken = dictionary["sasToken"];
+                }
+            }
+
+            public Dictionary<string, string> ToDictionary()
+            {
+                var dictionary = new Dictionary<string, string>();
+
+                if (StorageAccount is not null)
+                {
+                    dictionary["accountName"] = StorageAccount;
+                }
+
+                if (ContainerName is not null)
+                {
+                    dictionary["containerName"] = ContainerName;
+                }
+
+                if (ResourceGroupName is not null)
+                {
+                    dictionary["resourceGroup"] = ResourceGroupName;
+                }
+
+                if (SasToken is not null)
+                {
+                    dictionary["sasToken"] = SasToken;
+                }
+
+                return dictionary;
+            }
+
+            public override bool Equals(object other)
+            {
+                return string.Equals(StorageAccount, ((MountableContainer)other).StorageAccount, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(ContainerName, ((MountableContainer)other).ContainerName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(SasToken, ((MountableContainer)other).SasToken, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(ResourceGroupName, ((MountableContainer)other).ResourceGroupName, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public override int GetHashCode()
+            {
+                if (SasToken is null)
+                {
+                    return HashCode.Combine(StorageAccount.GetHashCode(), ContainerName.GetHashCode(), ResourceGroupName.GetHashCode());
+                }
+                else
+                {
+                    return HashCode.Combine(StorageAccount.GetHashCode(), ContainerName.GetHashCode(), SasToken.GetHashCode());
+                }
+            }
         }
 
         private class ValidationException : Exception
