@@ -8,6 +8,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.IO;
 using System.Linq;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -374,7 +375,7 @@ namespace CromwellOnAzureDeployer
 
                             if (accountNames.TryGetValue("Name", out var name))
                             {
-                                configuration.Name = name;
+                                configuration.BatchPrefix = name;
                             }
 
                             // Override any configuration that is used by the update.
@@ -399,6 +400,13 @@ namespace CromwellOnAzureDeployer
                         if (configuration.UseAks)
                         {
                             kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
+                        }
+
+                        if (string.IsNullOrWhiteSpace(configuration.BatchPrefix))
+                        {
+                            var blob = new byte[10];
+                            RandomNumberGenerator.Fill(blob);
+                            configuration.BatchPrefix = CommonUtilities.Base32.ConvertToBase32(blob).TrimEnd('=')[..15];
                         }
 
                         ValidateRegionName(configuration.RegionName);
@@ -1066,7 +1074,7 @@ namespace CromwellOnAzureDeployer
 
             if (installedVersion is null)
             {
-                UpdateSetting(settings, defaults, "Name", configuration.Name, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "Name", configuration.BatchPrefix, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "CosmosDbAccountName", configuration.CosmosDbAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
@@ -1426,7 +1434,7 @@ namespace CromwellOnAzureDeployer
         private async Task WritePersonalizedFilesToVmAsync(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
         {
             var env04SettingsContent = Utility.GetFileContent("scripts", "env-04-settings.txt");
-            env04SettingsContent = env04SettingsContent.Replace("{DefaultName}", configuration.Name);
+            env04SettingsContent = env04SettingsContent.Replace("{DefaultName}", configuration.BatchPrefix);
 
             if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
             {
@@ -2472,7 +2480,7 @@ namespace CromwellOnAzureDeployer
                     var existingFileContent = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
                     var existingSettings = Utility.DelimitedTextToDictionary(existingFileContent.Output.Trim());
                     var newSettings = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-04-settings.txt"));
-                    newSettings["Name"] = configuration.Name;
+                    newSettings["Name"] = configuration.BatchPrefix;
 
                     foreach (var key in newSettings.Keys.Except(existingSettings.Keys))
                     {
@@ -2866,6 +2874,7 @@ namespace CromwellOnAzureDeployer
                 ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
             }
 
+            ThrowIfProvidedForUpdate(configuration.BatchPrefix, nameof(configuration.BatchPrefix));
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
             ThrowIfProvidedForUpdate(configuration.CosmosDbAccountName, nameof(configuration.CosmosDbAccountName));
             ThrowIfProvidedForUpdate(configuration.CrossSubscriptionAKSDeployment, nameof(configuration.CrossSubscriptionAKSDeployment));
@@ -2905,6 +2914,14 @@ namespace CromwellOnAzureDeployer
                 else
                 {
                     ValidateDependantFeature(configuration.UseAks, nameof(configuration.UseAks), configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault(), nameof(configuration.ProvisionPostgreSqlOnAzure));
+                }
+            }
+
+            if (!configuration.Update)
+            {
+                if (configuration.BatchPrefix?.Length > 15 || (configuration.BatchPrefix?.Any(c => !char.IsAsciiLetterOrDigit(c)) ?? false))
+                {
+                    throw new ValidationException("BatchPrefix must not be longer than 15 chars and may contain only ASCII letters or digits", false);
                 }
             }
         }
