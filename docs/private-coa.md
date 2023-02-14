@@ -222,13 +222,13 @@ The following are instructions on how to setup a virtual network, and azure cont
 
 ### 6. Update wdl and Managed identity access to run test workflow
 ```
-    // Add Network Contributor as Resource Group [issue 405](https://github.com/microsoft/CromwellOnAzure/issues/405)
+    // Add Network Contributor as Resource Group [issue 450](https://github.com/microsoft/CromwellOnAzure/issues/450)
     Add MI of CoA VM Network Contributor RBAC at the Resource Group it fixes this issues
     Restart CoA VM
 
 //[Use private Docker containers hosted on Azure](https://github.com/microsoft/CromwellOnAzure/blob/develop/docs/troubleshooting-guide.md#use-private-docker-containers-hosted-on-azure)
     
-    //Update path of container in test.wdl ($storage_account_name/inputs.test.wdl)    
+    //Update path of container in test.wdl ($storage_account_name/inputs.test.wdl)  [issue 585](https://github.com/microsoft/CromwellOnAzure/issues/585)  
      docker: '$mycontainerregistry.azurecr.io/ubuntu:20.04'
      
      //Upload new trigger file to test.
