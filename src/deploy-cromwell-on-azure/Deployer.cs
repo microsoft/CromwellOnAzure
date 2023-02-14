@@ -708,6 +708,7 @@ namespace CromwellOnAzureDeployer
             if (installedVersion is null)
             {
                 var provisionPostgreSqlOnAzure = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault();
+                UpdateSetting(settings, defaults, "Name", configuration.Name, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
