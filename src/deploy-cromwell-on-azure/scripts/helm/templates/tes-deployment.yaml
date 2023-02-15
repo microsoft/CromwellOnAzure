@@ -66,16 +66,6 @@ spec:
               value: {{ .Values.config.disableBatchScheduling | quote }}
             - name: DockerInDockerImageName
               value: {{ .Values.config.dockerInDockerImageName }}
-<<<<<<< HEAD
-            - name: BatchImageOffer
-              value: {{ .Values.config.batchImageOffer }}
-            - name: BatchImagePublisher
-              value: {{ .Values.config.batchImagePublisher }}
-            - name: BatchImageSku
-              value: {{ .Values.config.batchImageSku | quote }}
-            - name: BatchImageVersion
-              value: {{ .Values.config.batchImageVersion }}
-=======
             - name: UseLegacyBatchImplementationWithAutopools
               value: {{ .Values.config.useLegacyBatchImplementationWithAutopools | quote }}
             - name: Gen2BatchImageOffer
@@ -94,7 +84,6 @@ spec:
               value: {{ .Values.config.gen1BatchImageSku | quote }}
             - name: Gen1BatchImageVersion
               value: {{ .Values.config.gen1BatchImageVersion }}
->>>>>>> origin/develop
             - name: BatchNodeAgentSkuId
               value: {{ .Values.config.batchNodeAgentSkuId }}
             - name: BatchPoolRotationForcedDays
