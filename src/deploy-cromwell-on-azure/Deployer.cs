@@ -674,6 +674,127 @@ namespace CromwellOnAzureDeployer
                 () => containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksClusterName, cluster));
         }
 
+<<<<<<< HEAD
+=======
+        private async Task UpgradeVMDeployment(IResourceGroup resourceGroup, Dictionary<string, string> accountNames, ConnectionInfo sshConnectionInfo, IStorageAccount storageAccount, ICosmosDBAccount cosmosDb, IVirtualMachine linuxVm)
+        {
+            IIdentity managedIdentity = null;
+
+            await ConfigureVmAsync(sshConnectionInfo, null);
+
+            if (!accountNames.TryGetValue("ManagedIdentityClientId", out var existingUserManagedIdentity))
+            {
+                managedIdentity = await ReplaceSystemManagedIdentityWithUserManagedIdentityAsync(resourceGroup, linuxVm);
+            }
+            else
+            {
+                managedIdentity = await linuxVm.UserAssignedManagedServiceIdentityIds.Select(GetIdentityByIdAsync).FirstOrDefault(MatchesClientId);
+
+                if (managedIdentity is null)
+                {
+                    throw new ValidationException($"The managed identity, referenced by the VM configuration retrieved from virtual machine {configuration.VmName}, does not exist or is not accessible to the current user. ");
+                }
+
+                Task<IIdentity> GetIdentityByIdAsync(string id) => azureSubscriptionClient.Identities.GetByIdAsync(id);
+
+                bool MatchesClientId(Task<IIdentity> identity)
+                {
+                    try
+                    {
+                        return existingUserManagedIdentity.Equals(identity.Result.ClientId, StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch (Exception e)
+                    {
+                        ConsoleEx.WriteLine(e.Message);
+                        _ = identity.Exception;
+                        return false;
+                    }
+                }
+            }
+
+            await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
+
+            var installedVersion = await GetInstalledCromwellOnAzureVersionAsync(sshConnectionInfo);
+
+            if (installedVersion is null)
+            {
+                // If upgrading from pre-2.1 version, patch the installed Cromwell configuration file (disable call caching and default to preemptible)
+                await PatchCromwellConfigurationFileV200Async(storageAccount);
+                await SetCosmosDbContainerAutoScaleAsync(cosmosDb);
+            }
+
+            if (installedVersion is null || installedVersion < new Version(2, 1))
+            {
+                await PatchContainersToMountFileV210Async(storageAccount, managedIdentity.Name);
+            }
+
+            if (installedVersion is null || installedVersion < new Version(2, 2))
+            {
+                await PatchContainersToMountFileV220Async(storageAccount);
+            }
+
+            if (installedVersion is null || installedVersion < new Version(2, 4))
+            {
+                await PatchContainersToMountFileV240Async(storageAccount);
+                await PatchAccountNamesFileV240Async(sshConnectionInfo, managedIdentity);
+            }
+
+            if (installedVersion is null || installedVersion < new Version(2, 5))
+            {
+                await MitigateChaosDbV250Async(cosmosDb);
+            }
+
+            var newSettingsAdded = false;
+
+            if (installedVersion is null || installedVersion < new Version(3, 0))
+            {
+                await PatchCromwellConfigurationFileV300Async(storageAccount);
+                await AddNewSettingsAsync(sshConnectionInfo);
+                newSettingsAdded = true;
+                await UpgradeBlobfuseV300Async(sshConnectionInfo);
+                await DisableDockerServiceV300Async(sshConnectionInfo);
+
+                ConsoleEx.WriteLine($"It's recommended to update the default CoA storage account to a General Purpose v2 account.", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine($"To do that, navigate to the storage account in the Azure Portal,", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine($"Configuration tab, and click 'Upgrade.'", ConsoleColor.Yellow);
+            }
+
+            if (installedVersion is null || installedVersion < new Version(3, 1))
+            {
+                if (!newSettingsAdded)
+                {
+                    await AddNewSettingsAsync(sshConnectionInfo);
+                    newSettingsAdded = true;
+                }
+
+                await PatchCromwellConfigurationFileV310Async(storageAccount);
+            }
+
+            if (installedVersion is null || installedVersion < new Version(3, 2))
+            {
+                if (!newSettingsAdded)
+                {
+                    await AddNewSettingsAsync(sshConnectionInfo);
+                    newSettingsAdded = true;
+                }
+
+                await PatchAllowedVmSizesFileV320Async(storageAccount);
+                await PatchMySqlDbRootPasswordV320Async(sshConnectionInfo);
+            }
+
+            if (installedVersion is null || installedVersion < new Version(4, 0))
+            {
+                if (!newSettingsAdded) // Migrations from 3.1 to 3.2 may not have added the new global start-task settings
+                {
+                    await AddNewSettingsAsync(sshConnectionInfo);
+                    newSettingsAdded = true;
+                }
+
+                await PatchContainersAddJobPreparationScriptV400Async(storageAccount);
+            }
+        }
+
+>>>>>>> origin/develop
         private static Dictionary<string, string> GetDefaultValues(string[] files)
         {
             var settings = new Dictionary<string, string>();
@@ -1441,6 +1562,221 @@ namespace CromwellOnAzureDeployer
             WriteExecutionTime(line, startTime);
         }
 
+<<<<<<< HEAD
+=======
+        private Task PatchCromwellConfigurationFileV200Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
+                    {
+                        // Replace "enabled = true" with "enabled = false" in call-caching element
+                        (Utility.ConfigReplaceTextItemBase)new Utility.ConfigReplaceRegExItemText(@"^(\s*call-caching\s*{[^}]*enabled\s*[=:]{1}\s*)(true)$", "$1false", RegexOptions.Multiline),
+                        // Add "preemptible: true" to default-runtime-attributes element, if preemptible is not already present
+                        new Utility.ConfigReplaceRegExItemEvaluator(@"(?![\s\S]*preemptible)^(\s*default-runtime-attributes\s*{)([^}]*$)(\s*})$", match => $"{match.Groups[1].Value}{match.Groups[2].Value}\n          preemptible: true{match.Groups[3].Value}", RegexOptions.Multiline),
+                    }, (await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cts)) ?? Utility.GetFileContent("scripts", CromwellConfigurationFileName)));
+                });
+
+        private Task PatchContainersToMountFileV210Async(IStorageAccount storageAccount, string managedIdentityName)
+            => Execute(
+                $"Adding public datasettestinputs/dataset container to '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
+
+                    if (containersToMountText is not null)
+                    {
+                        // Add datasettestinputs container if not already present
+                        if (!containersToMountText.Contains("datasettestinputs.blob.core.windows.net/dataset"))
+                        {
+                            // [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="SAS token for public use")]
+                            var dataSetUrl = "https://datasettestinputs.blob.core.windows.net/dataset?sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D";
+                            containersToMountText = $"{containersToMountText.TrimEnd()}\n{dataSetUrl}";
+                        }
+
+                        containersToMountText = containersToMountText
+                            .Replace("where the VM has Contributor role", $"where the identity '{managedIdentityName}' has 'Contributor' role")
+                            .Replace("where VM's identity", "where CoA VM")
+                            .Replace("that the VM's identity has Contributor role", $"that the identity '{managedIdentityName}' has 'Contributor' role");
+
+                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountText);
+                    }
+                });
+
+        private Task PatchContainersToMountFileV220Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Commenting out msgenpublicdata/inputs in '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container. It will be removed in v2.3...",
+                async () =>
+                {
+                    var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
+
+                    if (containersToMountText is not null)
+                    {
+                        containersToMountText = containersToMountText.Replace("https://msgenpublicdata", $"#https://msgenpublicdata");
+
+                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountText);
+                    }
+                });
+
+        private Task PatchContainersToMountFileV240Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Removing reference to msgenpublicdata/inputs in '{ContainersToMountFileName}' file in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var containersToMountText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, cts);
+
+                    if (containersToMountText is not null)
+                    {
+                        var regex = new Regex("^.*msgenpublicdata.blob.core.windows.net/inputs.*(\n|\r|\r\n)", RegexOptions.Multiline);
+                        containersToMountText = regex.Replace(containersToMountText, string.Empty);
+
+                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, containersToMountText);
+                    }
+                });
+
+        private Task PatchAccountNamesFileV240Async(ConnectionInfo sshConnectionInfo, IIdentity managedIdentity)
+            => Execute(
+                $"Adding Managed Identity ClientId to 'env-01-account-names.txt' file on the VM...",
+                async () =>
+                {
+                    var accountNames = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-01-account-names.txt")).Output);
+                    accountNames["ManagedIdentityClientId"] = managedIdentity.ClientId;
+
+                    await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.DictionaryToDelimitedText(accountNames), $"{CromwellAzureRootDir}/env-01-account-names.txt", false));
+                });
+
+        private async Task MitigateChaosDbV250Async(ICosmosDBAccount cosmosDb)
+            => await Execute("#ChaosDB remedition (regenerating CosmosDB primary key)...",
+                () => cosmosDb.RegenerateKeyAsync(KeyKind.Primary.Value));
+
+        private Task PatchCromwellConfigurationFileV300Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cts);
+                    var tesBackendParametersRegex = new Regex(@"^(\s*endpoint.*)([\s\S]*)", RegexOptions.Multiline);
+
+                    // Add "use_tes_11_preview_backend_parameters = true" to TES config, after endpoint setting, if use_tes_11_preview_backend_parameters is not already present
+                    if (!cromwellConfigText.Contains("use_tes_11_preview_backend_parameters", StringComparison.OrdinalIgnoreCase))
+                    {
+                        cromwellConfigText = tesBackendParametersRegex.Replace(cromwellConfigText, match => $"{match.Groups[1].Value}\n        use_tes_11_preview_backend_parameters = true{match.Groups[2].Value}");
+                    }
+
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
+                });
+
+        private async Task UpgradeBlobfuseV300Async(ConnectionInfo sshConnectionInfo)
+            => await Execute("Upgrading blobfuse to 1.4.3...",
+                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo apt-get update ; sudo apt-get --only-upgrade install blobfuse=1.4.3"));
+
+        private async Task DisableDockerServiceV300Async(ConnectionInfo sshConnectionInfo)
+            => await Execute("Disabling auto-start of Docker service...",
+                () => ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, "sudo systemctl disable docker"));
+
+        private Task PatchCromwellConfigurationFileV310Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Patching '{CromwellConfigurationFileName}' in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var cromwellConfigText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cts);
+                    var akkaHttpRegex = new Regex(@"(\s*akka\.http\.host-connection-pool\.pool-implementation.*$)", RegexOptions.Multiline);
+                    cromwellConfigText = akkaHttpRegex.Replace(cromwellConfigText, match => string.Empty);
+
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, cromwellConfigText);
+                });
+
+        private async Task PatchMySqlDbRootPasswordV320Async(ConnectionInfo sshConnectionInfo)
+        {
+            if (!configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+            {
+                await Execute(
+                    $"Adding new setting to 'env-04-settings.txt' file on the VM...",
+                    async () =>
+                    {
+                        var envSettings = Utility.DelimitedTextToDictionary((await ExecuteCommandOnVirtualMachineWithRetriesAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt")).Output);
+                        // [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Previously hardcoded password only accessible within security context.")]
+                        envSettings["MYSQL_ROOT_PASSWORD"] = "cromwell";
+                        await UploadFilesToVirtualMachineAsync(sshConnectionInfo, (Utility.DictionaryToDelimitedText(envSettings), $"{CromwellAzureRootDir}/env-04-settings.txt", false));
+                    }
+                );
+            }
+        }
+
+        private Task PatchAllowedVmSizesFileV320Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Patching '{AllowedVmSizesFileName}' in '{ConfigurationContainerName}' storage container...",
+                async () =>
+                {
+                    var allowedVmSizesText = await DownloadTextFromStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, cts);
+
+                    allowedVmSizesText = allowedVmSizesText
+                        .Replace("Azure VM sizes used", "Azure VM sizes/families used")
+                        .Replace("VM size names", "VM size or family names")
+                        .Replace("# Standard_D3_v2", "# standardDv2Family");
+
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, allowedVmSizesText);
+                });
+
+        private Task PatchContainersAddJobPreparationScriptV400Async(IStorageAccount storageAccount)
+            => Execute(
+                $"Adding job scripts...",
+                () => UploadTextToStorageAccountAsync(storageAccount, InputsContainerName, "coa-tes/job-prep.sh", Utility.GetFileContent("scripts", "job-prep.sh")));
+
+        private Task AddNewSettingsAsync(ConnectionInfo sshConnectionInfo)
+            => Execute(
+                $"Adding new settings to 'env-04-settings.txt' file on the VM...",
+                async () =>
+                {
+                    var existingFileContent = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
+                    var existingSettings = Utility.DelimitedTextToDictionary(existingFileContent.Output.Trim());
+                    var newSettings = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-04-settings.txt"));
+                    newSettings["Name"] = configuration.Name;
+
+                    foreach (var key in newSettings.Keys.Except(existingSettings.Keys))
+                    {
+                        existingSettings.Add(key, newSettings[key]);
+                    }
+
+                    var newFileContent = Utility.DictionaryToDelimitedText(existingSettings);
+
+                    await UploadFilesToVirtualMachineAsync(
+                        sshConnectionInfo,
+                        new[] {
+                            (newFileContent, $"{CromwellAzureRootDir}/env-04-settings.txt", false)
+                        });
+                });
+
+        private async Task SetCosmosDbContainerAutoScaleAsync(ICosmosDBAccount cosmosDb)
+        {
+            var tesDb = await cosmosDb.GetSqlDatabaseAsync(Constants.CosmosDbDatabaseId);
+            var taskContainer = await tesDb.GetSqlContainerAsync(Constants.CosmosDbContainerId);
+            var requestThroughput = await taskContainer.GetThroughputSettingsAsync();
+
+            if (requestThroughput is not null && requestThroughput.Throughput is not null && requestThroughput.AutopilotSettings?.MaxThroughput is null)
+            {
+                var key = (await cosmosDb.ListKeysAsync()).PrimaryMasterKey;
+                var cosmosClient = new CosmosRestClient(cosmosDb.DocumentEndpoint, key);
+
+                // If the container has request throughput setting configured, and it is currently manual, set it to auto
+                await Execute(
+                    $"Switching the throughput setting for CosmosDb container 'Tasks' in database 'TES' from Manual to Autoscale...",
+                    () => cosmosClient.SwitchContainerRequestThroughputToAutoAsync(Constants.CosmosDbDatabaseId, Constants.CosmosDbContainerId));
+            }
+        }
+
+        private static ConnectionInfo GetSshConnectionInfo(IVirtualMachine linuxVm, string vmUsername, string vmPassword)
+        {
+            var publicIPAddress = linuxVm.GetPrimaryPublicIPAddress();
+
+            return new ConnectionInfo(
+                publicIPAddress is not null ? publicIPAddress.Fqdn : linuxVm.GetPrimaryNetworkInterface().PrimaryPrivateIP,
+                vmUsername,
+                new PasswordAuthenticationMethod(vmUsername, vmPassword));
+        }
+
+>>>>>>> origin/develop
         private static void ValidateMainIdentifierPrefix(string prefix)
         {
             const int maxLength = 12;
