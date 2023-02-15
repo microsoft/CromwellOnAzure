@@ -404,9 +404,9 @@ namespace CromwellOnAzureDeployer
 
                         if (string.IsNullOrWhiteSpace(configuration.BatchPrefix))
                         {
-                            var blob = new byte[10];
+                            var blob = new byte[5];
                             RandomNumberGenerator.Fill(blob);
-                            configuration.BatchPrefix = CommonUtilities.Base32.ConvertToBase32(blob).TrimEnd('=')[..15];
+                            configuration.BatchPrefix = CommonUtilities.Base32.ConvertToBase32(blob).TrimEnd('=');
                         }
 
                         ValidateRegionName(configuration.RegionName);
@@ -2919,9 +2919,9 @@ namespace CromwellOnAzureDeployer
 
             if (!configuration.Update)
             {
-                if (configuration.BatchPrefix?.Length > 15 || (configuration.BatchPrefix?.Any(c => !char.IsAsciiLetterOrDigit(c)) ?? false))
+                if (configuration.BatchPrefix?.Length > 11 || (configuration.BatchPrefix?.Any(c => !char.IsAsciiLetterOrDigit(c)) ?? false))
                 {
-                    throw new ValidationException("BatchPrefix must not be longer than 15 chars and may contain only ASCII letters or digits", false);
+                    throw new ValidationException("BatchPrefix must not be longer than 11 chars and may contain only ASCII letters or digits", false);
                 }
             }
         }
