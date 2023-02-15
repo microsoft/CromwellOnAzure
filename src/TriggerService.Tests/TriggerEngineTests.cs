@@ -14,14 +14,20 @@ namespace TriggerService.Tests
     [TestClass]
     public class TriggerEngineTests
     {
+        public TriggerEngineTests()
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+
+        private volatile bool isStorageAvailable = false;
+        private volatile bool isCromwellAvailable = false;
+
         [TestMethod]
         public async Task TriggerEngineRunsAndOnlyLogsAvailabilityOncePerSystemUponAvailableStateAsync()
         {
+            // TODO - this test still occasionally fails on this: Assert.IsTrue(availableLines.Count == 4);
+            // and results in availableLines.Count = 3
             var loggerFactory = new TestLoggerFake();
             var environment = new Mock<ICromwellOnAzureEnvironment>();
             var logger = loggerFactory.CreateLogger<TriggerEngineTests>();
-            var isStorageAvailable = false;
-            var isCromwellAvailable = false;
 
             environment.Setup(x => x.ProcessAndAbortWorkflowsAsync()).Returns(() =>
             {

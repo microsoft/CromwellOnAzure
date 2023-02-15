@@ -19,6 +19,9 @@ namespace TriggerService.Tests
     [TestClass]
     public class ProcessNewWorkflowTests
     {
+        public ProcessNewWorkflowTests()
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+
         [TestMethod]
         public async Task NewWorkflowsAreMovedToInProgressSubdirectory()
         {
@@ -79,7 +82,8 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) => {
+                .Callback((string content, string container, string blobName) =>
+                {
                     newTriggerName = blobName;
                     newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
                 });
@@ -131,7 +135,8 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) => {
+                .Callback((string content, string container, string blobName) =>
+                {
                     newTriggerName = blobName;
                     newTriggerContent = content;
                 });

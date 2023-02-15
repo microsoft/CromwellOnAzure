@@ -6,9 +6,10 @@ services:
   tes:
     image: "$TesImageName"
     environment:
+      - ASPNETCORE_URLS=http://0.0.0.0:80/
       - DefaultStorageAccountName=$DefaultStorageAccountName
-      - CosmosDbAccountName=$CosmosDbAccountName
-      - BatchAccountName=$BatchAccountName
+      - CosmosDb__AccountName=$CosmosDbAccountName
+      - BatchAccount__AccountName=$BatchAccountName
       - ApplicationInsightsAccountName=$ApplicationInsightsAccountName
       - AzureServicesAuthConnectionString=RunAs=App;AppId=$ManagedIdentityClientId
       - UsePreemptibleVmsOnly=$UsePreemptibleVmsOnly
@@ -31,9 +32,17 @@ services:
       - BatchImageVersion=$BatchImageVersion
       - BatchNodeAgentSkuId=$BatchNodeAgentSkuId
       - CromwellDrsLocalizerImageName=$CromwellDrsLocalizerImageName
+      - UseLegacyBatchImplementationWithAutopools=$UseLegacyBatchImplementationWithAutopools
       - MarthaUrl=$MarthaUrl
       - MarthaKeyVaultName=$MarthaKeyVaultName
       - MarthaSecretName=$MarthaSecretName
+      - BatchPoolRotationForcedDays=$BatchPoolRotationForcedDays
+      - Name=$Name
+      - GlobalStartTaskPath=$GlobalStartTaskPath
+      - PostgreSqlServerName=$PostgreSqlServerName
+      - PostgreSqlTesDatabaseName=$PostgreSqlTesDatabaseName
+      - PostgreSqlTesUserLogin=$PostgreSqlTesUserLogin
+      - PostgreSqlTesUserPassword=$PostgreSqlTesUserPassword
     expose:
       - "80"
     volumes:

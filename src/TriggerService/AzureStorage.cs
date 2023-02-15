@@ -25,7 +25,7 @@ namespace TriggerService
         private readonly CloudStorageAccount account;
         private readonly CloudBlobClient blobClient;
         private readonly HttpClient httpClient;
-        private readonly HashSet<string> createdContainers = new HashSet<string>();
+        private readonly HashSet<string> createdContainers = new();
 
         public AzureStorage(CloudStorageAccount account, HttpClient httpClient)
         {
@@ -37,7 +37,7 @@ namespace TriggerService
 
             blobClient = account.CreateCloudBlobClient();
             var host = account.BlobStorageUri.PrimaryUri.Host;
-            AccountName = host.Substring(0, host.IndexOf("."));
+            AccountName = host[..host.IndexOf(".")];
         }
 
         public string AccountName { get; }
@@ -93,11 +93,12 @@ namespace TriggerService
             var readmeBlobName = $"{lowercaseState}/readme.txt";
 
             return blobs
+                .Where(blob => !blob.Name.Equals(lowercaseState, StringComparison.OrdinalIgnoreCase))
                 .Where(blob => !blob.Name.Equals(readmeBlobName, StringComparison.OrdinalIgnoreCase))
                 .Where(blob => blob.Properties.LastModified.HasValue)
                 .Select(blob => new TriggerFile { Uri = blob.Uri.AbsoluteUri, ContainerName = WorkflowsContainerName, Name = blob.Name, LastModified = blob.Properties.LastModified.Value });
         }
-		
+
         /// <inheritdoc />
         public async Task<string> UploadFileTextAsync(string content, string container, string blobName)
         {
@@ -186,7 +187,7 @@ namespace TriggerService
                     blobListingDetails: BlobListingDetails.None,
                     maxResults: null,
                     options: null,
-                    operationContext: null).ConfigureAwait(false);
+                    operationContext: null);
 
                 continuationToken = partialResult.ContinuationToken;
 

@@ -1,14 +1,15 @@
 # Welcome to Cromwell on Azure
+[Cromwell](https://cromwell.readthedocs.io/en/stable/) is a workflow management system for scientific workflows, orchestrating the computing tasks needed for genomics analysis. Originally developed by the [Broad Institute](https://github.com/broadinstitute/cromwell), Cromwell is also used in the GATK Best Practices genome analysis pipeline. Cromwell supports running scripts at various scales, including your local machine, a local computing cluster, and on the cloud. <br />
+
+Cromwell on Azure configures all Azure resources needed to run workflows through Cromwell on the Azure cloud, and uses the [GA4GH TES](https://cromwell.readthedocs.io/en/develop/backends/TES/) backend for orchestrating the tasks that create a workflow. The installation sets up a VM host to run the Cromwell server and uses Azure Batch to spin up virtual machines that run each task in a workflow. Cromwell workflows can be written using either the [WDL](https://github.com/openwdl/wdl) or the [CWL](https://www.commonwl.org/) scripting languages. To see examples of WDL scripts - see this ['Learn WDL'](https://github.com/openwdl/learn-wdl) repository on GitHub. To see examples of CWL scripts - see this ['CWL search result'](https://dockstore.org/search?descriptorType=CWL&searchMode=files) on Dockstore.<br />
+
 ### Latest release
- * [Release 3.0.0](https://github.com/microsoft/CromwellOnAzure/releases/tag/3.0.0)<br/>
- [Release notes for version 3.0.0](docs/release-notes/3.0.0.md)
- 
-Check the "Update Instructions" section in the version 3.0.0 [release notes](docs/release-notes/3.0.0.md/#update-instructions) to learn how to update an existing Cromwell on Azure deployment to version 3.0.0. You can customize some parameters when updating. Please [see these customization instructions](docs/troubleshooting-guide.md/#Customize-your-Cromwell-on-Azure-deployment), specifically the "Used by update" and "Comment" columns in the table.<br/>
+ * https://github.com/microsoft/CromwellOnAzure/releases
 
 #### Getting started
- * What is [Cromwell on Azure?](#Cromwell-on-Azure) <br/>
  * Deploy Cromwell on Azure now using this [guide](#Deploy-your-instance-of-Cromwell-on-Azure)<br/>
  * A brief [demo video](https://youtu.be/QlRQ63n_mKw) on how to run workflows using Cromwell on Azure<br/>
+ * When working with the code, please note that the stable branch is `main`.  The `develop` branch is unstable, and is used for development between releases.
 
 #### Running workflows
  * Prepare, start or abort your workflow [using this guide](docs/managing-your-workflow.md/#Managing-your-workflow)<br/>
@@ -25,11 +26,7 @@ If you are running into an issue and cannot find any information in the troubles
 
 ![Logo](/docs/screenshots/logo.png)
 
-## Cromwell on Azure 
 
-[Cromwell](https://cromwell.readthedocs.io/en/stable/) is a workflow management system for scientific workflows, orchestrating the computing tasks needed for genomics analysis. Originally developed by the [Broad Institute](https://github.com/broadinstitute/cromwell), Cromwell is also used in the GATK Best Practices genome analysis pipeline. Cromwell supports running scripts at various scales, including your local machine, a local computing cluster, and on the cloud. <br />
-
-Cromwell on Azure configures all Azure resources needed to run workflows through Cromwell on the Azure cloud, and uses the [GA4GH TES](https://cromwell.readthedocs.io/en/develop/backends/TES/) backend for orchestrating the tasks that create a workflow. The installation sets up a VM host to run the Cromwell server and uses Azure Batch to spin up virtual machines that run each task in a workflow. Cromwell workflows can be written using either the [WDL](https://github.com/openwdl/wdl) or the [CWL](https://www.commonwl.org/) scripting languages. To see examples of WDL scripts - see this ['Learn WDL'](https://github.com/openwdl/learn-wdl) repository on GitHub. To see examples of CWL scripts - see this ['CWL search result'](https://dockstore.org/search?descriptorType=CWL&searchMode=files) on Dockstore.<br />
 
 ## Deploy your instance of Cromwell on Azure
 
@@ -48,44 +45,6 @@ Cromwell on Azure configures all Azure resources needed to run workflows through
 ### Download the deployment executable
 
 Download the required executable from [Releases](https://github.com/microsoft/CromwellOnAzure/releases). Choose the runtime of your choice from `win-x64`, `linux-x64`, `osx-x64`. *On Windows machines, we recommend using the `win-x64` runtime (deployment using the `linux-x64` runtime via the Windows Subsystem for Linux is not supported).*<br/>
-
-### Optional: build the executable yourself
-Note: Build instructions only provided for the latest release.
-
-#### Linux
-*Preqrequisites*:<br/>
-.NET 5 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
-
-For example, instructions for *Ubuntu 18.04* are available [here](https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu#1804-) and below for convenience:
-
-```
-wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
-sudo dpkg -i packages-microsoft-prod.deb
-rm packages-microsoft-prod.deb
-sudo apt-get update && \
-sudo apt-get install -y apt-transport-https && \
-sudo apt-get update && \
-sudo apt-get install -y dotnet-sdk-5.0
-```
-
-#### Windows
-*Preqrequisites*:<br/>
-.NET 5 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
-
-*Recommended*:<br/>
-VS 2019
-
-#### Build steps
-1. Clone the [Cromwell on Azure repository](https://github.com/microsoft/CromwellOnAzure)
-2. Build the solution using `dotnet build` on bash or Powershell. For Windows, you can choose to build and test using VS 2019
-3. Run tests using `dotnet test` on bash or Powershell
-4. [Publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish#synopsis) the `deploy-cromwell-on-azure` project [as a self-contained deployment with your target runtime identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/deploying/#self-contained-deployments-scd) to produce the executable
-
-Example<br/> 
-Linux: `dotnet publish -r linux-x64`<br/>
-Windows: `dotnet publish -r win-x64`<br/>
-
-Learn more about `dotnet` commands [here](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet#dotnet-commands)
 
 ### Run the deployment executable
 
@@ -122,6 +81,7 @@ Prepare, start or abort a workflow using instructions [here](docs/managing-your-
 Once deployed, Cromwell on Azure configures the following Azure resources:
 
 * [Host VM](https://azure.microsoft.com/en-us/services/virtual-machines/) - runs [Ubuntu 18.04 LTS](https://github.com/microsoft/CromwellOnAzure/blob/421ccd163bfd53807413ed696c0dab31fb2478aa/src/deploy-cromwell-on-azure/Configuration.cs#L16) and [Docker Compose with four containers](https://github.com/microsoft/CromwellOnAzure/blob/master/src/deploy-cromwell-on-azure/scripts/docker-compose.yml) (Cromwell, MySQL, TES, TriggerService).  [Blobfuse](https://github.com/Azure/azure-storage-fuse) is used to mount the default storage account as a local file system available to the four containers.  Also created are an OS and data disk, network interface, public IP address, virtual network, and network security group. [Learn more](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/)
+* *Optional* [Azure Kubernetes Service](https://learn.microsoft.com/en-us/azure/aks/intro-kubernetes) - if `--useaks true` is specified, CoA will be deployed on AKS instead of a host VM.  [Learn more](docs/coa-aks.md)
 * [Batch account](https://docs.microsoft.com/en-us/azure/batch/) - The Azure Batch account is used by TES to spin up the virtual machines that run each task in a workflow.  After deployment, create an Azure support request to increase your core quotas if you plan on running large workflows.  [Learn more](https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit#resource-quotas)
 * [Storage account](https://docs.microsoft.com/en-us/azure/storage/) - The Azure Storage account is mounted to the host VM using [blobfuse](https://github.com/Azure/azure-storage-fuse), which enables [Azure Block Blobs](https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs) to be mounted as a local file system available to the four containers running in Docker. By default, it includes the following Blob containers - `configuration`, `cromwell-executions`, `cromwell-workflow-logs`, `inputs`, `outputs`, and `workflows`.
 * [Application Insights](https://docs.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview) - This contains logs from TES and the Trigger Service to enable debugging.
@@ -233,3 +193,40 @@ Other WDL examples on Cromwell on Azure:
 ## Related Projects
 
 [Genomics Data Analysis with Jupyter Notebooks on Azure](https://github.com/microsoft/genomicsnotebook)<br/>
+
+## How to build the deployment executable yourself
+
+#### Building on Linux
+*Preqrequisites*:<br/>
+.NET 6 SDK for [Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux). Get instructions for your Linux distro and version to install the SDK. 
+
+For example, instructions for *Ubuntu 18.04* are available [here](https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu#1804-) and below for convenience:
+
+```
+wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+rm packages-microsoft-prod.deb
+sudo apt-get update && \
+sudo apt-get install -y apt-transport-https && \
+sudo apt-get update && \
+sudo apt-get install -y dotnet-sdk-7.0
+```
+
+#### Building on Windows
+*Preqrequisites*:<br/>
+.NET 7 SDK for [Windows](https://dotnet.microsoft.com/download). Get the executable and follow the wizard to install the SDK.
+
+*Recommended*:<br/>
+VS 2022
+
+#### Build steps
+1. Clone the [Cromwell on Azure repository](https://github.com/microsoft/CromwellOnAzure)
+2. Build the solution using `dotnet build` on bash or Powershell. For Windows, you can choose to build and test using VS 2022
+3. Run tests using `dotnet test` on bash or Powershell
+4. [Publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish#synopsis) the `deploy-cromwell-on-azure` project [as a self-contained deployment with your target runtime identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/deploying/#self-contained-deployments-scd) to produce the executable
+
+Example<br/> 
+Linux: `dotnet publish -r linux-x64`<br/>
+Windows: `dotnet publish -r win-x64`<br/>
+
+Learn more about `dotnet` commands [here](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet#dotnet-commands)

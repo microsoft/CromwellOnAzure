@@ -1,6 +1,9 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 
 # build runtime image
-FROM mcr.microsoft.com/dotnet/runtime:5.0
+FROM mcr.microsoft.com/dotnet/runtime:7.0
 WORKDIR /app
 COPY . ./
+RUN apt update && apt full-upgrade -y && apt autoremove -y
 ENTRYPOINT ["dotnet", "TriggerService.dll"]

@@ -8,7 +8,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,6 +19,7 @@ namespace CromwellOnAzureDeployer
         private static object lockObj = default;
         private static Size offset = default;
         private static bool isRedirected = false;
+        private static Size? sizeIfNotResized;
         private static Writer writer = default;
 
         // This method is reentrant and can safely be called multiple times
@@ -39,10 +39,12 @@ namespace CromwellOnAzureDeployer
                     return;
                 }
 
-                writer = new Writer(Console.Out);
+                sizeIfNotResized = new(Console.BufferWidth, Console.BufferHeight);
+
+                writer = new(Console.Out);
                 Console.SetOut(writer);
 
-                // Possible extension point: use version of Writer that colorizes StdError
+                // Possible extension point: use a version of Writer that colorizes StdError
                 if (!Console.IsErrorRedirected)
                 {
                     // Since the output is going to the same place ($CONOUT or its equivalent) we can just use the same writer
@@ -74,6 +76,20 @@ namespace CromwellOnAzureDeployer
                 }
             }
             return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool WasResized() // Assumed to only be called with the lock held
+        {
+            if (sizeIfNotResized is null) { return true; }
+
+            if (Console.BufferHeight != sizeIfNotResized.Value.Height || Console.BufferWidth != sizeIfNotResized.Value.Width)
+            {
+                sizeIfNotResized = null;
+                return true;
+            }
+
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -186,15 +202,23 @@ namespace CromwellOnAzureDeployer
 
                 lock (lockObj)
                 {
-                    this.ForegroundColor = color;
+                    this.ForegroundColor = color ?? ForegroundColor;
+
+                    var wasResized = WasResized();
+                    if (wasResized)
+                    {
+                        value = contents;
+                        terminateLine = true;
+                    }
 
                     var (saveLeft, saveTop) = Console.GetCursorPosition();
-                    var restoreCursor = AppendPoint.HasValue;
+                    var restoreCursor = !wasResized && AppendPoint.HasValue;
 
                     try
                     {
                         AppendPoint ??= GetOffsetCursorPosition();
-                        var startPos = AppendPoint.Value;
+
+                        var startPos = wasResized ? GetOffsetCursorPosition() : AppendPoint.Value;
                         var curPos = startPos - offset;
 
                         if (curPos.Y < 0) // This line has now scrolled out of reach
@@ -211,9 +235,9 @@ namespace CromwellOnAzureDeployer
                         {
                             // TODO: insert (endPos.Y - startPos.Y) lines after current line (startPos.Y - offest.Height). This is done differently depending on the platform.
                         }
-                        if (color is not null)
+                        if (ForegroundColor is not null)
                         {
-                            Console.ForegroundColor = color.Value;
+                            Console.ForegroundColor = ForegroundColor.Value;
                         }
                         writer.SystemWriter.Write(value);
 
@@ -234,9 +258,9 @@ namespace CromwellOnAzureDeployer
 
                         if (endPos.X == Console.BufferWidth && !terminateLine) // Cursor is left at the last glyph written instead of right after the last glyph written when that last glyph is written into the right-most column.
                         {
-                            endPos = new Point(0, endPos.Y + 1);
-                            AppendPoint = new Point(0, AppendPoint.Value.Y + 1);
-                            finalPos = new Point(0, finalPos.Y + 1);
+                            endPos = new(0, endPos.Y + 1);
+                            AppendPoint = new(0, AppendPoint.Value.Y + 1);
+                            finalPos = new(0, finalPos.Y + 1);
                         }
 
                         offset += (terminateLine ? new Size(0, endPos.Y + 1) : new Size(endPos)) - new Size(terminateLine ? 0 : finalPos.X, finalPos.Y);
@@ -295,7 +319,7 @@ namespace CromwellOnAzureDeployer
             }
 
             public override ValueTask DisposeAsync()
-                => new(Task.WhenAll(new Task[]
+                => new(Task.WhenAll(new[]
                 {
                     SystemWriter.DisposeAsync().AsTask(),
                     base.DisposeAsync().AsTask()

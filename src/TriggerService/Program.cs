@@ -20,6 +20,9 @@ namespace TriggerService
 {
     internal class Program
     {
+        public Program()
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
+
         public static async Task Main()
             => await InitAndRunAsync();
 
@@ -35,7 +38,12 @@ namespace TriggerService
                 {
                     if (!string.IsNullOrWhiteSpace(instrumentationKey))
                     {
-                        loggingBuilder.AddApplicationInsights(instrumentationKey,
+                        var connectionString = $"InstrumentationKey={instrumentationKey}";
+                        loggingBuilder.AddApplicationInsights(
+                            configuration =>
+                            {
+                                configuration.ConnectionString = connectionString;
+                            },
                             options =>
                             {
                                 options.TrackExceptionsAsExceptionTelemetry = false;
@@ -60,10 +68,10 @@ namespace TriggerService
                 storageAccount,
                 new CromwellApiClient.CromwellApiClient(cromwellUrl),
                 new CosmosDbRepository<TesTask>(
-                    cosmosDbEndpoint, 
-                    cosmosDbKey, 
-                    Constants.CosmosDbDatabaseId, 
-                    Constants.CosmosDbContainerId, 
+                    cosmosDbEndpoint,
+                    cosmosDbKey,
+                    Constants.CosmosDbDatabaseId,
+                    Constants.CosmosDbContainerId,
                     Constants.CosmosDbPartitionId),
                 storageAccounts);
 
