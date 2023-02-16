@@ -66,6 +66,7 @@ The following are instructions on how to setup a virtual network, and azure cont
      // Login into Az
     az login  
     
+    az account set --subscription $subscription
     // Copy and paste all the environments variables such as $subscription from the other shell.
     batchsubnetid=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $vnet_name --name batchnodessubnet --query id --output tsv)
     ```
