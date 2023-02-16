@@ -74,8 +74,8 @@ spec:
               value: {{ .Values.config.batchNodeAgentSkuId }}
             - name: BatchPoolRotationForcedDays
               value: {{ .Values.config.batchPoolRotationForcedDays | quote }}
-            - name: Name
-              value: {{ .Values.config.name | quote }}
+            - name: BatchPrefix
+              value: {{ .Values.config.batchPrefix | quote }}
             - name: MarthaUrl
               value: {{ .Values.config.marthaUrl }}
             - name: MarthaKeyVaultName

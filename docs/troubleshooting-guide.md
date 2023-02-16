@@ -263,6 +263,7 @@ string PostgreSqlServerName | Y | Y | N | Name of existing postgresql server.
 bool UsePostgreSqlSingleServer = false | Y | N | N | Use Postgresql single server rather than flexi servers, only recommended if you need to use private endpoints.
 string KeyVaultName | Y | Y | N | Name of an existing key vault.
 bool CrossSubscriptionAKSDeployment | Y | N | N | AKS cluster is in a different subscription than the storage account, so a keyvault and storage key will be used for storage auth for AKS.
+string   BatchPrefix | Y | Y | N | An identifier used as part of the prefix for batch pool and job names. Used to enable sharing batch accounts.
 
 The following are more advanced configuration parameters:
 

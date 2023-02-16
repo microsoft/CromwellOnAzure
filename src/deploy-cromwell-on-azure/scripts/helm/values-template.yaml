@@ -27,7 +27,7 @@ config:
   gen1BatchImageVersion: RUNTIME_PARAMETER
   batchNodeAgentSkuId: RUNTIME_PARAMETER
   batchPoolRotationForcedDays: "7"
-  name: RUNTIME_PARAMETER
+  batchPrefix: RUNTIME_PARAMETER
   marthaUrl: RUNTIME_PARAMETER
   marthaKeyVaultName: RUNTIME_PARAMETER
   marthaSecretName: RUNTIME_PARAMETER

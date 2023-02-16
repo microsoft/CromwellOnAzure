@@ -373,7 +373,7 @@ namespace CromwellOnAzureDeployer
                             managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
-                            if (accountNames.TryGetValue("Name", out var name))
+                            if (accountNames.TryGetValue("BatchPrefix", out var name))
                             {
                                 configuration.BatchPrefix = name;
                             }
@@ -1074,7 +1074,7 @@ namespace CromwellOnAzureDeployer
 
             if (installedVersion is null)
             {
-                UpdateSetting(settings, defaults, "Name", configuration.BatchPrefix, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "BatchPrefix", configuration.BatchPrefix, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "CosmosDbAccountName", configuration.CosmosDbAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
@@ -2478,7 +2478,7 @@ namespace CromwellOnAzureDeployer
                     var existingFileContent = await ExecuteCommandOnVirtualMachineAsync(sshConnectionInfo, $"cat {CromwellAzureRootDir}/env-04-settings.txt");
                     var existingSettings = Utility.DelimitedTextToDictionary(existingFileContent.Output.Trim());
                     var newSettings = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-04-settings.txt"));
-                    newSettings["Name"] = configuration.BatchPrefix;
+                    newSettings["BatchPrefix"] = configuration.BatchPrefix;
 
                     foreach (var key in newSettings.Keys.Except(existingSettings.Keys))
                     {
