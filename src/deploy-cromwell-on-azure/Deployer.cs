@@ -8,6 +8,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.IO;
 using System.Linq;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -104,6 +105,7 @@ namespace CromwellOnAzureDeployer
         };
 
         private Configuration configuration { get; set; }
+        private ITokenProvider tokenProvider;
         private TokenCredentials tokenCredentials;
         private IAzure azureSubscriptionClient { get; set; }
         private Microsoft.Azure.Management.Fluent.Azure.IAuthenticated azureClient { get; set; }
@@ -137,8 +139,9 @@ namespace CromwellOnAzureDeployer
 
                 await Execute("Connecting to Azure Services...", async () =>
                 {
-                    tokenCredentials = new TokenCredentials(new RefreshableAzureServiceTokenProvider("https://management.azure.com/"));
-                    azureCredentials = new AzureCredentials(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
+                    tokenProvider = new RefreshableAzureServiceTokenProvider("https://management.azure.com/");
+                    tokenCredentials = new(tokenProvider);
+                    azureCredentials = new(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
                     azureClient = GetAzureClient(azureCredentials);
                     azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                     subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
@@ -261,6 +264,13 @@ namespace CromwellOnAzureDeployer
 
                     if (!configuration.Update)
                     {
+                        if (string.IsNullOrWhiteSpace(configuration.BatchPrefix))
+                        {
+                            var blob = new byte[5];
+                            RandomNumberGenerator.Fill(blob);
+                            configuration.BatchPrefix = CommonUtilities.Base32.ConvertToBase32(blob).TrimEnd('=');
+                        }
+
                         ValidateRegionName(configuration.RegionName);
                         ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
@@ -708,7 +718,7 @@ namespace CromwellOnAzureDeployer
             if (installedVersion is null)
             {
                 var provisionPostgreSqlOnAzure = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault();
-                UpdateSetting(settings, defaults, "Name", configuration.Name, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "BatchPrefix", configuration.BatchPrefix, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
@@ -1491,7 +1501,7 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException($"If ResourceGroupName is provided, the resource group must already exist.", displayExample: false);
             }
 
-            var token = await new AzureServiceTokenProvider().GetAccessTokenAsync("https://management.azure.com/");
+            var token = (await tokenProvider.GetAuthenticationHeaderAsync(CancellationToken.None)).Parameter;
             var currentPrincipalObjectId = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.FirstOrDefault(c => c.Type == "oid").Value;
 
             var currentPrincipalSubscriptionRoleIds = (await azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeWithHttpMessagesAsync($"/subscriptions/{configuration.SubscriptionId}", new ODataQuery<RoleAssignmentFilter>($"atScope() and assignedTo('{currentPrincipalObjectId}')")))
@@ -1754,6 +1764,8 @@ namespace CromwellOnAzureDeployer
 
             ThrowIfNotProvidedForUpdate(configuration.ResourceGroupName, nameof(configuration.ResourceGroupName));
 
+
+            ThrowIfProvidedForUpdate(configuration.BatchPrefix, nameof(configuration.BatchPrefix));
             ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
             ThrowIfProvidedForUpdate(configuration.CrossSubscriptionAKSDeployment, nameof(configuration.CrossSubscriptionAKSDeployment));
@@ -1777,6 +1789,14 @@ namespace CromwellOnAzureDeployer
             {
                 configuration.ProvisionPostgreSqlOnAzure = true;
             }            
+
+            if (!configuration.Update)
+            {
+                if (configuration.BatchPrefix?.Length > 11 || (configuration.BatchPrefix?.Any(c => !char.IsAsciiLetterOrDigit(c)) ?? false))
+                {
+                    throw new ValidationException("BatchPrefix must not be longer than 11 chars and may contain only ASCII letters or digits", false);
+                }
+            }
         }
 
         private static void DisplayBillingReaderInsufficientAccessLevelWarning()

@@ -4,7 +4,6 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using System.Security.Cryptography;
 using Microsoft.Extensions.Configuration;
 
 namespace CromwellOnAzureDeployer
@@ -25,18 +24,11 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlVersion { get; set; } = "14";
         public string DefaultPostgreSqlSubnetName { get; set; } = "sqlsubnet";
         public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
-        public string Name { get; set; } = CreateNewName();
-
-        private static string CreateNewName()
-        {
-            var blob = new byte[6];
-            RandomNumberGenerator.Fill(blob);
-            return CommonUtilities.Base32.ConvertToBase32(blob).TrimEnd('=');
-        }
     }
 
     public abstract class UserAccessibleConfiguration
     {
+        public string BatchPrefix { get; set; }
         public string SubscriptionId { get; set; }
         public string RegionName { get; set; }
         public string MainIdentifierPrefix { get; set; } = "coa";
