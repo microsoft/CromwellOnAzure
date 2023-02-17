@@ -8,10 +8,13 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Common;
 using CromwellApiClient;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Tes.Models;
 using Tes.Repository;
@@ -19,26 +22,50 @@ using Tes.Repository;
 [assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace TriggerService
 {
-    public class CromwellOnAzureEnvironment : ICromwellOnAzureEnvironment
+    public class TriggerHostedService : ITriggerHostedService, IHostedService
     {
         private const string OutputsContainerName = "outputs";
+        private readonly CancellationTokenSource hostCancellationTokenSource = new CancellationTokenSource();
         private static readonly TimeSpan inProgressWorkflowInvisibilityPeriod = TimeSpan.FromMinutes(1);
         private static readonly Regex workflowStateRegex = new("^[^/]*");
         private static readonly Regex blobNameRegex = new("^(?:https?://|/)?[^/]+/[^/]+/([^?.]+)");  // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs in the trigger file.
         private IAzureStorage storage { get; set; }
         internal ICromwellApiClient cromwellApiClient { get; set; }
         private readonly List<IAzureStorage> storageAccounts;
-        private readonly ILogger<AzureStorage> logger;
+        private readonly ILogger<TriggerHostedService> logger;
         private readonly IRepository<TesTask> tesTaskRepository;
+        private readonly AvailabilityTracker cromwellAvailability = new();
+        private readonly AvailabilityTracker azStorageAvailability = new();
+        private readonly TimeSpan mainInterval;
+        private readonly TimeSpan availabilityCheckInterval;
 
-        public CromwellOnAzureEnvironment(ILoggerFactory loggerFactory, IAzureStorage storage, ICromwellApiClient cromwellApiClient, IRepository<TesTask> tesTaskRepository, IEnumerable<IAzureStorage> storages)
+        public TriggerHostedService(
+            ILogger<TriggerHostedService> logger,
+            IOptions<TriggerServiceOptions> triggerServiceOptions,
+            ICromwellApiClient cromwellApiClient,
+            IRepository<TesTask> tesTaskRepository,
+            IAzureStorageUtility azureStorageUtility)
         {
-            this.storage = storage;
-            this.storageAccounts = storages.ToList();
+            mainInterval = TimeSpan.FromMilliseconds(triggerServiceOptions.Value.MainRunIntervalMilliseconds);
+            availabilityCheckInterval = TimeSpan.FromMilliseconds(triggerServiceOptions.Value.AvailabilityCheckIntervalMilliseconds);
             this.cromwellApiClient = cromwellApiClient;
-            this.logger = loggerFactory.CreateLogger<AzureStorage>();
-            this.tesTaskRepository = tesTaskRepository;
+            this.logger = logger;
             logger.LogInformation($"Cromwell URL: {cromwellApiClient.GetUrl()}");
+
+            (storageAccounts, storage) = azureStorageUtility.GetStorageAccountsUsingMsiAsync(triggerServiceOptions.Value.DefaultStorageAccountName).Result;
+
+            this.tesTaskRepository = tesTaskRepository;
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            return Task.Run(RunAsync);
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            hostCancellationTokenSource.Cancel();
+            return Task.CompletedTask;
         }
 
         public async Task<bool> IsCromwellAvailableAsync()
@@ -382,16 +409,83 @@ namespace TriggerService
                 WorkflowState.InProgress,
                 workflowNameAction: name => name.Replace(".json", $".{workflowId}.json"));
 
-        private static string GetParentPath(string path)
+        private async Task RunAsync()
         {
-            if (string.IsNullOrEmpty(path))
+            logger.LogInformation("Trigger Service successfully started.");
+
+            await Task.WhenAll(
+                RunContinuouslyAsync(UpdateExistingWorkflowsAsync, nameof(UpdateExistingWorkflowsAsync)),
+                RunContinuouslyAsync(ProcessAndAbortWorkflowsAsync, nameof(ProcessAndAbortWorkflowsAsync)));
+        }
+
+        private async Task RunContinuouslyAsync(Func<Task> task, string description)
+        {
+            while (!hostCancellationTokenSource.IsCancellationRequested)
             {
-                return null;
+                try
+                {
+                    await Task.WhenAll(
+                        cromwellAvailability.WaitForAsync(
+                            IsCromwellAvailableAsync,
+                            availabilityCheckInterval,
+                            Constants.CromwellSystemName,
+                            msg => logger.LogInformation(msg), hostCancellationTokenSource.Token),
+                        azStorageAvailability.WaitForAsync(
+                            IsAzureStorageAvailableAsync,
+                            availabilityCheckInterval,
+                            "Azure Storage",
+                            msg => logger.LogInformation(msg), hostCancellationTokenSource.Token));
+
+                    await task.Invoke();
+                    await Task.Delay(mainInterval);
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError(exc, $"RunContinuously exception for {description}");
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                }
             }
+        }
 
-            var pathComponents = path.TrimEnd('/').Split('/');
+        private async Task UploadOutputsAsync(Guid id, string sampleName)
+        {
+            try
+            {
+                var outputsResponse = await cromwellApiClient.GetOutputsAsync(id);
 
-            return string.Join('/', pathComponents.Take(pathComponents.Length - 1));
+                await storage.UploadFileTextAsync(
+                    outputsResponse.Json,
+                    OutputsContainerName,
+                    $"{sampleName}.{id}.outputs.json");
+
+                var metadataResponse = await cromwellApiClient.GetMetadataAsync(id);
+
+                await storage.UploadFileTextAsync(
+                    metadataResponse.Json,
+                    OutputsContainerName,
+                    $"{sampleName}.{id}.metadata.json");
+            }
+            catch (Exception exc)
+            {
+                logger.LogWarning(exc, $"Getting outputs and/or timing threw an exception for Id: {id}");
+            }
+        }
+
+        private async Task UploadTimingAsync(Guid id, string sampleName)
+        {
+            try
+            {
+                var timingResponse = await cromwellApiClient.GetTimingAsync(id);
+
+                await storage.UploadFileTextAsync(
+                    timingResponse.Html,
+                    OutputsContainerName,
+                    $"{sampleName}.{id}.timing.html");
+            }
+            catch (Exception exc)
+            {
+                logger.LogWarning(exc, $"Getting timing threw an exception for Id: {id}");
+            }
         }
 
         private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId)
@@ -479,45 +573,16 @@ namespace TriggerService
         private static string GetBlobName(string url)
             => blobNameRegex.Match(url)?.Groups[1].Value.Replace("/", "_");
 
-        private async Task UploadOutputsAsync(Guid id, string sampleName)
+        private static string GetParentPath(string path)
         {
-            try
+            if (string.IsNullOrEmpty(path))
             {
-                var outputsResponse = await cromwellApiClient.GetOutputsAsync(id);
-
-                await storage.UploadFileTextAsync(
-                    outputsResponse.Json,
-                    OutputsContainerName,
-                    $"{sampleName}.{id}.outputs.json");
-
-                var metadataResponse = await cromwellApiClient.GetMetadataAsync(id);
-
-                await storage.UploadFileTextAsync(
-                    metadataResponse.Json,
-                    OutputsContainerName,
-                    $"{sampleName}.{id}.metadata.json");
+                return null;
             }
-            catch (Exception exc)
-            {
-                logger.LogWarning(exc, $"Getting outputs and/or timing threw an exception for Id: {id}");
-            }
-        }
 
-        private async Task UploadTimingAsync(Guid id, string sampleName)
-        {
-            try
-            {
-                var timingResponse = await cromwellApiClient.GetTimingAsync(id);
+            var pathComponents = path.TrimEnd('/').Split('/');
 
-                await storage.UploadFileTextAsync(
-                    timingResponse.Html,
-                    OutputsContainerName,
-                    $"{sampleName}.{id}.timing.html");
-            }
-            catch (Exception exc)
-            {
-                logger.LogWarning(exc, $"Getting timing threw an exception for Id: {id}");
-            }
+            return string.Join('/', pathComponents.Take(pathComponents.Length - 1));
         }
     }
 }
