@@ -27,12 +27,12 @@ The following are instructions on how to setup a virtual network, and azure cont
     ```
     az network vnet create -g $resource_group_name -n $vnet_name --address-prefixes 10.1.0.0/16
     az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n vmsubnet --address-prefixes 10.1.0.0/24
-    az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n mysqlsubnet --address-prefixes 10.1.1.0/24
+    az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n sqlsubnet --address-prefixes 10.1.1.0/24
     az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n batchnodessubnet --address-prefixes 10.1.2.0/24
     az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n pesubnet --address-prefixes 10.1.3.0/24
 
     az network vnet subnet update --resource-group $resource_group_name --vnet-name $vnet_name --name vmsubnet --service-endpoints "Microsoft.Storage"
-    az network vnet subnet update --resource-group $resource_group_name --vnet-name $vnet_name --name mysqlsubnet --service-endpoints "Microsoft.Storage"
+    az network vnet subnet update --resource-group $resource_group_name --vnet-name $vnet_name --name sqlsubnet --service-endpoints "Microsoft.Storage"
     az network vnet subnet update --resource-group $resource_group_name --vnet-name $vnet_name --name batchnodessubnet --service-endpoints "Microsoft.Storage"
 
     az network vnet subnet update \
@@ -77,7 +77,7 @@ The following are instructions on how to setup a virtual network, and azure cont
     az storage account create --name $storage_account_name --resource-group $resource_group_name
 
     az storage account network-rule add --resource-group $resource_group_name --account-name $storage_account_name --subnet vmsubnet --vnet-name $vnet_name
-    az storage account network-rule add --resource-group $resource_group_name --account-name $storage_account_name --subnet mysqlsubnet --vnet-name $vnet_name
+    az storage account network-rule add --resource-group $resource_group_name --account-name $storage_account_name --subnet sqlsubnet --vnet-name $vnet_name
     az storage account network-rule add --resource-group $resource_group_name --account-name $storage_account_name --subnet batchnodessubnet --vnet-name $vnet_name
     
     stroageAccountId="/subscriptions/$subscription/resourceGroups/$resource_group_name/providers/Microsoft.Storage/storageAccounts/$storage_account_name"
@@ -131,28 +131,13 @@ The following are instructions on how to setup a virtual network, and azure cont
     sudo apt  install docker.io
     
     az acr create --resource-group $resource_group_name --name $mycontainerregistry --sku Premium
-    az acr login --name $mycontainerregistry
+    sudo az acr login --name $mycontainerregistry
     
     
     // To account for dockerinDocker [issue 401](https://github.com/microsoft/CromwellOnAzure/issues/401)
     // create docker file 
-    
-    
-    FROM docker.io/library/docker:latest
-    LABEL author="Venkat S. Malladi"
-
-    ENV DEBIAN_FRONTEND=noninteractive
-
-    RUN apk add grep
-    RUN apk add bash
-
-    sudo docker build -t $mycontainerregistry.azurecr.io/docker:v1 .
+    sudo docker build -t $mycontainerregistry.azurecr.io/docker:v1 https://raw.githubusercontent.com/microsoft/CromwellOnAzure/develop/src/deploy-cromwell-on-azure/samples/docker-dockerfile
     sudo docker push $mycontainerregistry.azurecr.io/docker:v1
-    
-    //az acr import \
-    //  --name $mycontainerregistry \
-     // --source docker.io/library/docker:latest \
-     // --image docker:v1
 
     az acr import \
       --name $mycontainerregistry \
@@ -165,7 +150,6 @@ The following are instructions on how to setup a virtual network, and azure cont
       --image ubuntu:22.04
     
     az acr update --name $mycontainerregistry --public-network-enabled false
-
     
     acrID="/subscriptions/$subscription/resourceGroups/$resource_group_name/providers/Microsoft.ContainerRegistry/registries/$mycontainerregistry"
     MSYS_NO_PATHCONV=1 az network private-endpoint create \
@@ -206,6 +190,7 @@ The following are instructions on how to setup a virtual network, and azure cont
     wget https://github.com/microsoft/CromwellOnAzure/releases/download/$version/deploy-cromwell-on-azure-linux
     chmod 744 deploy-cromwell-on-azure-linux
    
+    export AzureServicesAuthConnectionString="RunAs=Developer;DeveloperTool=AzureCli"
     ./deploy-cromwell-on-azure-linux --SubscriptionId $subscription --RegionName $location \
         --MainIdentifierPrefix $coa_identifier \
         --StorageAccountName $storage_account_name \
@@ -218,7 +203,7 @@ The following are instructions on how to setup a virtual network, and azure cont
         --ResourceGroupName $resource_group_name \
         --VnetName $vnet_name \
         --VnetResourceGroupName $resource_group_name \
-        --VmSubnetName vmsubnet
+        --VmSubnetName vmsubnet 
     ```
 
 ### 6. Update wdl and Managed identity access to run test workflow
