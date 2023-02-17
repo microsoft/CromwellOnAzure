@@ -394,7 +394,7 @@ namespace TriggerService.Tests
         {
             var files = RetrievePostFiles(processedTriggerInfo);
          
-            Assert.AreEqual(processedTriggerInfo.WorkflowInputs.Count + 1, files.Count, "unexpected number of files");
+            Assert.AreEqual(processedTriggerInfo.WorkflowInputs.Count, files.Count, "unexpected number of files");
 
             for (var i = 0; i < processedTriggerInfo.WorkflowInputs.Count; i++)
             {
