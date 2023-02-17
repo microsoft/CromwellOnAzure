@@ -10,6 +10,6 @@ namespace CromwellApiClient
     {
         public HttpStatusCode? HttpStatusCode { get; set; }
         public CromwellApiException(string message, Exception exc, HttpStatusCode? httpStatusCode) : base(message, exc)
-	    => HttpStatusCode = httpStatusCode;
+            => HttpStatusCode = httpStatusCode;
     }
 }

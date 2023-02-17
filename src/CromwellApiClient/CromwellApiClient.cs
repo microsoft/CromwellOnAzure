@@ -5,10 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using TriggerService;
 
 [assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace CromwellApiClient
@@ -20,16 +21,18 @@ namespace CromwellApiClient
         private static readonly HttpClient httpClient = new();
         private readonly string url;
 
-        public CromwellApiClient(string baseUrl)
+        public CromwellApiClient(IOptions<CromwellApiClientOptions> cromwellApiClientOptions)
         {
+            ArgumentException.ThrowIfNullOrEmpty(cromwellApiClientOptions.Value.BaseUrl, nameof(cromwellApiClientOptions.Value.BaseUrl));
+
             Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
-            if (string.IsNullOrWhiteSpace(baseUrl))
+            if (string.IsNullOrWhiteSpace(cromwellApiClientOptions.Value.BaseUrl))
             {
-                throw new ArgumentException(null, nameof(baseUrl));
+                throw new ArgumentException(null, nameof(cromwellApiClientOptions.Value.BaseUrl));
             }
 
-            url = $"{baseUrl.TrimEnd('/')}{basePath}";
+            url = $"{cromwellApiClientOptions.Value.BaseUrl.TrimEnd('/')}{basePath}";
         }
 
         public string GetUrl()
@@ -39,16 +42,16 @@ namespace CromwellApiClient
             => await GetAsync<GetLogsResponse>($"/{id}/logs");
 
         public async Task<GetOutputsResponse> GetOutputsAsync(Guid id)
-            => new GetOutputsResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json") };
+            => new() { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json") };
 
         public async Task<GetMetadataResponse> GetMetadataAsync(Guid id)
-            => new GetMetadataResponse { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json") };
+            => new() { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json") };
 
         public async Task<GetStatusResponse> GetStatusAsync(Guid id)
             => await GetAsync<GetStatusResponse>($"/{id}/status");
 
         public async Task<GetTimingResponse> GetTimingAsync(Guid id)
-            => new GetTimingResponse { Id = id, Html = await GetAsyncWithMediaType($"/{id}/timing", "text/html") };
+            => new() { Id = id, Html = await GetAsyncWithMediaType($"/{id}/timing", "text/html") };
 
         public async Task<PostAbortResponse> PostAbortAsync(Guid id)
             => await PostAsync<PostAbortResponse>($"/{id}/abort", id);
@@ -89,17 +92,17 @@ namespace CromwellApiClient
             for (var i = 0; i < workflowInputsFilename.Count; i++)
             {
                 var parameterName = i == 0 ? "workflowInputs" : "workflowInputs_" + (i + 1);
-                files.Add(new FileToPost(workflowInputsFilename[i], workflowInputsData[i], parameterName, removeTabs: true));
+                files.Add(new(workflowInputsFilename[i], workflowInputsData[i], parameterName, removeTabs: true));
             }
 
             if (workflowOptionsFilename is not null && workflowOptionsData is not null)
             {
-                files.Add(new FileToPost(workflowOptionsFilename, workflowOptionsData, "workflowOptions", removeTabs: true));
+                files.Add(new(workflowOptionsFilename, workflowOptionsData, "workflowOptions", removeTabs: true));
             }
 
             if (workflowDependenciesFilename is not null && workflowDependenciesData is not null)
             {
-                files.Add(new FileToPost(workflowDependenciesFilename, workflowDependenciesData, "workflowDependencies"));
+                files.Add(new(workflowDependenciesFilename, workflowDependenciesData, "workflowDependencies"));
             }
 
             return files;
@@ -151,11 +154,11 @@ namespace CromwellApiClient
 
                 var request = new HttpRequestMessage()
                 {
-                    RequestUri = new Uri(url),
+                    RequestUri = new(url),
                     Method = HttpMethod.Get,
                 };
 
-                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(mediaType));
+                request.Headers.Accept.Add(new(mediaType));
                 response = await httpClient.SendAsync(request);
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync();
@@ -185,7 +188,7 @@ namespace CromwellApiClient
             try
             {
                 url = GetApiUrl(path);
-                var content = new FormUrlEncodedContent(new[] { new KeyValuePair<string, string>("id", id.ToString()) });
+                var content = new FormUrlEncodedContent(new KeyValuePair<string, string>[] { new("id", id.ToString()) });
                 response = await httpClient.PostAsync(url, content);
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsAsync<T>();

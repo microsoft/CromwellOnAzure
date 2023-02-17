@@ -17,17 +17,17 @@ namespace Common
 
         public static string GetAvailabilityMessage(string systemName) => $"{systemName} is available.";
 
-        public async Task WaitForAsync(Func<Task<bool>> availabilityCondition, TimeSpan waitTime, string systemName, Action<string> informationLogger)
+        public async Task WaitForAsync(Func<Task<bool>> availabilityCondition, TimeSpan waitTime, string systemName, Action<string> informationLogger, CancellationToken cancellationToken)
         {
-            await semaphoreSlim.WaitAsync();
+            await semaphoreSlim.WaitAsync(cancellationToken);
 
             try
             {
-                while (!(await availabilityCondition.Invoke()))
+                while (!await availabilityCondition.Invoke() && !cancellationToken.IsCancellationRequested)
                 {
                     hasBeenAvailable = false;
                     informationLogger.Invoke($"Waiting {waitTime.TotalSeconds:n0}s for {systemName} to become available...");
-                    await Task.Delay(waitTime);
+                    await Task.Delay(waitTime, cancellationToken);
                 }
 
                 if (!hasBeenAvailable)
