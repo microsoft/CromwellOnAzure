@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using k8s;
+using k8s.Models;
 using Microsoft.Azure.Management.ContainerService;
 using Microsoft.Azure.Management.ContainerService.Fluent;
 using Microsoft.Azure.Management.Msi.Fluent;
@@ -29,7 +30,7 @@ namespace CromwellOnAzureDeployer
     {
         private static readonly AsyncRetryPolicy WorkloadReadyRetryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryAsync(12, retryAttempt => TimeSpan.FromSeconds(15));
+            .WaitAndRetryAsync(40, retryAttempt => TimeSpan.FromSeconds(15));
 
         private static readonly AsyncRetryPolicy KubeExecRetryPolicy = Policy
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
@@ -74,6 +75,40 @@ namespace CromwellOnAzureDeployer
             var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
             var k8sClientConfiguration = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
             return new Kubernetes(k8sClientConfiguration);
+        }
+
+        public V1Deployment GetUbuntuDeploymentTemplate()
+        {
+            return KubernetesYaml.Deserialize<V1Deployment>(
+                """
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  creationTimestamp: null
+                  labels:
+                    io.kompose.service: ubuntu
+                  name: ubuntu
+                spec:
+                  replicas: 1
+                  selector:
+                    matchLabels:
+                      io.kompose.service: ubuntu
+                  strategy: {}
+                  template:
+                    metadata:
+                      creationTimestamp: null
+                      labels:
+                        io.kompose.service: ubuntu
+                    spec:
+                      containers:
+                        - name: ubuntu
+                          image: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                          command: [ "/bin/bash", "-c", "--" ]
+                          args: [ "while true; do sleep 30; done;" ]
+                          resources: {}
+                      restartPolicy: Always
+                status: {}
+                """);
         }
 
         public async Task DeployCoADependenciesAsync()
@@ -164,7 +199,7 @@ namespace CromwellOnAzureDeployer
             return ValuesToSettings(values);
         }
 
-        public async Task ExecuteCommandsOnPodAsync(IKubernetes client, string podName, IEnumerable<string[]> commands)
+        public async Task ExecuteCommandsOnPodAsync(IKubernetes client, string podName, IEnumerable<string[]> commands, string aksNamespace)
         {
             var printHandler = new ExecAsyncCallback(async (stdIn, stdOut, stdError) =>
             {
@@ -197,10 +232,10 @@ namespace CromwellOnAzureDeployer
                 }
             });
 
-            var pods = await client.CoreV1.ListNamespacedPodAsync(configuration.AksCoANamespace);
+            var pods = await client.CoreV1.ListNamespacedPodAsync(aksNamespace);
             var workloadPod = pods.Items.Where(x => x.Metadata.Name.Contains(podName)).FirstOrDefault();
 
-            if (!await WaitForWorkloadAsync(client, podName, cts.Token))
+            if (!await WaitForWorkloadAsync(client, podName, aksNamespace, cts.Token))
             {
                 throw new Exception($"Timed out waiting for {podName} to start.");
             }
@@ -211,7 +246,7 @@ namespace CromwellOnAzureDeployer
             {
                 foreach (var command in commands)
                 {
-                    await client.NamespacedPodExecAsync(workloadPod.Metadata.Name, configuration.AksCoANamespace, podName, command, true, printHandler, CancellationToken.None);
+                    await client.NamespacedPodExecAsync(workloadPod.Metadata.Name, aksNamespace, podName, command, true, printHandler, CancellationToken.None);
                 }
             });
 
@@ -223,7 +258,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task WaitForCromwellAsync(IKubernetes client)
         {
-            if (!await WaitForWorkloadAsync(client, "cromwell", cts.Token))
+            if (!await WaitForWorkloadAsync(client, "cromwell", configuration.AksCoANamespace, cts.Token))
             {
                 throw new Exception("Timed out waiting for Cromwell to start.");
             }
@@ -269,7 +304,6 @@ namespace CromwellOnAzureDeployer
             values.Config["cromwellOnAzureVersion"] = settings["CromwellOnAzureVersion"];
             values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
             values.Config["applicationInsightsAccountName"] = settings["ApplicationInsightsAccountName"];
-            values.Config["cosmosDbAccountName"] = settings["CosmosDbAccountName"];
             values.Config["batchAccountName"] = settings["BatchAccountName"];
             values.Config["batchNodesSubnetId"] = settings["BatchNodesSubnetId"];
             values.Config["coaNamespace"] = settings["AksCoANamespace"];
@@ -292,15 +326,31 @@ namespace CromwellOnAzureDeployer
             values.Config["marthaSecretName"] = settings["MarthaSecretName"];
             values.Config["name"] = settings["Name"];
             values.Config["crossSubscriptionAKSDeployment"] = settings["CrossSubscriptionAKSDeployment"];
-            values.Config["postgreSqlServerName"] = settings["PostgreSqlServerName"];
-            values.Config["postgreSqlDatabaseName"] = settings["PostgreSqlDatabaseName"];
-            values.Config["postgreSqlUserLogin"] = settings["PostgreSqlUserLogin"];
-            values.Config["postgreSqlUserPassword"] = settings["PostgreSqlUserPassword"];
             values.Config["usePostgreSqlSingleServer"] = settings["UsePostgreSqlSingleServer"];
+
             values.Images["tes"] = settings["TesImageName"];
             values.Images["triggerservice"] = settings["TriggerServiceImageName"];
             values.Images["cromwell"] = settings["CromwellImageName"];
+
             values.Persistence["storageAccount"] = settings["DefaultStorageAccountName"];
+
+            values.TesDatabase["postgreSqlServerName"] = settings["PostgreSqlServerName"];
+            values.TesDatabase["postgreSqlServerNameSuffix"] = settings["PostgreSqlServerNameSuffix"];
+            values.TesDatabase["postgreSqlServerPort"] = settings["PostgreSqlServerPort"];
+            values.TesDatabase["postgreSqlServerSslMode"] = settings["PostgreSqlServerSslMode"];
+            // Note: Notice "Tes" is omitted from the property name since it's now in the TesDatabase section
+            values.TesDatabase["postgreSqlDatabaseName"] = settings["PostgreSqlTesDatabaseName"];
+            values.TesDatabase["postgreSqlDatabaseUserLogin"] = settings["PostgreSqlTesDatabaseUserLogin"];
+            values.TesDatabase["postgreSqlDatabaseUserPassword"] = settings["PostgreSqlTesDatabaseUserPassword"];
+
+            values.CromwellDatabase["postgreSqlServerName"] = settings["PostgreSqlServerName"];
+            values.CromwellDatabase["postgreSqlServerNameSuffix"] = settings["PostgreSqlServerNameSuffix"];
+            values.CromwellDatabase["postgreSqlServerPort"] = settings["PostgreSqlServerPort"];
+            values.CromwellDatabase["postgreSqlServerSslMode"] = settings["PostgreSqlServerSslMode"];
+            // Note: Notice "Cromwell" is omitted from the property name since it's now in the CromwellDatabase section
+            values.CromwellDatabase["postgreSqlDatabaseName"] = settings["PostgreSqlCromwellDatabaseName"];
+            values.CromwellDatabase["postgreSqlDatabaseUserLogin"] = settings["PostgreSqlCromwellDatabaseUserLogin"];
+            values.CromwellDatabase["postgreSqlDatabaseUserPassword"] = settings["PostgreSqlCromwellDatabaseUserPassword"];
         }
 
         private static Dictionary<string, string> ValuesToSettings(HelmValues values)
@@ -309,7 +359,6 @@ namespace CromwellOnAzureDeployer
                 ["CromwellOnAzureVersion"] = values.Config["cromwellOnAzureVersion"],
                 ["AzureServicesAuthConnectionString"] = values.Config["azureServicesAuthConnectionString"],
                 ["ApplicationInsightsAccountName"] = values.Config["applicationInsightsAccountName"],
-                ["CosmosDbAccountName"] = values.Config["cosmosDbAccountName"],
                 ["BatchAccountName"] = values.Config["batchAccountName"],
                 ["BatchNodesSubnetId"] = values.Config["batchNodesSubnetId"],
                 ["AksCoANamespace"] = values.Config["coaNamespace"],
@@ -332,17 +381,30 @@ namespace CromwellOnAzureDeployer
                 ["MarthaSecretName"] = values.Config["marthaSecretName"],
                 ["Name"] = values.Config["name"],
                 ["CrossSubscriptionAKSDeployment"] = values.Config["crossSubscriptionAKSDeployment"],
-                ["PostgreSqlServerName"] = values.Config["postgreSqlServerName"],
-                ["PostgreSqlDatabaseName"] = values.Config["postgreSqlDatabaseName"],
-                ["PostgreSqlUserLogin"] = values.Config["postgreSqlUserLogin"],
-                ["PostgreSqlUserPassword"] = values.Config["postgreSqlUserPassword"],
                 ["UsePostgreSqlSingleServer"] = values.Config["usePostgreSqlSingleServer"],
                 ["ManagedIdentityClientId"] = values.Identity["clientId"],
                 ["TesImageName"] = values.Images["tes"],
                 ["TriggerServiceImageName"] = values.Images["triggerservice"],
                 ["CromwellImageName"] = values.Images["cromwell"],
-                ["DefaultStorageAccountName"] = values.Persistence["storageAccount"]
+                ["DefaultStorageAccountName"] = values.Persistence["storageAccount"],
+                
+                // This is only defined once, so use the TesDatabase values
+                ["PostgreSqlServerName"] = values.TesDatabase["postgreSqlServerName"],
+                ["PostgreSqlServerNameSuffix"] = values.TesDatabase["postgreSqlServerNameSuffix"],
+                ["PostgreSqlServerPort"] = values.TesDatabase["postgreSqlServerPort"],
+                ["PostgreSqlServerSslMode"] = values.TesDatabase["postgreSqlServerSslMode"],
+
+                // Note: Notice "Tes" is added to the property name since it's coming from the TesDatabase section
+                ["PostgreSqlTesDatabaseName"] = values.TesDatabase["postgreSqlDatabaseName"],
+                ["PostgreSqlTesDatabaseUserLogin"] = values.TesDatabase["postgreSqlDatabaseUserLogin"],
+                ["PostgreSqlTesDatabaseUserPassword"] = values.TesDatabase["postgreSqlDatabaseUserPassword"],
+
+                // Note: Notice "Cromwell" is added to the property name since it's coming from the TesDatabase section
+                ["PostgreSqlCromwellDatabaseName"] = values.CromwellDatabase["postgreSqlDatabaseName"],
+                ["PostgreSqlCromwellDatabaseUserLogin"] = values.CromwellDatabase["postgreSqlDatabaseUserLogin"],
+                ["PostgreSqlCromwellDatabaseUserPassword"] = values.CromwellDatabase["postgreSqlDatabaseUserPassword"],
             };
+        
 
         private async Task<string> ExecHelmProcessAsync(string command, string workingDirectory = null, bool throwOnNonZeroExitCode = true)
         {
@@ -411,14 +473,14 @@ namespace CromwellOnAzureDeployer
             return output;
         }
 
-        private async Task<bool> WaitForWorkloadAsync(IKubernetes client, string deploymentName, CancellationToken cancellationToken)
+        private async Task<bool> WaitForWorkloadAsync(IKubernetes client, string deploymentName, string aksNamespace, CancellationToken cancellationToken)
         {
-            var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
+            var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(aksNamespace, cancellationToken: cancellationToken);
             var deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
 
             var result = await WorkloadReadyRetryPolicy.ExecuteAndCaptureAsync(async () =>
             {
-                deployments = await client.AppsV1.ListNamespacedDeploymentAsync(configuration.AksCoANamespace, cancellationToken: cancellationToken);
+                deployments = await client.AppsV1.ListNamespacedDeploymentAsync(aksNamespace, cancellationToken: cancellationToken);
                 deployment = deployments.Items.Where(x => x.Metadata.Name.Equals(deploymentName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
 
                 if ((deployment?.Status?.ReadyReplicas ?? 0) < 1)
@@ -434,6 +496,8 @@ namespace CromwellOnAzureDeployer
         {
             public Dictionary<string, string> Service { get; set; }
             public Dictionary<string, string> Config { get; set; }
+            public Dictionary<string, string> TesDatabase { get; set; }
+            public Dictionary<string, string> CromwellDatabase { get; set; }
             public Dictionary<string, string> Images { get; set; }
             public List<string> DefaultContainers { get; set; }
             public List<Dictionary<string, string>> InternalContainersMIAuth { get; set; }

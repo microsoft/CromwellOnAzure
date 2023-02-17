@@ -6,7 +6,7 @@ using CromwellApiClient;
 
 namespace TriggerService
 {
-    public interface ICromwellOnAzureEnvironment
+    public interface ITriggerHostedService
     {
         Task AbortWorkflowsAsync();
         Task ExecuteNewWorkflowsAsync();
