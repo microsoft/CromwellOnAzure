@@ -203,7 +203,10 @@ The following are instructions on how to setup a virtual network, and azure cont
         --ResourceGroupName $resource_group_name \
         --VnetName $vnet_name \
         --VnetResourceGroupName $resource_group_name \
-        --VmSubnetName vmsubnet 
+        --VmSubnetName vmsubnet \
+        --PostgreSqlSubnetName sqlsubnet \
+        --UseAks true \
+        --HelmBinaryPath /usr/sbin/helm
     ```
 
 ### 6. Update wdl and Managed identity access to run test workflow
