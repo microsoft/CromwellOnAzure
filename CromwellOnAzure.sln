@@ -26,6 +26,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tests", "src\Common.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tes", "src\ga4gh-tes\src\Tes\Tes.csproj", "{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommonUtilities", "src\ga4gh-tes\src\CommonUtilities\CommonUtilities.csproj", "{D64C9EE2-C421-4538-8D03-7152129C6D1A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -64,6 +66,10 @@ Global
 		{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FED94A67-D3B6-473A-8C3B-1D6C9687B43E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D64C9EE2-C421-4538-8D03-7152129C6D1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D64C9EE2-C421-4538-8D03-7152129C6D1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D64C9EE2-C421-4538-8D03-7152129C6D1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D64C9EE2-C421-4538-8D03-7152129C6D1A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
