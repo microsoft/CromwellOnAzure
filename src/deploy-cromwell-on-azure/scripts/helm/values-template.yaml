@@ -7,7 +7,6 @@ config:
   resourceGroup: RUNTIME_PARAMETER
   azureServicesAuthConnectionString: RUNTIME_PARAMETER
   applicationInsightsAccountName: RUNTIME_PARAMETER
-  cosmosDbAccountName: RUNTIME_PARAMETER
   azureOfferDurableId: MS-AZR-0003p
   batchAccountName: RUNTIME_PARAMETER
   batchNodesSubnetId: RUNTIME_PARAMETER
@@ -27,12 +26,30 @@ config:
   gen1BatchImageVersion: RUNTIME_PARAMETER
   batchNodeAgentSkuId: RUNTIME_PARAMETER
   batchPoolRotationForcedDays: "7"
-  name: RUNTIME_PARAMETER
+  batchPrefix: RUNTIME_PARAMETER
   marthaUrl: RUNTIME_PARAMETER
   marthaKeyVaultName: RUNTIME_PARAMETER
   marthaSecretName: RUNTIME_PARAMETER
   globalStartTaskPath: /configuration/start-task.sh
   batchManagedIdentity:
+
+tesDatabase:
+  postgreSqlServerName: RUNTIME_PARAMETER
+  postgreSqlServerNameSuffix: RUNTIME_PARAMETER
+  postgreSqlServerPort: RUNTIME_PARAMETER
+  postgreSqlServerSslMode: RUNTIME_PARAMETER
+  postgreSqlDatabaseName: RUNTIME_PARAMETER
+  postgreSqlDatabaseUserLogin: RUNTIME_PARAMETER
+  postgreSqlDatabaseUserPassword: RUNTIME_PARAMETER
+
+cromwellDatabase:
+  postgreSqlServerName: RUNTIME_PARAMETER
+  postgreSqlServerNameSuffix: RUNTIME_PARAMETER
+  postgreSqlServerPort: RUNTIME_PARAMETER
+  postgreSqlServerSslMode: RUNTIME_PARAMETER
+  postgreSqlDatabaseName: RUNTIME_PARAMETER
+  postgreSqlDatabaseUserLogin: RUNTIME_PARAMETER
+  postgreSqlDatabaseUserPassword: RUNTIME_PARAMETER
 
 images:
   cromwell: RUNTIME_PARAMETER
