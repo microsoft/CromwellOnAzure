@@ -600,9 +600,11 @@ namespace CromwellOnAzureDeployer
 
                                 if (configuration.ManualHelmDeployment)
                                 {
+                                    ConsoleEx.WriteLine($"Helm chart written to disk at: {kubernetesManager.helmScriptsRootDirectory}");
                                     ConsoleEx.WriteLine($"Please modify: {kubernetesManager.TempHelmValuesYamlPath}");
-                                    ConsoleEx.WriteLine($"Then, deploy the helm chart, and press Enter to continue.");
+                                    ConsoleEx.WriteLine("Run the following postgresql command to setup the database.");
                                     ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer));
+                                    ConsoleEx.WriteLine($"Then, deploy the helm chart, and press Enter to continue.");
                                     ConsoleEx.ReadLine();
                                 }
                                 else
@@ -687,7 +689,13 @@ namespace CromwellOnAzureDeployer
                 finally
                 {
                     await Task.WhenAll(
-                        Task.Run(() => kubernetesManager?.DeleteTempFiles()),
+                        Task.Run(() =>
+                        {
+                            if (!configuration.ManualHelmDeployment)
+                            {
+                                kubernetesManager?.DeleteTempFiles();
+                            }
+                        }),
                         Task.Run(async () =>
                         {
                             if (!configuration.KeepSshPortOpen.GetValueOrDefault())
