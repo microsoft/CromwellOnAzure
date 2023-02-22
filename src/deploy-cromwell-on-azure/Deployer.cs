@@ -2005,20 +2005,6 @@ namespace CromwellOnAzureDeployer
             await container.CreateIfNotExistsAsync();
             await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, token);
         }
-        
-        private static string GetLinuxParentPath(string path)
-        {
-            const char dirSeparator = '/';
-
-            if (string.IsNullOrEmpty(path))
-            {
-                return null;
-            }
-
-            var pathComponents = path.TrimEnd(dirSeparator).Split(dirSeparator);
-
-            return string.Join(dirSeparator, pathComponents.Take(pathComponents.Length - 1));
-        }
 
         public async Task<List<MountableContainer>> GetContainersToMount(string path)
         {
@@ -2030,9 +2016,9 @@ namespace CromwellOnAzureDeployer
             var containers = new HashSet<MountableContainer>();
             var exclusion = new HashSet<MountableContainer>();
             var wildCardAccounts = new List<string>();
-            var contents = await File.ReadAllTextAsync(path);
+            var contents = await File.ReadAllLinesAsync(path);
 
-            foreach (var line in contents.Split("\n", StringSplitOptions.RemoveEmptyEntries))
+            foreach (var line in contents)
             {
                 if (line.StartsWith("#"))
                 {
