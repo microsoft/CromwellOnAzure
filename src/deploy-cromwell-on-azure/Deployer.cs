@@ -258,12 +258,11 @@ namespace CromwellOnAzureDeployer
                             var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
                             var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
 
-                            var containers = await GetContainersToMount(configuration.ContainersToMountPath);
                             kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
                             await kubernetesManager.UpgradeAKSDeploymentAsync(
                                 settings,
                                 storageAccount,
-                                containers);
+                                containersToMount);
                         }
                     }
 
@@ -435,7 +434,6 @@ namespace CromwellOnAzureDeployer
                             await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                         }
 
-                        var containersToMount = await GetContainersToMount(configuration.ContainersToMountPath);
                         await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity, containersToMount);
 
                         if (configuration.ManualHelmDeployment)
