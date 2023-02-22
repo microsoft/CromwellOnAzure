@@ -166,6 +166,8 @@ namespace CromwellOnAzureDeployer
                 IIdentity managedIdentity = null;
                 IPrivateDnsZone postgreSqlDnsZone = null;
 
+                var containersToMount = await GetContainersToMount(configuration.ContainersToMountPath);
+
                 try
                 {
                     if (configuration.Update)
@@ -256,9 +258,11 @@ namespace CromwellOnAzureDeployer
                             var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
                             var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
 
+                            kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
                             await kubernetesManager.UpgradeAKSDeploymentAsync(
                                 settings,
-                                storageAccount);
+                                storageAccount,
+                                containersToMount);
                         }
                     }
 
@@ -430,7 +434,7 @@ namespace CromwellOnAzureDeployer
                             await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                         }
 
-                        await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity);
+                        await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity, containersToMount);
 
                         if (configuration.ManualHelmDeployment)
                         {
@@ -1774,7 +1778,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
             ThrowIfProvidedForUpdate(configuration.CrossSubscriptionAKSDeployment, nameof(configuration.CrossSubscriptionAKSDeployment));
-            ThrowIfProvidedForUpdate(configuration.ProvisionPostgreSqlOnAzure, nameof(configuration.ProvisionPostgreSqlOnAzure));
+            //ThrowIfProvidedForUpdate(configuration.ProvisionPostgreSqlOnAzure, nameof(configuration.ProvisionPostgreSqlOnAzure));
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
@@ -1998,6 +2002,82 @@ namespace CromwellOnAzureDeployer
 
             await container.CreateIfNotExistsAsync();
             await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, token);
+        }
+
+        public async Task<List<MountableContainer>> GetContainersToMount(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            var containers = new HashSet<MountableContainer>();
+            var exclusion = new HashSet<MountableContainer>();
+            var wildCardAccounts = new List<string>();
+            var contents = await File.ReadAllLinesAsync(path);
+
+            foreach (var line in contents)
+            {
+                if (line.StartsWith("#"))
+                {
+                    continue;
+                }
+
+                if (line.StartsWith("-"))
+                {
+                    var parts = line.Trim('-').Split("/", StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        var storageAccount = await GetExistingStorageAccountAsync(parts[0]);
+                        exclusion.Add(new MountableContainer() { StorageAccount = parts[0], ContainerName = parts[1].Trim(), ResourceGroupName = storageAccount.ResourceGroupName });
+                    }
+                }
+
+                if (line.StartsWith("/"))
+                {
+                    var parts = line.Split("/", StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        if (string.Equals(parts[1].Trim(), "*"))
+                        {
+                            wildCardAccounts.Add(parts[0]);
+                        }
+                        else
+                        {
+                            var storageAccount = await GetExistingStorageAccountAsync(parts[0]);
+                            containers.Add(new MountableContainer() { StorageAccount = parts[0], ContainerName = parts[1].Trim(), ResourceGroupName = storageAccount.ResourceGroupName });
+                        }
+                    }
+                }
+
+                if (line.StartsWith("http"))
+                {
+                    var blobUrl = new BlobUriBuilder(new Uri(line));
+                    var blobHostStorageAccount = blobUrl.Host.Split(".").First();
+                    containers.Add(new MountableContainer()
+                    {
+                        StorageAccount = blobHostStorageAccount,
+                        ContainerName = blobUrl.BlobContainerName,
+                        SasToken = blobUrl.Sas.ToString()
+                    });
+                }
+            }
+
+            foreach (var accountName in wildCardAccounts)
+            {
+                var storageAccount = await GetExistingStorageAccountAsync(accountName);
+                var blobContainers = await storageAccount.Manager.BlobContainers.ListAsync(storageAccount.ResourceGroupName, storageAccount.Name);
+                foreach (var page in blobContainers)
+                {
+                    foreach (var container in page.Value.ToList())
+                    {
+                        containers.Add(new MountableContainer() { StorageAccount = accountName, ContainerName = container.Name, ResourceGroupName = storageAccount.ResourceGroupName });
+                    }
+                }
+            }
+
+            containers.ExceptWith(exclusion);
+            return containers.ToList();
         }
 
         private class ValidationException : Exception
