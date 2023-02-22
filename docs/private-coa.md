@@ -51,7 +51,7 @@ The following are instructions on how to setup a virtual network, and azure cont
 ### 2. Provision a VM to run the CoA deployer. Since the CoA VM will not have direct internet access, we need to create a temporary jumpbox on the virtal network with a public IP address so the deployer can have ssh access to the CoA VM.
 
     ```
-    az vm create -n PrivateDeployerVM3 -g $resource_group_name --vnet-name $vnet_name --subnet vmsubnet --image UbuntuLTS --admin-username azureuser --generate-ssh-keys
+    az vm create -n PrivateDeployerVM3 -g $resource_group_name --vnet-name $vnet_name --subnet vmsubnet --image canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest --admin-username azureuser --generate-ssh-keys
     ```
     
 ### 3. SSH into the deployer VM we created
