@@ -10,7 +10,6 @@
   "ResourceGroupName": "",
   "BatchAccountName": "",
   "StorageAccountName": "",
-  "CosmosDbAccountName": "",
   "ApplicationInsightsAccountName": "",
   "VmName": "",
   "Silent": false,

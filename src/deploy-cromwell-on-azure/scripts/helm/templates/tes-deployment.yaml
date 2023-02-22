@@ -25,8 +25,23 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
         supplementalGroups: [1000]
+      terminationGracePeriodSeconds: 90
       containers:
         - env:
+            - name: TesPostgreSql__PostgreSqlServerName
+              value: {{ .Values.tesDatabase.postgreSqlServerName }}
+            - name: TesPostgreSql__PostgreSqlServerNameSuffix
+              value: {{ .Values.tesDatabase.postgreSqlServerNameSuffix }}
+            - name: TesPostgreSql__PostgreSqlServerSslMode
+              value: {{ .Values.tesDatabase.postgreSqlServerSslMode }}
+            - name: TesPostgreSql__PostgreSqlServerPort
+              value: {{ .Values.tesDatabase.postgreSqlServerPort | quote }}
+            - name: TesPostgreSql__PostgreSqlDatabaseName
+              value: {{ .Values.tesDatabase.postgreSqlDatabaseName }}
+            - name: TesPostgreSql__PostgreSqlDatabaseUserLogin
+              value: {{ .Values.tesDatabase.postgreSqlDatabaseUserLogin }}
+            - name: TesPostgreSql__PostgreSqlDatabaseUserPassword
+              value: {{ .Values.tesDatabase.postgreSqlDatabaseUserPassword }}
             - name: ASPNETCORE_URLS
               value: http://0.0.0.0:{{ .Values.service.tesPort }}/
             - name: DefaultStorageAccountName
@@ -35,10 +50,10 @@ spec:
               value: {{ .Values.config.azureServicesAuthConnectionString }}
             - name: ApplicationInsightsAccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
-            - name: CosmosDb__AccountName
-              value: {{ .Values.config.cosmosDbAccountName }}
             - name: AzureOfferDurableId
               value: {{ .Values.config.azureOfferDurableId }}
+            - name: UseLegacyBatchImplementationWithAutopools
+              value: {{ .Values.config.useLegacyBatchImplementationWithAutopools | quote }}
             - name: BatchAccount__AccountName
               value: {{ .Values.config.batchAccountName }}
             - name: BatchNodesSubnetId
@@ -53,20 +68,28 @@ spec:
               value: {{ .Values.config.dockerInDockerImageName }}
             - name: UseLegacyBatchImplementationWithAutopools
               value: {{ .Values.config.useLegacyBatchImplementationWithAutopools | quote }}
-            - name: BatchImageOffer
-              value: {{ .Values.config.batchImageOffer }}
-            - name: BatchImagePublisher
-              value: {{ .Values.config.batchImagePublisher }}
-            - name: BatchImageSku
-              value: {{ .Values.config.batchImageSku | quote }}
-            - name: BatchImageVersion
-              value: {{ .Values.config.batchImageVersion }}
+            - name: Gen2BatchImageOffer
+              value: {{ .Values.config.gen2BatchImageOffer }}
+            - name: Gen2BatchImagePublisher
+              value: {{ .Values.config.gen2BatchImagePublisher }}
+            - name: Gen2BatchImageSku
+              value: {{ .Values.config.gen2BatchImageSku | quote }}
+            - name: Gen2BatchImageVersion
+              value: {{ .Values.config.gen2BatchImageVersion }}
+            - name: Gen1BatchImageOffer
+              value: {{ .Values.config.gen1BatchImageOffer }}
+            - name: Gen1BatchImagePublisher
+              value: {{ .Values.config.gen1BatchImagePublisher }}
+            - name: Gen1BatchImageSku
+              value: {{ .Values.config.gen1BatchImageSku | quote }}
+            - name: Gen1BatchImageVersion
+              value: {{ .Values.config.gen1BatchImageVersion }}
             - name: BatchNodeAgentSkuId
               value: {{ .Values.config.batchNodeAgentSkuId }}
             - name: BatchPoolRotationForcedDays
               value: {{ .Values.config.batchPoolRotationForcedDays | quote }}
-            - name: Name
-              value: {{ .Values.config.name }}
+            - name: BatchPrefix
+              value: {{ .Values.config.batchPrefix | quote }}
             - name: MarthaUrl
               value: {{ .Values.config.marthaUrl }}
             - name: MarthaKeyVaultName
