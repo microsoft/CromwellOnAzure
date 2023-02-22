@@ -1056,7 +1056,7 @@ namespace CromwellOnAzureDeployer
                         configuration.ResourceGroupName, configuration.PostgreSqlServerName,
                         new FlexibleServerModel.Server(
                            location: configuration.RegionName,
-                           version: configuration.PostgreSqlVersion,
+                           version: configuration.PostgreSqlFlexibleVersion,
                            sku: new Sku(configuration.PostgreSqlSkuName, configuration.PostgreSqlTier),
                            storage: new FlexibleServerModel.Storage(configuration.PostgreSqlStorageSize),
                            administratorLogin: configuration.PostgreSqlAdministratorLogin,
@@ -1095,7 +1095,7 @@ namespace CromwellOnAzureDeployer
                            new SingleServerModel.ServerPropertiesForDefaultCreate(
                                administratorLogin: configuration.PostgreSqlAdministratorLogin,
                                administratorLoginPassword: configuration.PostgreSqlAdministratorPassword,
-                               version: configuration.PostgreSqlVersion,
+                               version: configuration.PostgreSqlSingleServerVersion,
                                publicNetworkAccess: "Disabled",
                                storageProfile: new Microsoft.Azure.Management.PostgreSQL.Models.StorageProfile(
                                    storageMB: configuration.PostgreSqlStorageSize * 1000)),
@@ -1542,12 +1542,12 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-            if (configuration.UsePostgreSqlSingleServer && int.Parse(configuration.PostgreSqlVersion) > 11)
+            if (configuration.UsePostgreSqlSingleServer && int.Parse(configuration.PostgreSqlSingleServerVersion) > 11)
             {
                 // https://learn.microsoft.com/en-us/azure/postgresql/single-server/concepts-version-policy
                 ConsoleEx.WriteLine($"Warning: as of 2/7/2023, Azure Database for PostgreSQL Single Server only supports up to PostgreSQL version 11", ConsoleColor.Yellow);
-                ConsoleEx.WriteLine($"{nameof(configuration.PostgreSqlVersion)} is currently set to {configuration.PostgreSqlVersion}", ConsoleColor.Yellow);
-                ConsoleEx.WriteLine($"Deployment will continue but could fail; please consider including '--{nameof(configuration.PostgreSqlVersion)} 11'", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine($"{nameof(configuration.PostgreSqlSingleServerVersion)} is currently set to {configuration.PostgreSqlSingleServerVersion}", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine($"Deployment will continue but could fail; please consider including '--{nameof(configuration.PostgreSqlSingleServerVersion)} 11'", ConsoleColor.Yellow);
                 ConsoleEx.WriteLine("More info: https://learn.microsoft.com/en-us/azure/postgresql/single-server/concepts-version-policy");
             }
         }
