@@ -77,17 +77,12 @@ namespace CromwellOnAzureDeployer
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
         public const string CromwellConfigurationFileName = "cromwell-application.conf";
-        public const string ContainersToMountFileName = "containers-to-mount";
-        public const string PersonalizedSettingsFileName = "settings-user";
-        public const string NonpersonalizedSettingsFileName = "settings-system";
         public const string AllowedVmSizesFileName = "allowed-vm-sizes";
         public const string InputsContainerName = "inputs";
         public const string CromwellAzureRootDir = "/data/cromwellazure";
         public const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
-        public const string SettingsDelimiter = "=:=";
         public const string StorageAccountKeySecretName = "CoAStorageKey";
         public const string PostgresqlSslMode = "VerifyFull";
-        public const string SshNsgRuleName = "SSH";
 
         private readonly CancellationTokenSource cts = new();
 
@@ -1001,15 +996,9 @@ namespace CromwellOnAzureDeployer
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
             => Execute(
-                $"Writing {ContainersToMountFileName} and {CromwellConfigurationFileName} files to '{ConfigurationContainerName}' storage container...",
+                $"Writing {CromwellConfigurationFileName} & {AllowedVmSizesFileName} files to '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, Utility.PersonalizeContent(new[]
-                    {
-                        new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
-                        new Utility.ConfigReplaceTextItem("{ManagedIdentityName}", managedIdentityName)
-                    }, "scripts", ContainersToMountFileName));
-
                     // Configure Cromwell config file for PostgreSQL on Azure.
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
