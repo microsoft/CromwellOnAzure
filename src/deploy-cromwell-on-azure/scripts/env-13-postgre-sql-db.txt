@@ -1,7 +1,0 @@
-﻿PostgreSqlCromwellDatabaseName={PostgreSqlCromwellDatabaseName}
-PostgreSqlTesDatabaseName={PostgreSqlTesDatabaseName}
-PostgreSqlCromwellUserLogin={PostgreSqlCromwellUserLogin}
-PostgreSqlCromwellUserPassword={PostgreSqlCromwellUserPassword}
-PostgreSqlTesUserLogin={PostgreSqlTesUserLogin}
-PostgreSqlTesUserPassword={PostgreSqlTesUserPassword}
-PostgreSqlTesDatabasePort={PostgreSqlTesDatabasePort}

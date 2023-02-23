@@ -63,11 +63,6 @@
     <EmbeddedResource Include="scripts\env-02-internal-images.txt" />
     <EmbeddedResource Include="scripts\env-03-external-images.txt" />
     <EmbeddedResource Include="scripts\env-04-settings.txt" />
-    <EmbeddedResource Include="scripts\env-13-postgre-sql-db.txt" />
-    <EmbeddedResource Include="scripts\mount-data-disk.sh" />
-    <EmbeddedResource Include="scripts\mount.blobfuse" />
-    <EmbeddedResource Include="scripts\mount_containers.sh" />
-    <EmbeddedResource Include="scripts\wait-for-it.sh" />
     <EmbeddedResource Include="test.wdl" />
     <EmbeddedResource Include="testInputs.json" />
     <Content Update="samples\config.json">
@@ -86,7 +81,6 @@
 
   <ItemGroup>
     <Folder Include="Properties\PublishProfiles\" />
-    <Folder Include="scripts\aks\" />
   </ItemGroup>
 
 </Project>

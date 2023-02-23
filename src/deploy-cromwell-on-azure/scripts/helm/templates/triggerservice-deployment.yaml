@@ -27,19 +27,19 @@ spec:
       containers:
         - env:
             - name: TesPostgreSql__PostgreSqlServerName
-              value: {{ .Values.tesDatabase.postgreSqlServerName }}
+              value: {{ .Values.tesDatabase.serverName }}
             - name: TesPostgreSql__PostgreSqlServerNameSuffix
-              value: {{ .Values.tesDatabase.postgreSqlServerNameSuffix }}
+              value: {{ .Values.tesDatabase.serverNameSuffix }}
             - name: TesPostgreSql__PostgreSqlServerSslMode
-              value: {{ .Values.tesDatabase.postgreSqlServerSslMode }}
+              value: {{ .Values.tesDatabase.serverSslMode }}
             - name: TesPostgreSql__PostgreSqlServerPort
-              value: {{ .Values.tesDatabase.postgreSqlServerPort | quote }}
+              value: {{ .Values.tesDatabase.serverPort | quote }}
             - name: TesPostgreSql__PostgreSqlDatabaseName
-              value: {{ .Values.tesDatabase.postgreSqlDatabaseName }}
+              value: {{ .Values.tesDatabase.databaseName }}
             - name: TesPostgreSql__PostgreSqlDatabaseUserLogin
-              value: {{ .Values.tesDatabase.postgreSqlDatabaseUserLogin }}
+              value: {{ .Values.tesDatabase.databaseUserLogin }}
             - name: TesPostgreSql__PostgreSqlDatabaseUserPassword
-              value: {{ .Values.tesDatabase.postgreSqlDatabaseUserPassword }}
+              value: {{ .Values.tesDatabase.databaseUserPassword }}
             - name: TriggerService__DefaultStorageAccountName
               value: {{ .Values.persistence.storageAccount }}
             - name: TriggerService__AzureServicesAuthConnectionString

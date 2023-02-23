@@ -101,10 +101,11 @@ namespace TriggerService.Tests
 
             postgreSqlOptions.Setup(o => o.Value).Returns(new PostgreSqlOptions
             {
-                PostgreSqlServerName = "fakeserver",
-                PostgreSqlDatabaseUserLogin = "fakeuser",
-                PostgreSqlDatabaseUserPassword = "fake987",
+                ServerName = "fakeserver",
+                DatabaseUserLogin = "fakeuser",
+                DatabaseUserPassword = "fake987",
             });
+
             var tesTaskRepository = new Mock<IRepository<TesTask>>().Object;
             var storageUtility = new Mock<IAzureStorageUtility>();
 
