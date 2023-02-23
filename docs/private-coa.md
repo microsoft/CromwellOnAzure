@@ -6,13 +6,11 @@ The following are instructions on how to setup a virtual network, and azure cont
 ### 0. Set variables and create Resource group:
 
     ```
-    subscription="594bef42-33f3-42df-b056-e7399d6ae7a0"
-    resource_group_name=coajsaun123
-    vnet_name=vnetjsaun456
-    mycontainerregistry=jsauncontainerregistry007
-    storage_account_name=jsaunstorageaccount123
-    cosmos_db_name=coacosmosdbjsaun123
-    private_endpoint_name_cosmos=myprivateendpoint123cosmos
+    subscription="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    resource_group_name=rgname
+    vnet_name=vnetname
+    mycontainerregistry=containerregistry
+    storage_account_name=storageaccount123
     private_endpoint_name_storage=myprivateendpoint123storage
     private_endpoint_name_cr=myprivateendpoint123cr
     location=eastus
@@ -89,39 +87,6 @@ The following are instructions on how to setup a virtual network, and azure cont
             --private-connection-resource-id $stroageAccountId \
             --group-id "Blob" \
             --connection-name "myConnection"
-
-    az cosmosdb create --name $cosmos_db_name --resource-group $resource_group_name \
-        --default-consistency-level Eventual \
-        --locations regionName="$location" failoverPriority=0 isZoneRedundant=False \
-        --locations regionName="$failoverLocation" failoverPriority=1 isZoneRedundant=False
-
-    cosmosId="/subscriptions/$subscription/resourceGroups/$resource_group_name/providers/Microsoft.DocumentDB/databaseAccounts/$cosmos_db_name"
-    MSYS_NO_PATHCONV=1 az network private-endpoint create \
-        --name $private_endpoint_name_cosmos \
-        --resource-group $resource_group_name \
-        --vnet-name $vnet_name  \
-        --subnet pesubnet \
-        --private-connection-resource-id $cosmosId \
-        --group-id "Sql" \
-        --connection-name "myConnection"
-
-    zoneName="privatelink.documents.azure.com"
-
-    az network private-dns zone create --resource-group $resource_group_name \
-        --name  $zoneName
-
-    az network private-dns link vnet create --resource-group $resource_group_name \
-        --zone-name  $zoneName\
-        --name myzonelink \
-        --virtual-network $vnet_name \
-        --registration-enabled false 
-
-    az network private-endpoint dns-zone-group create \
-        --resource-group $resource_group_name \
-        --endpoint-name $private_endpoint_name_cosmos \
-        --name "MyPrivateZoneGroup" \
-        --private-dns-zone $zoneName \
-        --zone-name "myzone" 
     ```
 
 ### 4. Provision Azure Container Registry
@@ -194,7 +159,6 @@ The following are instructions on how to setup a virtual network, and azure cont
     ./deploy-cromwell-on-azure-linux --SubscriptionId $subscription --RegionName $location \
         --MainIdentifierPrefix $coa_identifier \
         --StorageAccountName $storage_account_name \
-        --CosmosDbAccountName $cosmos_db_name \
         --PrivateNetworking true \
         --BatchNodesSubnetId $batchsubnetid \
         --DisableBatchNodesPublicIpAddress true \
@@ -205,7 +169,6 @@ The following are instructions on how to setup a virtual network, and azure cont
         --VnetResourceGroupName $resource_group_name \
         --VmSubnetName vmsubnet \
         --PostgreSqlSubnetName sqlsubnet \
-        --UseAks true \
         --HelmBinaryPath /usr/sbin/helm
     ```
 
