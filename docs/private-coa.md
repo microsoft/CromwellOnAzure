@@ -14,7 +14,6 @@ The following are instructions on how to setup a virtual network, and azure cont
     private_endpoint_name_storage=myprivateendpoint123storage
     private_endpoint_name_cr=myprivateendpoint123cr
     location=eastus
-    failoverLocation=eastus2
     
     // Create Resource group
     az group create -n $resource_group_name -l $location
