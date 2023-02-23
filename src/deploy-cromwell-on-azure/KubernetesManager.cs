@@ -359,7 +359,7 @@ namespace CromwellOnAzureDeployer
             batchImageGen1["publisher"] = settings["Gen1BatchImagePublisher"];
             batchImageGen1["sku"] = settings["Gen1BatchImageSku"];
             batchImageGen1["version"] = settings["Gen1BatchImageVersion"];
-            batchImageGen1["nodeAgentSkuId"] = settings["BatchNodeAgentSkuId"];
+            batchImageGen1["nodeAgentSkuId"] = settings["Gen1BatchNodeAgentSkuId"];
             martha["url"] = settings["MarthaUrl"];
             martha["keyVaultName"] = settings["MarthaKeyVaultName"];
             martha["secretName"] = settings["MarthaSecretName"];
@@ -432,7 +432,7 @@ namespace CromwellOnAzureDeployer
                 ["Gen1BatchImagePublisher"] = batchImageGen1["publisher"],
                 ["Gen1BatchImageSku"] = batchImageGen1["sku"],
                 ["Gen1BatchImageVersion"] = batchImageGen1["version"],
-                ["BatchNodeAgentSkuId"] = batchImageGen1["nodeAgentSkuId"],
+                ["Gen1BatchNodeAgentSkuId"] = batchImageGen1["nodeAgentSkuId"],
                 ["MarthaUrl"] = martha["url"],
                 ["MarthaKeyVaultName"] = martha["keyVaultName"],
                 ["MarthaSecretName"] = martha["secretName"],
