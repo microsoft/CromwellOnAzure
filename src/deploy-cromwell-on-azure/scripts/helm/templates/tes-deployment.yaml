@@ -66,8 +66,6 @@ spec:
               value: {{ .Values.config.disableBatchScheduling | quote }}
             - name: DockerInDockerImageName
               value: {{ .Values.config.dockerInDockerImageName }}
-            - name: UseLegacyBatchImplementationWithAutopools
-              value: {{ .Values.config.useLegacyBatchImplementationWithAutopools | quote }}
             - name: Gen2BatchImageOffer
               value: {{ .Values.config.gen2BatchImageOffer }}
             - name: Gen2BatchImagePublisher
