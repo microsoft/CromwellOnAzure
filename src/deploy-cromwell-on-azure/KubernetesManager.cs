@@ -331,13 +331,13 @@ namespace CromwellOnAzureDeployer
 
         private static void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)
         {
-            var batchAccount = values.Config["batchAccount"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var batchNodes = values.Config["batchNodes"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var batchScheduling = values.Config["batchScheduling"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var nodeImages = values.Config["nodeImages"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var batchImageGen2 = values.Config["batchImageGen2"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var batchImageGen1 = values.Config["batchImageGen1"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var martha = values.Config["martha"] as IDictionary<string, string> ?? new Dictionary<string, string>();
+            var batchAccount = GetObjectFromConfig(values, "batchAccount") ?? new Dictionary<string, string>();
+            var batchNodes = GetObjectFromConfig(values, "batchNodes") ?? new Dictionary<string, string>();
+            var batchScheduling = GetObjectFromConfig(values, "batchScheduling") ?? new Dictionary<string, string>();
+            var nodeImages = GetObjectFromConfig(values, "nodeImages") ?? new Dictionary<string, string>();
+            var batchImageGen2 = GetObjectFromConfig(values, "batchImageGen2") ?? new Dictionary<string, string>();
+            var batchImageGen1 = GetObjectFromConfig(values, "batchImageGen1") ?? new Dictionary<string, string>();
+            var martha = GetObjectFromConfig(values, "martha") ?? new Dictionary<string, string>();
 
             values.Config["cromwellOnAzureVersion"] = settings["CromwellOnAzureVersion"];
             values.Config["azureServicesAuthConnectionString"] = settings["AzureServicesAuthConnectionString"];
@@ -400,15 +400,18 @@ namespace CromwellOnAzureDeployer
             values.Config["martha"] = martha;
         }
 
+        private static IDictionary<string, string> GetObjectFromConfig(HelmValues values, string key)
+            => (values?.Config[key] as IDictionary<object, object>)?.ToDictionary(p => p.Key as string, p => p.Value as string);
+
         private static Dictionary<string, string> ValuesToSettings(HelmValues values)
         {
-            var batchAccount = values.Config["batchAccount"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var batchNodes = values.Config["batchNodes"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var batchScheduling = values.Config["batchScheduling"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var nodeImages = values.Config["nodeImages"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var batchImageGen2 = values.Config["batchImageGen2"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var batchImageGen1 = values.Config["batchImageGen1"] as IDictionary<string, string> ?? new Dictionary<string, string>();
-            var martha = values.Config["martha"] as IDictionary<string, string> ?? new Dictionary<string, string>();
+            var batchAccount = GetObjectFromConfig(values, "batchAccount") ?? new Dictionary<string, string>();
+            var batchNodes = GetObjectFromConfig(values, "batchNodes") ?? new Dictionary<string, string>();
+            var batchScheduling = GetObjectFromConfig(values, "batchScheduling") ?? new Dictionary<string, string>();
+            var nodeImages = GetObjectFromConfig(values, "nodeImages") ?? new Dictionary<string, string>();
+            var batchImageGen2 = GetObjectFromConfig(values, "batchImageGen2") ?? new Dictionary<string, string>();
+            var batchImageGen1 = GetObjectFromConfig(values, "batchImageGen1") ?? new Dictionary<string, string>();
+            var martha = GetObjectFromConfig(values, "martha") ?? new Dictionary<string, string>();
 
             return new()
             {
