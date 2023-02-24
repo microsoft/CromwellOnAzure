@@ -26,23 +26,23 @@ spec:
         supplementalGroups: [1000]
       containers:
         - env:
-            - name: TesPostgreSql__PostgreSqlServerName
+            - name: TesPostgreSql__ServerName
               value: {{ .Values.tesDatabase.serverName }}
-            - name: TesPostgreSql__PostgreSqlServerNameSuffix
+            - name: TesPostgreSql__ServerNameSuffix
               value: {{ .Values.tesDatabase.serverNameSuffix }}
-            - name: TesPostgreSql__PostgreSqlServerSslMode
+            - name: TesPostgreSql__ServerSslMode
               value: {{ .Values.tesDatabase.serverSslMode }}
-            - name: TesPostgreSql__PostgreSqlServerPort
+            - name: TesPostgreSql__ServerPort
               value: {{ .Values.tesDatabase.serverPort | quote }}
-            - name: TesPostgreSql__PostgreSqlDatabaseName
+            - name: TesPostgreSql__DatabaseName
               value: {{ .Values.tesDatabase.databaseName }}
-            - name: TesPostgreSql__PostgreSqlDatabaseUserLogin
+            - name: TesPostgreSql__DatabaseUserLogin
               value: {{ .Values.tesDatabase.databaseUserLogin }}
-            - name: TesPostgreSql__PostgreSqlDatabaseUserPassword
+            - name: TesPostgreSql__DatabaseUserPassword
               value: {{ .Values.tesDatabase.databaseUserPassword }}
             - name: TriggerService__DefaultStorageAccountName
               value: {{ .Values.persistence.storageAccount }}
-            - name: TriggerService__AzureServicesAuthConnectionString
+            - name: AzureServicesAuthConnectionString
               value: {{ .Values.config.azureServicesAuthConnectionString }}
             - name: TriggerService__ApplicationInsightsAccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
