@@ -21,7 +21,8 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlSkuName { get; set; } = "Standard_B2s";
         public string PostgreSqlTier { get; set; } = "Burstable";
         public string DefaultVmSubnetName { get; set; } = "vmsubnet";
-        public string PostgreSqlVersion { get; set; } = "14";
+        public string PostgreSqlFlexibleVersion { get; set; } = "14";
+        public string PostgreSqlSingleServerVersion { get; set; } = "11";
         public string DefaultPostgreSqlSubnetName { get; set; } = "sqlsubnet";
         public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
     }
@@ -75,7 +76,6 @@ namespace CromwellOnAzureDeployer
         public string BlobxferImageName { get; set; } = null;
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool DebugLogging { get; set; } = false;
-        public bool? ProvisionPostgreSqlOnAzure { get; set; } = true;
         public string PostgreSqlServerName { get; set; }
         public string PostgreSqlServerNameSuffix { get; set; } = ".postgres.database.azure.com";
         public int PostgreSqlServerPort { get; set; } = 5432;

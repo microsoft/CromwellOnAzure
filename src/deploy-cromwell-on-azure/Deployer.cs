@@ -77,17 +77,12 @@ namespace CromwellOnAzureDeployer
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
         public const string CromwellConfigurationFileName = "cromwell-application.conf";
-        public const string ContainersToMountFileName = "containers-to-mount";
-        public const string PersonalizedSettingsFileName = "settings-user";
-        public const string NonpersonalizedSettingsFileName = "settings-system";
         public const string AllowedVmSizesFileName = "allowed-vm-sizes";
         public const string InputsContainerName = "inputs";
         public const string CromwellAzureRootDir = "/data/cromwellazure";
         public const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
-        public const string SettingsDelimiter = "=:=";
         public const string StorageAccountKeySecretName = "CoAStorageKey";
         public const string PostgresqlSslMode = "VerifyFull";
-        public const string SshNsgRuleName = "SSH";
 
         private readonly CancellationTokenSource cts = new();
 
@@ -283,7 +278,7 @@ namespace CromwellOnAzureDeployer
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
                         var keyVault = await ValidateAndGetExistingKeyVault();
 
-                        if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName) && configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                        if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName))
                         {
                             configuration.PostgreSqlServerName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
                         }
@@ -358,7 +353,7 @@ namespace CromwellOnAzureDeployer
                         if (vnetAndSubnet is null)
                         {
                             configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                            configuration.PostgreSqlSubnetName = String.IsNullOrEmpty(configuration.PostgreSqlSubnetName) && configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? configuration.DefaultPostgreSqlSubnetName : configuration.PostgreSqlSubnetName;
+                            configuration.PostgreSqlSubnetName = String.IsNullOrEmpty(configuration.PostgreSqlSubnetName) ? configuration.DefaultPostgreSqlSubnetName : configuration.PostgreSqlSubnetName;
                             configuration.VmSubnetName = String.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
                             vnetAndSubnet = await CreateVnetAndSubnetsAsync(resourceGroup);
                         }
@@ -392,7 +387,7 @@ namespace CromwellOnAzureDeployer
                             });
                         }
 
-                        if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() && postgreSqlFlexServer is null)
+                        if (postgreSqlFlexServer is null)
                         {
                             postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
                         }
@@ -726,7 +721,6 @@ namespace CromwellOnAzureDeployer
 
             if (installedVersion is null)
             {
-                var provisionPostgreSqlOnAzure = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault();
                 UpdateSetting(settings, defaults, "BatchPrefix", configuration.BatchPrefix, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
@@ -746,7 +740,7 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseName", configuration.PostgreSqlCromwellDatabaseName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseUserLogin", GetFormattedPostgresqlUser(isCromwellPostgresUser: true), ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseUserPassword", configuration.PostgreSqlCromwellUserPassword, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "UsePostgreSqlSingleServer", provisionPostgreSqlOnAzure ? configuration.UsePostgreSqlSingleServer.ToString() : string.Empty, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "UsePostgreSqlSingleServer", configuration.UsePostgreSqlSingleServer.ToString(), ignoreDefaults: true);
             }
 
             BackFillSettings(settings, defaults);
@@ -1002,27 +996,18 @@ namespace CromwellOnAzureDeployer
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
             => Execute(
-                $"Writing {ContainersToMountFileName} and {CromwellConfigurationFileName} files to '{ConfigurationContainerName}' storage container...",
+                $"Writing {CromwellConfigurationFileName} & {AllowedVmSizesFileName} files to '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, Utility.PersonalizeContent(new[]
-                    {
-                        new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
-                        new Utility.ConfigReplaceTextItem("{ManagedIdentityName}", managedIdentityName)
-                    }, "scripts", ContainersToMountFileName));
-
                     // Configure Cromwell config file for PostgreSQL on Azure.
-                    if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
-                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
-                        {
-                            new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlCromwellDatabaseName}?sslmode=require\""),
-                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", configuration.UsePostgreSqlSingleServer ? $"\"{configuration.PostgreSqlCromwellUserLogin}@{configuration.PostgreSqlServerName}\"": $"\"{configuration.PostgreSqlCromwellUserLogin}\""),
-                            new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),
-                            new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
-                            new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
-                        }, "scripts", CromwellConfigurationFileName));
-                    }
+                        new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlCromwellDatabaseName}?sslmode=require\""),
+                        new Utility.ConfigReplaceTextItem("{DatabaseUser}", configuration.UsePostgreSqlSingleServer ? $"\"{configuration.PostgreSqlCromwellUserLogin}@{configuration.PostgreSqlServerName}\"": $"\"{configuration.PostgreSqlCromwellUserLogin}\""),
+                        new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),
+                        new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
+                        new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
+                    }, "scripts", CromwellConfigurationFileName));
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
@@ -1056,7 +1041,7 @@ namespace CromwellOnAzureDeployer
                         configuration.ResourceGroupName, configuration.PostgreSqlServerName,
                         new FlexibleServerModel.Server(
                            location: configuration.RegionName,
-                           version: configuration.PostgreSqlVersion,
+                           version: configuration.PostgreSqlFlexibleVersion,
                            sku: new Sku(configuration.PostgreSqlSkuName, configuration.PostgreSqlTier),
                            storage: new FlexibleServerModel.Storage(configuration.PostgreSqlStorageSize),
                            administratorLogin: configuration.PostgreSqlAdministratorLogin,
@@ -1095,7 +1080,7 @@ namespace CromwellOnAzureDeployer
                            new SingleServerModel.ServerPropertiesForDefaultCreate(
                                administratorLogin: configuration.PostgreSqlAdministratorLogin,
                                administratorLoginPassword: configuration.PostgreSqlAdministratorPassword,
-                               version: configuration.PostgreSqlVersion,
+                               version: configuration.PostgreSqlSingleServerVersion,
                                publicNetworkAccess: "Disabled",
                                storageProfile: new Microsoft.Azure.Management.PostgreSQL.Models.StorageProfile(
                                    storageMB: configuration.PostgreSqlStorageSize * 1000)),
@@ -1178,9 +1163,7 @@ namespace CromwellOnAzureDeployer
                         .WithAddressSpace(configuration.VnetAddressSpace)
                         .DefineSubnet(configuration.VmSubnetName).WithAddressPrefix(configuration.VmSubnetAddressSpace).Attach();
 
-                    vnetDefinition = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault()
-                        ? vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName).WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace).WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers").Attach()
-                        : vnetDefinition;
+                    vnetDefinition = vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName).WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace).WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers").Attach();
 
                     var vnet = await vnetDefinition.CreateAsync();
 
@@ -1542,12 +1525,12 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-            if (configuration.UsePostgreSqlSingleServer && int.Parse(configuration.PostgreSqlVersion) > 11)
+            if (configuration.UsePostgreSqlSingleServer && int.Parse(configuration.PostgreSqlSingleServerVersion) > 11)
             {
                 // https://learn.microsoft.com/en-us/azure/postgresql/single-server/concepts-version-policy
                 ConsoleEx.WriteLine($"Warning: as of 2/7/2023, Azure Database for PostgreSQL Single Server only supports up to PostgreSQL version 11", ConsoleColor.Yellow);
-                ConsoleEx.WriteLine($"{nameof(configuration.PostgreSqlVersion)} is currently set to {configuration.PostgreSqlVersion}", ConsoleColor.Yellow);
-                ConsoleEx.WriteLine($"Deployment will continue but could fail; please consider including '--{nameof(configuration.PostgreSqlVersion)} 11'", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine($"{nameof(configuration.PostgreSqlSingleServerVersion)} is currently set to {configuration.PostgreSqlSingleServerVersion}", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine($"Deployment will continue but could fail; please consider including '--{nameof(configuration.PostgreSqlSingleServerVersion)} 11'", ConsoleColor.Yellow);
                 ConsoleEx.WriteLine("More info: https://learn.microsoft.com/en-us/azure/postgresql/single-server/concepts-version-policy");
             }
         }
@@ -1589,9 +1572,9 @@ namespace CromwellOnAzureDeployer
                 return null;
             }
 
-            if (configuration.ProvisionPostgreSqlOnAzure == true && !AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName, configuration.PostgreSqlSubnetName))
+            if (!AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName, configuration.PostgreSqlSubnetName))
             {
-                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)}, {nameof(configuration.VmSubnetName)} and {nameof(configuration.PostgreSqlSubnetName)} are required when using an existing virtual network and {nameof(configuration.ProvisionPostgreSqlOnAzure)} is set.");
+                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)}, {nameof(configuration.VmSubnetName)} and {nameof(configuration.PostgreSqlSubnetName)} are required when using an existing virtual network.");
             }
 
             if (!AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName))
@@ -1626,29 +1609,26 @@ namespace CromwellOnAzureDeployer
             var resourceGraphClient = new ResourceGraphClient(tokenCredentials);
             var postgreSqlSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
 
-            if (configuration.ProvisionPostgreSqlOnAzure == true)
+            if (postgreSqlSubnet is null)
             {
-                if (postgreSqlSubnet is null)
-                {
-                    throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.PostgreSqlSubnetName}'");
-                }
+                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.PostgreSqlSubnetName}'");
+            }
 
-                var delegatedServices = postgreSqlSubnet.Inner.Delegations.Select(d => d.ServiceName);
-                var hasOtherDelegations = delegatedServices.Any(s => s != "Microsoft.DBforPostgreSQL/flexibleServers");
-                var hasNoDelegations = !delegatedServices.Any();
+            var delegatedServices = postgreSqlSubnet.Inner.Delegations.Select(d => d.ServiceName);
+            var hasOtherDelegations = delegatedServices.Any(s => s != "Microsoft.DBforPostgreSQL/flexibleServers");
+            var hasNoDelegations = !delegatedServices.Any();
 
-                if (hasOtherDelegations)
-                {
-                    throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' can have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation only.");
-                }
+            if (hasOtherDelegations)
+            {
+                throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' can have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation only.");
+            }
 
-                var resourcesInPostgreSqlSubnetQuery = $"where type =~ 'Microsoft.Network/networkInterfaces' | where properties.ipConfigurations[0].properties.subnet.id == '{postgreSqlSubnet.Inner.Id}'";
-                var resourcesExist = (await resourceGraphClient.ResourcesAsync(new QueryRequest(new[] { configuration.SubscriptionId }, resourcesInPostgreSqlSubnetQuery))).TotalRecords > 0;
+            var resourcesInPostgreSqlSubnetQuery = $"where type =~ 'Microsoft.Network/networkInterfaces' | where properties.ipConfigurations[0].properties.subnet.id == '{postgreSqlSubnet.Inner.Id}'";
+            var resourcesExist = (await resourceGraphClient.ResourcesAsync(new QueryRequest(new[] { configuration.SubscriptionId }, resourcesInPostgreSqlSubnetQuery))).TotalRecords > 0;
 
-                if (hasNoDelegations && resourcesExist)
-                {
-                    throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' must be either empty or have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation.");
-                }
+            if (hasNoDelegations && resourcesExist)
+            {
+                throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' must be either empty or have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation.");
             }
 
             return (vnet, vmSubnet, postgreSqlSubnet);
@@ -1792,12 +1772,7 @@ namespace CromwellOnAzureDeployer
             if (!configuration.ManualHelmDeployment)
             {
                 ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
-            }
-
-            if (configuration.ProvisionPostgreSqlOnAzure is null)
-            {
-                configuration.ProvisionPostgreSqlOnAzure = true;
-            }            
+            }      
 
             if (!configuration.Update)
             {
