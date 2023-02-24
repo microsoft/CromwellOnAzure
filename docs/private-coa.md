@@ -93,16 +93,17 @@ The following are instructions on how to setup a virtual network, and azure cont
     ```
     // Instal docker if not on machine
     sudo apt  install docker.io
+    sudo usermod -aG docker azureuser
+    // Exit and login again to get new group permissions.
     
     az acr create --resource-group $resource_group_name --name $mycontainerregistry --sku Premium
-    sudo az acr login --name $mycontainerregistry
-    
+    az acr login --name $mycontainerregistry
     
     // To account for dockerinDocker [issue 401](https://github.com/microsoft/CromwellOnAzure/issues/401)
     // create docker file 
     wget https://raw.githubusercontent.com/microsoft/CromwellOnAzure/develop/src/deploy-cromwell-on-azure/samples/docker-dockerfile -o Dockerfile
-    sudo docker build -t $mycontainerregistry.azurecr.io/docker:v1 .
-    sudo docker push $mycontainerregistry.azurecr.io/docker:v1
+    docker build -t $mycontainerregistry.azurecr.io/docker:v1 .
+    docker push $mycontainerregistry.azurecr.io/docker:v1
 
     az acr import \
       --name $mycontainerregistry \
@@ -188,7 +189,7 @@ The following are instructions on how to setup a virtual network, and azure cont
 //[Use private Docker containers hosted on Azure](https://github.com/microsoft/CromwellOnAzure/blob/develop/docs/troubleshooting-guide.md#use-private-docker-containers-hosted-on-azure)
     
     //Update path of container in test.wdl ($storage_account_name/inputs.test.wdl)  [issue 585](https://github.com/microsoft/CromwellOnAzure/issues/585)  
-     docker: '$mycontainerregistry.azurecr.io/ubuntu:20.04'
+     docker: '$mycontainerregistry.azurecr.io/ubuntu:22.04'
      
      //Upload new trigger file to test.
      
