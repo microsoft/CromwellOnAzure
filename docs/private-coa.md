@@ -100,7 +100,8 @@ The following are instructions on how to setup a virtual network, and azure cont
     
     // To account for dockerinDocker [issue 401](https://github.com/microsoft/CromwellOnAzure/issues/401)
     // create docker file 
-    sudo docker build -t $mycontainerregistry.azurecr.io/docker:v1 https://raw.githubusercontent.com/microsoft/CromwellOnAzure/develop/src/deploy-cromwell-on-azure/samples/docker-dockerfile
+    wget https://raw.githubusercontent.com/microsoft/CromwellOnAzure/develop/src/deploy-cromwell-on-azure/samples/docker-dockerfile -o Dockerfile
+    sudo docker build -t $mycontainerregistry.azurecr.io/docker:v1 .
     sudo docker push $mycontainerregistry.azurecr.io/docker:v1
 
     az acr import \
