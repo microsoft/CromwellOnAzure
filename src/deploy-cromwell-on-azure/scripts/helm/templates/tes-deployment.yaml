@@ -32,7 +32,7 @@ spec:
               value: {{ .Values.tesDatabase.serverName }}
             - name: TesPostgreSql__ServerNameSuffix
               value: {{ .Values.tesDatabase.serverNameSuffix }}
-            - name: TesPostgreSql__lServerSslMode
+            - name: TesPostgreSql__ServerSslMode
               value: {{ .Values.tesDatabase.serverSslMode }}
             - name: TesPostgreSql__ServerPort
               value: {{ .Values.tesDatabase.serverPort | quote }}
