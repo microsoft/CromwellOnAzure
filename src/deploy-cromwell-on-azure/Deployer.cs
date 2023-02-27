@@ -229,7 +229,7 @@ namespace CromwellOnAzureDeployer
                         {
                             if (accountNames.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
                             {
-                                bool.TryParse(crossSubscriptionAKSDeployment, out var parsed);
+                                _ = bool.TryParse(crossSubscriptionAKSDeployment, out var parsed);
                                 configuration.CrossSubscriptionAKSDeployment = parsed;
                             }
 
@@ -383,7 +383,7 @@ namespace CromwellOnAzureDeployer
                                 keyVault ??= await CreateKeyVaultAsync(configuration.KeyVaultName, managedIdentity, vnetAndSubnet.Value.vmSubnet);
                                 keyVaultUri = keyVault.Properties.VaultUri;
                                 var keys = await storageAccount.GetKeysAsync();
-                                await SetStorageKeySecret(keyVaultUri, StorageAccountKeySecretName, keys.First().Value);
+                                await SetStorageKeySecret(keyVaultUri, StorageAccountKeySecretName, keys[0].Value);
                             });
                         }
 
@@ -449,7 +449,7 @@ namespace CromwellOnAzureDeployer
                             // Deploy an ubuntu pod to run PSQL commands, then delete it
                             const string deploymentName = "ubuntu";
                             const string deploymentNamespace = "default";
-                            var ubuntuDeployment = kubernetesManager.GetUbuntuDeploymentTemplate();
+                            var ubuntuDeployment = KubernetesManager.GetUbuntuDeploymentTemplate();
                             await kubernetesClient.AppsV1.CreateNamespacedDeploymentAsync(ubuntuDeployment, deploymentNamespace);
                             await ExecuteQueriesOnAzurePostgreSQLDbFromK8(deploymentName, deploymentNamespace);
                             await kubernetesClient.AppsV1.DeleteNamespacedDeploymentAsync(deploymentName, deploymentNamespace);
@@ -1172,7 +1172,7 @@ namespace CromwellOnAzureDeployer
 
         private string GetFormattedPostgresqlUser(bool isCromwellPostgresUser)
         {
-            string user = isCromwellPostgresUser ?
+            var user = isCromwellPostgresUser ?
                 configuration.PostgreSqlCromwellUserLogin :
                 configuration.PostgreSqlTesUserLogin;
 
@@ -1975,7 +1975,7 @@ namespace CromwellOnAzureDeployer
             var blobClient = await GetBlobClientAsync(storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
-            await container.CreateIfNotExistsAsync();
+            await container.CreateIfNotExistsAsync(cancellationToken: token);
             await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, token);
         }
 
