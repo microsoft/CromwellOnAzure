@@ -110,7 +110,6 @@ namespace CromwellOnAzureDeployer
         private FlexibleServer.IPostgreSQLManagementClient postgreSqlFlexManagementClient { get; set; }
         private SingleServer.IPostgreSQLManagementClient postgreSqlSingleManagementClient { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
-        private bool SkipBillingReaderRoleAssignment { get; set; }
         private bool isResourceGroupCreated { get; set; }
         private KubernetesManager kubernetesManager { get; set; }
         private IKubernetes kubernetesClient { get; set; }
@@ -390,11 +389,6 @@ namespace CromwellOnAzureDeployer
                         if (postgreSqlFlexServer is null)
                         {
                             postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
-                        }
-
-                        if (!SkipBillingReaderRoleAssignment)
-                        {
-                            await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
                         }
 
                         await Task.WhenAll(new Task[]
@@ -1120,26 +1114,6 @@ namespace CromwellOnAzureDeployer
             return server;
         }
 
-        private async Task AssignVmAsBillingReaderToSubscriptionAsync(IIdentity managedIdentity)
-        {
-            try
-            {
-                await Execute(
-                    $"Assigning {BuiltInRole.BillingReader} role for user-managed identity to Subscription scope...",
-                    () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                        () => azureSubscriptionClient.AccessManagement.RoleAssignments
-                            .Define(Guid.NewGuid().ToString())
-                            .ForObjectId(managedIdentity.PrincipalId)
-                            .WithBuiltInRole(BuiltInRole.BillingReader)
-                            .WithSubscriptionScope(configuration.SubscriptionId)
-                            .CreateAsync(cts.Token)));
-            }
-            catch (Microsoft.Rest.Azure.CloudException)
-            {
-                DisplayBillingReaderInsufficientAccessLevelWarning();
-            }
-        }
-
         private Task AssignVmAsContributorToAppInsightsAsync(IIdentity managedIdentity, IResource appInsights)
             => Execute(
                 $"Assigning {BuiltInRole.Contributor} role for user-managed identity to App Insights resource scope...",
@@ -1472,7 +1446,6 @@ namespace CromwellOnAzureDeployer
         {
             const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
-            const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
 
             var azure = Microsoft.Azure.Management.Fluent.Azure
                 .Configure()
@@ -1500,9 +1473,7 @@ namespace CromwellOnAzureDeployer
                 .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
                 .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
-            var isuserAccessAdministrator = currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId);
-
-            if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && isuserAccessAdministrator))
+            if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId)))
             {
                 if (!rgExists)
                 {
@@ -1516,12 +1487,6 @@ namespace CromwellOnAzureDeployer
                 if (!currentPrincipalRgRoleIds.Contains(ownerRoleId))
                 {
                     throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
-                }
-
-                if (!isuserAccessAdministrator)
-                {
-                    SkipBillingReaderRoleAssignment = true;
-                    DisplayBillingReaderInsufficientAccessLevelWarning();
                 }
             }
 
@@ -1781,17 +1746,6 @@ namespace CromwellOnAzureDeployer
                     throw new ValidationException("BatchPrefix must not be longer than 11 chars and may contain only ASCII letters or digits", false);
                 }
             }
-        }
-
-        private static void DisplayBillingReaderInsufficientAccessLevelWarning()
-        {
-            ConsoleEx.WriteLine("Warning: insufficient subscription access level to assign the Billing Reader", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("role for the VM to your Azure Subscription.", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("Deployment will continue, but only default VM prices will be used for your workflows,", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("since the Billing Reader role is required to access RateCard API pricing data.", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("To resolve this in the future, have your Azure subscription Owner or Contributor", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("assign the Billing Reader role for the VM's managed identity to your Azure Subscription scope.", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("More info: https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access", ConsoleColor.Yellow);
         }
 
         private static void DisplayValidationExceptionAndExit(ValidationException validationException)
