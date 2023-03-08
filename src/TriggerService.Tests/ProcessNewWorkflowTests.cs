@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using Common;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
@@ -20,9 +22,7 @@ namespace TriggerService.Tests
     public class ProcessNewWorkflowTests
     {
         public ProcessNewWorkflowTests()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
         [TestMethod]
         public async Task NewWorkflowsAreMovedToInProgressSubdirectory()
@@ -35,7 +35,6 @@ namespace TriggerService.Tests
                 .Returns(Task.FromResult(new PostWorkflowResponse { Id = workflowId }));
 
             var (newTriggerName, newTriggerContent) = await ProcessNewWorkflowAsync(cromwellApiClient.Object);
-
             Assert.AreEqual($"inprogress/Sample.{workflowId}.json", newTriggerName);
         }
 
@@ -50,7 +49,6 @@ namespace TriggerService.Tests
                 .Throws(new Exception("Error submitting new workflow"));
 
             var (newTriggerName, newTriggerContent) = await ProcessNewWorkflowAsync(cromwellApiClient.Object);
-
             Assert.IsTrue(newTriggerName.StartsWith("failed/"));
             Assert.AreEqual("ErrorSubmittingWorkflowToCromwell", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReason);
             Assert.AreEqual("Error submitting new workflow", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReasonDetail);
@@ -84,12 +82,43 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) => {
+                .Callback((string content, string container, string blobName) =>
+                {
                     newTriggerName = blobName;
                     newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
                 });
 
-            var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            var logger = new NullLogger<TriggerHostedService>();
+            var optionsMock = new Mock<IOptions<TriggerServiceOptions>>();
+
+            optionsMock.Setup(o => o.Value).Returns(new TriggerServiceOptions()
+            {
+                DefaultStorageAccountName = "fakestorage",
+                ApplicationInsightsAccountName = "fakeappinsights"
+            });
+
+            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>();
+
+            postgreSqlOptions.Setup(o => o.Value).Returns(new PostgreSqlOptions
+            {
+                ServerName = "fakeserver",
+                DatabaseUserLogin = "fakeuser",
+                DatabaseUserPassword = "fake987",
+            });
+
+            var tesTaskRepository = new Mock<IRepository<TesTask>>().Object;
+            var storageUtility = new Mock<IAzureStorageUtility>();
+
+            storageUtility
+                .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
+
+            var cromwellOnAzureEnvironment = new TriggerHostedService(
+                logger,
+                optionsMock.Object,
+                cromwellApiClient,
+                tesTaskRepository,
+                storageUtility.Object);
 
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
 
@@ -136,7 +165,8 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) => {
+                .Callback((string content, string container, string blobName) =>
+                {
                     newTriggerName = blobName;
                     newTriggerContent = content;
                 });
@@ -146,10 +176,31 @@ namespace TriggerService.Tests
                 .Setup(az => az.DeleteBlobIfExistsAsync(It.IsAny<string>(), $"new/Sample.json"))
                 .Callback(() => deleted = true);
 
-            var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient.Object, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            var logger = new Mock<ILogger<TriggerHostedService>>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>();
+
+            triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
+            {
+                DefaultStorageAccountName = "fakestorage",
+                ApplicationInsightsAccountName = "fakeappinsights"
+            });
+            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
+            var cromwellApiClient2 = new Mock<ICromwellApiClient>().Object;
+            var tesTaskRepository = new Mock<IRepository<TesTask>>().Object;
+            var storageUtility = new Mock<IAzureStorageUtility>();
+
+            storageUtility
+                .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
+
+            var cromwellOnAzureEnvironment = new TriggerHostedService(
+                logger,
+                triggerServiceOptions.Object, 
+                cromwellApiClient2, 
+                tesTaskRepository, 
+                storageUtility.Object);
 
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
-
             Assert.IsTrue(newTriggerName.StartsWith("failed/"));
             Assert.IsTrue(deleted);
             Assert.IsFalse(triesToPost);

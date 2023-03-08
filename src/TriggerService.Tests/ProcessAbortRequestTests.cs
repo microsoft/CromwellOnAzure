@@ -2,11 +2,13 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Common;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
@@ -19,9 +21,7 @@ namespace TriggerService.Tests
     public class ProcessAbortRequestTests
     {
         public ProcessAbortRequestTests()
-        {
-            Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
-        }
+            => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
         [TestMethod]
         public async Task SuccessfulAbortRequestFileGetsMovedToFailedSubdirectory()
@@ -42,9 +42,7 @@ namespace TriggerService.Tests
             var workflowId = Guid.NewGuid();
             var cromwellApiClient = new Mock<ICromwellApiClient>();
             cromwellApiClient.Setup(ac => ac.PostAbortAsync(It.IsAny<Guid>())).Throws(new Exception("Workflow not found"));
-
             var (newTriggerName, newTriggerContent) = await ProcessAbortRequestAsync(workflowId, cromwellApiClient.Object);
-
             Assert.IsTrue(newTriggerName.StartsWith("failed/"));
             Assert.AreEqual("ErrorOccuredWhileAbortingWorkflow", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReason);
             Assert.AreEqual("Workflow not found", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReasonDetail);
@@ -66,11 +64,11 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort))
-                .Returns(Task.FromResult(new[] { 
-                    new TriggerFile { 
-                        Uri = $"http://tempuri.org/workflows/abort/{workflowId}.json", 
-                        ContainerName = "workflows", 
-                        Name = $"abort/{workflowId}.json", 
+                .Returns(Task.FromResult(new[] {
+                    new TriggerFile {
+                        Uri = $"http://tempuri.org/workflows/abort/{workflowId}.json",
+                        ContainerName = "workflows",
+                        Name = $"abort/{workflowId}.json",
                         LastModified = DateTimeOffset.UtcNow } }.AsEnumerable()));
 
             azureStorage
@@ -79,14 +77,30 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) => {
+                .Callback((string content, string container, string blobName) =>
+                {
                     newTriggerName = blobName;
-                    newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null; });
+                    newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
+                });
 
-            var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            var logger = new Mock<ILogger<TriggerHostedService>>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>();
 
+            triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
+            {
+                DefaultStorageAccountName = "fakestorage",
+                ApplicationInsightsAccountName = "fakeappinsights"
+            });
+
+            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
+            var storageUtility = new Mock<IAzureStorageUtility>();
+
+            storageUtility
+                .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
+
+            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository.Object, storageUtility.Object);
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
-
             return (newTriggerName, newTriggerContent);
         }
     }
