@@ -7,25 +7,57 @@ config:
   resourceGroup: RUNTIME_PARAMETER
   azureServicesAuthConnectionString: RUNTIME_PARAMETER
   applicationInsightsAccountName: RUNTIME_PARAMETER
-  cosmosDbAccountName: RUNTIME_PARAMETER
   azureOfferDurableId: MS-AZR-0003p
-  batchAccountName: RUNTIME_PARAMETER
-  batchNodesSubnetId: RUNTIME_PARAMETER
-  blobxferImageName: RUNTIME_PARAMETER
-  disableBatchNodesPublicIpAddress: RUNTIME_PARAMETER
-  disableBatchScheduling: RUNTIME_PARAMETER
-  dockerInDockerImageName: RUNTIME_PARAMETER
-  usePreemptibleVmsOnly: RUNTIME_PARAMETER
-  batchImageOffer: RUNTIME_PARAMETER
-  batchImagePublisher: RUNTIME_PARAMETER
-  batchImageSku: RUNTIME_PARAMETER
-  batchImageVersion: RUNTIME_PARAMETER
-  batchNodeAgentSkuId: RUNTIME_PARAMETER
-  marthaUrl: RUNTIME_PARAMETER
-  marthaKeyVaultName: RUNTIME_PARAMETER
-  marthaSecretName: RUNTIME_PARAMETER
-  globalStartTaskPath: /configuration/start-task.sh
-  batchManagedIdentity:
+  batchAccount:
+    accountName: RUNTIME_PARAMETER
+  batchNodes:
+    subnetId: RUNTIME_PARAMETER
+    disablePublicIpAddress: RUNTIME_PARAMETER
+    globalStartTask: /configuration/start-task.sh
+    globalManagedIdentity:
+  batchScheduling:
+    disable: RUNTIME_PARAMETER
+    usePreemptibleVmsOnly: RUNTIME_PARAMETER
+    useLegacyAutopools: "False"
+    poolRotationForcedDays: "7"
+    prefix: RUNTIME_PARAMETER
+  nodeImages:
+    blobxfer: RUNTIME_PARAMETER
+    docker: RUNTIME_PARAMETER
+  batchImageGen2:
+    offer: RUNTIME_PARAMETER
+    publisher: RUNTIME_PARAMETER
+    sku: RUNTIME_PARAMETER
+    version: RUNTIME_PARAMETER
+    nodeAgentSkuId: RUNTIME_PARAMETER
+  batchImageGen1:
+    offer: RUNTIME_PARAMETER
+    publisher: RUNTIME_PARAMETER
+    sku: RUNTIME_PARAMETER
+    version: RUNTIME_PARAMETER
+    nodeAgentSkuId: RUNTIME_PARAMETER
+  martha:
+    url: RUNTIME_PARAMETER
+    keyVaultName: RUNTIME_PARAMETER
+    secretName: RUNTIME_PARAMETER
+
+tesDatabase:
+  serverName: RUNTIME_PARAMETER
+  serverNameSuffix: RUNTIME_PARAMETER
+  serverPort: RUNTIME_PARAMETER
+  serverSslMode: RUNTIME_PARAMETER
+  databaseName: RUNTIME_PARAMETER
+  databaseUserLogin: RUNTIME_PARAMETER
+  databaseUserPassword: RUNTIME_PARAMETER
+
+cromwellDatabase:
+  serverName: RUNTIME_PARAMETER
+  serverNameSuffix: RUNTIME_PARAMETER
+  serverPort: RUNTIME_PARAMETER
+  serverSslMode: RUNTIME_PARAMETER
+  databaseName: RUNTIME_PARAMETER
+  databaseUserLogin: RUNTIME_PARAMETER
+  databaseUserPassword: RUNTIME_PARAMETER
 
 images:
   cromwell: RUNTIME_PARAMETER
@@ -42,12 +74,12 @@ defaultContainers:
 internalContainersMIAuth:
 #  - accountName: storageAccount
 #    containerName: dataset1
-#    resourceGroup: resourceGroup1    
+#    resourceGroup: resourceGroup1
 
 internalContainersKeyVaultAuth:
 #  - accountName: storageAccount
 #    containerName: dataset1
-#    keyVaultURL: 
+#    keyVaultURL:
 #    keyVaultSecretName:
 
 externalContainers:
