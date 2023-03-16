@@ -204,6 +204,7 @@ namespace TriggerService
                                 logger.LogInformation($"Setting to failed (aborted) Id: {id}");
 
                                 await UploadOutputsAsync(id, sampleName);
+                                _ = await UploadMetadataAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
                                 await MutateStateAsync(
@@ -219,10 +220,11 @@ namespace TriggerService
                                 logger.LogInformation($"Setting to failed Id: {id}");
 
                                 await UploadOutputsAsync(id, sampleName);
+                                var metadata = await UploadMetadataAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
                                 var taskWarnings = await GetWorkflowTaskWarningsAsync(id);
-                                var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id);
+                                var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id, metadata);
 
                                 await MutateStateAsync(
                                     blobTrigger.ContainerName,
@@ -239,6 +241,7 @@ namespace TriggerService
                         case WorkflowStatus.Succeeded:
                             {
                                 await UploadOutputsAsync(id, sampleName);
+                                _ = await UploadMetadataAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
                                 var taskWarnings = await GetWorkflowTaskWarningsAsync(id);
@@ -457,18 +460,32 @@ namespace TriggerService
                     outputsResponse.Json,
                     OutputsContainerName,
                     $"{sampleName}.{id}.outputs.json");
+            }
+            catch (Exception exc)
+            {
+                logger.LogWarning(exc, $"Getting outputs threw an exception for Id: {id}");
+            }
+        }
 
+        private async Task<string> UploadMetadataAsync(Guid id, string sampleName)
+        {
+            try
+            {
                 var metadataResponse = await cromwellApiClient.GetMetadataAsync(id);
 
                 await storage.UploadFileTextAsync(
                     metadataResponse.Json,
                     OutputsContainerName,
                     $"{sampleName}.{id}.metadata.json");
+
+                return metadataResponse.Json;
             }
             catch (Exception exc)
             {
-                logger.LogWarning(exc, $"Getting outputs and/or timing threw an exception for Id: {id}");
+                logger.LogWarning(exc, $"Getting metadata threw an exception for Id: {id}");
             }
+
+            return default;
         }
 
         private async Task UploadTimingAsync(Guid id, string sampleName)
@@ -488,9 +505,13 @@ namespace TriggerService
             }
         }
 
-        private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId)
+        private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId, string metadata)
         {
             const string BatchExecutionDirectoryName = "__batch";
+
+            var metadataFailures = string.IsNullOrWhiteSpace(metadata)
+                ? default
+                : JsonConvert.DeserializeObject<CromwellMetadata>(metadata)?.Failures;
 
             var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
 
@@ -528,6 +549,7 @@ namespace TriggerService
             return new WorkflowFailureInfo
             {
                 FailedTasks = failedTesTasks,
+                CromwellFailureLogs = metadataFailures,
                 WorkflowFailureReason = failedTesTasks.Any() ? "OneOrMoreTasksFailed" : "CromwellFailed"
             };
         }
