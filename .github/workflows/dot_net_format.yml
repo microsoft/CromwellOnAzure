@@ -21,4 +21,9 @@ jobs:
       - name: Run dotnet format
         shell: bash
         run: |
-              dotnet format --verify-no-changes --verbosity detailed
+          allProjectFiles=$(find ./ -type f -name "*.csproj" | tr '\n' ' ');
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "$allProjectFiles"
+          for file in $allProjectFiles; do
+              dotnet format $file --verbosity detailed
+          done
