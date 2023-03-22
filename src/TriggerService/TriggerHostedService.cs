@@ -141,7 +141,11 @@ namespace TriggerService
                         blobTrigger.ContainerName,
                         blobTrigger.Name,
                         WorkflowState.Failed,
-                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo { WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell", WorkflowFailureReasonDetail = e.Message });
+                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo
+                        {
+                            WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell",
+                            WorkflowFailureReasonDetail = $"Error processing trigger file {blobTrigger.Name}. " + e.Message
+                        });
                 }
             }
         }
@@ -327,11 +331,27 @@ namespace TriggerService
 
             if (GetBlockBlobStorage(url, storageAccounts) is IAzureStorage aStorage)
             {
-                data = await aStorage.DownloadBlockBlobAsync(url);
+                try
+                {
+                    data = await aStorage.DownloadBlockBlobAsync(url);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"{e.InnerException} while processing blob, cannot find {url} in {aStorage.AccountName}. " +
+                        $"Please confirm blob is accessible and named correctly before resubmitting your trigger file.");
+                }
             }
             else
             {
-                data = await storage.DownloadFileUsingHttpClientAsync(url);
+                try
+                {
+                    data = await storage.DownloadFileUsingHttpClientAsync(url);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"{e.InnerException} while downloading file from Http url {url}. " +
+                        $"Please make sure URL is correct and accessible before resubmitting your trigger file.");
+                }
             }
 
             return new ProcessedWorkflowItem(blobName, data);
