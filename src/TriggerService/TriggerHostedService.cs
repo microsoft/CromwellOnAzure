@@ -144,7 +144,7 @@ namespace TriggerService
                         wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo
                         {
                             WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell",
-                            WorkflowFailureReasonDetail = $"Error processing trigger file {blobTrigger.Name}. " + e.Message
+                            WorkflowFailureReasonDetail = $"Error processing trigger file {blobTrigger.Name}. Error:" + e.Message
                         });
                 }
             }
