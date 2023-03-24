@@ -29,7 +29,7 @@ namespace TriggerService.Tests
 
             int max = 10;
 
-            for (int i = 1; i < max; i++)
+            for (int i = 1; i <= max; i++)
             {
                 string blobName = $"new/{workflowFriendlyName}-{i}-of-{max}.json";
                 var blobClient = new BlobServiceClient(new Uri($"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/{blobName}?{workflowsContainerSasToken}"));
