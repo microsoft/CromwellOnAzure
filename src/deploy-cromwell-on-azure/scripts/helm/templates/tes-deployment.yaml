@@ -66,8 +66,6 @@ spec:
               value: {{ .Values.config.batchScheduling.disable | quote }}
             - name: NodeImages__Docker
               value: {{ .Values.config.nodeImages.docker }}
-            - name: BatchScheduling__UseLegacyAutopools
-              value: {{ .Values.config.batchScheduling.useLegacyAutopools | quote }}
             - name: BatchImageGen2__Offer
               value: {{ .Values.config.batchImageGen2.offer }}
             - name: BatchImageGen2__Publisher
