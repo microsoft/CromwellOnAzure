@@ -1308,7 +1308,7 @@ namespace CromwellOnAzureDeployer
         private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8(IKubernetes kubernetesClient, string podName, string aksNamespace)
             => Execute(
                 $"Executing script to create users in tes_db and cromwell_db...",
-                async () => 
+                async () =>
                 {
                     var cromwellScript = GetCreateCromwellUserString();
                     var tesScript = GetCreateTesUserString();
@@ -1842,7 +1842,7 @@ namespace CromwellOnAzureDeployer
             if (!configuration.ManualHelmDeployment)
             {
                 ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
-            }      
+            }
 
             if (!configuration.Update)
             {

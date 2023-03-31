@@ -195,9 +195,9 @@ namespace TriggerService.Tests
 
             var cromwellOnAzureEnvironment = new TriggerHostedService(
                 logger,
-                triggerServiceOptions.Object, 
-                cromwellApiClient2, 
-                tesTaskRepository, 
+                triggerServiceOptions.Object,
+                cromwellApiClient2,
+                tesTaskRepository,
                 storageUtility.Object);
 
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
