@@ -239,9 +239,8 @@ namespace CromwellOnAzureDeployer
                             }
 
                             existingAksCluster = aksClusters.First();
+                            configuration.AksClusterName = existingAksCluster.Name;
                         }
-
-                        await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
 
                         if (existingAksCluster is not null)
                         {
@@ -287,6 +286,8 @@ namespace CromwellOnAzureDeployer
                         {
                             throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.");
                         }
+
+                        await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                     }
 
                     if (!configuration.Update)
@@ -533,29 +534,30 @@ namespace CromwellOnAzureDeployer
             }
             catch (Exception exc)
             {
-                if (configuration.DebugLogging)
-                {
-                    if (exc is KubernetesException kExc)
-                    {
-                        ConsoleEx.WriteLine($"Kubenetes Status: {kExc.Status}");
-                    }
-
-                    if (exc is WebSocketException wExc)
-                    {
-                        ConsoleEx.WriteLine($"WebSocket ErrorCode: {wExc.WebSocketErrorCode}");
-                    }
-
-                    if (exc is HttpOperationException hExc)
-                    {
-                        ConsoleEx.WriteLine($"HTTP Response: {hExc.Response.Content}");
-                    }
-                    ConsoleEx.WriteLine(exc.StackTrace, ConsoleColor.Red);
-                }
-
                 if (!(exc is OperationCanceledException && cts.Token.IsCancellationRequested))
                 {
                     ConsoleEx.WriteLine();
                     ConsoleEx.WriteLine($"{exc.GetType().Name}: {exc.Message}", ConsoleColor.Red);
+
+                    if (configuration.DebugLogging)
+                    {
+                        ConsoleEx.WriteLine(exc.StackTrace, ConsoleColor.Red);
+
+                        if (exc is KubernetesException kExc)
+                        {
+                            ConsoleEx.WriteLine($"Kubenetes Status: {kExc.Status}");
+                        }
+
+                        if (exc is WebSocketException wExc)
+                        {
+                            ConsoleEx.WriteLine($"WebSocket ErrorCode: {wExc.WebSocketErrorCode}");
+                        }
+
+                        if (exc is HttpOperationException hExc)
+                        {
+                            ConsoleEx.WriteLine($"HTTP Response: {hExc.Response.Content}");
+                        }
+                    }
                 }
 
                 ConsoleEx.WriteLine();
@@ -749,7 +751,8 @@ namespace CromwellOnAzureDeployer
 
             // Process images
             UpdateSetting(settings, defaults, "CromwellImageName", configuration.CromwellVersion, v => $"broadinstitute/cromwell:{v}",
-                ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "CromwellImageName", configuration.CromwellVersion is null, installedVersion, tag => GetTag(settings["CromwellImageName"]) < GetTag(defaults["CromwellImageName"])));
+                ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "CromwellImageName", configuration.CromwellVersion is null, installedVersion,
+                    tag => GetTag(settings["CromwellImageName"]) <= GetTag(defaults["CromwellImageName"]))); // There's not a good way to detect customization of this property, so default to forced upgrade to the new default.
             UpdateSetting(settings, defaults, "TesImageName", configuration.TesImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TesImageName", configuration.TesImageName is null, installedVersion));
             UpdateSetting(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName is null, installedVersion));
 
@@ -791,14 +794,16 @@ namespace CromwellOnAzureDeployer
         }
 
         /// <summary>
-        /// Determines if current setting should be ignored (used for product image names)
+        /// Determines if current setting should be ignored (used for product image names).
         /// </summary>
-        /// <param name="settings"></param>
-        /// <param name="defaults"></param>
-        /// <param name="key"></param>
-        /// <param name="valueIsNull"></param>
-        /// <param name="installedVersion"></param>
+        /// <param name="settings">Property bag being updated.</param>
+        /// <param name="defaults">Property bag containing default values.</param>
+        /// <param name="key">Key of value in both <paramref name="settings"/> and <paramref name="defaults"/>.</param>
+        /// <param name="valueIsNull">True if configuration value to set is null. See <see cref="UpdateSetting{T}(Dictionary{string, string}, Dictionary{string, string}, string, T, Func{T, string}, string, bool?)"/>'s "value" parameter.</param>
+        /// <param name="installedVersion">A <see cref="Version"/> of the current configuration, or null if this is not an update.</param>
+        /// <param name="IsInstalledNotCustomized">A <see cref="Predicate{T}"/> where the parameter is the image tag of the currently configured image. Only called if the rest of the image name is identical to the default. Return False if the value is considered customized, otherwise True.</param>
         /// <returns>false if current setting should be ignored, null otherwise.</returns>
+        /// <remarks>This method provides a value for the "ignoreDefaults" parameter to <see cref="UpdateSetting{T}(Dictionary{string, string}, Dictionary{string, string}, string, T, Func{T, string}, string, bool?)"/> for use with container image names.</remarks>
         private static bool? ImageNameIgnoreDefaults(Dictionary<string, string> settings, Dictionary<string, string> defaults, string key, bool valueIsNull, Version installedVersion, Predicate<string> IsInstalledNotCustomized = default)
         {
             if (installedVersion is null || !valueIsNull)
@@ -863,7 +868,7 @@ namespace CromwellOnAzureDeployer
         /// <typeparam name="T">Type of <paramref name="value"/>.</typeparam>
         /// <param name="settings">Property bag being updated.</param>
         /// <param name="defaults">Property bag containing default values.</param>
-        /// <param name="key">Key of value in both <paramref name="settings"/> and <paramref name="defaults"/></param>
+        /// <param name="key">Key of value in both <paramref name="settings"/> and <paramref name="defaults"/>.</param>
         /// <param name="value">Configuration value to set. Nullable. See remarks.</param>
         /// <param name="ConvertValue">Function that converts <paramref name="value"/> to a string. Can be used for formatting. Defaults to returning the value's string.</param>
         /// <param name="defaultValue">Value to use if <paramref name="defaults"/> does not contain a record for <paramref name="key"/> when <paramref name="value"/> is null.</param>
