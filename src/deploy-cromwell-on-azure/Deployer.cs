@@ -112,7 +112,6 @@ namespace CromwellOnAzureDeployer
         private IEnumerable<string> subscriptionIds { get; set; }
         private bool isResourceGroupCreated { get; set; }
         private KubernetesManager kubernetesManager { get; set; }
-        private IKubernetes kubernetesClient { get; set; }
 
         public Deployer(Configuration configuration)
         {
@@ -159,6 +158,7 @@ namespace CromwellOnAzureDeployer
                 var keyVaultUri = string.Empty;
                 IIdentity managedIdentity = null;
                 IPrivateDnsZone postgreSqlDnsZone = null;
+                IKubernetes kubernetesClient = null;
 
                 var containersToMount = await GetContainersToMount(configuration.ContainersToMountPath);
 
@@ -173,10 +173,6 @@ namespace CromwellOnAzureDeployer
 
                         ConsoleEx.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
-                        var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
-
-                        Dictionary<string, string> accountNames = null;
-
                         if (!string.IsNullOrEmpty(configuration.StorageAccountName))
                         {
                             storageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName)
@@ -184,13 +180,13 @@ namespace CromwellOnAzureDeployer
                         }
                         else
                         {
-                            var storageAccounts = await azureSubscriptionClient.StorageAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName);
+                            var storageAccounts = (await azureSubscriptionClient.StorageAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName)).ToList();
 
                             if (!storageAccounts.Any())
                             {
                                 throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any storage accounts.");
                             }
-                            if (storageAccounts.Count() > 1)
+                            if (storageAccounts.Count > 1)
                             {
                                 throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple storage accounts. {nameof(configuration.StorageAccountName)} must be provided.");
                             }
@@ -198,15 +194,16 @@ namespace CromwellOnAzureDeployer
                             storageAccount = storageAccounts.First();
                         }
 
-                        accountNames = await kubernetesManager.GetAKSSettingsAsync(storageAccount);
-                        
+                        // If the previous installation was pre 4.0, we probably will error out below this line but before we make any changes. If not, we will guard below anyway.
 
-                        if (!accountNames.Any())
+                        var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccount);
+
+                        if (!aksValues.Any())
                         {
                             throw new ValidationException($"Could not retrieve account names");
                         }
 
-                        if (!accountNames.TryGetValue("BatchAccountName", out var batchAccountName))
+                        if (!aksValues.TryGetValue("BatchAccountName", out var batchAccountName))
                         {
                             throw new ValidationException($"Could not retrieve the Batch account name");
                         }
@@ -216,29 +213,51 @@ namespace CromwellOnAzureDeployer
 
                         configuration.BatchAccountName = batchAccountName;
 
-                        accountNames.TryGetValue("PostgreSqlServerName", out var postgreSqlServerName);
+                        aksValues.TryGetValue("PostgreSqlServerName", out var postgreSqlServerName);
 
                         configuration.PostgreSqlServerName = postgreSqlServerName;
                         //postgreSqlFlexServer = GetExistingPostgresqlService(postgreSqlServerName); // TODO: Get existing postgresql server
-                        
+
+                        ManagedCluster existingAksCluster = default;
+
+                        if (!string.IsNullOrEmpty(configuration.AksClusterName))
+                        {
+                            existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
+                        }
+                        else
+                        {
+                            using var client = new ContainerServiceClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId };
+                            var aksClusters = (await client.ManagedClusters.ListByResourceGroupAsync(configuration.ResourceGroupName)).ToList();
+
+                            if (!aksClusters.Any())
+                            {
+                                throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any AKS clusters.");
+                            }
+                            if (aksClusters.Count > 1)
+                            {
+                                throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple AKS clusters. {nameof(configuration.AksClusterName)} must be provided.");
+                            }
+
+                            existingAksCluster = aksClusters.First();
+                        }
 
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
 
                         if (existingAksCluster is not null)
                         {
-                            if (accountNames.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
+                            if (aksValues.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
                             {
                                 _ = bool.TryParse(crossSubscriptionAKSDeployment, out var parsed);
                                 configuration.CrossSubscriptionAKSDeployment = parsed;
                             }
 
-                            if (accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
+                            if (aksValues.TryGetValue("KeyVaultName", out var keyVaultName))
                             {
                                 var keyVault = await GetKeyVaultAsync(keyVaultName);
                                 keyVaultUri = keyVault.Properties.VaultUri;
                             }
 
-                            if (!accountNames.TryGetValue("ManagedIdentityClientId", out var managedIdentityClientId))
+                            if (!aksValues.TryGetValue("ManagedIdentityClientId", out var managedIdentityClientId))
                             {
                                 throw new ValidationException($"Could not retrieve ManagedIdentityClientId.");
                             }
@@ -247,16 +266,26 @@ namespace CromwellOnAzureDeployer
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
                             // Override any configuration that is used by the update.
-                            var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccount);
                             var versionString = aksValues["CromwellOnAzureVersion"];
                             var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
+
+                            if (installedVersion is null || installedVersion < new Version(4, 0))
+                            {
+                                throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.");
+                            }
+
                             var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
 
-                            kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
-                            await kubernetesManager.UpgradeAKSDeploymentAsync(
-                                settings,
-                                storageAccount,
-                                containersToMount);
+                            //if (installedVersion is null || installedVersion < new Version(4, 1))
+                            //{
+                            //}
+
+                            await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount);
+                            kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup);
+                        }
+                        else
+                        {
+                            throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.");
                         }
                     }
 
@@ -424,34 +453,25 @@ namespace CromwellOnAzureDeployer
                         }
 
                         await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity, containersToMount);
+                        kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup,
+                            new[]
+                            {
+                                "Run the following postgresql command to setup the database.",
+                                "\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer, configuration.PostgreSqlCromwellDatabaseName, GetCreateCromwellUserString()),
+                                "\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer, configuration.PostgreSqlTesDatabaseName, GetCreateTesUserString()),
+                            },
+                            async kubernetesClient =>
+                            {
+                                await kubernetesManager.DeployCoADependenciesAsync();
 
-                        if (configuration.ManualHelmDeployment)
-                        {
-                            ConsoleEx.WriteLine($"Helm chart written to disk at: {kubernetesManager.helmScriptsRootDirectory}");
-                            ConsoleEx.WriteLine($"Please update values file if needed here: {kubernetesManager.TempHelmValuesYamlPath}");
-                            ConsoleEx.WriteLine("Run the following postgresql command to setup the database.");
-                            ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer, configuration.PostgreSqlCromwellDatabaseName, GetCreateCromwellUserString()));
-                            ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer, configuration.PostgreSqlTesDatabaseName, GetCreateTesUserString()));
-                            ConsoleEx.WriteLine($"Then, deploy the helm chart, and press Enter to continue.");
-                            ConsoleEx.ReadLine();
-                        }
-                        else
-                        {
-                            kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
-                            await kubernetesManager.DeployCoADependenciesAsync();
-
-                            // Deploy an ubuntu pod to run PSQL commands, then delete it
-                            const string deploymentName = "ubuntu";
-                            const string deploymentNamespace = "default";
-                            var ubuntuDeployment = KubernetesManager.GetUbuntuDeploymentTemplate();
-                            await kubernetesClient.AppsV1.CreateNamespacedDeploymentAsync(ubuntuDeployment, deploymentNamespace);
-                            await ExecuteQueriesOnAzurePostgreSQLDbFromK8(deploymentName, deploymentNamespace);
-                            await kubernetesClient.AppsV1.DeleteNamespacedDeploymentAsync(deploymentName, deploymentNamespace);
-
-                            await kubernetesManager.DeployHelmChartToClusterAsync();
-                        }
+                                // Deploy an ubuntu pod to run PSQL commands, then delete it
+                                const string deploymentNamespace = "default";
+                                var (deploymentName, ubuntuDeployment) = KubernetesManager.GetUbuntuDeploymentTemplate();
+                                await kubernetesClient.AppsV1.CreateNamespacedDeploymentAsync(ubuntuDeployment, deploymentNamespace);
+                                await ExecuteQueriesOnAzurePostgreSQLDbFromK8(kubernetesClient, deploymentName, deploymentNamespace);
+                                await kubernetesClient.AppsV1.DeleteNamespacedDeploymentAsync(deploymentName, deploymentNamespace);
+                            });
                     }
-
                     if (kubernetesClient is not null)
                     {
                         await kubernetesManager.WaitForCromwellAsync(kubernetesClient);
@@ -543,6 +563,31 @@ namespace CromwellOnAzureDeployer
                 WriteGeneralRetryMessageToConsole();
                 await DeleteResourceGroupIfUserConsentsAsync();
                 return 1;
+            }
+        }
+
+        private async Task<IKubernetes> PerformHelmDeploymentAsync(IResourceGroup resourceGroup, IEnumerable<string> manualPrecommands = default, Func<IKubernetes, Task> asyncTask = default)
+        {
+            if (configuration.ManualHelmDeployment)
+            {
+                ConsoleEx.WriteLine($"Helm chart written to disk at: {kubernetesManager.helmScriptsRootDirectory}");
+                ConsoleEx.WriteLine($"Please update values file if needed here: {kubernetesManager.TempHelmValuesYamlPath}");
+
+                foreach (var line in manualPrecommands ?? Enumerable.Empty<string>())
+                {
+                    ConsoleEx.WriteLine(line);
+                }
+
+                ConsoleEx.WriteLine($"Then, deploy the helm chart, and press Enter to continue.");
+                ConsoleEx.ReadLine();
+                return default;
+            }
+            else
+            {
+                var kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
+                await (asyncTask?.Invoke(kubernetesClient) ?? Task.CompletedTask);
+                await kubernetesManager.DeployHelmChartToClusterAsync();
+                return kubernetesClient;
             }
         }
 
@@ -703,9 +748,10 @@ namespace CromwellOnAzureDeployer
             UpdateSetting(settings, defaults, "CromwellOnAzureVersion", default(string), ignoreDefaults: false);
 
             // Process images
-            UpdateSetting(settings, defaults, "CromwellImageName", configuration.CromwellVersion, v => $"broadinstitute/cromwell:{v}");
-            UpdateSetting(settings, defaults, "TesImageName", configuration.TesImageName);
-            UpdateSetting(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName);
+            UpdateSetting(settings, defaults, "CromwellImageName", configuration.CromwellVersion, v => $"broadinstitute/cromwell:{v}",
+                ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "CromwellImageName", configuration.CromwellVersion is null, installedVersion, tag => GetTag(settings["CromwellImageName"]) < GetTag(defaults["CromwellImageName"])));
+            UpdateSetting(settings, defaults, "TesImageName", configuration.TesImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TesImageName", configuration.TesImageName is null, installedVersion));
+            UpdateSetting(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName is null, installedVersion));
 
             // Additional non-personalized settings
             UpdateSetting(settings, defaults, "BatchNodesSubnetId", configuration.BatchNodesSubnetId);
@@ -739,6 +785,62 @@ namespace CromwellOnAzureDeployer
 
             BackFillSettings(settings, defaults);
             return settings;
+
+            static int GetTag(string imageName)
+                => int.TryParse(imageName?[(imageName.LastIndexOf(':') + 1)..] ?? string.Empty, System.Globalization.NumberStyles.Integer, System.Globalization.NumberFormatInfo.InvariantInfo, out var tag) ? tag : 0;
+        }
+
+        /// <summary>
+        /// Determines if current setting should be ignored (used for product image names)
+        /// </summary>
+        /// <param name="settings"></param>
+        /// <param name="defaults"></param>
+        /// <param name="key"></param>
+        /// <param name="valueIsNull"></param>
+        /// <param name="installedVersion"></param>
+        /// <returns>false if current setting should be ignored, null otherwise.</returns>
+        private static bool? ImageNameIgnoreDefaults(Dictionary<string, string> settings, Dictionary<string, string> defaults, string key, bool valueIsNull, Version installedVersion, Predicate<string> IsInstalledNotCustomized = default)
+        {
+            if (installedVersion is null || !valueIsNull)
+            {
+                return null;
+            }
+
+            var sameVersionUpgrade = installedVersion.Equals(new(defaults["CromwellOnAzureVersion"]));
+            _ = settings.TryGetValue(key, out var installed);
+            _ = defaults.TryGetValue(key, out var @default);
+            var defaultPath = @default?[..@default.LastIndexOf(':')];
+            var installedTag = installed?[(installed.LastIndexOf(':') + 1)..];
+            bool? result;
+
+            IsInstalledNotCustomized ??= new(tag =>
+                // Is the tag a version (without decorations)?
+                Version.TryParse(tag, out var version) &&
+                // Is the image's version the same as the installed version?
+                version.Equals(installedVersion));
+
+            try
+            {
+                // Is this our official prepository/image?
+                result = installed.StartsWith(defaultPath + ":")
+                    // Is the installed tag customized?
+                    && IsInstalledNotCustomized(installedTag)
+                    // Upgrade image
+                    ? false
+                    // Preserve configured image
+                    : null;
+            }
+            catch (ArgumentException)
+            {
+                result = null;
+            }
+
+            if (result is null && !sameVersionUpgrade)
+            {
+                ConsoleEx.WriteLine($"Warning: CromwellOnAzure is being upgraded, but {key} was customized, and is not being upgraded, which might not be what you want. (To remove the customization of {key}, set it to the empty string.)", ConsoleColor.Yellow);
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -1198,7 +1300,7 @@ namespace CromwellOnAzureDeployer
                     return dnsZone;
                 });
 
-        private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8(string podName, string aksNamespace)
+        private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8(IKubernetes kubernetesClient, string podName, string aksNamespace)
             => Execute(
                 $"Executing script to create users in tes_db and cromwell_db...",
                 async () => 
@@ -1731,8 +1833,6 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
-
-            ThrowIfNotProvidedForUpdate(configuration.AksClusterName, nameof(configuration.AksClusterName));
 
             if (!configuration.ManualHelmDeployment)
             {
