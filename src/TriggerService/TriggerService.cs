@@ -37,21 +37,20 @@ namespace TriggerService
                         }
 
                         Console.WriteLine($"ApplicationInsightsAccountName: {triggerServiceOptions.ApplicationInsightsAccountName}");
-                        var instrumentationKey = await AzureStorage.GetAppInsightsInstrumentationKeyAsync(triggerServiceOptions.ApplicationInsightsAccountName);
+                        var connectionString = await AzureStorage.GetAppInsightsConnectionStringAsync(triggerServiceOptions.ApplicationInsightsAccountName);
 
-                        if (string.IsNullOrWhiteSpace(instrumentationKey))
+                        if (string.IsNullOrWhiteSpace(connectionString))
                         {
-                            throw new Exception($"No instrumentation key found for {triggerServiceOptions.ApplicationInsightsAccountName}, does this service have Contributor access or equivalent to {triggerServiceOptions.ApplicationInsightsAccountName}?");
+                            throw new Exception($"No connection string found for {triggerServiceOptions.ApplicationInsightsAccountName}, does this service have Contributor access or equivalent to {triggerServiceOptions.ApplicationInsightsAccountName}?");
                         }
 
                         loggingBuilder.AddApplicationInsights(
                             configuration =>
                             {
-                                configuration.ConnectionString = $"InstrumentationKey={instrumentationKey}";
+                                configuration.ConnectionString = connectionString;
                             },
                             options =>
                             {
-                                options.TrackExceptionsAsExceptionTelemetry = false;
                             });
 
                     })
