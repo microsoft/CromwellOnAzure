@@ -59,9 +59,6 @@ namespace CromwellOnAzureDeployer
         public string CromwellVersion { get; set; }
         public string TesImageName { get; set; }
         public string TriggerServiceImageName { get; set; }
-        public string CustomCromwellImagePath { get; set; }
-        public string CustomTesImagePath { get; set; }
-        public string CustomTriggerServiceImagePath { get; set; }
         public bool SkipTestWorkflow { get; set; } = false;
         public bool Update { get; set; } = false;
         public string VnetResourceGroupName { get; set; }
