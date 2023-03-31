@@ -1,4 +1,4 @@
-name: Format check on push
+name: Format check on pull request
 on: pull_request
 jobs:
   dotnet-format:
