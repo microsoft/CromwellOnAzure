@@ -144,7 +144,7 @@ namespace TriggerService
                         wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo
                         {
                             WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell",
-                            WorkflowFailureReasonDetail = $"Error processing trigger file {blobTrigger.Name}. Error:" + e.Message
+                            WorkflowFailureReasonDetail = $"Error processing trigger file {blobTrigger.Name}. Error: " + e.Message
                         });
                 }
             }
@@ -337,8 +337,7 @@ namespace TriggerService
                 }
                 catch (Exception e)
                 {
-                    throw new Exception($"{e.InnerException} while processing blob, cannot find {url} in {aStorage.AccountName}. " +
-                        $"Please confirm blob is accessible and named correctly before resubmitting your trigger file.");
+                    throw new Exception($"{e?.InnerException.Message ?? e.Message}. Failed to retrieve {url} from {aStorage.AccountName}. ");
                 }
             }
             else
@@ -349,8 +348,7 @@ namespace TriggerService
                 }
                 catch (Exception e)
                 {
-                    throw new Exception($"{e.InnerException} while downloading file from Http url {url}. " +
-                        $"Please make sure URL is correct and accessible before resubmitting your trigger file.");
+                    throw new Exception($"{e?.InnerException.Message ?? e.Message}. Failed to download file from Http URL {url}.");
                 }
             }
 
