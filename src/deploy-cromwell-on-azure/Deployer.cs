@@ -91,6 +91,7 @@ namespace CromwellOnAzureDeployer
             "Microsoft.Authorization",
             "Microsoft.Batch",
             "Microsoft.Compute",
+            "Microsoft.ContainerService",
             "Microsoft.DocumentDB",
             "Microsoft.OperationalInsights",
             "Microsoft.insights",
