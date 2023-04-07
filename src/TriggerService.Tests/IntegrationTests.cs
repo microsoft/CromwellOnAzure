@@ -94,7 +94,7 @@ namespace TriggerService.Tests
             for (var i = 1; i <= countOfWorkflowsToRun; i++)
             {
                 // example: new/mutect2-001-of-100-2023-4-7-3-9.0fb0858a-3166-4a22-85b6-4337df2f53c5.json
-                var blobName = $"new/{workflowFriendlyName}-{i:D3}-of-{countOfWorkflowsToRun:D3}-{date}.json";
+                var blobName = $"new/{workflowFriendlyName}-{i:D4}-of-{countOfWorkflowsToRun:D4}-{date}.json";
                 var blobClient = new BlobServiceClient(new Uri($"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/{blobName}?{workflowsContainerSasToken.TrimStart('?')}"));
                 var container = blobClient.GetBlobContainerClient(containerName);
                 await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(triggerFileJson), true);
