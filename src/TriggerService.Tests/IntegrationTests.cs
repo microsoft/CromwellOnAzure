@@ -51,21 +51,30 @@ namespace TriggerService.Tests
             const string accountName = "";
             const string accountKey = "";
             const string batchUrl = "";
-            var maxAge = TimeSpan.FromHours(48);
+            var maxAge = TimeSpan.FromHours(2);
 
             var credentials = new BatchSharedKeyCredentials(batchUrl, accountName, accountKey);
             using var batchClient = BatchClient.Open(credentials);
             var cutoffTime = DateTime.UtcNow.Subtract(maxAge);
             var pools = await batchClient.PoolOperations.ListPools().ToListAsync();
 
+            int count = 0;
+
             foreach (var pool in pools)
             {
-                if (pool.CreationTime < cutoffTime)
+                if (pool.CreationTime < cutoffTime
+                    && pool.CurrentLowPriorityComputeNodes == 0
+                    && pool.TargetLowPriorityComputeNodes == 0
+                    && pool.CurrentDedicatedComputeNodes == 0
+                    && pool.TargetDedicatedComputeNodes == 0)
                 {
                     Console.WriteLine($"Deleting Batch pool {pool.Id}...");
                     await batchClient.PoolOperations.DeletePoolAsync(pool.Id);
+                    count++;
                 }
             }
+
+            Console.WriteLine($"Deleted {count} pools.");
         }
     }
 }
