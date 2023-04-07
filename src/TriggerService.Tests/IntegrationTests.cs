@@ -2,6 +2,8 @@
 using System.Net.Http;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
+using Microsoft.Azure.Batch;
+using Microsoft.Azure.Batch.Auth;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace TriggerService.Tests
@@ -38,6 +40,31 @@ namespace TriggerService.Tests
                 var blobClient = new BlobServiceClient(new Uri($"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/{blobName}?{workflowsContainerSasToken.TrimStart('?')}"));
                 var container = blobClient.GetBlobContainerClient(containerName);
                 await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(triggerFileJson), true);
+            }
+        }
+
+        [Ignore]
+        [TestCategory("Integration")]
+        [TestMethod]
+        public async Task DeleteOldBatchPoolsAsync()
+        {
+            const string accountName = "";
+            const string accountKey = "";
+            const string batchUrl = "";
+            var maxAge = TimeSpan.FromHours(48);
+
+            var credentials = new BatchSharedKeyCredentials(batchUrl, accountName, accountKey);
+            using var batchClient = BatchClient.Open(credentials);
+            var cutoffTime = DateTime.UtcNow.Subtract(maxAge);
+            var pools = await batchClient.PoolOperations.ListPools().ToListAsync();
+
+            foreach (var pool in pools)
+            {
+                if (pool.CreationTime < cutoffTime)
+                {
+                    Console.WriteLine($"Deleting Batch pool {pool.Id}...");
+                    await batchClient.PoolOperations.DeletePoolAsync(pool.Id);
+                }
             }
         }
     }
