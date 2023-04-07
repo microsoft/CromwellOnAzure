@@ -2,7 +2,7 @@
   "profiles": {
     "Setup": {
       "commandName": "Project",
-      "commandLineArgs": "--subscriptionid aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee --regionname westus2 --mainidentifierprefix coatest",
+      "commandLineArgs": "--subscriptionid 594bef42-33f3-42df-b056-e7399d6ae7a0 --regionname southcentralus --mainidentifierprefix msftsc --helmbinarypath c:\\temp\\helm.exe --tesimagename mcr.microsoft.com/ga4gh/tes:int-4.1.23083.6982 --triggerserviceimagename mcr.microsoft.com/cromwellonazure/triggerservice:int-4.1.23083.6983 --debuglogging true",
       "sqlDebugging": true
     }
   }
