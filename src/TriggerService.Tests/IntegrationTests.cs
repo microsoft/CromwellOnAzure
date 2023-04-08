@@ -49,6 +49,29 @@ namespace TriggerService.Tests
             await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName);
         }
 
+        /// <summary>
+        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken, and remove the [Ignore] attribute
+        /// </summary>
+        /// <returns></returns>
+        [Ignore]
+        [TestCategory("Integration")]
+        [TestMethod]
+        public async Task CancelAllRunningWorkflowsAsync()
+        {
+            const string containerName = "workflows";
+
+            var blobClient = new BlobServiceClient(new Uri($"https://{testStorageAccountName}.blob.core.windows.net?{workflowsContainerSasToken.TrimStart('?')}"));
+            var container = blobClient.GetBlobContainerClient(containerName);
+            var enumerator = container.GetBlobsAsync(prefix: "inprogress/").GetAsyncEnumerator();
+
+            while (await enumerator.MoveNextAsync())
+            {
+                // example: inprogress/mutect2-001-of-100-2023-4-7-3-9.0fb0858a-3166-4a22-85b6-4337df2f53c5.json
+                var blobName = enumerator.Current.Name;
+                await container.GetBlobClient($"abort/{System.IO.Path.GetFileName(blobName)}").UploadAsync(BinaryData.FromString(string.Empty), true);
+            }
+        }
+
         [Ignore]
         [TestCategory("Integration")]
         [TestMethod]
@@ -93,7 +116,7 @@ namespace TriggerService.Tests
 
             for (var i = 1; i <= countOfWorkflowsToRun; i++)
             {
-                // example: new/mutect2-001-of-100-2023-4-7-3-9.0fb0858a-3166-4a22-85b6-4337df2f53c5.json
+                // example: new/mutect2-001-of-100-2023-4-7-3-9.json
                 var blobName = $"new/{workflowFriendlyName}-{i:D4}-of-{countOfWorkflowsToRun:D4}-{date}.json";
                 var blobClient = new BlobServiceClient(new Uri($"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/{blobName}?{workflowsContainerSasToken.TrimStart('?')}"));
                 var container = blobClient.GetBlobContainerClient(containerName);
