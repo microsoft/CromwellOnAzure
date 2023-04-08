@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
@@ -61,9 +60,9 @@ namespace TriggerService.Tests
 
             while (await enumerator.MoveNextAsync())
             {
-                var blob = enumerator.Current;
                 // example: inprogress/mutect2-001-of-100-2023-4-7-3-9.0fb0858a-3166-4a22-85b6-4337df2f53c5.json
-                await container.GetBlobClient($"abort/{string.Join('.', System.IO.Path.GetFileName(blob.Name).Split('.').TakeLast(2))}").UploadAsync(BinaryData.FromString(string.Empty), true);
+                var blobName = enumerator.Current.Name;
+                await container.GetBlobClient($"abort/{System.IO.Path.GetFileName(blobName)}").UploadAsync(BinaryData.FromString(string.Empty), true);
             }
         }
 
