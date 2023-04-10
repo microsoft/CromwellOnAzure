@@ -521,7 +521,7 @@ namespace TriggerService
                 {
                     if (metadataFailures[i].Message?.Length > maxFailureMessageLength)
                     {
-                        metadataFailures[i].Message = metadataFailures[i].Message[..maxFailureMessageLength];
+                        metadataFailures[i].Message = $"{metadataFailures[i].Message[..maxFailureMessageLength]} [TRUNCATED by Cromwell On Azure's Trigger Service]";
                     }
                 }
             }
