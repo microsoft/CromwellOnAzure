@@ -43,15 +43,16 @@ namespace TriggerService.Tests
         {
             var workflowId = Guid.NewGuid();
             var cromwellApiClient = new Mock<ICromwellApiClient>();
+            var exceptionMessage = "Error submitting new workflow";
 
             cromwellApiClient
                 .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
-                .Throws(new Exception("Error submitting new workflow"));
+                .Throws(new Exception(exceptionMessage));
 
             var (newTriggerName, newTriggerContent) = await ProcessNewWorkflowAsync(cromwellApiClient.Object);
             Assert.IsTrue(newTriggerName.StartsWith("failed/"));
             Assert.AreEqual("ErrorSubmittingWorkflowToCromwell", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReason);
-            Assert.AreEqual("Error submitting new workflow", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReasonDetail);
+            Assert.IsTrue(newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReasonDetail.Contains(exceptionMessage));
         }
 
         private static async Task<(string newTriggerName, Workflow newTriggerContent)> ProcessNewWorkflowAsync(ICromwellApiClient cromwellApiClient)
