@@ -49,10 +49,27 @@ spec:
           volumeMounts:
             - mountPath: /cromwell-tmp
               name: cromwell-tmp-claim
-{{- range .Values.defaultContainers }}
-            - mountPath: {{.}}
-              name: {{.}}-claim1
+{{- $storageAccount  := .Values.persistence.storageAccount -}}
+{{- range .Values.internalContainersMIAuth }}
+{{- $path := printf "/%s/%s" .accountName .containerName }}
+{{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
+{{- if eq $storageAccount .accountName }}
+  {{- $path = printf "/%s" .containerName}}
+  {{- $claimName = printf "%s-claim1" .containerName }}
+{{- end}}
+            - mountPath: {{ $path }}
+              name: {{ $claimName }}
 {{- end }}
+{{- range .Values.internalContainersKeyVaultAuth }}
+{{- $path := printf "/%s/%s" .accountName .containerName }}
+{{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
+{{- if eq $storageAccount .accountName }}
+  {{- $path = printf "/%s" .containerName}}
+  {{- $claimName = printf "%s-claim1" .containerName }}
+{{- end}}
+            - mountPath: {{ $path }}
+              name: {{ $claimName }}
+{{- end}}
 {{- range .Values.externalContainers }}
             - mountPath: /{{.accountName}}/{{.containerName}}
               name: {{.accountName}}-{{.containerName}}-claim1
@@ -66,10 +83,23 @@ spec:
         - name: cromwell-tmp-claim
           persistentVolumeClaim:
             claimName: cromwell-tmp-claim
-{{- range .Values.defaultContainers }}
-        - name: {{.}}-claim1
+{{- range .Values.internalContainersMIAuth }}
+{{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
+{{- if eq $storageAccount .accountName }}
+  {{- $claimName = printf "%s-claim1" .containerName }}
+{{- end}}
+        - name: {{ $claimName }}
           persistentVolumeClaim:
-            claimName: {{.}}-claim1
+            claimName: {{ $claimName }}
+{{- end }}
+{{- range .Values.internalContainersKeyVaultAuth }}
+{{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
+{{- if eq $storageAccount .accountName }}
+  {{- $claimName = printf "%s-claim1" .containerName }}
+{{- end}}
+        - name: {{ $claimName }}
+          persistentVolumeClaim:
+            claimName: {{ $claimName }}
 {{- end }}
 {{- range .Values.externalContainers }}
         - name: {{.accountName}}-{{.containerName}}-claim1

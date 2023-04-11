@@ -33,7 +33,7 @@ namespace CromwellOnAzureDeployer
         public string SubscriptionId { get; set; }
         public string RegionName { get; set; }
         public string MainIdentifierPrefix { get; set; } = "coa";
-        public string VmSize { get; set; } = "Standard_D3_v2";
+        public string VmSize { get; set; } = "Standard_D4s_v3";
         public string VnetAddressSpace { get; set; } = "10.1.0.0/16"; // 10.1.0.0 - 10.1.255.255, 65536 IPs
         // Address space for CoA services.
         public string VmSubnetAddressSpace { get; set; } = "10.1.0.0/24"; // 10.1.0.0 - 10.1.0.255, 256 IPs
@@ -59,9 +59,6 @@ namespace CromwellOnAzureDeployer
         public string CromwellVersion { get; set; }
         public string TesImageName { get; set; }
         public string TriggerServiceImageName { get; set; }
-        public string CustomCromwellImagePath { get; set; }
-        public string CustomTesImagePath { get; set; }
-        public string CustomTriggerServiceImagePath { get; set; }
         public bool SkipTestWorkflow { get; set; } = false;
         public bool Update { get; set; } = false;
         public string VnetResourceGroupName { get; set; }
