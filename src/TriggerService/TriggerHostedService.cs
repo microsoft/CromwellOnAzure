@@ -337,7 +337,9 @@ namespace TriggerService
                 }
                 catch (Exception e)
                 {
-                    throw new Exception($"Failed to retrieve {url} from account {aStorage.AccountName}. {e?.GetType().FullName}:{e.InnerException?.Message ?? e.Message}", e);
+                    throw new Exception($"Failed to retrieve {url} from account {aStorage.AccountName}. " +
+                        $"Possible causes include improperly configured container permissions, or an incorrect file name or location." +
+                        $"{e?.GetType().FullName}:{e.InnerException?.Message ?? e.Message}", e);
                 }
             }
             else
