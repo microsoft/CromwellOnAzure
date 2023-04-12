@@ -141,7 +141,11 @@ namespace TriggerService
                         blobTrigger.ContainerName,
                         blobTrigger.Name,
                         WorkflowState.Failed,
-                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo { WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell", WorkflowFailureReasonDetail = e.Message });
+                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo
+                        {
+                            WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell",
+                            WorkflowFailureReasonDetail = $"Error processing trigger file {blobTrigger.Name}. Error: {e.Message}"
+                        });
                 }
             }
         }
@@ -327,11 +331,27 @@ namespace TriggerService
 
             if (GetBlockBlobStorage(url, storageAccounts) is IAzureStorage aStorage)
             {
-                data = await aStorage.DownloadBlockBlobAsync(url);
+                try
+                {
+                    data = await aStorage.DownloadBlockBlobAsync(url);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to retrieve {url} from account {aStorage.AccountName}. " +
+                        $"Possible causes include improperly configured container permissions, or an incorrect file name or location." +
+                        $"{e?.GetType().FullName}:{e.InnerException?.Message ?? e.Message}", e);
+                }
             }
             else
             {
-                data = await storage.DownloadFileUsingHttpClientAsync(url);
+                try
+                {
+                    data = await storage.DownloadFileUsingHttpClientAsync(url);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to download file from Http URL {url}. {e?.GetType().FullName}:{e.InnerException?.Message ?? e.Message}", e);
+                }
             }
 
             return new ProcessedWorkflowItem(blobName, data);
@@ -508,10 +528,23 @@ namespace TriggerService
         private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId, string metadata)
         {
             const string BatchExecutionDirectoryName = "__batch";
+            const int maxFailureMessageLength = 4096;
 
             var metadataFailures = string.IsNullOrWhiteSpace(metadata)
                 ? default
                 : JsonConvert.DeserializeObject<CromwellMetadata>(metadata)?.Failures;
+
+            if (metadataFailures?.Count > 0)
+            {
+                // Truncate failure messages; some can be 56k+ when it's an HTML message
+                for (int i = 0; i < metadataFailures.Count; i++)
+                {
+                    if (metadataFailures[i].Message?.Length > maxFailureMessageLength)
+                    {
+                        metadataFailures[i].Message = $"{metadataFailures[i].Message[..maxFailureMessageLength]} [TRUNCATED by Cromwell On Azure's Trigger Service]";
+                    }
+                }
+            }
 
             var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
 
