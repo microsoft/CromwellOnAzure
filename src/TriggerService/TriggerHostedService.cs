@@ -528,10 +528,23 @@ namespace TriggerService
         private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId, string metadata)
         {
             const string BatchExecutionDirectoryName = "__batch";
+            const int maxFailureMessageLength = 4096;
 
             var metadataFailures = string.IsNullOrWhiteSpace(metadata)
                 ? default
                 : JsonConvert.DeserializeObject<CromwellMetadata>(metadata)?.Failures;
+
+            if (metadataFailures?.Count > 0)
+            {
+                // Truncate failure messages; some can be 56k+ when it's an HTML message
+                for (int i = 0; i < metadataFailures.Count; i++)
+                {
+                    if (metadataFailures[i].Message?.Length > maxFailureMessageLength)
+                    {
+                        metadataFailures[i].Message = $"{metadataFailures[i].Message[..maxFailureMessageLength]} [TRUNCATED by Cromwell On Azure's Trigger Service]";
+                    }
+                }
+            }
 
             var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
 
