@@ -19,7 +19,7 @@ namespace CromwellOnAzureDeployer
             public string SasToken 
             { 
                 get => sasToken; 
-                set => sasToken = value.TrimStart('?'); 
+                set => sasToken = value?.TrimStart('?'); 
             }
 
             public MountableContainer() { }
