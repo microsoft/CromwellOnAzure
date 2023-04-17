@@ -535,7 +535,7 @@ namespace CromwellOnAzureDeployer
                     }
                     else
                     {
-                        var isTestWorkflowSuccessful = await RunTestWorkflow(storageAccount, usePreemptibleVm: batchAccount.LowPriorityCoreQuota > 0, configuration.UbuntuImageName);
+                        var isTestWorkflowSuccessful = await RunTestWorkflow(storageAccount, usePreemptibleVm: batchAccount.LowPriorityCoreQuota > 0, configuration.TestWdlDockerImageName);
 
                         if (!isTestWorkflowSuccessful)
                         {
@@ -944,6 +944,8 @@ namespace CromwellOnAzureDeployer
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "DockerInDockerImageName", configuration.DockerInDockerImageName, "env-09-docker-in-docker-image-name.txt");
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "BlobxferImageName", configuration.BlobxferImageName, "env-10-blobxfer-image-name.txt");
             await HandleConfigurationPropertyAsync(sshConnectionInfo, "DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress, "env-11-disable-batch-nodes-public-ip-address.txt");
+            await HandleConfigurationPropertyAsync(sshConnectionInfo, "testWdlDockerImageName", configuration.TestWdlDockerImageName, "env-14-test-wdl-image-name.txt");
+
         }
 
         private static async Task HandleConfigurationPropertyAsync(ConnectionInfo sshConnectionInfo, string key, string value, string envFileName)
@@ -2006,11 +2008,11 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task<bool> RunTestWorkflow(IStorageAccount storageAccount, bool usePreemptibleVm = true, string UbuntuImageName = default )
+        private async Task<bool> RunTestWorkflow(IStorageAccount storageAccount, bool usePreemptibleVm = true, string testWdlDockerImageName = default )
         {
             var startTime = DateTime.UtcNow;
             var line = ConsoleEx.WriteLine("Running a test workflow...");
-            var isTestWorkflowSuccessful = await TestWorkflowAsync(storageAccount, usePreemptibleVm, UbuntuImageName);
+            var isTestWorkflowSuccessful = await TestWorkflowAsync(storageAccount, usePreemptibleVm, testWdlDockerImageName);
             WriteExecutionTime(line, startTime);
 
             if (isTestWorkflowSuccessful)
@@ -2036,7 +2038,7 @@ namespace CromwellOnAzureDeployer
         private static void WriteGeneralRetryMessageToConsole()
             => ConsoleEx.WriteLine("Please try deployment again, and create an issue if this continues to fail: https://github.com/microsoft/CromwellOnAzure/issues");
 
-        private async Task<bool> TestWorkflowAsync(IStorageAccount storageAccount, bool usePreemptibleVm = true, string UbuntuImageName = default)
+        private async Task<bool> TestWorkflowAsync(IStorageAccount storageAccount, bool usePreemptibleVm = true, string testWdlDockerImageName = default)
         {
             const string testDirectoryName = "test";
             const string wdlFileName = "test.wdl";
@@ -2053,9 +2055,9 @@ namespace CromwellOnAzureDeployer
                 wdlFileContent = wdlFileContent.Replace("preemptible: true", "preemptible: false", StringComparison.OrdinalIgnoreCase);
             }
 
-            if (!string.IsNullOrEmpty(UbuntuImageName))
+            if (!string.IsNullOrEmpty(testWdlDockerImageName))
             {
-                wdlFileContent = wdlFileContent.Replace("docker: 'ubuntu:18.04'",  $"docker: '{UbuntuImageName}'");
+                wdlFileContent = wdlFileContent.Replace("docker: 'ubuntu:18.04'",  $"docker: '{testWdlDockerImageName}'");
             }
 
             var workflowTrigger = new Workflow
