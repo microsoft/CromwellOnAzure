@@ -1,0 +1,215 @@
+﻿apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: cromwell-tmp-claim
+  name: cromwell-tmp-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.cromwellTmpSize }}
+status: {}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: blob-fuse
+provisioner: blob.csi.azure.com
+parameters:
+  skuName: Premium_LRS  # available values: Standard_LRS, Premium_LRS, Standard_GRS, Standard_RAGRS
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+mountOptions:
+  - -o allow_other
+  - --file-cache-timeout-in-seconds=120
+  - --use-attr-cache=true
+  - --cancel-list-on-mount-seconds=10  # prevent billing charges on mounting
+  - -o attr_timeout=120
+  - -o entry_timeout=120
+  - -o negative_timeout=120
+  - --log-level=LOG_WARNING  # LOG_WARNING, LOG_INFO, LOG_DEBUG
+  - --cache-size-mb=1000  # Default will be 80% of available memory, eviction will happen beyond that.
+---
+{{- $rg  := .Values.config.resourceGroup -}}
+{{- $namespace := .Values.config.coaNamespace -}}
+{{- $storageAccount  := .Values.persistence.storageAccount -}}
+{{- $size  := .Values.persistence.blobPvcSize -}}
+
+{{- range .Values.internalContainersMIAuth }}
+{{- $storageClassName := printf "blob-%s-%s" .accountName .containerName }}
+{{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
+{{- if eq $storageAccount .accountName }}
+  {{- $storageClassName = printf "blob-%s" .containerName}}
+  {{- $claimName = printf "%s-claim1" .containerName }}
+{{- end}}
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ $storageClassName }}
+provisioner: blob.csi.azure.com
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  resourceGroup: {{ .resourceGroup }}
+  storageAccount: {{ .accountName }}
+  containerName: {{ .containerName }}
+mountOptions:
+  - -o allow_other
+  - --file-cache-timeout-in-seconds=120
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $claimName }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ $size }}
+  storageClassName: {{ $storageClassName }}
+---
+{{- end }}
+
+{{- range .Values.internalContainersKeyVaultAuth }}
+{{- $pvName := printf "pv-blob-%s-%s" .accountName .containerName }}
+{{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
+{{- $handleName := printf "pv-handle-%s-%s" .accountName .containerName }}
+{{- if eq $storageAccount .accountName }}
+  {{- $pvName = printf "pv-blob-%s" .containerName}}
+  {{- $claimName = printf "%s-claim1" .containerName }}
+  {{- $handleName = printf "pv-handle-%s" .containerName }}
+{{- end}}
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $pvName }}
+spec:
+  capacity:
+    storage: {{ $size }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain  # If set as "Delete" container would be removed after pvc deletion
+  storageClassName: blob-fuse
+  mountOptions:
+    - -o allow_other
+    - --file-cache-timeout-in-seconds=120
+  csi:
+    driver: blob.csi.azure.com
+    readOnly: false
+    # make sure this volumeid is unique in the cluster
+    # `#` is not allowed in self defined volumeHandle
+    volumeHandle: {{ $handleName }}
+    volumeAttributes:
+      storageAccountName: {{ .accountName }}
+      containerName: {{ .containerName }}
+      keyVaultURL: {{ .keyVaultURL | quote }}
+      keyVaultSecretName: {{ .keyVaultSecretName }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $claimName }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ $size }}
+  volumeName: {{ $pvName }}
+  storageClassName: blob-fuse
+---
+{{- end }}
+
+{{- range .Values.externalContainers }}
+apiVersion: v1
+data:
+  azurestorageaccountname: {{.accountName | b64enc}}
+  azurestorageaccountkey: {{.accountKey | b64enc}}
+kind: Secret
+metadata:
+  name: sa-secret-{{ .accountName }}-{{.containerName}}
+type: Opaque
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: blob-{{ .accountName }}-{{.containerName}}
+provisioner: blob.csi.azure.com
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  resourceGroup: {{ .resourceGroup }}
+  storageAccount: {{ .accountName }}
+  containerName: {{ .containerName }}
+mountOptions:
+  - -o allow_other
+  - --file-cache-timeout-in-seconds=120
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .accountName }}-{{ .containerName }}-claim1
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ $size }}
+  storageClassName: blob-{{ .accountName }}-{{.containerName}}
+---
+{{- end }}
+
+{{- range .Values.externalSasContainers }}
+apiVersion: v1
+data:
+  azurestorageaccountname: {{.accountName | b64enc}}
+  azurestorageaccountsastoken: {{.sasToken | b64enc}}
+kind: Secret
+metadata:
+  name: sa-secret-{{ .accountName }}-{{ .containerName }}
+type: Opaque
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-blob-{{ .accountName }}-{{ .containerName }}
+spec:
+  capacity:
+    storage: {{ $size }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - -o allow_other
+    - --file-cache-timeout-in-seconds=120
+  csi:
+    driver: blob.csi.azure.com
+    readOnly: false
+    volumeHandle: pv-handle-{{ .accountName }}-{{ .containerName }}
+    volumeAttributes:
+      containerName: {{ .containerName }}
+    nodeStageSecretRef:
+      name: sa-secret-{{ .accountName }}-{{.containerName}}
+      namespace: {{ $namespace }}
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ .accountName }}-{{ .containerName }}-claim1
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ $size }}
+  volumeName: pv-blob-{{ .accountName }}-{{ .containerName }}
+  storageClassName: ""
+---
+{{- end }}
