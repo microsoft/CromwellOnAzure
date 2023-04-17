@@ -61,4 +61,4 @@ Once you've provisioned the above and you're ready to run Cromwell on Azure, the
 - BatchAccountName
 - StorageAccountName 
 - CosmosDbAccountName
-- The image names if you have your own Azure Container Registry (TesImageName, TriggerServiceImageName, DockerInDockerImageName, BlobxferImageName)
+- The image names if you have your own Azure Container Registry (TesImageName, TriggerServiceImageName, DockerInDockerImageName, BlobxferImageName, UbuntuImageName)

@@ -535,7 +535,7 @@ namespace CromwellOnAzureDeployer
                     }
                     else
                     {
-                        var isTestWorkflowSuccessful = await RunTestWorkflow(storageAccount, usePreemptibleVm: batchAccount.LowPriorityCoreQuota > 0);
+                        var isTestWorkflowSuccessful = await RunTestWorkflow(storageAccount, usePreemptibleVm: batchAccount.LowPriorityCoreQuota > 0, configuration.UbuntuImageName);
 
                         if (!isTestWorkflowSuccessful)
                         {
@@ -2006,11 +2006,11 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task<bool> RunTestWorkflow(IStorageAccount storageAccount, bool usePreemptibleVm = true)
+        private async Task<bool> RunTestWorkflow(IStorageAccount storageAccount, bool usePreemptibleVm = true, string UbuntuImageName )
         {
             var startTime = DateTime.UtcNow;
             var line = ConsoleEx.WriteLine("Running a test workflow...");
-            var isTestWorkflowSuccessful = await TestWorkflowAsync(storageAccount, usePreemptibleVm);
+            var isTestWorkflowSuccessful = await TestWorkflowAsync(storageAccount, usePreemptibleVm, UbuntuImageName);
             WriteExecutionTime(line, startTime);
 
             if (isTestWorkflowSuccessful)
@@ -2036,7 +2036,7 @@ namespace CromwellOnAzureDeployer
         private static void WriteGeneralRetryMessageToConsole()
             => ConsoleEx.WriteLine("Please try deployment again, and create an issue if this continues to fail: https://github.com/microsoft/CromwellOnAzure/issues");
 
-        private async Task<bool> TestWorkflowAsync(IStorageAccount storageAccount, bool usePreemptibleVm = true)
+        private async Task<bool> TestWorkflowAsync(IStorageAccount storageAccount, bool usePreemptibleVm = true, string UbuntuImageName)
         {
             const string testDirectoryName = "test";
             const string wdlFileName = "test.wdl";
@@ -2051,6 +2051,11 @@ namespace CromwellOnAzureDeployer
             if (!usePreemptibleVm)
             {
                 wdlFileContent = wdlFileContent.Replace("preemptible: true", "preemptible: false", StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (!string.IsNullOrEmpty(UbuntuImageName))
+            {
+                wdlFileContent = wdlFileContent.Replace("docker: 'ubuntu:18.04'",  $"docker: '{UbuntuImageName}'");
             }
 
             var workflowTrigger = new Workflow
