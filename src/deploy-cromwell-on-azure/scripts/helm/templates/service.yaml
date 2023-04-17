@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    io.kompose.service: cromwell
+  name: cromwell
+spec:
+  ports:
+    - name: {{ .Values.service.cromwellPort | quote }}
+      port: {{ .Values.service.cromwellPort }}
+      targetPort: {{ .Values.service.cromwellPort }}
+  selector:
+    io.kompose.service: cromwell
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    io.kompose.service: tes
+  name: tes
+spec:
+  ports:
+    - name: {{ .Values.service.tesPort | quote }}
+      port: {{ .Values.service.tesPort }}
+      targetPort: {{ .Values.service.tesPort }}
+  selector:
+    io.kompose.service: tes
+status:
+  loadBalancer: {}

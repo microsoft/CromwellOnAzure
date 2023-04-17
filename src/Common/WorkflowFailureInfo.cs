@@ -9,10 +9,12 @@ namespace Common
     {
         public string WorkflowFailureReason { get; set; }
         public string WorkflowFailureReasonDetail { get; set; }
+        public List<CromwellMetadataCausedBy> CromwellFailureLogs { get; set; }
         public List<FailedTaskInfo> FailedTasks { get; set; }
 
-        public bool ShouldSerializeWorkflowFailureReason() => WorkflowFailureReason is object;
-        public bool ShouldSerializeWorkflowFailureReasonDetail() => WorkflowFailureReasonDetail is object;
-        public bool ShouldSerializeFailedTasks() => FailedTasks is object && FailedTasks.Count > 0;
+        public bool ShouldSerializeWorkflowFailureReason() => WorkflowFailureReason is not null;
+        public bool ShouldSerializeWorkflowFailureReasonDetail() => WorkflowFailureReasonDetail is not null;
+        public bool ShouldSerializeCromwellFailureLogs() => CromwellFailureLogs?.Count > 0;
+        public bool ShouldSerializeFailedTasks() => FailedTasks is not null && FailedTasks.Count > 0;
     }
 }

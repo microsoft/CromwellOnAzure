@@ -2,7 +2,7 @@
   "profiles": {
     "Setup": {
       "commandName": "Project",
-      "commandLineArgs": "--subscriptionid aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee --regionname westus2 --mainidentifierprefix coatest",
+      "commandLineArgs": "--subscriptionid aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee --regionname eastus --mainidentifierprefix coatest --debuglogging true --helmbinarypath c:\\temp\\helm.exe",
       "sqlDebugging": true
     }
   }
