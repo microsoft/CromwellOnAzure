@@ -2006,7 +2006,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task<bool> RunTestWorkflow(IStorageAccount storageAccount, bool usePreemptibleVm = true, string UbuntuImageName )
+        private async Task<bool> RunTestWorkflow(IStorageAccount storageAccount, bool usePreemptibleVm = true, string UbuntuImageName = default )
         {
             var startTime = DateTime.UtcNow;
             var line = ConsoleEx.WriteLine("Running a test workflow...");
@@ -2036,7 +2036,7 @@ namespace CromwellOnAzureDeployer
         private static void WriteGeneralRetryMessageToConsole()
             => ConsoleEx.WriteLine("Please try deployment again, and create an issue if this continues to fail: https://github.com/microsoft/CromwellOnAzure/issues");
 
-        private async Task<bool> TestWorkflowAsync(IStorageAccount storageAccount, bool usePreemptibleVm = true, string UbuntuImageName)
+        private async Task<bool> TestWorkflowAsync(IStorageAccount storageAccount, bool usePreemptibleVm = true, string UbuntuImageName = default)
         {
             const string testDirectoryName = "test";
             const string wdlFileName = "test.wdl";
