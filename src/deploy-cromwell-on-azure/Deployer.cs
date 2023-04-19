@@ -1940,7 +1940,7 @@ namespace CromwellOnAzureDeployer
 
             if (!string.IsNullOrEmpty(testWdlDockerImageName))
             {
-                wdlFileContent = wdlFileContent.Replace("docker: 'ubuntu:18.04'",  $"docker: '{testWdlDockerImageName}'");
+                wdlFileContent = wdlFileContent.Replace("docker: 'mcr.microsoft.com/mirror/docker/library/ubuntu:22.04'",  $"docker: '{testWdlDockerImageName}'");
             }
 
             var workflowTrigger = new Workflow
