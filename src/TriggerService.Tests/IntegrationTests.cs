@@ -26,7 +26,7 @@ namespace TriggerService.Tests
         [Ignore]
         [TestCategory("Integration")]
         [TestMethod]
-        public async Task RunTestWdlAsync()
+        public async Task RunGlobTestWdlAsync()
         {
             const string containerName = "inputs";
             var wdlBlobName = $"globtest.wdl";
