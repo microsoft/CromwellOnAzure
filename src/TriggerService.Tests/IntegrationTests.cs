@@ -51,7 +51,9 @@ namespace TriggerService.Tests
                 WorkflowInputsUrl = wdlInputsUrl
             };
 
-            var triggerFileBlobName = $"new/globtesttrigger.json";
+            var n = DateTime.UtcNow;
+            var date = $"{n.Year}-{n.Month}-{n.Day}-{n.Hour}-{n.Minute}";
+            var triggerFileBlobName = $"new/globtest-{date}.json";
             string triggerJson = System.Text.Json.JsonSerializer.Serialize(workflowTrigger).Replace(@"\r\n\", @"\n");
             var triggerUrl = $"https://{testStorageAccountName}.blob.core.windows.net?{workflowsContainerSasToken.TrimStart('?')}";
             blobClient = new BlobServiceClient(new Uri(triggerUrl));
