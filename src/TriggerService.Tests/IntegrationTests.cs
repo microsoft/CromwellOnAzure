@@ -29,21 +29,21 @@ namespace TriggerService.Tests
         public async Task RunTestWdlAsync()
         {
             const string containerName = "inputs";
-            var wdlBlobName = $"test/globtest.wdl";
+            var wdlBlobName = $"globtest.wdl";
             var wdlPath = Path.Combine(Path.GetFullPath(@"..\..\..\test-wdls\globtest"), wdlBlobName);
-            string wdlUrl = $"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/{wdlBlobName}?{workflowsContainerSasToken.TrimStart('?')}";
+            string wdlUrl = $"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/test/{wdlBlobName}?{workflowsContainerSasToken.TrimStart('?')}";
             var blobClient = new BlobServiceClient(new Uri(wdlUrl));
             var container = blobClient.GetBlobContainerClient(containerName);
             var text = (await File.ReadAllTextAsync(wdlPath)).Replace(@"\r\n\", @"\n");
-            await container.GetBlobClient(wdlBlobName).UploadAsync(BinaryData.FromString(text), true);
+            await container.GetBlobClient("test/" + wdlBlobName).UploadAsync(BinaryData.FromString(text), true);
 
-            var wdlInputsBlobName = $"test/globtestinputs.json";
+            var wdlInputsBlobName = $"globtestinputs.json";
             var wdlInputsPath = Path.Combine(Path.GetFullPath(@"..\..\..\test-wdls\globtest"), wdlInputsBlobName);
-            string wdlInputsUrl = $"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/{wdlInputsBlobName}?{workflowsContainerSasToken.TrimStart('?')}";
+            string wdlInputsUrl = $"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/test/{wdlInputsBlobName}?{workflowsContainerSasToken.TrimStart('?')}";
             blobClient = new BlobServiceClient(new Uri(wdlInputsUrl));
             container = blobClient.GetBlobContainerClient(containerName);
             text = (await File.ReadAllTextAsync(wdlInputsPath)).Replace(@"\r\n\", @"\n");
-            await container.GetBlobClient(wdlInputsBlobName).UploadAsync(BinaryData.FromString(text), true);
+            await container.GetBlobClient("test/" + wdlInputsBlobName).UploadAsync(BinaryData.FromString(text), true);
 
             var workflowTrigger = new Workflow
             {
