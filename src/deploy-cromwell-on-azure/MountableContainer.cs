@@ -17,10 +17,10 @@ namespace CromwellOnAzureDeployer
         public string ContainerName { get; set; }
         public string SasToken { get; set; }
         public string ResourceGroupName { get; set; }
-        public string SasToken 
-        { 
-            get => sasToken; 
-            set => sasToken = value?.TrimStart('?'); 
+        public string SasToken
+        {
+            get => sasToken;
+            set => sasToken = value?.TrimStart('?');
         }
 
         public MountableContainer() { }
