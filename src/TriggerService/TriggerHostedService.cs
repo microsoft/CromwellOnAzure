@@ -141,7 +141,11 @@ namespace TriggerService
                         blobTrigger.ContainerName,
                         blobTrigger.Name,
                         WorkflowState.Failed,
-                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo { WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell", WorkflowFailureReasonDetail = e.Message });
+                        wf => wf.WorkflowFailureInfo = new WorkflowFailureInfo
+                        {
+                            WorkflowFailureReason = "ErrorSubmittingWorkflowToCromwell",
+                            WorkflowFailureReasonDetail = $"Error processing trigger file {blobTrigger.Name}. Error: {e.Message}"
+                        });
                 }
             }
         }
@@ -207,6 +211,7 @@ namespace TriggerService
                                 logger.LogInformation($"Setting to failed (aborted) Id: {id}");
 
                                 await UploadOutputsAsync(id, sampleName);
+                                _ = await UploadMetadataAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
                                 await MutateStateAsync(
@@ -222,10 +227,11 @@ namespace TriggerService
                                 logger.LogInformation($"Setting to failed Id: {id}");
 
                                 await UploadOutputsAsync(id, sampleName);
+                                var metadata = await UploadMetadataAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
                                 var taskWarnings = await GetWorkflowTaskWarningsAsync(id);
-                                var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id);
+                                var workflowFailureInfo = await GetWorkflowFailureInfoAsync(id, metadata);
 
                                 await MutateStateAsync(
                                     blobTrigger.ContainerName,
@@ -242,6 +248,7 @@ namespace TriggerService
                         case WorkflowStatus.Succeeded:
                             {
                                 await UploadOutputsAsync(id, sampleName);
+                                _ = await UploadMetadataAsync(id, sampleName);
                                 await UploadTimingAsync(id, sampleName);
 
                                 var taskWarnings = await GetWorkflowTaskWarningsAsync(id);
@@ -327,11 +334,27 @@ namespace TriggerService
 
             if (GetBlockBlobStorage(url, storageAccounts) is IAzureStorage aStorage)
             {
-                data = await aStorage.DownloadBlockBlobAsync(url);
+                try
+                {
+                    data = await aStorage.DownloadBlockBlobAsync(url);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to retrieve {url} from account {aStorage.AccountName}. " +
+                        $"Possible causes include improperly configured container permissions, or an incorrect file name or location." +
+                        $"{e?.GetType().FullName}:{e.InnerException?.Message ?? e.Message}", e);
+                }
             }
             else
             {
-                data = await storage.DownloadFileUsingHttpClientAsync(url);
+                try
+                {
+                    data = await storage.DownloadFileUsingHttpClientAsync(url);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to download file from Http URL {url}. {e?.GetType().FullName}:{e.InnerException?.Message ?? e.Message}", e);
+                }
             }
 
             return new ProcessedWorkflowItem(blobName, data);
@@ -460,18 +483,32 @@ namespace TriggerService
                     outputsResponse.Json,
                     OutputsContainerName,
                     $"{sampleName}.{id}.outputs.json");
+            }
+            catch (Exception exc)
+            {
+                logger.LogWarning(exc, $"Getting outputs threw an exception for Id: {id}");
+            }
+        }
 
+        private async Task<string> UploadMetadataAsync(Guid id, string sampleName)
+        {
+            try
+            {
                 var metadataResponse = await cromwellApiClient.GetMetadataAsync(id);
 
                 await storage.UploadFileTextAsync(
                     metadataResponse.Json,
                     OutputsContainerName,
                     $"{sampleName}.{id}.metadata.json");
+
+                return metadataResponse.Json;
             }
             catch (Exception exc)
             {
-                logger.LogWarning(exc, $"Getting outputs and/or timing threw an exception for Id: {id}");
+                logger.LogWarning(exc, $"Getting metadata threw an exception for Id: {id}");
             }
+
+            return default;
         }
 
         private async Task UploadTimingAsync(Guid id, string sampleName)
@@ -491,9 +528,26 @@ namespace TriggerService
             }
         }
 
-        private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId)
+        private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId, string metadata)
         {
             const string BatchExecutionDirectoryName = "__batch";
+            const int maxFailureMessageLength = 4096;
+
+            var metadataFailures = string.IsNullOrWhiteSpace(metadata)
+                ? default
+                : JsonConvert.DeserializeObject<CromwellMetadata>(metadata)?.Failures;
+
+            if (metadataFailures?.Count > 0)
+            {
+                // Truncate failure messages; some can be 56k+ when it's an HTML message
+                for (int i = 0; i < metadataFailures.Count; i++)
+                {
+                    if (metadataFailures[i].Message?.Length > maxFailureMessageLength)
+                    {
+                        metadataFailures[i].Message = $"{metadataFailures[i].Message[..maxFailureMessageLength]} [TRUNCATED by Cromwell On Azure's Trigger Service]";
+                    }
+                }
+            }
 
             var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
 
@@ -531,6 +585,7 @@ namespace TriggerService
             return new WorkflowFailureInfo
             {
                 FailedTasks = failedTesTasks,
+                CromwellFailureLogs = metadataFailures,
                 WorkflowFailureReason = failedTesTasks.Any() ? "OneOrMoreTasksFailed" : "CromwellFailed"
             };
         }

@@ -77,17 +77,12 @@ namespace CromwellOnAzureDeployer
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
         public const string CromwellConfigurationFileName = "cromwell-application.conf";
-        public const string ContainersToMountFileName = "containers-to-mount";
-        public const string PersonalizedSettingsFileName = "settings-user";
-        public const string NonpersonalizedSettingsFileName = "settings-system";
         public const string AllowedVmSizesFileName = "allowed-vm-sizes";
         public const string InputsContainerName = "inputs";
         public const string CromwellAzureRootDir = "/data/cromwellazure";
         public const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
-        public const string SettingsDelimiter = "=:=";
         public const string StorageAccountKeySecretName = "CoAStorageKey";
         public const string PostgresqlSslMode = "VerifyFull";
-        public const string SshNsgRuleName = "SSH";
 
         private readonly CancellationTokenSource cts = new();
 
@@ -96,8 +91,10 @@ namespace CromwellOnAzureDeployer
             "Microsoft.Authorization",
             "Microsoft.Batch",
             "Microsoft.Compute",
+            "Microsoft.ContainerService",
             "Microsoft.DocumentDB",
             "Microsoft.OperationalInsights",
+            "Microsoft.OperationsManagement",
             "Microsoft.insights",
             "Microsoft.Network",
             "Microsoft.Storage",
@@ -115,10 +112,8 @@ namespace CromwellOnAzureDeployer
         private FlexibleServer.IPostgreSQLManagementClient postgreSqlFlexManagementClient { get; set; }
         private SingleServer.IPostgreSQLManagementClient postgreSqlSingleManagementClient { get; set; }
         private IEnumerable<string> subscriptionIds { get; set; }
-        private bool SkipBillingReaderRoleAssignment { get; set; }
         private bool isResourceGroupCreated { get; set; }
         private KubernetesManager kubernetesManager { get; set; }
-        private IKubernetes kubernetesClient { get; set; }
 
         public Deployer(Configuration configuration)
         {
@@ -165,6 +160,9 @@ namespace CromwellOnAzureDeployer
                 var keyVaultUri = string.Empty;
                 IIdentity managedIdentity = null;
                 IPrivateDnsZone postgreSqlDnsZone = null;
+                IKubernetes kubernetesClient = null;
+
+                var containersToMount = await GetContainersToMount(configuration.ContainersToMountPath);
 
                 try
                 {
@@ -177,10 +175,6 @@ namespace CromwellOnAzureDeployer
 
                         ConsoleEx.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
-                        var existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
-
-                        Dictionary<string, string> accountNames = null;
-
                         if (!string.IsNullOrEmpty(configuration.StorageAccountName))
                         {
                             storageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName)
@@ -188,13 +182,13 @@ namespace CromwellOnAzureDeployer
                         }
                         else
                         {
-                            var storageAccounts = await azureSubscriptionClient.StorageAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName);
+                            var storageAccounts = (await azureSubscriptionClient.StorageAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName)).ToList();
 
                             if (!storageAccounts.Any())
                             {
                                 throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any storage accounts.");
                             }
-                            if (storageAccounts.Count() > 1)
+                            if (storageAccounts.Count > 1)
                             {
                                 throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple storage accounts. {nameof(configuration.StorageAccountName)} must be provided.");
                             }
@@ -202,15 +196,16 @@ namespace CromwellOnAzureDeployer
                             storageAccount = storageAccounts.First();
                         }
 
-                        accountNames = await kubernetesManager.GetAKSSettingsAsync(storageAccount);
-                        
+                        // If the previous installation was pre 4.0, we probably will error out below this line but before we make any changes. If not, we will guard below anyway.
 
-                        if (!accountNames.Any())
+                        var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccount);
+
+                        if (!aksValues.Any())
                         {
                             throw new ValidationException($"Could not retrieve account names");
                         }
 
-                        if (!accountNames.TryGetValue("BatchAccountName", out var batchAccountName))
+                        if (!aksValues.TryGetValue("BatchAccountName", out var batchAccountName))
                         {
                             throw new ValidationException($"Could not retrieve the Batch account name");
                         }
@@ -220,29 +215,50 @@ namespace CromwellOnAzureDeployer
 
                         configuration.BatchAccountName = batchAccountName;
 
-                        accountNames.TryGetValue("PostgreSqlServerName", out var postgreSqlServerName);
+                        aksValues.TryGetValue("PostgreSqlServerName", out var postgreSqlServerName);
 
                         configuration.PostgreSqlServerName = postgreSqlServerName;
                         //postgreSqlFlexServer = GetExistingPostgresqlService(postgreSqlServerName); // TODO: Get existing postgresql server
-                        
 
-                        await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
+                        ManagedCluster existingAksCluster = default;
+
+                        if (!string.IsNullOrEmpty(configuration.AksClusterName))
+                        {
+                            existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
+                        }
+                        else
+                        {
+                            using var client = new ContainerServiceClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId };
+                            var aksClusters = (await client.ManagedClusters.ListByResourceGroupAsync(configuration.ResourceGroupName)).ToList();
+
+                            if (!aksClusters.Any())
+                            {
+                                throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any AKS clusters.");
+                            }
+                            if (aksClusters.Count > 1)
+                            {
+                                throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple AKS clusters. {nameof(configuration.AksClusterName)} must be provided.");
+                            }
+
+                            existingAksCluster = aksClusters.First();
+                            configuration.AksClusterName = existingAksCluster.Name;
+                        }
 
                         if (existingAksCluster is not null)
                         {
-                            if (accountNames.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
+                            if (aksValues.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
                             {
-                                bool.TryParse(crossSubscriptionAKSDeployment, out var parsed);
+                                _ = bool.TryParse(crossSubscriptionAKSDeployment, out var parsed);
                                 configuration.CrossSubscriptionAKSDeployment = parsed;
                             }
 
-                            if (accountNames.TryGetValue("KeyVaultName", out var keyVaultName))
+                            if (aksValues.TryGetValue("KeyVaultName", out var keyVaultName))
                             {
                                 var keyVault = await GetKeyVaultAsync(keyVaultName);
                                 keyVaultUri = keyVault.Properties.VaultUri;
                             }
 
-                            if (!accountNames.TryGetValue("ManagedIdentityClientId", out var managedIdentityClientId))
+                            if (!aksValues.TryGetValue("ManagedIdentityClientId", out var managedIdentityClientId))
                             {
                                 throw new ValidationException($"Could not retrieve ManagedIdentityClientId.");
                             }
@@ -251,15 +267,29 @@ namespace CromwellOnAzureDeployer
                                 ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
 
                             // Override any configuration that is used by the update.
-                            var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccount);
                             var versionString = aksValues["CromwellOnAzureVersion"];
                             var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
+
+                            if (installedVersion is null || installedVersion < new Version(4, 0))
+                            {
+                                throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.");
+                            }
+
                             var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
 
-                            await kubernetesManager.UpgradeAKSDeploymentAsync(
-                                settings,
-                                storageAccount);
+                            //if (installedVersion is null || installedVersion < new Version(4, 1))
+                            //{
+                            //}
+
+                            await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount);
+                            kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup);
                         }
+                        else
+                        {
+                            throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.");
+                        }
+
+                        await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                     }
 
                     if (!configuration.Update)
@@ -279,7 +309,7 @@ namespace CromwellOnAzureDeployer
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
                         var keyVault = await ValidateAndGetExistingKeyVault();
 
-                        if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName) && configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                        if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName))
                         {
                             configuration.PostgreSqlServerName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
                         }
@@ -354,7 +384,7 @@ namespace CromwellOnAzureDeployer
                         if (vnetAndSubnet is null)
                         {
                             configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                            configuration.PostgreSqlSubnetName = String.IsNullOrEmpty(configuration.PostgreSqlSubnetName) && configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() ? configuration.DefaultPostgreSqlSubnetName : configuration.PostgreSqlSubnetName;
+                            configuration.PostgreSqlSubnetName = String.IsNullOrEmpty(configuration.PostgreSqlSubnetName) ? configuration.DefaultPostgreSqlSubnetName : configuration.PostgreSqlSubnetName;
                             configuration.VmSubnetName = String.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
                             vnetAndSubnet = await CreateVnetAndSubnetsAsync(resourceGroup);
                         }
@@ -375,6 +405,11 @@ namespace CromwellOnAzureDeployer
                             await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
+
+                            if (!string.IsNullOrWhiteSpace(configuration.BatchNodesSubnetId))
+                            {
+                                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                            }
                         });
 
                         if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
@@ -384,18 +419,13 @@ namespace CromwellOnAzureDeployer
                                 keyVault ??= await CreateKeyVaultAsync(configuration.KeyVaultName, managedIdentity, vnetAndSubnet.Value.vmSubnet);
                                 keyVaultUri = keyVault.Properties.VaultUri;
                                 var keys = await storageAccount.GetKeysAsync();
-                                await SetStorageKeySecret(keyVaultUri, StorageAccountKeySecretName, keys.First().Value);
+                                await SetStorageKeySecret(keyVaultUri, StorageAccountKeySecretName, keys[0].Value);
                             });
                         }
 
-                        if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault() && postgreSqlFlexServer is null)
+                        if (postgreSqlFlexServer is null)
                         {
                             postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
-                        }
-
-                        if (!SkipBillingReaderRoleAssignment)
-                        {
-                            await AssignVmAsBillingReaderToSubscriptionAsync(managedIdentity);
                         }
 
                         await Task.WhenAll(new Task[]
@@ -430,33 +460,26 @@ namespace CromwellOnAzureDeployer
                             await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                         }
 
-                        await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity);
+                        await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity, containersToMount);
+                        kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup,
+                            new[]
+                            {
+                                "Run the following postgresql command to setup the database.",
+                                "\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer, configuration.PostgreSqlCromwellDatabaseName, GetCreateCromwellUserString()),
+                                "\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer, configuration.PostgreSqlTesDatabaseName, GetCreateTesUserString()),
+                            },
+                            async kubernetesClient =>
+                            {
+                                await kubernetesManager.DeployCoADependenciesAsync();
 
-                        if (configuration.ManualHelmDeployment)
-                        {
-                            ConsoleEx.WriteLine($"Please modify: {kubernetesManager.TempHelmValuesYamlPath}");
-                            ConsoleEx.WriteLine($"Then, deploy the helm chart, and press Enter to continue.");
-                            ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer, configuration.PostgreSqlCromwellDatabaseName, GetCreateCromwellUserString()));
-                            ConsoleEx.WriteLine("\tPostgreSQL command: " + GetPostgreSQLCreateCromwellUserCommand(configuration.UsePostgreSqlSingleServer, configuration.PostgreSqlTesDatabaseName, GetCreateTesUserString()));
-                            ConsoleEx.ReadLine();
-                        }
-                        else
-                        {
-                            kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
-                            await kubernetesManager.DeployCoADependenciesAsync();
-
-                            // Deploy an ubuntu pod to run PSQL commands, then delete it
-                            const string deploymentName = "ubuntu";
-                            const string deploymentNamespace = "default";
-                            var ubuntuDeployment = kubernetesManager.GetUbuntuDeploymentTemplate();
-                            await kubernetesClient.AppsV1.CreateNamespacedDeploymentAsync(ubuntuDeployment, deploymentNamespace);
-                            await ExecuteQueriesOnAzurePostgreSQLDbFromK8(deploymentName, deploymentNamespace);
-                            await kubernetesClient.AppsV1.DeleteNamespacedDeploymentAsync(deploymentName, deploymentNamespace);
-
-                            await kubernetesManager.DeployHelmChartToClusterAsync();
-                        }
+                                // Deploy an ubuntu pod to run PSQL commands, then delete it
+                                const string deploymentNamespace = "default";
+                                var (deploymentName, ubuntuDeployment) = KubernetesManager.GetUbuntuDeploymentTemplate();
+                                await kubernetesClient.AppsV1.CreateNamespacedDeploymentAsync(ubuntuDeployment, deploymentNamespace);
+                                await ExecuteQueriesOnAzurePostgreSQLDbFromK8(kubernetesClient, deploymentName, deploymentNamespace);
+                                await kubernetesClient.AppsV1.DeleteNamespacedDeploymentAsync(deploymentName, deploymentNamespace);
+                            });
                     }
-
                     if (kubernetesClient is not null)
                     {
                         await kubernetesManager.WaitForCromwellAsync(kubernetesClient);
@@ -464,7 +487,10 @@ namespace CromwellOnAzureDeployer
                 }
                 finally
                 {
-                    kubernetesManager.DeleteTempFiles();
+                    if (!configuration.ManualHelmDeployment)
+                    {
+                        kubernetesManager?.DeleteTempFiles();
+                    }
                 }
 
                 batchAccount = await GetExistingBatchAccountAsync(configuration.BatchAccountName);
@@ -515,29 +541,30 @@ namespace CromwellOnAzureDeployer
             }
             catch (Exception exc)
             {
-                if (configuration.DebugLogging)
-                {
-                    if (exc is KubernetesException kExc)
-                    {
-                        ConsoleEx.WriteLine($"Kubenetes Status: {kExc.Status}");
-                    }
-
-                    if (exc is WebSocketException wExc)
-                    {
-                        ConsoleEx.WriteLine($"WebSocket ErrorCode: {wExc.WebSocketErrorCode}");
-                    }
-
-                    if (exc is HttpOperationException hExc)
-                    {
-                        ConsoleEx.WriteLine($"HTTP Response: {hExc.Response.Content}");
-                    }
-                    ConsoleEx.WriteLine(exc.StackTrace, ConsoleColor.Red);
-                }
-
                 if (!(exc is OperationCanceledException && cts.Token.IsCancellationRequested))
                 {
                     ConsoleEx.WriteLine();
                     ConsoleEx.WriteLine($"{exc.GetType().Name}: {exc.Message}", ConsoleColor.Red);
+
+                    if (configuration.DebugLogging)
+                    {
+                        ConsoleEx.WriteLine(exc.StackTrace, ConsoleColor.Red);
+
+                        if (exc is KubernetesException kExc)
+                        {
+                            ConsoleEx.WriteLine($"Kubenetes Status: {kExc.Status}");
+                        }
+
+                        if (exc is WebSocketException wExc)
+                        {
+                            ConsoleEx.WriteLine($"WebSocket ErrorCode: {wExc.WebSocketErrorCode}");
+                        }
+
+                        if (exc is HttpOperationException hExc)
+                        {
+                            ConsoleEx.WriteLine($"HTTP Response: {hExc.Response.Content}");
+                        }
+                    }
                 }
 
                 ConsoleEx.WriteLine();
@@ -545,6 +572,31 @@ namespace CromwellOnAzureDeployer
                 WriteGeneralRetryMessageToConsole();
                 await DeleteResourceGroupIfUserConsentsAsync();
                 return 1;
+            }
+        }
+
+        private async Task<IKubernetes> PerformHelmDeploymentAsync(IResourceGroup resourceGroup, IEnumerable<string> manualPrecommands = default, Func<IKubernetes, Task> asyncTask = default)
+        {
+            if (configuration.ManualHelmDeployment)
+            {
+                ConsoleEx.WriteLine($"Helm chart written to disk at: {kubernetesManager.helmScriptsRootDirectory}");
+                ConsoleEx.WriteLine($"Please update values file if needed here: {kubernetesManager.TempHelmValuesYamlPath}");
+
+                foreach (var line in manualPrecommands ?? Enumerable.Empty<string>())
+                {
+                    ConsoleEx.WriteLine(line);
+                }
+
+                ConsoleEx.WriteLine($"Then, deploy the helm chart, and press Enter to continue.");
+                ConsoleEx.ReadLine();
+                return default;
+            }
+            else
+            {
+                var kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
+                await (asyncTask?.Invoke(kubernetesClient) ?? Task.CompletedTask);
+                await kubernetesManager.DeployHelmChartToClusterAsync();
+                return kubernetesClient;
             }
         }
 
@@ -705,9 +757,11 @@ namespace CromwellOnAzureDeployer
             UpdateSetting(settings, defaults, "CromwellOnAzureVersion", default(string), ignoreDefaults: false);
 
             // Process images
-            UpdateSetting(settings, defaults, "CromwellImageName", configuration.CromwellVersion, v => $"broadinstitute/cromwell:{v}");
-            UpdateSetting(settings, defaults, "TesImageName", configuration.TesImageName);
-            UpdateSetting(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName);
+            UpdateSetting(settings, defaults, "CromwellImageName", configuration.CromwellVersion, v => $"broadinstitute/cromwell:{v}",
+                ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "CromwellImageName", configuration.CromwellVersion is null, installedVersion,
+                    tag => GetTag(settings["CromwellImageName"]) <= GetTag(defaults["CromwellImageName"]))); // There's not a good way to detect customization of this property, so default to forced upgrade to the new default.
+            UpdateSetting(settings, defaults, "TesImageName", configuration.TesImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TesImageName", configuration.TesImageName is null, installedVersion));
+            UpdateSetting(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName is null, installedVersion));
 
             // Additional non-personalized settings
             UpdateSetting(settings, defaults, "BatchNodesSubnetId", configuration.BatchNodesSubnetId);
@@ -717,7 +771,6 @@ namespace CromwellOnAzureDeployer
 
             if (installedVersion is null)
             {
-                var provisionPostgreSqlOnAzure = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault();
                 UpdateSetting(settings, defaults, "BatchPrefix", configuration.BatchPrefix, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
@@ -737,11 +790,69 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseName", configuration.PostgreSqlCromwellDatabaseName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseUserLogin", GetFormattedPostgresqlUser(isCromwellPostgresUser: true), ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseUserPassword", configuration.PostgreSqlCromwellUserPassword, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "UsePostgreSqlSingleServer", provisionPostgreSqlOnAzure ? configuration.UsePostgreSqlSingleServer.ToString() : string.Empty, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "UsePostgreSqlSingleServer", configuration.UsePostgreSqlSingleServer.ToString(), ignoreDefaults: true);
             }
 
             BackFillSettings(settings, defaults);
             return settings;
+
+            static int GetTag(string imageName)
+                => int.TryParse(imageName?[(imageName.LastIndexOf(':') + 1)..] ?? string.Empty, System.Globalization.NumberStyles.Integer, System.Globalization.NumberFormatInfo.InvariantInfo, out var tag) ? tag : 0;
+        }
+
+        /// <summary>
+        /// Determines if current setting should be ignored (used for product image names).
+        /// </summary>
+        /// <param name="settings">Property bag being updated.</param>
+        /// <param name="defaults">Property bag containing default values.</param>
+        /// <param name="key">Key of value in both <paramref name="settings"/> and <paramref name="defaults"/>.</param>
+        /// <param name="valueIsNull">True if configuration value to set is null. See <see cref="UpdateSetting{T}(Dictionary{string, string}, Dictionary{string, string}, string, T, Func{T, string}, string, bool?)"/>'s "value" parameter.</param>
+        /// <param name="installedVersion">A <see cref="Version"/> of the current configuration, or null if this is not an update.</param>
+        /// <param name="IsInstalledNotCustomized">A <see cref="Predicate{T}"/> where the parameter is the image tag of the currently configured image. Only called if the rest of the image name is identical to the default. Return False if the value is considered customized, otherwise True.</param>
+        /// <returns>false if current setting should be ignored, null otherwise.</returns>
+        /// <remarks>This method provides a value for the "ignoreDefaults" parameter to <see cref="UpdateSetting{T}(Dictionary{string, string}, Dictionary{string, string}, string, T, Func{T, string}, string, bool?)"/> for use with container image names.</remarks>
+        private static bool? ImageNameIgnoreDefaults(Dictionary<string, string> settings, Dictionary<string, string> defaults, string key, bool valueIsNull, Version installedVersion, Predicate<string> IsInstalledNotCustomized = default)
+        {
+            if (installedVersion is null || !valueIsNull)
+            {
+                return null;
+            }
+
+            var sameVersionUpgrade = installedVersion.Equals(new(defaults["CromwellOnAzureVersion"]));
+            _ = settings.TryGetValue(key, out var installed);
+            _ = defaults.TryGetValue(key, out var @default);
+            var defaultPath = @default?[..@default.LastIndexOf(':')];
+            var installedTag = installed?[(installed.LastIndexOf(':') + 1)..];
+            bool? result;
+
+            IsInstalledNotCustomized ??= new(tag =>
+                // Is the tag a version (without decorations)?
+                Version.TryParse(tag, out var version) &&
+                // Is the image's version the same as the installed version?
+                version.Equals(installedVersion));
+
+            try
+            {
+                // Is this our official prepository/image?
+                result = installed.StartsWith(defaultPath + ":")
+                    // Is the installed tag customized?
+                    && IsInstalledNotCustomized(installedTag)
+                    // Upgrade image
+                    ? false
+                    // Preserve configured image
+                    : null;
+            }
+            catch (ArgumentException)
+            {
+                result = null;
+            }
+
+            if (result is null && !sameVersionUpgrade)
+            {
+                ConsoleEx.WriteLine($"Warning: CromwellOnAzure is being upgraded, but {key} was customized, and is not being upgraded, which might not be what you want. (To remove the customization of {key}, set it to the empty string.)", ConsoleColor.Yellow);
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -764,7 +875,7 @@ namespace CromwellOnAzureDeployer
         /// <typeparam name="T">Type of <paramref name="value"/>.</typeparam>
         /// <param name="settings">Property bag being updated.</param>
         /// <param name="defaults">Property bag containing default values.</param>
-        /// <param name="key">Key of value in both <paramref name="settings"/> and <paramref name="defaults"/></param>
+        /// <param name="key">Key of value in both <paramref name="settings"/> and <paramref name="defaults"/>.</param>
         /// <param name="value">Configuration value to set. Nullable. See remarks.</param>
         /// <param name="ConvertValue">Function that converts <paramref name="value"/> to a string. Can be used for formatting. Defaults to returning the value's string.</param>
         /// <param name="defaultValue">Value to use if <paramref name="defaults"/> does not contain a record for <paramref name="key"/> when <paramref name="value"/> is null.</param>
@@ -897,6 +1008,21 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(cts.Token)));
         }
 
+        private Task AssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource)
+        {
+            // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#network-contributor
+            var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7";
+            return Execute(
+                $"Assigning Network Contributor role for the managed id to resource group scope...",
+                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
+                    () => azureSubscriptionClient.AccessManagement.RoleAssignments
+                        .Define(Guid.NewGuid().ToString())
+                        .ForObjectId(managedIdentity.PrincipalId)
+                        .WithRoleDefinition(roleDefinitionId)
+                        .WithResourceScope(resource)
+                        .CreateAsync(cts.Token)));
+        }
+
         private Task AssignVmAsDataReaderToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
         {
             // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-reader
@@ -993,27 +1119,18 @@ namespace CromwellOnAzureDeployer
 
         private Task WritePersonalizedFilesToStorageAccountAsync(IStorageAccount storageAccount, string managedIdentityName)
             => Execute(
-                $"Writing {ContainersToMountFileName} and {CromwellConfigurationFileName} files to '{ConfigurationContainerName}' storage container...",
+                $"Writing {CromwellConfigurationFileName} & {AllowedVmSizesFileName} files to '{ConfigurationContainerName}' storage container...",
                 async () =>
                 {
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, ContainersToMountFileName, Utility.PersonalizeContent(new[]
-                    {
-                        new Utility.ConfigReplaceTextItem("{DefaultStorageAccountName}", configuration.StorageAccountName),
-                        new Utility.ConfigReplaceTextItem("{ManagedIdentityName}", managedIdentityName)
-                    }, "scripts", ContainersToMountFileName));
-
                     // Configure Cromwell config file for PostgreSQL on Azure.
-                    if (configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault())
+                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
-                        await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
-                        {
-                            new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlCromwellDatabaseName}?sslmode=require\""),
-                            new Utility.ConfigReplaceTextItem("{DatabaseUser}", configuration.UsePostgreSqlSingleServer ? $"\"{configuration.PostgreSqlCromwellUserLogin}@{configuration.PostgreSqlServerName}\"": $"\"{configuration.PostgreSqlCromwellUserLogin}\""),
-                            new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),
-                            new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
-                            new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
-                        }, "scripts", CromwellConfigurationFileName));
-                    }
+                        new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlCromwellDatabaseName}?sslmode=require\""),
+                        new Utility.ConfigReplaceTextItem("{DatabaseUser}", configuration.UsePostgreSqlSingleServer ? $"\"{configuration.PostgreSqlCromwellUserLogin}@{configuration.PostgreSqlServerName}\"": $"\"{configuration.PostgreSqlCromwellUserLogin}\""),
+                        new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),
+                        new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
+                        new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
+                    }, "scripts", CromwellConfigurationFileName));
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
@@ -1047,7 +1164,7 @@ namespace CromwellOnAzureDeployer
                         configuration.ResourceGroupName, configuration.PostgreSqlServerName,
                         new FlexibleServerModel.Server(
                            location: configuration.RegionName,
-                           version: configuration.PostgreSqlVersion,
+                           version: configuration.PostgreSqlFlexibleVersion,
                            sku: new Sku(configuration.PostgreSqlSkuName, configuration.PostgreSqlTier),
                            storage: new FlexibleServerModel.Storage(configuration.PostgreSqlStorageSize),
                            administratorLogin: configuration.PostgreSqlAdministratorLogin,
@@ -1086,7 +1203,7 @@ namespace CromwellOnAzureDeployer
                            new SingleServerModel.ServerPropertiesForDefaultCreate(
                                administratorLogin: configuration.PostgreSqlAdministratorLogin,
                                administratorLoginPassword: configuration.PostgreSqlAdministratorPassword,
-                               version: configuration.PostgreSqlVersion,
+                               version: configuration.PostgreSqlSingleServerVersion,
                                publicNetworkAccess: "Disabled",
                                storageProfile: new Microsoft.Azure.Management.PostgreSQL.Models.StorageProfile(
                                    storageMB: configuration.PostgreSqlStorageSize * 1000)),
@@ -1126,26 +1243,6 @@ namespace CromwellOnAzureDeployer
             return server;
         }
 
-        private async Task AssignVmAsBillingReaderToSubscriptionAsync(IIdentity managedIdentity)
-        {
-            try
-            {
-                await Execute(
-                    $"Assigning {BuiltInRole.BillingReader} role for user-managed identity to Subscription scope...",
-                    () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                        () => azureSubscriptionClient.AccessManagement.RoleAssignments
-                            .Define(Guid.NewGuid().ToString())
-                            .ForObjectId(managedIdentity.PrincipalId)
-                            .WithBuiltInRole(BuiltInRole.BillingReader)
-                            .WithSubscriptionScope(configuration.SubscriptionId)
-                            .CreateAsync(cts.Token)));
-            }
-            catch (Microsoft.Rest.Azure.CloudException)
-            {
-                DisplayBillingReaderInsufficientAccessLevelWarning();
-            }
-        }
-
         private Task AssignVmAsContributorToAppInsightsAsync(IIdentity managedIdentity, IResource appInsights)
             => Execute(
                 $"Assigning {BuiltInRole.Contributor} role for user-managed identity to App Insights resource scope...",
@@ -1169,9 +1266,7 @@ namespace CromwellOnAzureDeployer
                         .WithAddressSpace(configuration.VnetAddressSpace)
                         .DefineSubnet(configuration.VmSubnetName).WithAddressPrefix(configuration.VmSubnetAddressSpace).Attach();
 
-                    vnetDefinition = configuration.ProvisionPostgreSqlOnAzure.GetValueOrDefault()
-                        ? vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName).WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace).WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers").Attach()
-                        : vnetDefinition;
+                    vnetDefinition = vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName).WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace).WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers").Attach();
 
                     var vnet = await vnetDefinition.CreateAsync();
 
@@ -1180,7 +1275,7 @@ namespace CromwellOnAzureDeployer
 
         private string GetFormattedPostgresqlUser(bool isCromwellPostgresUser)
         {
-            string user = isCromwellPostgresUser ?
+            var user = isCromwellPostgresUser ?
                 configuration.PostgreSqlCromwellUserLogin :
                 configuration.PostgreSqlTesUserLogin;
 
@@ -1232,10 +1327,10 @@ namespace CromwellOnAzureDeployer
                     return dnsZone;
                 });
 
-        private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8(string podName, string aksNamespace)
+        private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8(IKubernetes kubernetesClient, string podName, string aksNamespace)
             => Execute(
                 $"Executing script to create users in tes_db and cromwell_db...",
-                async () => 
+                async () =>
                 {
                     var cromwellScript = GetCreateCromwellUserString();
                     var tesScript = GetCreateTesUserString();
@@ -1480,7 +1575,6 @@ namespace CromwellOnAzureDeployer
         {
             const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
             const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
-            const string userAccessAdministratorRoleId = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9";
 
             var azure = Microsoft.Azure.Management.Fluent.Azure
                 .Configure()
@@ -1508,9 +1602,7 @@ namespace CromwellOnAzureDeployer
                 .Body.AsContinuousCollection(link => Extensions.Synchronize(() => azureSubscriptionClient.AccessManagement.RoleAssignments.Inner.ListForScopeNextWithHttpMessagesAsync(link)).Body)
                 .Select(b => b.RoleDefinitionId.Split(new[] { '/' }).Last());
 
-            var isuserAccessAdministrator = currentPrincipalSubscriptionRoleIds.Contains(userAccessAdministratorRoleId);
-
-            if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId) && isuserAccessAdministrator))
+            if (!currentPrincipalSubscriptionRoleIds.Contains(ownerRoleId) && !(currentPrincipalSubscriptionRoleIds.Contains(contributorRoleId)))
             {
                 if (!rgExists)
                 {
@@ -1525,20 +1617,14 @@ namespace CromwellOnAzureDeployer
                 {
                     throw new ValidationException($"Insufficient access to deploy. You must be: 1) Owner of the subscription, or 2) Contributor and User Access Administrator of the subscription, or 3) Owner of the resource group", displayExample: false);
                 }
-
-                if (!isuserAccessAdministrator)
-                {
-                    SkipBillingReaderRoleAssignment = true;
-                    DisplayBillingReaderInsufficientAccessLevelWarning();
-                }
             }
 
-            if (configuration.UsePostgreSqlSingleServer && int.Parse(configuration.PostgreSqlVersion) > 11)
+            if (configuration.UsePostgreSqlSingleServer && int.Parse(configuration.PostgreSqlSingleServerVersion) > 11)
             {
                 // https://learn.microsoft.com/en-us/azure/postgresql/single-server/concepts-version-policy
                 ConsoleEx.WriteLine($"Warning: as of 2/7/2023, Azure Database for PostgreSQL Single Server only supports up to PostgreSQL version 11", ConsoleColor.Yellow);
-                ConsoleEx.WriteLine($"{nameof(configuration.PostgreSqlVersion)} is currently set to {configuration.PostgreSqlVersion}", ConsoleColor.Yellow);
-                ConsoleEx.WriteLine($"Deployment will continue but could fail; please consider including '--{nameof(configuration.PostgreSqlVersion)} 11'", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine($"{nameof(configuration.PostgreSqlSingleServerVersion)} is currently set to {configuration.PostgreSqlSingleServerVersion}", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine($"Deployment will continue but could fail; please consider including '--{nameof(configuration.PostgreSqlSingleServerVersion)} 11'", ConsoleColor.Yellow);
                 ConsoleEx.WriteLine("More info: https://learn.microsoft.com/en-us/azure/postgresql/single-server/concepts-version-policy");
             }
         }
@@ -1580,9 +1666,9 @@ namespace CromwellOnAzureDeployer
                 return null;
             }
 
-            if (configuration.ProvisionPostgreSqlOnAzure == true && !AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName, configuration.PostgreSqlSubnetName))
+            if (!AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName, configuration.PostgreSqlSubnetName))
             {
-                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)}, {nameof(configuration.VmSubnetName)} and {nameof(configuration.PostgreSqlSubnetName)} are required when using an existing virtual network and {nameof(configuration.ProvisionPostgreSqlOnAzure)} is set.");
+                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)}, {nameof(configuration.VmSubnetName)} and {nameof(configuration.PostgreSqlSubnetName)} are required when using an existing virtual network.");
             }
 
             if (!AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName))
@@ -1617,29 +1703,26 @@ namespace CromwellOnAzureDeployer
             var resourceGraphClient = new ResourceGraphClient(tokenCredentials);
             var postgreSqlSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
 
-            if (configuration.ProvisionPostgreSqlOnAzure == true)
+            if (postgreSqlSubnet is null)
             {
-                if (postgreSqlSubnet is null)
-                {
-                    throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.PostgreSqlSubnetName}'");
-                }
+                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.PostgreSqlSubnetName}'");
+            }
 
-                var delegatedServices = postgreSqlSubnet.Inner.Delegations.Select(d => d.ServiceName);
-                var hasOtherDelegations = delegatedServices.Any(s => s != "Microsoft.DBforPostgreSQL/flexibleServers");
-                var hasNoDelegations = !delegatedServices.Any();
+            var delegatedServices = postgreSqlSubnet.Inner.Delegations.Select(d => d.ServiceName);
+            var hasOtherDelegations = delegatedServices.Any(s => s != "Microsoft.DBforPostgreSQL/flexibleServers");
+            var hasNoDelegations = !delegatedServices.Any();
 
-                if (hasOtherDelegations)
-                {
-                    throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' can have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation only.");
-                }
+            if (hasOtherDelegations)
+            {
+                throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' can have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation only.");
+            }
 
-                var resourcesInPostgreSqlSubnetQuery = $"where type =~ 'Microsoft.Network/networkInterfaces' | where properties.ipConfigurations[0].properties.subnet.id == '{postgreSqlSubnet.Inner.Id}'";
-                var resourcesExist = (await resourceGraphClient.ResourcesAsync(new QueryRequest(new[] { configuration.SubscriptionId }, resourcesInPostgreSqlSubnetQuery))).TotalRecords > 0;
+            var resourcesInPostgreSqlSubnetQuery = $"where type =~ 'Microsoft.Network/networkInterfaces' | where properties.ipConfigurations[0].properties.subnet.id == '{postgreSqlSubnet.Inner.Id}'";
+            var resourcesExist = (await resourceGraphClient.ResourcesAsync(new QueryRequest(new[] { configuration.SubscriptionId }, resourcesInPostgreSqlSubnetQuery))).TotalRecords > 0;
 
-                if (hasNoDelegations && resourcesExist)
-                {
-                    throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' must be either empty or have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation.");
-                }
+            if (hasNoDelegations && resourcesExist)
+            {
+                throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' must be either empty or have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation.");
             }
 
             return (vnet, vmSubnet, postgreSqlSubnet);
@@ -1769,7 +1852,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
             ThrowIfProvidedForUpdate(configuration.CrossSubscriptionAKSDeployment, nameof(configuration.CrossSubscriptionAKSDeployment));
-            ThrowIfProvidedForUpdate(configuration.ProvisionPostgreSqlOnAzure, nameof(configuration.ProvisionPostgreSqlOnAzure));
+            //ThrowIfProvidedForUpdate(configuration.ProvisionPostgreSqlOnAzure, nameof(configuration.ProvisionPostgreSqlOnAzure));
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
@@ -1778,17 +1861,10 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
 
-            ThrowIfNotProvidedForUpdate(configuration.AksClusterName, nameof(configuration.AksClusterName));
-
             if (!configuration.ManualHelmDeployment)
             {
                 ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
             }
-
-            if (configuration.ProvisionPostgreSqlOnAzure is null)
-            {
-                configuration.ProvisionPostgreSqlOnAzure = true;
-            }            
 
             if (!configuration.Update)
             {
@@ -1797,17 +1873,6 @@ namespace CromwellOnAzureDeployer
                     throw new ValidationException("BatchPrefix must not be longer than 11 chars and may contain only ASCII letters or digits", false);
                 }
             }
-        }
-
-        private static void DisplayBillingReaderInsufficientAccessLevelWarning()
-        {
-            ConsoleEx.WriteLine("Warning: insufficient subscription access level to assign the Billing Reader", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("role for the VM to your Azure Subscription.", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("Deployment will continue, but only default VM prices will be used for your workflows,", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("since the Billing Reader role is required to access RateCard API pricing data.", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("To resolve this in the future, have your Azure subscription Owner or Contributor", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("assign the Billing Reader role for the VM's managed identity to your Azure Subscription scope.", ConsoleColor.Yellow);
-            ConsoleEx.WriteLine("More info: https://github.com/microsoft/CromwellOnAzure/blob/master/docs/troubleshooting-guide.md#dynamic-cost-optimization-and-ratecard-api-access", ConsoleColor.Yellow);
         }
 
         private static void DisplayValidationExceptionAndExit(ValidationException validationException)
@@ -1991,8 +2056,84 @@ namespace CromwellOnAzureDeployer
             var blobClient = await GetBlobClientAsync(storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
-            await container.CreateIfNotExistsAsync();
+            await container.CreateIfNotExistsAsync(cancellationToken: token);
             await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(content), true, token);
+        }
+
+        public async Task<List<MountableContainer>> GetContainersToMount(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            var containers = new HashSet<MountableContainer>();
+            var exclusion = new HashSet<MountableContainer>();
+            var wildCardAccounts = new List<string>();
+            var contents = await File.ReadAllLinesAsync(path);
+
+            foreach (var line in contents)
+            {
+                if (line.StartsWith("#"))
+                {
+                    continue;
+                }
+
+                if (line.StartsWith("-"))
+                {
+                    var parts = line.Trim('-').Split("/", StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        var storageAccount = await GetExistingStorageAccountAsync(parts[0]);
+                        exclusion.Add(new MountableContainer() { StorageAccount = parts[0], ContainerName = parts[1].Trim(), ResourceGroupName = storageAccount.ResourceGroupName });
+                    }
+                }
+
+                if (line.StartsWith("/"))
+                {
+                    var parts = line.Split("/", StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        if (string.Equals(parts[1].Trim(), "*"))
+                        {
+                            wildCardAccounts.Add(parts[0]);
+                        }
+                        else
+                        {
+                            var storageAccount = await GetExistingStorageAccountAsync(parts[0]);
+                            containers.Add(new MountableContainer() { StorageAccount = parts[0], ContainerName = parts[1].Trim(), ResourceGroupName = storageAccount.ResourceGroupName });
+                        }
+                    }
+                }
+
+                if (line.StartsWith("http"))
+                {
+                    var blobUrl = new BlobUriBuilder(new Uri(line));
+                    var blobHostStorageAccount = blobUrl.Host.Split(".").First();
+                    containers.Add(new MountableContainer()
+                    {
+                        StorageAccount = blobHostStorageAccount,
+                        ContainerName = blobUrl.BlobContainerName,
+                        SasToken = blobUrl.Sas.ToString()
+                    });
+                }
+            }
+
+            foreach (var accountName in wildCardAccounts)
+            {
+                var storageAccount = await GetExistingStorageAccountAsync(accountName);
+                var blobContainers = await storageAccount.Manager.BlobContainers.ListAsync(storageAccount.ResourceGroupName, storageAccount.Name);
+                foreach (var page in blobContainers)
+                {
+                    foreach (var container in page.Value.ToList())
+                    {
+                        containers.Add(new MountableContainer() { StorageAccount = accountName, ContainerName = container.Name, ResourceGroupName = storageAccount.ResourceGroupName });
+                    }
+                }
+            }
+
+            containers.ExceptWith(exclusion);
+            return containers.ToList();
         }
 
         private class ValidationException : Exception

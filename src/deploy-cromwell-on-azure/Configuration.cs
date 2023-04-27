@@ -21,7 +21,8 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlSkuName { get; set; } = "Standard_B2s";
         public string PostgreSqlTier { get; set; } = "Burstable";
         public string DefaultVmSubnetName { get; set; } = "vmsubnet";
-        public string PostgreSqlVersion { get; set; } = "14";
+        public string PostgreSqlFlexibleVersion { get; set; } = "14";
+        public string PostgreSqlSingleServerVersion { get; set; } = "11";
         public string DefaultPostgreSqlSubnetName { get; set; } = "sqlsubnet";
         public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
     }
@@ -32,7 +33,7 @@ namespace CromwellOnAzureDeployer
         public string SubscriptionId { get; set; }
         public string RegionName { get; set; }
         public string MainIdentifierPrefix { get; set; } = "coa";
-        public string VmSize { get; set; } = "Standard_D3_v2";
+        public string VmSize { get; set; } = "Standard_D4s_v3";
         public string VnetAddressSpace { get; set; } = "10.1.0.0/16"; // 10.1.0.0 - 10.1.255.255, 65536 IPs
         // Address space for CoA services.
         public string VmSubnetAddressSpace { get; set; } = "10.1.0.0/24"; // 10.1.0.0 - 10.1.0.255, 256 IPs
@@ -58,9 +59,6 @@ namespace CromwellOnAzureDeployer
         public string CromwellVersion { get; set; }
         public string TesImageName { get; set; }
         public string TriggerServiceImageName { get; set; }
-        public string CustomCromwellImagePath { get; set; }
-        public string CustomTesImagePath { get; set; }
-        public string CustomTriggerServiceImagePath { get; set; }
         public bool SkipTestWorkflow { get; set; } = false;
         public bool Update { get; set; } = false;
         public string VnetResourceGroupName { get; set; }
@@ -75,13 +73,13 @@ namespace CromwellOnAzureDeployer
         public string BlobxferImageName { get; set; } = null;
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool DebugLogging { get; set; } = false;
-        public bool? ProvisionPostgreSqlOnAzure { get; set; } = true;
         public string PostgreSqlServerName { get; set; }
         public string PostgreSqlServerNameSuffix { get; set; } = ".postgres.database.azure.com";
         public int PostgreSqlServerPort { get; set; } = 5432;
         public string PostgreSqlServerSslMode { get; set; } = "VerifyFull";
         public bool UsePostgreSqlSingleServer { get; set; } = false;
         public string KeyVaultName { get; set; }
+        public string ContainersToMountPath { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {

@@ -43,7 +43,7 @@ namespace TriggerService
         public string AccountName { get; }
         public string AccountAuthority => account.BlobStorageUri.PrimaryUri.Authority;
 
-        public static async Task<string> GetAppInsightsInstrumentationKeyAsync(string appInsightsApplicationId)
+        public static async Task<string> GetAppInsightsConnectionStringAsync(string appInsightsApplicationId)
         {
             var azureClient = await GetAzureManagementClientAsync();
             var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
@@ -59,7 +59,7 @@ namespace TriggerService
 
                     if (app is not null)
                     {
-                        return app.InstrumentationKey;
+                        return app.ConnectionString;
                     }
                 }
                 catch
