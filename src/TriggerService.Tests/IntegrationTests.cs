@@ -2,9 +2,11 @@
 // Licensed under the MIT License.
 
 using System;
+using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
+using Common;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Auth;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -16,6 +18,48 @@ namespace TriggerService.Tests
     {
         private const string testStorageAccountName = "";
         private const string workflowsContainerSasToken = "";
+
+        /// <summary>
+        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken, and remove the [Ignore] attribute
+        /// </summary>
+        /// <returns></returns>
+        [Ignore]
+        [TestCategory("Integration")]
+        [TestMethod]
+        public async Task RunGlobTestWdlAsync()
+        {
+            const string containerName = "inputs";
+            var wdlBlobName = $"globtest.wdl";
+            var wdlPath = Path.Combine(Path.GetFullPath(@"..\..\..\test-wdls\globtest"), wdlBlobName);
+            string wdlUrl = $"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/test/{wdlBlobName}?{workflowsContainerSasToken.TrimStart('?')}";
+            var blobClient = new BlobServiceClient(new Uri(wdlUrl));
+            var container = blobClient.GetBlobContainerClient(containerName);
+            var text = (await File.ReadAllTextAsync(wdlPath)).Replace(@"\r\n\", @"\n");
+            await container.GetBlobClient("test/" + wdlBlobName).UploadAsync(BinaryData.FromString(text), true);
+
+            var wdlInputsBlobName = $"globtestinputs.json";
+            var wdlInputsPath = Path.Combine(Path.GetFullPath(@"..\..\..\test-wdls\globtest"), wdlInputsBlobName);
+            string wdlInputsUrl = $"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/test/{wdlInputsBlobName}?{workflowsContainerSasToken.TrimStart('?')}";
+            blobClient = new BlobServiceClient(new Uri(wdlInputsUrl));
+            container = blobClient.GetBlobContainerClient(containerName);
+            text = (await File.ReadAllTextAsync(wdlInputsPath)).Replace(@"\r\n\", @"\n");
+            await container.GetBlobClient("test/" + wdlInputsBlobName).UploadAsync(BinaryData.FromString(text), true);
+
+            var workflowTrigger = new Workflow
+            {
+                WorkflowUrl = wdlUrl,
+                WorkflowInputsUrl = wdlInputsUrl
+            };
+
+            var n = DateTime.UtcNow;
+            var date = $"{n.Year}-{n.Month}-{n.Day}-{n.Hour}-{n.Minute}";
+            var triggerFileBlobName = $"new/globtest-{date}.json";
+            string triggerJson = System.Text.Json.JsonSerializer.Serialize(workflowTrigger).Replace(@"\r\n\", @"\n");
+            var triggerUrl = $"https://{testStorageAccountName}.blob.core.windows.net?{workflowsContainerSasToken.TrimStart('?')}";
+            blobClient = new BlobServiceClient(new Uri(triggerUrl));
+            container = blobClient.GetBlobContainerClient("workflows");
+            await container.GetBlobClient(triggerFileBlobName).UploadAsync(BinaryData.FromString(triggerJson), true);
+        }
 
         /// <summary>
         /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken, and remove the [Ignore] attribute
