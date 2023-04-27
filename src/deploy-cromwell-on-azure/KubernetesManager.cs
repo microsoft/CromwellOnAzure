@@ -155,7 +155,7 @@ namespace CromwellOnAzureDeployer
             {
                 values.InternalContainersKeyVaultAuth = new List<Dictionary<string, string>>();
 
-                foreach (var container in values.DefaultContainers)
+                foreach (var container in values.DefaultContainers.Union(values.CromwellContainers, StringComparer.OrdinalIgnoreCase))
                 {
                     var containerConfig = new Dictionary<string, string>()
                     {
@@ -172,7 +172,7 @@ namespace CromwellOnAzureDeployer
             {
                 values.InternalContainersMIAuth = new List<Dictionary<string, string>>();
 
-                foreach (var container in values.DefaultContainers)
+                foreach (var container in values.DefaultContainers.Union(values.CromwellContainers, StringComparer.OrdinalIgnoreCase))
                 {
                     var containerConfig = new Dictionary<string, string>()
                     {
@@ -192,14 +192,24 @@ namespace CromwellOnAzureDeployer
         }
 
 
-        public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount)
+        public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount, Version previousVersion)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
             UpdateValuesFromSettings(values, settings);
             MergeContainers(containersToMount, values);
+            ProcessHelmValuesUpdates(values, previousVersion);
             var valuesString = KubernetesYaml.Serialize(values);
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
+        }
+
+        private void ProcessHelmValuesUpdates(HelmValues values, Version previousVersion)
+        {
+            if (previousVersion < new Version(4, 3))
+            {
+                values.CromwellContainers = new List<string>() { "configuration", "cromwell-executions", "cromwell-workflow-logs", "outputs" };
+                values.DefaultContainers = new List<string>() { "inputs" };
+            }
         }
 
         public async Task<Dictionary<string, string>> GetAKSSettingsAsync(IStorageAccount storageAccount)
@@ -561,6 +571,7 @@ namespace CromwellOnAzureDeployer
             public Dictionary<string, string> TesDatabase { get; set; }
             public Dictionary<string, string> CromwellDatabase { get; set; }
             public Dictionary<string, string> Images { get; set; }
+            public List<string> CromwellContainers { get; set; }
             public List<string> DefaultContainers { get; set; }
             public List<Dictionary<string, string>> InternalContainersMIAuth { get; set; }
             public List<Dictionary<string, string>> InternalContainersKeyVaultAuth { get; set; }

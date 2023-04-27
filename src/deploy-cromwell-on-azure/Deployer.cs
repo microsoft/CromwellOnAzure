@@ -281,7 +281,7 @@ namespace CromwellOnAzureDeployer
                             //{
                             //}
 
-                            await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount);
+                            await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
                             kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup);
                         }
                         else
@@ -1343,8 +1343,8 @@ namespace CromwellOnAzureDeployer
                     }
 
                     var commands = new List<string[]> {
-                        new string[] { "apt", "update" },
-                        new string[] { "apt", "install", "-y", "postgresql-client" },
+                        new string[] { "apt", "-qq", "update" },
+                        new string[] { "apt", "-qq", "install", "-y", "postgresql-client" },
                         new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlCromwellDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" },
                         new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlTesDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} >> ~/.pgpass" },
                         new string[] { "bash", "-lic", "chmod 0600 ~/.pgpass" },
