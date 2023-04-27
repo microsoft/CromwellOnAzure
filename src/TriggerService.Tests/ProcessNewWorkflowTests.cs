@@ -46,7 +46,7 @@ namespace TriggerService.Tests
             var exceptionMessage = "Error submitting new workflow";
 
             cromwellApiClient
-                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
+                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
                 .Throws(new Exception(exceptionMessage));
 
             var (newTriggerName, newTriggerContent) = await ProcessNewWorkflowAsync(cromwellApiClient.Object);
