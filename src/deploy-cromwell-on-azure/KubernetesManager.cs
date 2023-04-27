@@ -155,7 +155,7 @@ namespace CromwellOnAzureDeployer
             {
                 values.InternalContainersKeyVaultAuth = new List<Dictionary<string, string>>();
 
-                foreach (var container in values.DefaultContainers.Union(values.CromwellContainers))
+                foreach (var container in values.DefaultContainers.Union(values.CromwellContainers, StringComparer.OrdinalIgnoreCase))
                 {
                     var containerConfig = new Dictionary<string, string>()
                     {
@@ -172,7 +172,7 @@ namespace CromwellOnAzureDeployer
             {
                 values.InternalContainersMIAuth = new List<Dictionary<string, string>>();
 
-                foreach (var container in values.DefaultContainers.Union(values.CromwellContainers))
+                foreach (var container in values.DefaultContainers.Union(values.CromwellContainers, StringComparer.OrdinalIgnoreCase))
                 {
                     var containerConfig = new Dictionary<string, string>()
                     {
@@ -192,19 +192,18 @@ namespace CromwellOnAzureDeployer
         }
 
 
-        public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount)
+        public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount, Version previousVersion)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
-            var previousVersion = new Version(values.Config.ContainsKey("cromwellOnAzureVersion") ? (string)values.Config["cromwellOnAzureVersion"] : "4.0");
             UpdateValuesFromSettings(values, settings);
             MergeContainers(containersToMount, values);
-            UpdateValues(values, previousVersion);
+            ProcessHelmValuesUpdates(values, previousVersion);
             var valuesString = KubernetesYaml.Serialize(values);
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
         }
 
-        private void UpdateValues(HelmValues values, Version previousVersion)
+        private void ProcessHelmValuesUpdates(HelmValues values, Version previousVersion)
         {
             if (previousVersion < new Version(4, 3))
             {
