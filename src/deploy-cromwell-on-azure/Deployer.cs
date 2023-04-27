@@ -405,6 +405,11 @@ namespace CromwellOnAzureDeployer
                             await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
+
+                            if (!string.IsNullOrWhiteSpace(configuration.BatchNodesSubnetId))
+                            {
+                                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                            }
                         });
 
                         if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
@@ -994,6 +999,21 @@ namespace CromwellOnAzureDeployer
             var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/f1a07417-d97a-45cb-824c-7a7467783830";
             return Execute(
                 $"Assigning Managed ID Operator role for the managed id to resource group scope...",
+                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
+                    () => azureSubscriptionClient.AccessManagement.RoleAssignments
+                        .Define(Guid.NewGuid().ToString())
+                        .ForObjectId(managedIdentity.PrincipalId)
+                        .WithRoleDefinition(roleDefinitionId)
+                        .WithResourceScope(resource)
+                        .CreateAsync(cts.Token)));
+        }
+
+        private Task AssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource)
+        {
+            // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#network-contributor
+            var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7";
+            return Execute(
+                $"Assigning Network Contributor role for the managed id to resource group scope...",
                 () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
                     () => azureSubscriptionClient.AccessManagement.RoleAssignments
                         .Define(Guid.NewGuid().ToString())
