@@ -1104,7 +1104,7 @@ namespace CromwellOnAzureDeployer
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
 
-            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
+            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "tes-internal", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
             await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
         }
 
