@@ -54,7 +54,7 @@ spec:
 {{- range .Values.internalContainersMIAuth }}
 {{- $path := printf "/%s/%s" .accountName .containerName }}
 {{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
-{{- if and (eq $storageAccount .accountName) (has (lower .containerName) $cromwellContainers)}}
+{{- if and (eq (lower $storageAccount) (lower .accountName)) (has (lower .containerName) $cromwellContainers)}}
   {{- $path = printf "/%s" .containerName}}
   {{- $claimName = printf "%s-claim1" .containerName }}
 {{- end}}
@@ -64,7 +64,7 @@ spec:
 {{- range .Values.internalContainersKeyVaultAuth }}
 {{- $path := printf "/%s/%s" .accountName .containerName }}
 {{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
-{{- if and (eq $storageAccount .accountName) (has (lower .containerName) $cromwellContainers)}}
+{{- if and (eq (lower $storageAccount) (lower .accountName)) (has (lower .containerName) $cromwellContainers)}}
   {{- $path = printf "/%s" .containerName}}
   {{- $claimName = printf "%s-claim1" .containerName }}
 {{- end}}
@@ -86,7 +86,7 @@ spec:
             claimName: cromwell-tmp-claim
 {{- range .Values.internalContainersMIAuth }}
 {{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
-{{- if and (eq $storageAccount .accountName) (has (lower .containerName) $cromwellContainers)}}
+{{- if and (eq (lower $storageAccount) (lower .accountName)) (has (lower .containerName) $cromwellContainers)}}
   {{- $claimName = printf "%s-claim1" .containerName }}
 {{- end}}
         - name: {{ $claimName }}
@@ -95,7 +95,7 @@ spec:
 {{- end }}
 {{- range .Values.internalContainersKeyVaultAuth }}
 {{- $claimName := printf "%s-%s-claim1" .accountName .containerName }}
-{{- if and (eq $storageAccount .accountName) (has (lower .containerName) $cromwellContainers)}}
+{{- if and (eq (lower $storageAccount) (lower .accountName)) (has (lower .containerName) $cromwellContainers)}}
   {{- $claimName = printf "%s-claim1" .containerName }}
 {{- end}}
         - name: {{ $claimName }}
