@@ -251,7 +251,9 @@ namespace CromwellApiClient
 
                 if (parameters is not null)
                 {
-                    content.Add(new FormUrlEncodedContent(parameters));
+                    var formContent = new FormUrlEncodedContent(parameters);
+                    var formData = await formContent.ReadAsStringAsync();
+                    content.Add(new StringContent(formData), "form-data");
                 }
 
                 foreach (var file in files)
