@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -247,22 +246,22 @@ namespace CromwellApiClient
             try
             {
                 url = GetApiUrl(path);
-                var content = new MultipartFormDataContent();
+                using var formContent = new MultipartFormDataContent(Guid.NewGuid().ToString());
+                formContent.Headers.ContentType.MediaType = "multipart/form-data";
 
-                if (parameters is not null)
+                foreach (var parameter in parameters)
                 {
-                    var formContent = new FormUrlEncodedContent(parameters);
-                    var formData = await formContent.ReadAsStringAsync();
-                    content.Add(new StringContent(formData), "form-data");
+                    formContent.Add(new StringContent(parameter.Value), parameter.Key);
                 }
 
                 foreach (var file in files)
                 {
-                    var contentPart = new ByteArrayContent(file.Data);
-                    content.Add(contentPart, file.ParameterName, file.Filename);
+                    formContent.Add(new ByteArrayContent(file.Data), file.ParameterName, file.Filename);
                 }
 
-                response = await httpClient.PostAsync(url, content);
+                var req = formContent.ToString();
+
+                response = await httpClient.PostAsync(url, formContent);
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsAsync<T>();
             }
