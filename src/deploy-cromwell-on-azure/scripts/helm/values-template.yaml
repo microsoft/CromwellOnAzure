@@ -67,7 +67,7 @@ images:
 # Mounted as /containername as expected by Cromwell
 cromwellContainers:
   - configuration
-  - tes-internal
+  - cromwell-executions
   - cromwell-workflow-logs
   - outputs
 
