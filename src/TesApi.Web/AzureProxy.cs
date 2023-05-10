@@ -972,6 +972,7 @@ namespace TesApi.Web
                         Type = Microsoft.Azure.Management.Batch.Models.PoolIdentityType.UserAssigned,
                         UserAssignedIdentities = identityResourceIds.ToDictionary(x => x, x => new Microsoft.Azure.Management.Batch.Models.UserAssignedIdentities())
                     },
+                    TargetNodeCommunicationMode = Microsoft.Azure.Management.Batch.Models.NodeCommunicationMode.Simplified,
                     StartTask = startTask
                 };
 

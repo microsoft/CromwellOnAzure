@@ -945,6 +945,7 @@ namespace TesApi.Web
                 ResizeTimeout = TimeSpan.FromMinutes(30),
                 TargetLowPriorityComputeNodes = preemptible ? 1 : 0,
                 TargetDedicatedComputeNodes = preemptible ? 0 : 1,
+                TargetNodeCommunicationMode = NodeCommunicationMode.Simplified,
                 StartTask = startTask
             };
 
