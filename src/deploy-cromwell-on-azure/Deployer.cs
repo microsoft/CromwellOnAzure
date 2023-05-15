@@ -281,6 +281,12 @@ namespace CromwellOnAzureDeployer
                             //{
                             //}
 
+                            if (installedVersion is null || installedVersion < new Version(4, 4))
+                            {
+                                // Ensure all storage containers are created.
+                                await CreateDefaultStorageContainersAsync(storageAccount);
+                            }
+
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
                             kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup);
                         }
