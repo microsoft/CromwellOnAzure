@@ -286,6 +286,13 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        /// <summary>
+        /// Writes pod logs and events to disk, as well as all events for the AKS cluster. 
+        /// </summary>
+        /// <param name="client">IKubernetes client</param>
+        /// <param name="podName">Name of pod to get the logs.</param>
+        /// <param name="aksNamespace">Namespace where the pod is running.</param>
+        /// <returns></returns>
         public async Task WritePodLogsAndEventsToDisk(IKubernetes client, string podName, string aksNamespace)
         {
             try
