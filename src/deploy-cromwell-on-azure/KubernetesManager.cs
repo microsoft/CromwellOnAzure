@@ -282,7 +282,7 @@ namespace CromwellOnAzureDeployer
                     await WritePodLogsAndEventsToDisk(client, podName, aksNamespace);
                 }
 
-                throw new Exception($"Deployer timed out waiting for {podName} pod to start.");
+                throw new Exception($"Pod failed to run commands after being marked ready.", result.FinalException);
             }
         }
 
