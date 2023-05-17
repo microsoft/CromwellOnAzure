@@ -18,6 +18,7 @@ using Microsoft.Azure.Management.Msi.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Management.Storage.Fluent;
+using Newtonsoft.Json;
 using Polly;
 using Polly.Retry;
 
@@ -256,6 +257,11 @@ namespace CromwellOnAzureDeployer
 
             if (!await WaitForWorkloadAsync(client, podName, aksNamespace, cts.Token))
             {
+                if (configuration.DebugLogging)
+                {
+                    await WritePodLogsAndEventsToDisk(client, podName, aksNamespace);
+                }
+
                 throw new Exception($"Timed out waiting for {podName} to start.");
             }
 
@@ -271,7 +277,61 @@ namespace CromwellOnAzureDeployer
 
             if (result.Outcome != OutcomeType.Successful && result.FinalException is not null)
             {
-                throw result.FinalException;
+                if (configuration.DebugLogging)
+                {
+                    await WritePodLogsAndEventsToDisk(client, podName, aksNamespace);
+                }
+
+                throw new Exception($"Deployer timed out waiting for {podName} pod to start.");
+            }
+        }
+
+        public async Task WritePodLogsAndEventsToDisk(IKubernetes client, string podName, string aksNamespace)
+        {
+            try
+            {
+                var pods = await client.CoreV1.ListNamespacedPodAsync(aksNamespace);
+                var workloadPod = pods.Items.Where(x => x.Metadata.Name.Contains(podName)).FirstOrDefault();
+                ConsoleEx.WriteLine($"Pod {podName} Status:\n\t{JsonConvert.SerializeObject(workloadPod.Status)}");
+            }
+            catch (Exception e)
+            {
+                ConsoleEx.WriteLine($"Exception thrown retriving {podName} pod status.");
+                ConsoleEx.WriteLine(e.Message);
+            }
+
+            try
+            {
+                var logStream = await client.CoreV1.ReadNamespacedPodLogAsync(podName, aksNamespace);
+                var podTempFile = Path.GetTempFileName();
+
+                var reader = new StreamReader(logStream);
+                var logs = reader.ReadToEnd();
+                await File.WriteAllTextAsync(podTempFile, logs);
+                ConsoleEx.WriteLine($"Pod {podName} Logs: {podTempFile}");
+            }
+            catch (Exception e)
+            {
+                ConsoleEx.WriteLine($"Exception thrown retriving {podName} pod log.");
+                ConsoleEx.WriteLine(e.Message);
+            }
+
+            try
+            {
+                var events = await client.CoreV1.ListEventForAllNamespacesAsync();
+                var podEventsFile = Path.GetTempFileName();
+                var allEventsFile = Path.GetTempFileName();
+
+                await File.WriteAllTextAsync(podEventsFile, string.Join("\n", events.Items.Where(x => x.InvolvedObject.Name.Contains(podName)).Select(x => JsonConvert.SerializeObject(x))));
+                ConsoleEx.WriteLine($"Pod {podName} Events: {podEventsFile}");
+
+                await File.WriteAllTextAsync(allEventsFile, string.Join("\n", events.Items.Select(x => JsonConvert.SerializeObject(x))));
+                ConsoleEx.WriteLine($"All Events: {allEventsFile}");
+            }
+            catch (Exception e)
+            {
+                ConsoleEx.WriteLine($"Exception thrown retriving AKS events.");
+                ConsoleEx.WriteLine(e.Message);
             }
         }
 
