@@ -393,7 +393,7 @@ namespace TriggerService.Tests
                 .Returns(Task.FromResult(new GetTimingResponse()));
 
             repository
-                .Setup(r => r.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()))
+                .Setup(r => r.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>(), It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(Task.FromResult(tesTasks));
 
             var logger = new Mock<ILogger<TriggerHostedService>>().Object;
