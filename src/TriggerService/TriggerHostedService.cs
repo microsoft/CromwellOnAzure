@@ -546,7 +546,7 @@ namespace TriggerService
                 }
             }
 
-            var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
+            var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString(), CancellationToken.None);
 
             // Select the last attempt of each Cromwell task, and then select only the failed ones
             // If CromwellResultCode is > 0, point to Cromwell stderr/out. Otherwise, if batch exit code > 0, point to Batch stderr/out
@@ -589,7 +589,7 @@ namespace TriggerService
 
         private async Task<List<TaskWarning>> GetWorkflowTaskWarningsAsync(Guid workflowId)
         {
-            var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
+            var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString(), CancellationToken.None);
 
             // Select the last attempt of each Cromwell task, and then select only those that have a warning
             var taskWarnings = tesTasks
