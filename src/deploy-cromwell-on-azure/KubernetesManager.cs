@@ -303,7 +303,7 @@ namespace CromwellOnAzureDeployer
             }
             catch (Exception e)
             {
-                ConsoleEx.WriteLine($"Exception thrown retriving {podName} pod status.");
+                ConsoleEx.WriteLine($"Exception thrown retrieving {podName} pod status.");
                 ConsoleEx.WriteLine(e.Message);
             }
 
@@ -313,13 +313,13 @@ namespace CromwellOnAzureDeployer
                 var podTempFile = Path.GetTempFileName();
 
                 var reader = new StreamReader(logStream);
-                var logs = reader.ReadToEnd();
+                var logs = await reader.ReadToEndAsync();
                 await File.WriteAllTextAsync(podTempFile, logs);
                 ConsoleEx.WriteLine($"Pod {podName} Logs: {podTempFile}");
             }
             catch (Exception e)
             {
-                ConsoleEx.WriteLine($"Exception thrown retriving {podName} pod log.");
+                ConsoleEx.WriteLine($"Exception thrown retrieving {podName} pod log.");
                 ConsoleEx.WriteLine(e.Message);
             }
 
@@ -337,7 +337,7 @@ namespace CromwellOnAzureDeployer
             }
             catch (Exception e)
             {
-                ConsoleEx.WriteLine($"Exception thrown retriving AKS events.");
+                ConsoleEx.WriteLine($"Exception thrown retrieving AKS events.");
                 ConsoleEx.WriteLine(e.Message);
             }
         }
