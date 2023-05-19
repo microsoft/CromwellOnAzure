@@ -282,6 +282,12 @@ namespace CromwellOnAzureDeployer
                             //{
                             //}
 
+                            if (installedVersion is null || installedVersion < new Version(4, 4))
+                            {
+                                // Ensure all storage containers are created.
+                                await CreateDefaultStorageContainersAsync(storageAccount);
+                            }
+
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
                             kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup);
                         }
@@ -1103,7 +1109,7 @@ namespace CromwellOnAzureDeployer
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
 
-            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", ConfigurationContainerName };
+            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", "tes-internal", ConfigurationContainerName };
             await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
         }
 
