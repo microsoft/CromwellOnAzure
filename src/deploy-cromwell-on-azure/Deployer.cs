@@ -34,6 +34,7 @@ using Microsoft.Azure.Management.KeyVault.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
 using Microsoft.Azure.Management.Network;
 using Microsoft.Azure.Management.Network.Fluent;
+using Microsoft.Azure.Management.Network.Fluent.Models;
 using Microsoft.Azure.Management.Network.Models;
 using Microsoft.Azure.Management.PostgreSQL;
 using Microsoft.Azure.Management.PrivateDns.Fluent;
@@ -384,9 +385,11 @@ namespace CromwellOnAzureDeployer
                         if (vnetAndSubnet is null)
                         {
                             configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
-                            configuration.PostgreSqlSubnetName = String.IsNullOrEmpty(configuration.PostgreSqlSubnetName) ? configuration.DefaultPostgreSqlSubnetName : configuration.PostgreSqlSubnetName;
-                            configuration.VmSubnetName = String.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
+                            configuration.PostgreSqlSubnetName = string.IsNullOrEmpty(configuration.PostgreSqlSubnetName) ? configuration.DefaultPostgreSqlSubnetName : configuration.PostgreSqlSubnetName;
+                            configuration.BatchSubnetName = string.IsNullOrEmpty(configuration.BatchSubnetName) ? configuration.DefaultBatchSubnetName : configuration.BatchSubnetName;
+                            configuration.VmSubnetName = string.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
                             vnetAndSubnet = await CreateVnetAndSubnetsAsync(resourceGroup);
+                            this.configuration.BatchNodesSubnetId = vnetAndSubnet.Value.batchSubnet.Inner.Id;
                         }
 
                         if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
@@ -405,11 +408,7 @@ namespace CromwellOnAzureDeployer
                             await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
-
-                            if (!string.IsNullOrWhiteSpace(configuration.BatchNodesSubnetId))
-                            {
-                                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
-                            }
+                            await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
                         });
 
                         if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
@@ -1254,7 +1253,7 @@ namespace CromwellOnAzureDeployer
                         .WithResourceScope(appInsights)
                         .CreateAsync(cts.Token)));
 
-        private Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet)> CreateVnetAndSubnetsAsync(IResourceGroup resourceGroup)
+        private Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet, ISubnet batchSubnet)> CreateVnetAndSubnetsAsync(IResourceGroup resourceGroup)
           => Execute(
                 $"Creating virtual network and subnets: {configuration.VnetName}...",
                 async () =>
@@ -1264,13 +1263,27 @@ namespace CromwellOnAzureDeployer
                         .WithRegion(configuration.RegionName)
                         .WithExistingResourceGroup(resourceGroup)
                         .WithAddressSpace(configuration.VnetAddressSpace)
-                        .DefineSubnet(configuration.VmSubnetName).WithAddressPrefix(configuration.VmSubnetAddressSpace).Attach();
+                        .DefineSubnet(configuration.VmSubnetName)
+                        .WithAddressPrefix(configuration.VmSubnetAddressSpace).Attach();
 
-                    vnetDefinition = vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName).WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace).WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers").Attach();
+                    vnetDefinition = vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName)
+                        .WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace)
+                        .WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers")
+                        .Attach();
+
+                    // TODO Add Service Endpoint to Container Registry (Requires refacturing to use Azure.ResourceManager.Network)
+                    // or implement https://github.com/microsoft/ga4gh-tes/issues/209
+                    vnetDefinition = vnetDefinition.DefineSubnet(configuration.BatchSubnetName)
+                        .WithAddressPrefix(configuration.BatchNodesSubnetAddressSpace)
+                        .WithAccessFromService(ServiceEndpointType.MicrosoftStorage)
+                        .Attach();
 
                     var vnet = await vnetDefinition.CreateAsync();
 
-                    return (vnet, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value, vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value);
+                    return (vnet, 
+                        vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value, 
+                        vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value,
+                        vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.BatchSubnetName, StringComparison.OrdinalIgnoreCase)).Value);
                 });
 
         private string GetFormattedPostgresqlUser(bool isCromwellPostgresUser)
@@ -1651,7 +1664,7 @@ namespace CromwellOnAzureDeployer
                 ?? throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
         }
 
-        private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
+        private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet, ISubnet batchSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
         {
             static bool AllOrNoneSet(params string[] values) => values.All(v => !string.IsNullOrEmpty(v)) || values.All(v => string.IsNullOrEmpty(v));
             static bool NoneSet(params string[] values) => values.All(v => string.IsNullOrEmpty(v));
@@ -1725,7 +1738,9 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' must be either empty or have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation.");
             }
 
-            return (vnet, vmSubnet, postgreSqlSubnet);
+            var batchSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.BatchSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
+
+            return (vnet, vmSubnet, postgreSqlSubnet, batchSubnet);
         }
 
         private async Task ValidateBatchAccountQuotaAsync()
@@ -1872,6 +1887,11 @@ namespace CromwellOnAzureDeployer
                 {
                     throw new ValidationException("BatchPrefix must not be longer than 11 chars and may contain only ASCII letters or digits", false);
                 }
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuration.BatchNodesSubnetId) && !string.IsNullOrWhiteSpace(configuration.BatchSubnetName))
+            {
+                throw new Exception("Invalid configuration options BatchNodesSubnetId and BatchSubnetName are mutually exclusive.");
             }
         }
 
