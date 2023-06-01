@@ -64,12 +64,16 @@ images:
   tes: RUNTIME_PARAMETER
   triggerservice: RUNTIME_PARAMETER
 
-defaultContainers:
+# Mounted as /containername as expected by Cromwell
+cromwellContainers:
   - configuration
   - cromwell-executions
   - cromwell-workflow-logs
-  - inputs
   - outputs
+
+# Mounted as /accountname/containername 
+defaultContainers:
+  - inputs
 
 internalContainersMIAuth:
 #  - accountName: storageAccount
