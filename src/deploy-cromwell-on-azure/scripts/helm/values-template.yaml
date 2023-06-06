@@ -22,7 +22,6 @@ config:
     poolRotationForcedDays: "7"
     prefix: RUNTIME_PARAMETER
   nodeImages:
-    blobxfer: RUNTIME_PARAMETER
     docker: RUNTIME_PARAMETER
   batchImageGen2:
     offer: RUNTIME_PARAMETER
