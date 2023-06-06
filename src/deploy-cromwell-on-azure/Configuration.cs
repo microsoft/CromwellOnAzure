@@ -80,6 +80,7 @@ namespace CromwellOnAzureDeployer
         public bool UsePostgreSqlSingleServer { get; set; } = false;
         public string KeyVaultName { get; set; }
         public string ContainersToMountPath { get; set; }
+        public string TesInternalPathPrefix { get; set; } = null;
 
         public static Configuration BuildConfiguration(string[] args)
         {

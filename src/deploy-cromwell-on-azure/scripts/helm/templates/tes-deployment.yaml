@@ -46,6 +46,8 @@ spec:
               value: http://0.0.0.0:{{ .Values.service.tesPort }}/
             - name: Storage__DefaultAccountName
               value: {{ .Values.persistence.storageAccount }}
+            - name: Storage__TesInternalPathPrefix
+              value: {{ .Values.persistence.tesInternalPathPrefix }}
             - name: AzureServicesAuthConnectionString
               value: {{ .Values.config.azureServicesAuthConnectionString }}
             - name: ApplicationInsights__AccountName
