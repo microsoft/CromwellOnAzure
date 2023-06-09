@@ -43,7 +43,7 @@ namespace CromwellOnAzureDeployer
         public string KubernetesServiceCidr = "10.1.4.0/22"; // 10.1.4.0 -> 10.1.7.255, 1024 IPs
         public string KubernetesDnsServiceIP = "10.1.4.10";
         public string KubernetesDockerBridgeCidr = "172.17.0.1/16"; // 172.17.0.0 - 172.17.255.255, 65536 IPs
-        public string BatchNodesSubnetAddressSpace { get; set; } = "10.1.32.0/19"; // 10.1.32.0 - 	10.1.63.255, 8192 IPs
+        public string BatchNodesSubnetAddressSpace { get; set; } = "10.1.128.0/17"; // 10.1.128.0 - 10.1.255.255, 32768 IPs
 
         public string ResourceGroupName { get; set; }
         public string BatchAccountName { get; set; }

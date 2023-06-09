@@ -12,7 +12,11 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.Core;
 using Azure.Identity;
+using Azure.ResourceManager;
+using Azure.ResourceManager.Network;
+using Azure.ResourceManager.Network.Models;
 using Azure.Security.KeyVault.Secrets;
 using Azure.Storage;
 using Azure.Storage.Blobs;
@@ -108,6 +112,7 @@ namespace CromwellOnAzureDeployer
         private IAzure azureSubscriptionClient { get; set; }
         private Microsoft.Azure.Management.Fluent.Azure.IAuthenticated azureClient { get; set; }
         private IResourceManager resourceManagerClient { get; set; }
+        private ArmClient armClient { get; set; }
         private Microsoft.Azure.Management.Network.INetworkManagementClient networkManagementClient { get; set; }
         private AzureCredentials azureCredentials { get; set; }
         private FlexibleServer.IPostgreSQLManagementClient postgreSqlFlexManagementClient { get; set; }
@@ -139,6 +144,7 @@ namespace CromwellOnAzureDeployer
                     tokenCredentials = new(tokenProvider);
                     azureCredentials = new(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
                     azureClient = GetAzureClient(azureCredentials);
+                    armClient = new ArmClient(new DefaultAzureCredential());
                     azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                     subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                     resourceManagerClient = GetResourceManagerClient(azureCredentials);
@@ -286,6 +292,11 @@ namespace CromwellOnAzureDeployer
                             {
                                 // Ensure all storage containers are created.
                                 await CreateDefaultStorageContainersAsync(storageAccount);
+                            }
+
+                            if ((installedVersion is null || installedVersion < new Version(4, 5)) && string.IsNullOrWhiteSpace(settings["BatchNodesSubnetId"]))
+                            {
+                                await UpdateVnetWithBatchSubnet();
                             }
 
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
@@ -1277,19 +1288,29 @@ namespace CromwellOnAzureDeployer
                         .WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers")
                         .Attach();
 
-                    // TODO Add Service Endpoint to Container Registry (Requires refacturing to use Azure.ResourceManager.Network)
-                    // or implement https://github.com/microsoft/ga4gh-tes/issues/209
                     vnetDefinition = vnetDefinition.DefineSubnet(configuration.BatchSubnetName)
                         .WithAddressPrefix(configuration.BatchNodesSubnetAddressSpace)
                         .WithAccessFromService(ServiceEndpointType.MicrosoftStorage)
+                        .WithAccessFromService(ServiceEndpointType.MicrosoftSql)
                         .Attach();
 
                     var vnet = await vnetDefinition.CreateAsync();
+                    var batchSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.BatchSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
+
+                    // Use the new ResourceManager sdk to add the ACR service endpoint since it is absent from the fluent sdk.
+                    var armBatchSubnet = (await armClient.GetSubnetResource(new ResourceIdentifier(batchSubnet.Inner.Id)).GetAsync()).Value;
+
+                    armBatchSubnet.Data.ServiceEndpoints.Add(new ServiceEndpointProperties()
+                    {
+                        Service = "Microsoft.ContainerRegistry",
+                    });
+
+                    await armBatchSubnet.UpdateAsync(Azure.WaitUntil.Completed, armBatchSubnet.Data);
 
                     return (vnet, 
                         vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value, 
                         vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value,
-                        vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.BatchSubnetName, StringComparison.OrdinalIgnoreCase)).Value);
+                        batchSubnet);
                 });
 
         private string GetFormattedPostgresqlUser(bool isCromwellPostgresUser)
@@ -1759,6 +1780,66 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException($"The regional Batch account quota ({accountQuota} account(s) per region) for the specified subscription has been reached. Submit a support request to increase the quota or choose another region.", displayExample: false);
             }
         }
+
+        private Task UpdateVnetWithBatchSubnet()
+            => Execute(
+                $"Creating batch subnet...",
+                async () =>
+                {
+                    var resourceId = new ResourceIdentifier($"/subscriptions/{configuration.SubscriptionId}/resourceGroups/{configuration.ResourceGroupName}/");
+                    var coaRg = armClient.GetResourceGroupResource(resourceId);
+
+                    var vnetCollection = coaRg.GetVirtualNetworks();
+                    var vnet = vnetCollection.FirstOrDefault();
+
+                    if (vnetCollection.Count() != 1)
+                    {
+                        ConsoleEx.WriteLine("There are multiple vnets found in the resource group so the deployer cannot automatically create the subnet.", ConsoleColor.Red);
+                        ConsoleEx.WriteLine("In order to avoid unnecessary load balancer charges we suggest manually configuring your deployment to use a subnet for batch pools with service endpoints.", ConsoleColor.Red);
+                        ConsoleEx.WriteLine("See: https://github.com/microsoft/CromwellOnAzure/wiki/Using-a-batch-pool-subnet-with-service-endpoints-to-avoid-load-balancer-charges.", ConsoleColor.Red);
+
+                        return;
+                    }
+
+                    var vnetData = vnet.Data;
+                    var ipRange = vnetData.AddressPrefixes.Single();
+
+                    var defaultSubnetNames = new List<string> { configuration.DefaultVmSubnetName, configuration.DefaultPostgreSqlSubnetName, configuration.DefaultBatchSubnetName };
+
+                    if (!string.Equals(ipRange, configuration.VnetAddressSpace, StringComparison.OrdinalIgnoreCase) ||
+                        vnetData.Subnets.Select(x => x.Name).Except(defaultSubnetNames).Any())
+                    {
+                        ConsoleEx.WriteLine("We detected a customized networking setup so the deployer will not automatically create the subnet.", ConsoleColor.Red);
+                        ConsoleEx.WriteLine("In order to avoid unnecessary load balancer charges we suggest manually configuring your deployment to use a subnet for batch pools with service endpoints.", ConsoleColor.Red);
+                        ConsoleEx.WriteLine("See: https://github.com/microsoft/CromwellOnAzure/wiki/Using-a-batch-pool-subnet-with-service-endpoints-to-avoid-load-balancer-charges.", ConsoleColor.Red);
+
+                        return;
+                    }
+
+                    var batchSubnet = new SubnetData
+                    {
+                        Name = configuration.DefaultBatchSubnetName,
+                        AddressPrefix = configuration.BatchNodesSubnetAddressSpace,
+                    };
+
+                    batchSubnet.ServiceEndpoints.Add(new ServiceEndpointProperties()
+                    {
+                        Service = "Microsoft.Storage",
+                    });
+
+                    batchSubnet.ServiceEndpoints.Add(new ServiceEndpointProperties()
+                    {
+                        Service = "Microsoft.Sql",
+                    });
+
+                    batchSubnet.ServiceEndpoints.Add(new ServiceEndpointProperties()
+                    {
+                        Service = "Microsoft.ContainerRegistry",
+                    });
+
+                    vnetData.Subnets.Add(batchSubnet);
+                    await vnetCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, vnetData.Name, vnetData);
+                });
 
         private async Task ValidateVmAsync()
         {
