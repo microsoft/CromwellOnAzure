@@ -74,7 +74,7 @@ namespace CromwellOnAzureDeployer
         public string BatchNodesSubnetId { get; set; } = null;
         public string DockerInDockerImageName { get; set; } = null;
         public string BlobxferImageName { get; set; } = null;
-        public bool? DisableBatchNodesPublicIpAddress { get; set; } = true;
+        public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool DebugLogging { get; set; } = false;
         public string PostgreSqlServerName { get; set; }
         public string PostgreSqlServerNameSuffix { get; set; } = ".postgres.database.azure.com";
