@@ -406,7 +406,11 @@ namespace CromwellOnAzureDeployer
                             configuration.BatchSubnetName = string.IsNullOrEmpty(configuration.BatchSubnetName) ? configuration.DefaultBatchSubnetName : configuration.BatchSubnetName;
                             configuration.VmSubnetName = string.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
                             vnetAndSubnet = await CreateVnetAndSubnetsAsync(resourceGroup);
-                            this.configuration.BatchNodesSubnetId = vnetAndSubnet.Value.batchSubnet.Inner.Id;
+
+                            if (string.IsNullOrEmpty(this.configuration.BatchNodesSubnetId))
+                            {
+                                this.configuration.BatchNodesSubnetId = vnetAndSubnet.Value.batchSubnet.Inner.Id;
+                            }
                         }
 
                         if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
