@@ -58,8 +58,6 @@ spec:
               value: {{ .Values.config.batchAccount.accountName }}
             - name: BatchNodes__SubnetId
               value: {{ .Values.config.batchNodes.subnetId }}
-            - name: NodeImages__Blobxfer
-              value: {{ .Values.config.nodeImages.blobxfer }}
             - name: BatchNodes__DisablePublicIpAddress
               value: {{ .Values.config.batchNodes.disablePublicIpAddress | quote }}
             - name: BatchScheduling__Disable
