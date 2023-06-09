@@ -292,11 +292,11 @@ namespace CromwellOnAzureDeployer
                             {
                                 // Ensure all storage containers are created.
                                 await CreateDefaultStorageContainersAsync(storageAccount);
-                            }
 
-                            if ((installedVersion is null || installedVersion < new Version(4, 5)) && string.IsNullOrWhiteSpace(settings["BatchNodesSubnetId"]))
-                            {
-                                await UpdateVnetWithBatchSubnet();
+                                if (string.IsNullOrWhiteSpace(settings["BatchNodesSubnetId"]))
+                                {
+                                    await UpdateVnetWithBatchSubnet();
+                                }
                             }
 
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
