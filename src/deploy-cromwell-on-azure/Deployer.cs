@@ -295,7 +295,7 @@ namespace CromwellOnAzureDeployer
 
                                 if (string.IsNullOrWhiteSpace(settings["BatchNodesSubnetId"]))
                                 {
-                                    await UpdateVnetWithBatchSubnet();
+                                    settings["BatchNodesSubnetId"] = await UpdateVnetWithBatchSubnet();
                                 }
                             }
 
@@ -1784,7 +1784,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private Task UpdateVnetWithBatchSubnet()
+        private Task<string> UpdateVnetWithBatchSubnet()
             => Execute(
                 $"Creating batch subnet...",
                 async () =>
@@ -1801,7 +1801,7 @@ namespace CromwellOnAzureDeployer
                         ConsoleEx.WriteLine("In order to avoid unnecessary load balancer charges we suggest manually configuring your deployment to use a subnet for batch pools with service endpoints.", ConsoleColor.Red);
                         ConsoleEx.WriteLine("See: https://github.com/microsoft/CromwellOnAzure/wiki/Using-a-batch-pool-subnet-with-service-endpoints-to-avoid-load-balancer-charges.", ConsoleColor.Red);
 
-                        return;
+                        return null;
                     }
 
                     var vnetData = vnet.Data;
@@ -1816,7 +1816,7 @@ namespace CromwellOnAzureDeployer
                         ConsoleEx.WriteLine("In order to avoid unnecessary load balancer charges we suggest manually configuring your deployment to use a subnet for batch pools with service endpoints.", ConsoleColor.Red);
                         ConsoleEx.WriteLine("See: https://github.com/microsoft/CromwellOnAzure/wiki/Using-a-batch-pool-subnet-with-service-endpoints-to-avoid-load-balancer-charges.", ConsoleColor.Red);
 
-                        return;
+                        return null;
                     }
 
                     var batchSubnet = new SubnetData
@@ -1841,7 +1841,9 @@ namespace CromwellOnAzureDeployer
                     });
 
                     vnetData.Subnets.Add(batchSubnet);
-                    await vnetCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, vnetData.Name, vnetData);
+                    var updatedVnet = (await vnetCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, vnetData.Name, vnetData)).Value;
+
+                    return (await updatedVnet.GetSubnetAsync(configuration.DefaultBatchSubnetName)).Value.Id.ToString();
                 });
 
         private async Task ValidateVmAsync()
