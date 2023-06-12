@@ -1819,7 +1819,7 @@ namespace CromwellOnAzureDeployer
                         Name = configuration.DefaultBatchSubnetName,
                         AddressPrefix = configuration.BatchNodesSubnetAddressSpace,
                     };
-
+                  
                     AddServiceEndpointsToSubnet(batchSubnet);
 
                     vnetData.Subnets.Add(batchSubnet);
