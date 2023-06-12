@@ -1293,8 +1293,6 @@ namespace CromwellOnAzureDeployer
 
                     vnetDefinition = vnetDefinition.DefineSubnet(configuration.BatchSubnetName)
                         .WithAddressPrefix(configuration.BatchNodesSubnetAddressSpace)
-                        .WithAccessFromService(ServiceEndpointType.MicrosoftStorage)
-                        .WithAccessFromService(ServiceEndpointType.MicrosoftSql)
                         .Attach();
 
                     var vnet = await vnetDefinition.CreateAsync();
@@ -1303,10 +1301,7 @@ namespace CromwellOnAzureDeployer
                     // Use the new ResourceManager sdk to add the ACR service endpoint since it is absent from the fluent sdk.
                     var armBatchSubnet = (await armClient.GetSubnetResource(new ResourceIdentifier(batchSubnet.Inner.Id)).GetAsync()).Value;
 
-                    armBatchSubnet.Data.ServiceEndpoints.Add(new ServiceEndpointProperties()
-                    {
-                        Service = "Microsoft.ContainerRegistry",
-                    });
+                    AddServiceEndpointsToSubnet(armBatchSubnet.Data);
 
                     await armBatchSubnet.UpdateAsync(Azure.WaitUntil.Completed, armBatchSubnet.Data);
 
@@ -1825,26 +1820,36 @@ namespace CromwellOnAzureDeployer
                         AddressPrefix = configuration.BatchNodesSubnetAddressSpace,
                     };
 
-                    batchSubnet.ServiceEndpoints.Add(new ServiceEndpointProperties()
-                    {
-                        Service = "Microsoft.Storage",
-                    });
-
-                    batchSubnet.ServiceEndpoints.Add(new ServiceEndpointProperties()
-                    {
-                        Service = "Microsoft.Sql",
-                    });
-
-                    batchSubnet.ServiceEndpoints.Add(new ServiceEndpointProperties()
-                    {
-                        Service = "Microsoft.ContainerRegistry",
-                    });
+                    AddServiceEndpointsToSubnet(batchSubnet);
 
                     vnetData.Subnets.Add(batchSubnet);
                     var updatedVnet = (await vnetCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, vnetData.Name, vnetData)).Value;
 
                     return (await updatedVnet.GetSubnetAsync(configuration.DefaultBatchSubnetName)).Value.Id.ToString();
                 });
+
+        private void AddServiceEndpointsToSubnet(SubnetData subnet)
+        {
+            subnet.ServiceEndpoints.Add(new ServiceEndpointProperties()
+            {
+                Service = "Microsoft.Storage.Global",
+            });
+
+            subnet.ServiceEndpoints.Add(new ServiceEndpointProperties()
+            {
+                Service = "Microsoft.Sql",
+            });
+
+            subnet.ServiceEndpoints.Add(new ServiceEndpointProperties()
+            {
+                Service = "Microsoft.ContainerRegistry",
+            });
+
+            subnet.ServiceEndpoints.Add(new ServiceEndpointProperties()
+            {
+                Service = "Microsoft.KeyVault",
+            });
+        }
 
         private async Task ValidateVmAsync()
         {
