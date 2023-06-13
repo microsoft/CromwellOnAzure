@@ -7,6 +7,8 @@ assignees: ''
 
 ---
 
+*Note: CoA uses TES as a submodule.  Please consider creating this issue in the TES repository if you identify the root cause is there: https://github.com/microsoft/ga4gh-tes*
+
 **Problem:**
 A clear and concise description of what the problem is.
 
