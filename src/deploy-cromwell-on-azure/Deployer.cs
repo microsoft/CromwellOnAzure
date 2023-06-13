@@ -15,9 +15,9 @@ using System.Threading.Tasks;
 using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
-using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.Network;
 using Azure.ResourceManager.Network.Models;
+using Azure.ResourceManager.Resources;
 using Azure.Security.KeyVault.Secrets;
 using Azure.Storage;
 using Azure.Storage.Blobs;
@@ -1034,7 +1034,7 @@ namespace CromwellOnAzureDeployer
                         {
                             var rp = await subscription.GetResourceProviderAsync(rpName);
 
-                            foreach(var featureName in requiredResourceProviderFeatures[rpName])
+                            foreach (var featureName in requiredResourceProviderFeatures[rpName])
                             {
                                 var feature = await rp.Value.GetFeatureAsync(featureName);
 
@@ -1048,7 +1048,7 @@ namespace CromwellOnAzureDeployer
 
                         while (!cts.IsCancellationRequested)
                         {
-                            if (unregisteredFeatures.Count == 0) 
+                            if (unregisteredFeatures.Count == 0)
                             {
                                 break;
                             }
