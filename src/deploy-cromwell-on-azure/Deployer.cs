@@ -724,13 +724,18 @@ namespace CromwellOnAzureDeployer
             {
                 { "kubeletidentity", new ManagedClusterPropertiesIdentityProfileValue(managedIdentity.Id, managedIdentity.ClientId, managedIdentity.PrincipalId) }
             };
-            cluster.EnableRBAC = true;
-            cluster.AadProfile = new ManagedClusterAADProfile()
+
+            if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
             {
-                AdminGroupObjectIDs = configuration.AadGroupIds.Split(",", StringSplitOptions.RemoveEmptyEntries),
-                EnableAzureRBAC = false,
-                Managed = true
-            };
+                cluster.EnableRBAC = true;
+                cluster.AadProfile = new ManagedClusterAADProfile()
+                {
+                    AdminGroupObjectIDs = configuration.AadGroupIds.Split(",", StringSplitOptions.RemoveEmptyEntries),
+                    EnableAzureRBAC = false,
+                    Managed = true
+                };
+            }
+
             cluster.AgentPoolProfiles = new List<ManagedClusterAgentPoolProfile>
             {
                 new ManagedClusterAgentPoolProfile()
