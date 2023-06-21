@@ -144,9 +144,16 @@ namespace CromwellOnAzureDeployer
                     tokenCredentials = new(tokenProvider);
                     azureCredentials = new(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
                     azureClient = GetAzureClient(azureCredentials);
-                    var options = new DefaultAzureCredentialOptions();
-                    options.TenantId = configuration.TenantId;
-                    armClient = new ArmClient(new DefaultAzureCredential());
+
+                    if (string.IsNullOrEmpty(configuration.TenantId))
+                    {
+                        armClient = new ArmClient(new DefaultAzureCredential());
+                    }
+                    else
+                    {
+                        armClient = new ArmClient(new DefaultAzureCredential(new DefaultAzureCredentialOptions { TenantId = configuration.TenantId }));
+                    }
+
                     azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                     subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                     resourceManagerClient = GetResourceManagerClient(azureCredentials);
