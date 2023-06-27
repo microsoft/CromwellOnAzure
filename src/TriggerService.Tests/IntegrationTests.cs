@@ -2,13 +2,16 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
 using Common;
 using Microsoft.Azure.Batch;
 using Microsoft.Azure.Batch.Auth;
+using Microsoft.Azure.Management.CosmosDB.Fluent.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace TriggerService.Tests
@@ -84,6 +87,22 @@ namespace TriggerService.Tests
         [Ignore]
         [TestCategory("Integration")]
         [TestMethod]
+        public async Task RunScaleTestWithMutect2WaitTilDoneAsync()
+        {
+            const int countOfWorkflowsToRun = 10;
+            const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
+            const string workflowFriendlyName = $"mutect2";
+
+            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, waitTilDone: true);
+        }
+
+        /// <summary>
+        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken, and remove the [Ignore] attribute
+        /// </summary>
+        /// <returns></returns>
+        [Ignore]
+        [TestCategory("Integration")]
+        [TestMethod]
         public async Task RunScaleTestWithWholeGenomeGermlineSingleSampleAsync()
         {
             const int countOfWorkflowsToRun = 1500;
@@ -150,21 +169,68 @@ namespace TriggerService.Tests
             Console.WriteLine($"Deleted {count} pools.");
         }
 
-        private static async Task StartWorkflowsAsync(int countOfWorkflowsToRun, string triggerFile, string workflowFriendlyName)
+        private static async Task StartWorkflowsAsync(int countOfWorkflowsToRun, string triggerFile, string workflowFriendlyName, bool waitTilDone = false)
         {
             const string containerName = "workflows";
             var n = DateTime.UtcNow;
             var date = $"{n.Year}-{n.Month}-{n.Day}-{n.Hour}-{n.Minute}";
             using var httpClient = new HttpClient();
             var triggerFileJson = await (await httpClient.GetAsync(triggerFile)).Content.ReadAsStringAsync();
+            var blobNames = new List<string>();
 
             for (var i = 1; i <= countOfWorkflowsToRun; i++)
             {
                 // example: new/mutect2-001-of-100-2023-4-7-3-9.json
                 var blobName = $"new/{workflowFriendlyName}-{i:D4}-of-{countOfWorkflowsToRun:D4}-{date}.json";
+                blobNames.Add(blobName);
                 var blobClient = new BlobServiceClient(new Uri($"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/{blobName}?{workflowsContainerSasToken.TrimStart('?')}"));
                 var container = blobClient.GetBlobContainerClient(containerName);
                 await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(triggerFileJson), true);
+            }
+
+            if (waitTilDone)
+            {
+                int succeededCount = 0;
+                int failedCount = 0;
+
+                while (succeededCount + failedCount < countOfWorkflowsToRun)
+                {
+                    try
+                    {
+                        var blobClient = new BlobServiceClient(new Uri($"https://{testStorageAccountName}.blob.core.windows.net/{containerName}/?{workflowsContainerSasToken.TrimStart('?')}"));
+                        var container = blobClient.GetBlobContainerClient(containerName);
+                        var enumerator = container.GetBlobsAsync().GetAsyncEnumerator();
+                        var existingBlobNames = new List<string>();
+
+                        while (await enumerator.MoveNextAsync())
+                        {
+                            // example: inprogress/mutect2-001-of-100-2023-4-7-3-9.0fb0858a-3166-4a22-85b6-4337df2f53c5.json
+                            var blobName = enumerator.Current.Name;
+                            existingBlobNames.Add(blobName);
+                        }
+
+                        succeededCount = existingBlobNames
+                            .Count(name => blobNames.Any(b => name
+                                .StartsWith(b.Replace("new/", "succeeded/"))));
+
+                        failedCount = existingBlobNames
+                            .Count(name => blobNames.Any(b => name
+                                .StartsWith(b.Replace("new/", "failed/"))));
+
+                        Console.WriteLine($"Succeeded count: {succeededCount}");
+                        Console.WriteLine($"Failed count: {succeededCount}");
+                    }
+                    catch (Exception exc)
+                    {
+                        Console.WriteLine(exc);
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(5));
+                }
+
+                Console.WriteLine($"Completed in {(DateTime.UtcNow - n).TotalHours:n1} hours");
+                Console.WriteLine($"Succeeded count: {succeededCount}");
+                Console.WriteLine($"Failed count: {succeededCount}");
             }
         }
     }
