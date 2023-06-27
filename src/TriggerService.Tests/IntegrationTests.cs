@@ -78,15 +78,22 @@ namespace TriggerService.Tests
         /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken, and remove the [Ignore] attribute
         /// </summary>
         /// <returns></returns>
-        [Ignore]
         [TestCategory("Integration")]
         [TestMethod]
         public async Task RunScaleTestWithMutect2WaitTilDoneAsync()
         {
+            // This is set in the Azure Devops pipeline
+            const string storageAccountNamePath = "temp_storage_account_name.txt";
+
+            if (!File.Exists(storageAccountNamePath))
+            {
+                return;
+            }
+
+            string storageAccountName = (await File.ReadAllTextAsync(storageAccountNamePath)).Trim();
             const int countOfWorkflowsToRun = 10;
             const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
-            string storageAccountName = Environment.GetEnvironmentVariable("STORAGE_ACCOUNT_NAME");
 
             await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, storageAccountName, waitTilDone: true);
         }
