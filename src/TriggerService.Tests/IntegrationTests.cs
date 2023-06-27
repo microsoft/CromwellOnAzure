@@ -238,6 +238,5 @@ namespace TriggerService.Tests
                 Console.WriteLine($"Failed count: {failedCount}");
             }
         }
-
     }
 }
