@@ -300,7 +300,7 @@ namespace CromwellOnAzureDeployer
                             }
 
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
-                            kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup);
+                            kubernetesClient = await PerformHelmDeploymentAsync(existingAksCluster);
                         }
                         else
                         {
@@ -477,11 +477,11 @@ namespace CromwellOnAzureDeployer
 
                         if (aksCluster is null && !configuration.ManualHelmDeployment)
                         {
-                            await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
+                            aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                         }
 
                         await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity, containersToMount);
-                        kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup,
+                        kubernetesClient = await PerformHelmDeploymentAsync(aksCluster,
                             new[]
                             {
                                 "Run the following postgresql command to setup the database.",
@@ -595,7 +595,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task<IKubernetes> PerformHelmDeploymentAsync(IResourceGroup resourceGroup, IEnumerable<string> manualPrecommands = default, Func<IKubernetes, Task> asyncTask = default)
+        private async Task<IKubernetes> PerformHelmDeploymentAsync(ManagedCluster aksCluster, IEnumerable<string> manualPrecommands = default, Func<IKubernetes, Task> asyncTask = default)
         {
             if (configuration.ManualHelmDeployment)
             {
@@ -613,7 +613,7 @@ namespace CromwellOnAzureDeployer
             }
             else
             {
-                var kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
+                var kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(aksCluster);
                 await (asyncTask?.Invoke(kubernetesClient) ?? Task.CompletedTask);
                 await kubernetesManager.DeployHelmChartToClusterAsync();
                 return kubernetesClient;
