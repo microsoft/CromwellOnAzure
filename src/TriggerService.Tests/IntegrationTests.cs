@@ -84,13 +84,17 @@ namespace TriggerService.Tests
         {
             // This is set in the Azure Devops pipeline
             const string storageAccountNamePath = "temp_storage_account_name.txt";
+            var path = Path.Combine(Directory.GetCurrentDirectory(), storageAccountNamePath);
 
-            if (!File.Exists(storageAccountNamePath))
+            if (!File.Exists(path))
             {
+                Console.WriteLine($"Path not found - exiting integration test: {path}");
                 return;
             }
 
-            string storageAccountName = (await File.ReadAllTextAsync(storageAccountNamePath)).Trim();
+            Console.WriteLine($"Found path: {path}");
+
+            string storageAccountName = (await File.ReadAllTextAsync(path)).Trim();
             const int countOfWorkflowsToRun = 10;
             const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
