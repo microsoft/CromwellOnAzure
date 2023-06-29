@@ -82,9 +82,11 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task RunScaleTestWithMutect2WaitTilDoneAsync()
         {
-            // This is set in the Azure Devops pipeline
-            const string storageAccountNamePath = "temp_storage_account_name.txt";
-            var path = Path.Combine(Directory.GetCurrentDirectory(), storageAccountNamePath);
+            // This is set in the Azure Devops pipeline, which writes the file to the .csproj directory
+            // The current working directory is this: /mnt/vss/_work/r1/a/CoaArtifacts/AllSource/TriggerService.Tests/bin/Debug/net7.0/
+            // And the file is available here: /mnt/vss/_work/r1/a/CoaArtifacts/AllSource/TriggerService.Tests/temp_storage_account_name.txt
+            const string storageAccountNamePath = "../../../temp_storage_account_name.txt";
+            var path = storageAccountNamePath;
 
             if (!File.Exists(path))
             {
