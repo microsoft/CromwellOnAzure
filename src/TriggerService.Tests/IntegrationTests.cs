@@ -189,7 +189,7 @@ namespace TriggerService.Tests
             using var httpClient = new HttpClient();
             var triggerFileJson = await (await httpClient.GetAsync(triggerFile)).Content.ReadAsStringAsync();
             var blobNames = new List<string>();
-            var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net/"), new DefaultAzureCredential());
+            var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net/"), new AzureCliCredential());
 
             for (var i = 1; i <= countOfWorkflowsToRun; i++)
             {
