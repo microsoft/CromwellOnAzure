@@ -242,6 +242,8 @@ namespace TriggerService.Tests
                 Console.WriteLine($"Completed in {(DateTime.UtcNow - n).TotalHours:n1} hours");
                 Console.WriteLine($"Succeeded count: {succeededCount}");
                 Console.WriteLine($"Failed count: {failedCount}");
+
+                Assert.IsTrue(failedCount == 0);
             }
         }
     }
