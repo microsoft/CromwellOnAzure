@@ -187,10 +187,13 @@ namespace TriggerService.Tests
             var n = DateTime.UtcNow;
             var date = $"{n.Year}-{n.Month}-{n.Day}-{n.Hour}-{n.Minute}";
             using var httpClient = new HttpClient();
+
+            // 1.  Get the publically available trigger file
             var triggerFileJson = await (await httpClient.GetAsync(triggerFile)).Content.ReadAsStringAsync();
             var blobNames = new List<string>();
             var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net/"), new AzureCliCredential());
 
+            // 2.  Start the workflows by uploading new trigger files
             for (var i = 1; i <= countOfWorkflowsToRun; i++)
             {
                 // example: new/mutect2-001-of-100-2023-4-7-3-9.json
@@ -200,6 +203,7 @@ namespace TriggerService.Tests
                 await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(triggerFileJson), true);
             }
 
+            // 3.  Loop forever until they are all in a terminal state (succeeded or failed)
             if (waitTilDone)
             {
                 int succeededCount = 0;
@@ -236,7 +240,12 @@ namespace TriggerService.Tests
                         Console.WriteLine(exc);
                     }
 
-                    await Task.Delay(TimeSpan.FromSeconds(5));
+                    if (succeededCount + failedCount >= countOfWorkflowsToRun)
+                    {
+                        break;
+                    }
+
+                    await Task.Delay(TimeSpan.FromMinutes(1));
                 }
 
                 Console.WriteLine($"Completed in {(DateTime.UtcNow - n).TotalHours:n1} hours");
