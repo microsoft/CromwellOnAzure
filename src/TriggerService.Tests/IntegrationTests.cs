@@ -183,17 +183,18 @@ namespace TriggerService.Tests
             string storageAccountName,
             bool waitTilDone = false)
         {
+            var startTime = DateTime.UtcNow;
             const string containerName = "workflows";
-            var n = DateTime.UtcNow;
-            var date = $"{n.Year}-{n.Month}-{n.Day}-{n.Hour}-{n.Minute}";
-            using var httpClient = new HttpClient();
-
-            // 1.  Get the publically available trigger file
-            var triggerFileJson = await (await httpClient.GetAsync(triggerFile)).Content.ReadAsStringAsync();
-            var blobNames = new List<string>();
             var blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net/"), new AzureCliCredential());
 
+            // 1.  Get the publically available trigger file
+            using var httpClient = new HttpClient();
+            var triggerFileJson = await (await httpClient.GetAsync(triggerFile)).Content.ReadAsStringAsync();
+
             // 2.  Start the workflows by uploading new trigger files
+            var blobNames = new List<string>();
+            var date = $"{startTime.Year}-{startTime.Month}-{startTime.Day}-{startTime.Hour}-{startTime.Minute}";
+
             for (var i = 1; i <= countOfWorkflowsToRun; i++)
             {
                 // example: new/mutect2-001-of-100-2023-4-7-3-9.json
@@ -248,7 +249,7 @@ namespace TriggerService.Tests
                     await Task.Delay(TimeSpan.FromMinutes(1));
                 }
 
-                Console.WriteLine($"Completed in {(DateTime.UtcNow - n).TotalHours:n1} hours");
+                Console.WriteLine($"Completed in {(DateTime.UtcNow - startTime).TotalHours:n1} hours");
                 Console.WriteLine($"Succeeded count: {succeededCount}");
                 Console.WriteLine($"Failed count: {failedCount}");
 
