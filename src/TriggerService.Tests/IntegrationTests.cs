@@ -189,21 +189,22 @@ namespace TriggerService.Tests
             const string containerName = "workflows";
 
             BlobServiceClient blobServiceClient;
+
             if (string.IsNullOrEmpty(workflowsContainerSasToken))
             {
                 Console.WriteLine("No container SAS token specified; using AzureCliCredential");
                 blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net/"), new AzureCliCredential());
             }
             else
-            {
-                Console.WriteLine("Using the specified container SAS token.");
+            { 
                 blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net/"));
             }
 
-            BlobContainerClient container = blobServiceClient.GetBlobContainerClient(containerName);
+            var container = blobServiceClient.GetBlobContainerClient(containerName);
 
             if (!string.IsNullOrEmpty(workflowsContainerSasToken))
             {
+                Console.WriteLine("Using the specified container SAS token.");
                 var containerSasUri = new Uri($"https://{storageAccountName}.blob.core.windows.net/{containerName}?{workflowsContainerSasToken}");
                 container = new BlobContainerClient(containerSasUri);
             }
