@@ -99,6 +99,9 @@ namespace TriggerService.Tests
             string storageAccountName = lines[0].Trim();
             string workflowsContainerSasToken = lines[1].Trim();
 
+            Console.WriteLine("All test start:");
+            Console.WriteLine($"{File.ReadAllText(path)}");
+            Console.WriteLine("All text stop");
             Console.WriteLine($"storageAccountName: [{storageAccountName}]");
             Console.WriteLine($"workflowsContainerSasToken: [{workflowsContainerSasToken}]");
 
