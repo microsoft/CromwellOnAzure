@@ -97,7 +97,7 @@ namespace TriggerService.Tests
             Console.WriteLine($"Found path: {path}");
             var lines = await File.ReadAllLinesAsync(path);
             string storageAccountName = lines[0].Trim();
-            string workflowsContainerSasToken = lines[1].Trim();
+            string workflowsContainerSasToken = lines[1].Trim('"');
 
             Console.WriteLine("All test start:");
             Console.WriteLine($"{File.ReadAllText(path)}");
