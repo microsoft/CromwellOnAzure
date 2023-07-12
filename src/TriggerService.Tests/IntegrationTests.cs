@@ -98,6 +98,10 @@ namespace TriggerService.Tests
             var lines = await File.ReadAllLinesAsync(path);
             string storageAccountName = lines[0].Trim();
             string workflowsContainerSasToken = lines[1].Trim();
+
+            Console.WriteLine($"storageAccountName: [{storageAccountName}]");
+            Console.WriteLine($"workflowsContainerSasToken: [{workflowsContainerSasToken}]");
+
             const int countOfWorkflowsToRun = 10;
             const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
