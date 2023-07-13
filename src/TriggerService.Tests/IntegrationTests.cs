@@ -258,7 +258,7 @@ namespace TriggerService.Tests
 
                     failedCount = existingBlobNames
                         .Count(name => originalBlobNames.Any(b => b
-                            .Equals(name.Replace("failed/", "new/"), StringComparison.OrdinalIgnoreCase))));
+                            .Equals(name.Replace("failed/", "new/"), StringComparison.OrdinalIgnoreCase)));
 
                     var elapsed = DateTime.UtcNow - startTime;
                     Console.WriteLine($"[{elapsed.TotalMinutes:n0}m] Succeeded count: {succeededCount}");
