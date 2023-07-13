@@ -235,53 +235,58 @@ namespace TriggerService.Tests
             // 3.  Loop forever until they are all in a terminal state (succeeded or failed)
             if (waitTilDone)
             {
-                int succeededCount = 0;
-                int failedCount = 0;
+                await WaitTilAllWorkflowsInTerminalStateAsync(countOfWorkflowsToRun, startTime, container, blobNames);
+            }
+        }
 
-                while (succeededCount + failedCount < countOfWorkflowsToRun)
+        private static async Task WaitTilAllWorkflowsInTerminalStateAsync(int countOfWorkflowsToRun, DateTime startTime, BlobContainerClient container, List<string> originalBlobNames)
+        {
+            int succeededCount = 0;
+            int failedCount = 0;
+
+            while (succeededCount + failedCount < countOfWorkflowsToRun)
+            {
+                try
                 {
-                    try
+                    var enumerator = container.GetBlobsAsync().GetAsyncEnumerator();
+                    var existingBlobNames = new List<string>();
+
+                    while (await enumerator.MoveNextAsync())
                     {
-                        var enumerator = container.GetBlobsAsync().GetAsyncEnumerator();
-                        var existingBlobNames = new List<string>();
-
-                        while (await enumerator.MoveNextAsync())
-                        {
-                            // example: inprogress/mutect2-001-of-100-2023-4-7-3-9.0fb0858a-3166-4a22-85b6-4337df2f53c5.json
-                            var blobName = enumerator.Current.Name;
-                            existingBlobNames.Add(blobName);
-                        }
-
-                        succeededCount = existingBlobNames
-                            .Count(name => blobNames.Any(b => name
-                                .StartsWith(b.Replace("new/", "succeeded/"))));
-
-                        failedCount = existingBlobNames
-                            .Count(name => blobNames.Any(b => name
-                                .StartsWith(b.Replace("new/", "failed/"))));
-
-                        Console.WriteLine($"Succeeded count: {succeededCount}");
-                        Console.WriteLine($"Failed count: {failedCount}");
-                    }
-                    catch (Exception exc)
-                    {
-                        Console.WriteLine(exc);
+                        // example: inprogress/mutect2-001-of-100-2023-4-7-3-9.0fb0858a-3166-4a22-85b6-4337df2f53c5.json
+                        var blobName = enumerator.Current.Name;
+                        existingBlobNames.Add(blobName);
                     }
 
-                    if (succeededCount + failedCount >= countOfWorkflowsToRun)
-                    {
-                        break;
-                    }
+                    succeededCount = existingBlobNames
+                        .Count(existingBlobName => originalBlobNames.Any(b => b
+                            .Equals(existingBlobName.Replace("succeeded/", "new/"), StringComparison.OrdinalIgnoreCase)));
 
-                    await Task.Delay(TimeSpan.FromMinutes(1));
+                    failedCount = existingBlobNames
+                        .Count(name => originalBlobNames.Any(b => b
+                            .Equals(name.Replace("failed/", "new/"), StringComparison.OrdinalIgnoreCase))));
+
+                    Console.WriteLine($"Succeeded count: {succeededCount}");
+                    Console.WriteLine($"Failed count: {failedCount}");
+                }
+                catch (Exception exc)
+                {
+                    Console.WriteLine(exc);
                 }
 
-                Console.WriteLine($"Completed in {(DateTime.UtcNow - startTime).TotalHours:n1} hours");
-                Console.WriteLine($"Succeeded count: {succeededCount}");
-                Console.WriteLine($"Failed count: {failedCount}");
+                if (succeededCount + failedCount >= countOfWorkflowsToRun)
+                {
+                    break;
+                }
 
-                Assert.IsTrue(failedCount == 0);
+                await Task.Delay(TimeSpan.FromMinutes(1));
             }
+
+            Console.WriteLine($"Completed in {(DateTime.UtcNow - startTime).TotalHours:n1} hours");
+            Console.WriteLine($"Succeeded count: {succeededCount}");
+            Console.WriteLine($"Failed count: {failedCount}");
+
+            Assert.IsTrue(failedCount == 0);
         }
     }
 }
