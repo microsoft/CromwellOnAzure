@@ -253,12 +253,14 @@ namespace TriggerService.Tests
                     }
 
                     succeededCount = existingBlobNames
+                        .Where(b => b.StartsWith("succeeded/"))
                         .Count(existingBlobName => originalBlobNames.Any(b => b
                             .Equals(existingBlobName.Replace("succeeded/", "new/"), StringComparison.OrdinalIgnoreCase)));
 
                     failedCount = existingBlobNames
-                        .Count(name => originalBlobNames.Any(b => b
-                            .Equals(name.Replace("failed/", "new/"), StringComparison.OrdinalIgnoreCase)));
+                        .Where(b => b.StartsWith("failed/"))
+                        .Count(existingBlobName => originalBlobNames.Any(b => b
+                            .Equals(existingBlobName.Replace("failed/", "new/"), StringComparison.OrdinalIgnoreCase)));
 
                     var elapsed = DateTime.UtcNow - startTime;
                     Console.WriteLine($"[{elapsed.TotalMinutes:n0}m] Succeeded count: {succeededCount}");
