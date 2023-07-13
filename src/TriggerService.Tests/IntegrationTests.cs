@@ -99,13 +99,7 @@ namespace TriggerService.Tests
             string storageAccountName = lines[0].Trim();
             string workflowsContainerSasToken = lines[1].Trim('"');
 
-            Console.WriteLine("All test start:");
-            Console.WriteLine($"{File.ReadAllText(path)}");
-            Console.WriteLine("All text stop");
-            Console.WriteLine($"storageAccountName: [{storageAccountName}]");
-            Console.WriteLine($"workflowsContainerSasToken: [{workflowsContainerSasToken}]");
-
-            const int countOfWorkflowsToRun = 10;
+            const int countOfWorkflowsToRun = 1;
             const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
 
@@ -266,8 +260,9 @@ namespace TriggerService.Tests
                         .Count(name => originalBlobNames.Any(b => b
                             .Equals(name.Replace("failed/", "new/"), StringComparison.OrdinalIgnoreCase))));
 
-                    Console.WriteLine($"Succeeded count: {succeededCount}");
-                    Console.WriteLine($"Failed count: {failedCount}");
+                    var elapsed = DateTime.UtcNow - startTime;
+                    Console.WriteLine($"[{elapsed.TotalMinutes:n0}m] Succeeded count: {succeededCount}");
+                    Console.WriteLine($"[{elapsed.TotalMinutes:n0}m] Failed count: {failedCount}");
                 }
                 catch (Exception exc)
                 {
