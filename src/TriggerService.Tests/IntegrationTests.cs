@@ -100,7 +100,7 @@ namespace TriggerService.Tests
             string workflowsContainerSasToken = lines[1].Trim('"');
 
             const int countOfWorkflowsToRun = 1;
-            const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
+            const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/mattmcl4475/update-scatter-vm-size/mutect2.trigger.json"; // "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
 
             await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
