@@ -100,7 +100,7 @@ namespace TriggerService.Tests
             string workflowsContainerSasToken = lines[1].Trim('"');
 
             const int countOfWorkflowsToRun = 1;
-            const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/mattmcl4475/update-scatter-vm-size/mutect2.trigger.json"; // "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
+            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/mattmcl4475/long-running-int-test/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
 
             await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
@@ -187,7 +187,7 @@ namespace TriggerService.Tests
             string workflowsContainerSasToken = null)
         {
             var startTime = DateTime.UtcNow;
-            const string containerName = "workflows";
+            const string workflowsContainerName = "workflows";
 
             BlobServiceClient blobServiceClient;
 
@@ -201,13 +201,13 @@ namespace TriggerService.Tests
                 blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net/"));
             }
 
-            var container = blobServiceClient.GetBlobContainerClient(containerName);
+            var workflowsContainer = blobServiceClient.GetBlobContainerClient(workflowsContainerName);
 
             if (!string.IsNullOrEmpty(workflowsContainerSasToken))
             {
                 Console.WriteLine("Using the specified container SAS token.");
-                var containerSasUri = new Uri($"https://{storageAccountName}.blob.core.windows.net/{containerName}?{workflowsContainerSasToken}");
-                container = new BlobContainerClient(containerSasUri);
+                var containerSasUri = new Uri($"https://{storageAccountName}.blob.core.windows.net/{workflowsContainerName}?{workflowsContainerSasToken}");
+                workflowsContainer = new BlobContainerClient(containerSasUri);
             }
 
             // 1.  Get the publically available trigger file
@@ -223,13 +223,13 @@ namespace TriggerService.Tests
                 // example: new/mutect2-001-of-100-2023-4-7-3-9.json
                 var blobName = $"new/{workflowFriendlyName}-{i:D4}-of-{countOfWorkflowsToRun:D4}-{date}.json";
                 blobNames.Add(blobName);
-                await container.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(triggerFileJson), true);
+                await workflowsContainer.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(triggerFileJson), true);
             }
 
             // 3.  Loop forever until they are all in a terminal state (succeeded or failed)
             if (waitTilDone)
             {
-                await WaitTilAllWorkflowsInTerminalStateAsync(countOfWorkflowsToRun, startTime, container, blobNames);
+                await WaitTilAllWorkflowsInTerminalStateAsync(countOfWorkflowsToRun, startTime, workflowsContainer, blobNames);
             }
         }
 
