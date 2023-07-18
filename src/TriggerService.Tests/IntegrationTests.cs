@@ -75,7 +75,7 @@ namespace TriggerService.Tests
         }
 
         /// <summary>
-        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken, and remove the [Ignore] attribute
+        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken
         /// </summary>
         /// <returns></returns>
         [TestCategory("Integration")]
