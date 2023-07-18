@@ -252,6 +252,17 @@ namespace TriggerService.Tests
                         existingBlobNames.Add(blobName);
                     }
 
+                    // TODO remove -  debug
+                    foreach (var original in originalBlobNames)
+                    {
+                        Console.WriteLine($"Original: {original}");
+                    }
+
+                    foreach (var existing in existingBlobNames)
+                    {
+                        Console.WriteLine($"Existing: {existing}");
+                    }
+
                     succeededCount = existingBlobNames
                         .Where(b => b.StartsWith("succeeded/"))
                         .Count(existingBlobName => originalBlobNames.Any(b => b
