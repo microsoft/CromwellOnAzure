@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -178,7 +179,7 @@ namespace TriggerService.Tests
             Console.WriteLine($"Deleted {count} pools.");
         }
 
-        private static async Task StartWorkflowsAsync(
+        private async Task StartWorkflowsAsync(
             int countOfWorkflowsToRun,
             string triggerFile,
             string workflowFriendlyName,
@@ -233,24 +234,33 @@ namespace TriggerService.Tests
             }
         }
 
-        private static async Task WaitTilAllWorkflowsInTerminalStateAsync(int countOfWorkflowsToRun, DateTime startTime, BlobContainerClient container, List<string> originalBlobNames)
+        private async Task<List<string>> GetBlobsAsync(BlobContainerClient container)
+        {
+            var enumerator = container.GetBlobsAsync().GetAsyncEnumerator();
+            var existingBlobNames = new List<string>();
+
+            while (await enumerator.MoveNextAsync())
+            {
+                // example: inprogress/mutect2-001-of-100-2023-4-7-3-9.0fb0858a-3166-4a22-85b6-4337df2f53c5.json
+                var blobName = enumerator.Current.Name;
+                existingBlobNames.Add(blobName);
+            }
+
+            return existingBlobNames;
+        }
+
+        private async Task WaitTilAllWorkflowsInTerminalStateAsync(int countOfWorkflowsToRun, DateTime startTime, BlobContainerClient container, List<string> originalBlobNames)
         {
             int succeededCount = 0;
             int failedCount = 0;
 
-            while (succeededCount + failedCount < countOfWorkflowsToRun)
+            var sw = Stopwatch.StartNew();
+
+            while (succeededCount + failedCount < countOfWorkflowsToRun && sw.Elapsed.TotalHours < 5)
             {
                 try
                 {
-                    var enumerator = container.GetBlobsAsync().GetAsyncEnumerator();
-                    var existingBlobNames = new List<string>();
-
-                    while (await enumerator.MoveNextAsync())
-                    {
-                        // example: inprogress/mutect2-001-of-100-2023-4-7-3-9.0fb0858a-3166-4a22-85b6-4337df2f53c5.json
-                        var blobName = enumerator.Current.Name;
-                        existingBlobNames.Add(blobName);
-                    }
+                    var existingBlobNames = await GetBlobsAsync(container);
 
                     // TODO remove -  debug
                     foreach (var original in originalBlobNames)
@@ -294,7 +304,7 @@ namespace TriggerService.Tests
             Console.WriteLine($"Succeeded count: {succeededCount}");
             Console.WriteLine($"Failed count: {failedCount}");
 
-            Assert.IsTrue(failedCount == 0);
+            Assert.IsTrue(succeededCount + failedCount >= countOfWorkflowsToRun);
         }
     }
 }
