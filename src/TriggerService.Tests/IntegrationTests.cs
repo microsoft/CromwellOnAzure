@@ -30,34 +30,10 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task RunScaleTestWithMutect2WaitTilDoneAsync()
         {
-            // This is set in the Azure Devops pipeline, which writes the file to the .csproj directory
-            // The current working directory is this: /mnt/vss/_work/r1/a/CoaArtifacts/AllSource/TriggerService.Tests/bin/Debug/net7.0/
-            // And the file is available here: /mnt/vss/_work/r1/a/CoaArtifacts/AllSource/TriggerService.Tests/temp_storage_account_name.txt
-            const string storageAccountNamePath = "../../../temp_storage_account_name.txt";
-            var path = storageAccountNamePath;
-
-            if (!File.Exists(path))
-            {
-                Console.WriteLine($"Path not found - exiting integration test: {path}");
-                return;
-            }
-
-            Console.WriteLine($"Found path: {path}");
-            var lines = await File.ReadAllLinesAsync(path);
-            string storageAccountName = lines[0].Trim();
-            string workflowsContainerSasToken = lines[1].Trim('"');
-
-            int countOfWorkflowsToRun = 1;
-
-            if (lines.Length > 2)
-            {
-                int.TryParse(lines[2].Trim('"'), out countOfWorkflowsToRun);
-            }
-
             const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/mattmcl4475/long-running-int-test/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
 
-            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
+            await RunIntegrationTestAsync(triggerFile, workflowFriendlyName);
         }
 
         /// <summary>
@@ -199,6 +175,35 @@ namespace TriggerService.Tests
 
             Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Failed) == 1);
             Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Succeeded) == 1);
+        }
+
+        private async Task RunIntegrationTestAsync(string triggerFile, string workflowFriendlyName)
+        {
+            // This is set in the Azure Devops pipeline, which writes the file to the .csproj directory
+            // The current working directory is this: /mnt/vss/_work/r1/a/CoaArtifacts/AllSource/TriggerService.Tests/bin/Debug/net7.0/
+            // And the file is available here: /mnt/vss/_work/r1/a/CoaArtifacts/AllSource/TriggerService.Tests/temp_storage_account_name.txt
+            const string storageAccountNamePath = "../../../temp_storage_account_name.txt";
+            var path = storageAccountNamePath;
+
+            if (!File.Exists(path))
+            {
+                Console.WriteLine($"Path not found - exiting integration test: {path}");
+                return;
+            }
+
+            Console.WriteLine($"Found path: {path}");
+            var lines = await File.ReadAllLinesAsync(path);
+            string storageAccountName = lines[0].Trim();
+            string workflowsContainerSasToken = lines[1].Trim('"');
+
+            int countOfWorkflowsToRun = 1;
+
+            if (lines.Length > 2)
+            {
+                int.TryParse(lines[2].Trim('"'), out countOfWorkflowsToRun);
+            }
+
+            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
         }
 
         private async Task StartWorkflowsAsync(
