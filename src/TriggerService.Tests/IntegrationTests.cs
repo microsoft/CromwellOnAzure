@@ -302,7 +302,7 @@ namespace TriggerService.Tests
                     Console.WriteLine(exc);
                 }
 
-                if (succeededCount + failedCount >= countOfWorkflowsToRun)
+                if (succeededCount + failedCount == countOfWorkflowsToRun)
                 {
                     break;
                 }
@@ -314,7 +314,7 @@ namespace TriggerService.Tests
             Console.WriteLine($"Succeeded count: {succeededCount}");
             Console.WriteLine($"Failed count: {failedCount}");
 
-            Assert.IsTrue(succeededCount + failedCount >= countOfWorkflowsToRun);
+            Assert.IsTrue(succeededCount + failedCount == countOfWorkflowsToRun);
             Assert.IsTrue(failedCount == 0);
         }
     }
