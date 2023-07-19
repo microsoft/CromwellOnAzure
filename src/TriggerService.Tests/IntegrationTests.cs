@@ -225,7 +225,7 @@ namespace TriggerService.Tests
                 blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net/"), new AzureCliCredential());
             }
             else
-            { 
+            {
                 blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net/"));
             }
 
