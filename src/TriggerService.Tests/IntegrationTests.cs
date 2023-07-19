@@ -23,59 +23,6 @@ namespace TriggerService.Tests
         private const string testStorageAccountName = "";
 
         /// <summary>
-        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken, and remove the [Ignore] attribute
-        /// </summary>
-        /// <returns></returns>
-        [Ignore]
-        [TestCategory("Integration")]
-        [TestMethod]
-        public async Task RunGlobTestWdlAsync()
-        {
-            const string containerName = "inputs";
-            var blobServiceClient = new BlobServiceClient(new Uri($"https://{testStorageAccountName}.blob.core.windows.net/"), new AzureCliCredential());
-            var wdlBlobName = $"globtest.wdl";
-            var wdlPath = Path.Combine(Path.GetFullPath(@"..\..\..\test-wdls\globtest"), wdlBlobName);
-            var container = blobServiceClient.GetBlobContainerClient(containerName);
-            var text = (await File.ReadAllTextAsync(wdlPath)).Replace(@"\r\n\", @"\n");
-            await container.GetBlobClient("test/" + wdlBlobName).UploadAsync(BinaryData.FromString(text), true);
-
-            var wdlInputsBlobName = $"globtestinputs.json";
-            var wdlInputsPath = Path.Combine(Path.GetFullPath(@"..\..\..\test-wdls\globtest"), wdlInputsBlobName);
-            text = (await File.ReadAllTextAsync(wdlInputsPath)).Replace(@"\r\n\", @"\n");
-            await container.GetBlobClient("test/" + wdlInputsBlobName).UploadAsync(BinaryData.FromString(text), true);
-
-            var workflowTrigger = new Workflow
-            {
-                WorkflowUrl = blobServiceClient.Uri + "/" + containerName + "/test/" + wdlBlobName,
-                WorkflowInputsUrl = blobServiceClient.Uri + "/" + containerName + "/test/" + wdlInputsBlobName
-            };
-
-            var n = DateTime.UtcNow;
-            var date = $"{n.Year}-{n.Month}-{n.Day}-{n.Hour}-{n.Minute}";
-            var triggerFileBlobName = $"new/globtest-{date}.json";
-            string triggerJson = System.Text.Json.JsonSerializer.Serialize(workflowTrigger).Replace(@"\r\n\", @"\n");
-            container = blobServiceClient.GetBlobContainerClient("workflows");
-            await container.GetBlobClient(triggerFileBlobName).UploadAsync(BinaryData.FromString(triggerJson), true);
-        }
-
-
-        /// <summary>
-        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken, and remove the [Ignore] attribute
-        /// </summary>
-        /// <returns></returns>
-        [Ignore]
-        [TestCategory("Integration")]
-        [TestMethod]
-        public async Task RunScaleTestWithMutect2Async()
-        {
-            const int countOfWorkflowsToRun = 100;
-            const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
-            const string workflowFriendlyName = $"mutect2";
-
-            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, testStorageAccountName);
-        }
-
-        /// <summary>
         /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken
         /// </summary>
         /// <returns></returns>
@@ -111,6 +58,58 @@ namespace TriggerService.Tests
             const string workflowFriendlyName = $"mutect2";
 
             await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
+        }
+
+        /// <summary>
+        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken, and remove the [Ignore] attribute
+        /// </summary>
+        /// <returns></returns>
+        [Ignore]
+        [TestCategory("Integration")]
+        [TestMethod]
+        public async Task RunGlobTestWdlAsync()
+        {
+            const string containerName = "inputs";
+            var blobServiceClient = new BlobServiceClient(new Uri($"https://{testStorageAccountName}.blob.core.windows.net/"), new AzureCliCredential());
+            var wdlBlobName = $"globtest.wdl";
+            var wdlPath = Path.Combine(Path.GetFullPath(@"..\..\..\test-wdls\globtest"), wdlBlobName);
+            var container = blobServiceClient.GetBlobContainerClient(containerName);
+            var text = (await File.ReadAllTextAsync(wdlPath)).Replace(@"\r\n\", @"\n");
+            await container.GetBlobClient("test/" + wdlBlobName).UploadAsync(BinaryData.FromString(text), true);
+
+            var wdlInputsBlobName = $"globtestinputs.json";
+            var wdlInputsPath = Path.Combine(Path.GetFullPath(@"..\..\..\test-wdls\globtest"), wdlInputsBlobName);
+            text = (await File.ReadAllTextAsync(wdlInputsPath)).Replace(@"\r\n\", @"\n");
+            await container.GetBlobClient("test/" + wdlInputsBlobName).UploadAsync(BinaryData.FromString(text), true);
+
+            var workflowTrigger = new Workflow
+            {
+                WorkflowUrl = blobServiceClient.Uri + "/" + containerName + "/test/" + wdlBlobName,
+                WorkflowInputsUrl = blobServiceClient.Uri + "/" + containerName + "/test/" + wdlInputsBlobName
+            };
+
+            var n = DateTime.UtcNow;
+            var date = $"{n.Year}-{n.Month}-{n.Day}-{n.Hour}-{n.Minute}";
+            var triggerFileBlobName = $"new/globtest-{date}.json";
+            string triggerJson = System.Text.Json.JsonSerializer.Serialize(workflowTrigger).Replace(@"\r\n\", @"\n");
+            container = blobServiceClient.GetBlobContainerClient("workflows");
+            await container.GetBlobClient(triggerFileBlobName).UploadAsync(BinaryData.FromString(triggerJson), true);
+        }
+
+        /// <summary>
+        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken, and remove the [Ignore] attribute
+        /// </summary>
+        /// <returns></returns>
+        [Ignore]
+        [TestCategory("Integration")]
+        [TestMethod]
+        public async Task RunScaleTestWithMutect2Async()
+        {
+            const int countOfWorkflowsToRun = 100;
+            const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
+            const string workflowFriendlyName = $"mutect2";
+
+            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, testStorageAccountName);
         }
 
         /// <summary>
@@ -183,6 +182,23 @@ namespace TriggerService.Tests
             }
 
             Console.WriteLine($"Deleted {count} pools.");
+        }
+
+        [TestMethod]
+        public void CountCompletedWorkflowsTest()
+        {
+            var originalBlobNames = new List<string> {
+                "new/mutect2-0001-of-0001-2023-7-19-2-49.json",
+                "new/mutect2-0001-of-0001-2023-7-19-2-50.json"
+            };
+
+            var currentBlobNames = new List<string> {
+                "failed/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json",
+                "succeeded/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json"
+            };
+
+            Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Failed) == 1);
+            Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Succeeded) == 1);
         }
 
         private async Task StartWorkflowsAsync(
@@ -267,23 +283,6 @@ namespace TriggerService.Tests
                     .Replace(".json", "", StringComparison.OrdinalIgnoreCase))
                 .Count(originalBlobModified => currentBlobNames
                     .Any(currentBlob => currentBlob.StartsWith(originalBlobModified, StringComparison.OrdinalIgnoreCase)));
-        }
-
-        [TestMethod]
-        public void CountCompletedWorkflowsTest()
-        {
-            var originalBlobNames = new List<string> { 
-                "new/mutect2-0001-of-0001-2023-7-19-2-49.json", 
-                "new/mutect2-0001-of-0001-2023-7-19-2-50.json" 
-            };
-            
-            var currentBlobNames = new List<string> { 
-                "failed/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json",
-                "succeeded/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json"
-            };
-
-            Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Failed) == 1);
-            Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Succeeded) == 1);
         }
 
         private async Task WaitTilAllWorkflowsInTerminalStateAsync(int countOfWorkflowsToRun, DateTime startTime, BlobContainerClient container, List<string> originalBlobNames)
