@@ -263,7 +263,7 @@ namespace TriggerService.Tests
             }
         }
 
-        private async Task<List<string>> GetBlobsAsync(BlobContainerClient container)
+        private async Task<List<string>> ListContainerBlobNamesAsync(BlobContainerClient container)
         {
             var enumerator = container.GetBlobsAsync().GetAsyncEnumerator();
             var existingBlobNames = new List<string>();
@@ -301,7 +301,7 @@ namespace TriggerService.Tests
             {
                 try
                 {
-                    var existingBlobNames = await GetBlobsAsync(container);
+                    var existingBlobNames = await ListContainerBlobNamesAsync(container);
                     succeededCount = CountWorkflowsByState(originalBlobNames, existingBlobNames, WorkflowState.Succeeded);
                     failedCount = CountWorkflowsByState(originalBlobNames, existingBlobNames, WorkflowState.Failed);
                     Console.WriteLine($"[{sw.Elapsed.TotalMinutes:n0}m] Succeeded count: {succeededCount}");
