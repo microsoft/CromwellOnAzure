@@ -225,7 +225,7 @@ namespace TriggerService.Tests
             var blobNames = new List<string>();
             var date = $"{startTime.Year}-{startTime.Month}-{startTime.Day}-{startTime.Hour}-{startTime.Minute}";
 
-            Console.WriteLine($"Starting {countOfWorkflowsToRun} workflows...}");
+            Console.WriteLine($"Starting {countOfWorkflowsToRun} workflows...");
 
             for (var i = 1; i <= countOfWorkflowsToRun; i++)
             {
