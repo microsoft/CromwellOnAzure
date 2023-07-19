@@ -2109,10 +2109,17 @@ namespace CromwellOnAzureDeployer
                 try
                 {
                     var succeeded = container.GetBlobs(prefix: $"succeeded/{id}").Count() == 1;
-                    var failed = container.GetBlobs(prefix: $"failed/{id}").Count() == 1;
+                    var failedWorkflows = container.GetBlobs(prefix: $"failed/{id}").ToList();
+                    var failed = failedWorkflows.Count == 1;
 
                     if (succeeded || failed)
                     {
+                        if (failed)
+                        {
+                            var failedContent = (await container.GetBlobClient(failedWorkflows.First().Name).DownloadContentAsync()).Value.Content.ToString();
+                            ConsoleEx.WriteLine($"Failed workflow trigger JSON: {failedContent}");
+                        }
+
                         return succeeded && !failed;
                     }
                 }
