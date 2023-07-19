@@ -315,6 +315,7 @@ namespace TriggerService.Tests
             Console.WriteLine($"Failed count: {failedCount}");
 
             Assert.IsTrue(succeededCount + failedCount >= countOfWorkflowsToRun);
+            Assert.IsTrue(failedCount == 0);
         }
     }
 }
