@@ -170,7 +170,7 @@ namespace TriggerService.Tests
 
             var currentBlobNames = new List<string> {
                 "failed/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json",
-                "succeeded/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json"
+                "succeeded/mutect2-0001-of-0001-2023-7-19-2-50.817f052c-81f8-45ff-863b-03f9655eee5c.json"
             };
 
             Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Failed) == 1);
@@ -280,15 +280,42 @@ namespace TriggerService.Tests
 
         private int CountWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
         {
+            return GetWorkflowsByState(originalBlobNames, currentBlobNames, state).Count();
+        }
+
+        private List<string> GetWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
+        {
             var stateString = state.ToString().ToLowerInvariant();
 
-            return originalBlobNames
-                .Select(originalBlob => originalBlob
-                    .Replace("new/", $"{stateString}/", StringComparison.OrdinalIgnoreCase)
-                    .Replace(".json", "", StringComparison.OrdinalIgnoreCase))
-                .Count(originalBlobModified => currentBlobNames
-                    .Any(currentBlob => currentBlob.StartsWith(originalBlobModified, StringComparison.OrdinalIgnoreCase)));
+            return currentBlobNames
+                .Where(currentBlob => originalBlobNames
+                    .Any(originalBlob => currentBlob.StartsWith(
+                        originalBlob
+                        .Replace("new/", $"{stateString}/", StringComparison.OrdinalIgnoreCase)
+                        .Replace(".json", "", StringComparison.OrdinalIgnoreCase), StringComparison.OrdinalIgnoreCase)))
+                .ToList();
         }
+
+        [TestMethod]
+        public void GetWorkflowsByStateTest()
+        {
+            var originalBlobNames = new List<string> {
+                "new/mutect2-0001-of-0001-2023-7-19-2-49.json",
+                "new/mutect2-0001-of-0001-2023-7-19-2-50.json"
+            };
+
+            var currentBlobNames = new List<string> {
+                "failed/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json",
+                "succeeded/mutect2-0001-of-0001-2023-7-19-2-50.817f052c-81f8-45ff-863b-03f9655eee5c.json"
+            };
+
+            var failed = GetWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Failed);
+            var succeeded = GetWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Succeeded);
+            Assert.IsTrue(failed.Single() == currentBlobNames.First());
+            Assert.IsTrue(succeeded.Single() == currentBlobNames.Skip(1).First());
+        }
+
+
 
         private async Task WaitTilAllWorkflowsInTerminalStateAsync(int countOfWorkflowsToRun, DateTime startTime, BlobContainerClient container, List<string> originalBlobNames)
         {
@@ -304,8 +331,7 @@ namespace TriggerService.Tests
                     var existingBlobNames = await ListContainerBlobNamesAsync(container);
                     succeededCount = CountWorkflowsByState(originalBlobNames, existingBlobNames, WorkflowState.Succeeded);
                     failedCount = CountWorkflowsByState(originalBlobNames, existingBlobNames, WorkflowState.Failed);
-                    Console.WriteLine($"[{sw.Elapsed.TotalMinutes:n0}m] Succeeded count: {succeededCount}");
-                    Console.WriteLine($"[{sw.Elapsed.TotalMinutes:n0}m] Failed count: {failedCount}");
+                    Console.WriteLine($"[{sw.Elapsed.TotalMinutes:n0}m] Succeeded count: {succeededCount}, Failed count: {failedCount}");
                 }
                 catch (Exception exc)
                 {
@@ -325,7 +351,24 @@ namespace TriggerService.Tests
             Console.WriteLine($"Failed count: {failedCount}");
 
             Assert.IsTrue(succeededCount + failedCount == countOfWorkflowsToRun);
-            Assert.IsTrue(failedCount == 0);
+
+            if (failedCount > 0)
+            {
+                Console.WriteLine("Failed workflow details:");
+
+                var existingBlobNames = await ListContainerBlobNamesAsync(container);
+                var failedWorkflowBlobNames = GetWorkflowsByState(originalBlobNames, existingBlobNames, WorkflowState.Failed);
+
+                foreach (var workflowBlobName in failedWorkflowBlobNames)
+                {
+                    var content = (await container.GetBlobClient(workflowBlobName).DownloadContentAsync()).Value.Content.ToString();
+                    Console.WriteLine($"Failed workflow blob name: {workflowBlobName}");
+                    Console.WriteLine($"Failed workflow triggerfile content: {content}");
+                    Console.WriteLine(content);
+                }
+            }
+
+            Assert.IsTrue(failedCount == 0, $"{failedCount} workflows FAILED.");
         }
     }
 }
