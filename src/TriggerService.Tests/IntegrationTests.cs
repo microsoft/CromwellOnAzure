@@ -257,7 +257,7 @@ namespace TriggerService.Tests
             return existingBlobNames;
         }
 
-        public int CountWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
+        private int CountWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
         {
             var stateString = state.ToString().ToLowerInvariant();
 
@@ -272,9 +272,15 @@ namespace TriggerService.Tests
         [TestMethod]
         public void CountCompletedWorkflowsTest()
         {
-            var originalBlobNames = new List<string> { "new/mutect2-0001-of-0001-2023-7-19-2-49.json", "new/mutect2-0001-of-0001-2023-7-19-2-50.json" };
-            var currentBlobNames = new List<string> { "failed/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json",
-            "succeeded/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json"};
+            var originalBlobNames = new List<string> { 
+                "new/mutect2-0001-of-0001-2023-7-19-2-49.json", 
+                "new/mutect2-0001-of-0001-2023-7-19-2-50.json" 
+            };
+            
+            var currentBlobNames = new List<string> { 
+                "failed/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json",
+                "succeeded/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json"
+            };
 
             Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Failed) == 1);
             Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Succeeded) == 1);
