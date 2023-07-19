@@ -2108,19 +2108,19 @@ namespace CromwellOnAzureDeployer
             {
                 try
                 {
-                    var succeeded = container.GetBlobs(prefix: $"succeeded/{id}").Count() == 1;
-                    var failedWorkflows = container.GetBlobs(prefix: $"failed/{id}").ToList();
-                    var failed = failedWorkflows.Count == 1;
+                    var hasSucceeded = container.GetBlobs(prefix: $"succeeded/{id}").Count() == 1;
+                    var failedWorkflowTriggerFileBlobs = container.GetBlobs(prefix: $"failed/{id}").ToList();
+                    var hasFailed = failedWorkflowTriggerFileBlobs.Count == 1;
 
-                    if (succeeded || failed)
+                    if (hasSucceeded || hasFailed)
                     {
-                        if (failed)
+                        if (hasFailed)
                         {
-                            var failedContent = (await container.GetBlobClient(failedWorkflows.First().Name).DownloadContentAsync()).Value.Content.ToString();
+                            var failedContent = (await container.GetBlobClient(failedWorkflowTriggerFileBlobs.First().Name).DownloadContentAsync()).Value.Content.ToString();
                             ConsoleEx.WriteLine($"Failed workflow trigger JSON: {failedContent}");
                         }
 
-                        return succeeded && !failed;
+                        return hasSucceeded && !hasFailed;
                     }
                 }
                 catch (Exception exc)
