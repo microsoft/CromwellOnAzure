@@ -100,7 +100,13 @@ namespace TriggerService.Tests
             string storageAccountName = lines[0].Trim();
             string workflowsContainerSasToken = lines[1].Trim('"');
 
-            const int countOfWorkflowsToRun = 1;
+            int countOfWorkflowsToRun = 1;
+
+            if (lines.Length > 2)
+            {
+                int.TryParse(lines[2].Trim('"'), out countOfWorkflowsToRun);
+            }
+
             const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/mattmcl4475/long-running-int-test/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
 
@@ -219,6 +225,8 @@ namespace TriggerService.Tests
             var blobNames = new List<string>();
             var date = $"{startTime.Year}-{startTime.Month}-{startTime.Day}-{startTime.Hour}-{startTime.Minute}";
 
+            Console.WriteLine($"Starting {countOfWorkflowsToRun} workflows...}");
+
             for (var i = 1; i <= countOfWorkflowsToRun; i++)
             {
                 // example: new/mutect2-001-of-100-2023-4-7-3-9.json
@@ -249,6 +257,29 @@ namespace TriggerService.Tests
             return existingBlobNames;
         }
 
+        public int CountWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
+        {
+            var stateString = state.ToString().ToLowerInvariant();
+
+            return originalBlobNames
+                .Select(originalBlob => originalBlob
+                    .Replace("new/", $"{stateString}/", StringComparison.OrdinalIgnoreCase)
+                    .Replace(".json", "", StringComparison.OrdinalIgnoreCase))
+                .Count(originalBlobModified => currentBlobNames
+                    .Any(currentBlob => currentBlob.StartsWith(originalBlobModified, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        [TestMethod]
+        public void CountCompletedWorkflowsTest()
+        {
+            var originalBlobNames = new List<string> { "new/mutect2-0001-of-0001-2023-7-19-2-49.json", "new/mutect2-0001-of-0001-2023-7-19-2-50.json" };
+            var currentBlobNames = new List<string> { "failed/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json",
+            "succeeded/mutect2-0001-of-0001-2023-7-19-2-49.817f052c-81f8-45ff-863b-03f9655eee5c.json"};
+
+            Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Failed) == 1);
+            Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Succeeded) == 1);
+        }
+
         private async Task WaitTilAllWorkflowsInTerminalStateAsync(int countOfWorkflowsToRun, DateTime startTime, BlobContainerClient container, List<string> originalBlobNames)
         {
             int succeededCount = 0;
@@ -256,36 +287,15 @@ namespace TriggerService.Tests
 
             var sw = Stopwatch.StartNew();
 
-            while (succeededCount + failedCount < countOfWorkflowsToRun && sw.Elapsed.TotalHours < 5)
+            while (succeededCount + failedCount < countOfWorkflowsToRun) // && sw.Elapsed.TotalHours < 5)
             {
                 try
                 {
                     var existingBlobNames = await GetBlobsAsync(container);
-
-                    // TODO remove -  debug
-                    foreach (var original in originalBlobNames)
-                    {
-                        Console.WriteLine($"Original: {original}");
-                    }
-
-                    foreach (var existing in existingBlobNames)
-                    {
-                        Console.WriteLine($"Existing: {existing}");
-                    }
-
-                    succeededCount = existingBlobNames
-                        .Where(b => b.StartsWith("succeeded/"))
-                        .Count(existingBlobName => originalBlobNames.Any(b => b
-                            .Equals(existingBlobName.Replace("succeeded/", "new/"), StringComparison.OrdinalIgnoreCase)));
-
-                    failedCount = existingBlobNames
-                        .Where(b => b.StartsWith("failed/"))
-                        .Count(existingBlobName => originalBlobNames.Any(b => b
-                            .Equals(existingBlobName.Replace("failed/", "new/"), StringComparison.OrdinalIgnoreCase)));
-
-                    var elapsed = DateTime.UtcNow - startTime;
-                    Console.WriteLine($"[{elapsed.TotalMinutes:n0}m] Succeeded count: {succeededCount}");
-                    Console.WriteLine($"[{elapsed.TotalMinutes:n0}m] Failed count: {failedCount}");
+                    succeededCount = CountWorkflowsByState(originalBlobNames, existingBlobNames, WorkflowState.Succeeded);
+                    failedCount = CountWorkflowsByState(originalBlobNames, existingBlobNames, WorkflowState.Failed);
+                    Console.WriteLine($"[{sw.Elapsed.TotalMinutes:n0}m] Succeeded count: {succeededCount}");
+                    Console.WriteLine($"[{sw.Elapsed.TotalMinutes:n0}m] Failed count: {failedCount}");
                 }
                 catch (Exception exc)
                 {
