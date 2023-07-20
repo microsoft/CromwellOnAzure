@@ -389,7 +389,7 @@ namespace TriggerService.Tests
                 {
                     var content = (await container.GetBlobClient(workflowBlobName).DownloadContentAsync()).Value.Content.ToString();
                     Console.WriteLine($"Failed workflow blob name: {workflowBlobName}");
-                    Console.WriteLine($"Failed workflow triggerfile content: {content}");
+                    Console.WriteLine("Failed workflow triggerfile content:");
                     Console.WriteLine(content);
                 }
             }
