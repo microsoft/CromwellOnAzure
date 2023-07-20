@@ -33,7 +33,29 @@ namespace TriggerService.Tests
             const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/mattmcl4475/long-running-int-test/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
 
-            await RunIntegrationTestAsync(triggerFile, workflowFriendlyName);
+            await RunIntegrationTestAsync(new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) });
+        }
+
+        /// <summary>
+        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken
+        /// </summary>
+        /// <returns></returns>
+        [TestCategory("Integration")]
+        [TestMethod]
+        public async Task RunAllCommonWorkflowsWaitTilDoneAsync()
+        {
+            var workflowTriggerFiles = new List<(string triggerFileBlobUrl, string workflowFriendlyName)> {
+                ("https://raw.githubusercontent.com/microsoft/gatk4-data-processing-azure/main-azure/processing-for-variant-discovery-gatk4.b37.trigger.json", "preprocessing-b37"),
+                ("https://raw.githubusercontent.com/microsoft/gatk4-data-processing-azure/main-azure/processing-for-variant-discovery-gatk4.hg38.trigger.json", "preprocessing-hg38"),
+                ("https://raw.githubusercontent.com/microsoft/gatk4-genome-processing-pipeline-azure/main-azure/WholeGenomeGermlineSingleSample.trigger.json", "germline"),
+                ("https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json", "mutect2"),
+                ("https://raw.githubusercontent.com/microsoft/gatk4-rnaseq-germline-snps-indels-azure/jsaun/gatk4-rna-germline-variant-calling.trigger.json", "rna-germline"),
+                ("https://raw.githubusercontent.com/microsoft/gatk4-cnn-variant-filter-azure/main-azure/cram2filtered.trigger.json", "cram-to-filtered"),
+                ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/interleaved-fastq-to-paired-fastq.trigger.json", "fastq-to-paired"),
+                ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/paired-fastq-to-unmapped-bam.trigger.json", "paired-fastq-to-unmapped-bam"),
+                ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/cram-to-bam.trigger.json", "cram-to-bam") };
+
+            await RunIntegrationTestAsync(workflowTriggerFiles);
         }
 
         /// <summary>
@@ -84,8 +106,8 @@ namespace TriggerService.Tests
             const int countOfWorkflowsToRun = 100;
             const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
-
-            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, testStorageAccountName);
+            var triggerFiles = new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) };
+            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFiles, testStorageAccountName);
         }
 
         /// <summary>
@@ -101,7 +123,8 @@ namespace TriggerService.Tests
             const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-genome-processing-pipeline-azure/main-azure/WholeGenomeGermlineSingleSample.trigger.json";
             const string workflowFriendlyName = $"wgs-germline";
 
-            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, testStorageAccountName);
+            var triggerFiles = new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) };
+            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFiles, testStorageAccountName);
         }
 
         /// <summary>
@@ -177,7 +200,7 @@ namespace TriggerService.Tests
             Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Succeeded) == 1);
         }
 
-        private async Task RunIntegrationTestAsync(string triggerFile, string workflowFriendlyName)
+        private async Task RunIntegrationTestAsync(List<(string triggerFileBlobUrl, string workflowFriendlyName)> triggerFiles)
         {
             // This is set in the Azure Devops pipeline, which writes the file to the .csproj directory
             // The current working directory is this: /mnt/vss/_work/r1/a/CoaArtifacts/AllSource/TriggerService.Tests/bin/Debug/net7.0/
@@ -203,13 +226,12 @@ namespace TriggerService.Tests
                 int.TryParse(lines[2].Trim('"'), out countOfWorkflowsToRun);
             }
 
-            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFile, workflowFriendlyName, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
+            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFiles, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
         }
 
         private async Task StartWorkflowsAsync(
             int countOfWorkflowsToRun,
-            string triggerFile,
-            string workflowFriendlyName,
+            List<(string triggerFileBlobUrl, string workflowFriendlyName)> triggerFiles,
             string storageAccountName,
             bool waitTilDone = false,
             string workflowsContainerSasToken = null)
@@ -240,20 +262,24 @@ namespace TriggerService.Tests
 
             // 1.  Get the publically available trigger file
             using var httpClient = new HttpClient();
-            var triggerFileJson = await (await httpClient.GetAsync(triggerFile)).Content.ReadAsStringAsync();
-
-            // 2.  Start the workflows by uploading new trigger files
             var blobNames = new List<string>();
-            var date = $"{startTime.Year}-{startTime.Month}-{startTime.Day}-{startTime.Hour}-{startTime.Minute}";
 
-            Console.WriteLine($"Starting {countOfWorkflowsToRun} workflows...");
-
-            for (var i = 1; i <= countOfWorkflowsToRun; i++)
+            foreach (var triggerFile in triggerFiles)
             {
-                // example: new/mutect2-001-of-100-2023-4-7-3-9.json
-                var blobName = $"new/{workflowFriendlyName}-{i:D4}-of-{countOfWorkflowsToRun:D4}-{date}.json";
-                blobNames.Add(blobName);
-                await workflowsContainer.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(triggerFileJson), true);
+                var triggerFileJson = await (await httpClient.GetAsync(triggerFile.triggerFileBlobUrl)).Content.ReadAsStringAsync();
+
+                // 2.  Start the workflows by uploading new trigger files
+                
+                var date = $"{startTime.Year}-{startTime.Month}-{startTime.Day}-{startTime.Hour}-{startTime.Minute}";
+                Console.WriteLine($"Starting {countOfWorkflowsToRun} workflows...");
+
+                for (var i = 1; i <= countOfWorkflowsToRun; i++)
+                {
+                    // example: new/mutect2-001-of-100-2023-4-7-3-9.json
+                    var blobName = $"new/{triggerFile.workflowFriendlyName}-{i:D4}-of-{countOfWorkflowsToRun:D4}-{date}.json";
+                    blobNames.Add(blobName);
+                    await workflowsContainer.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(triggerFileJson), true);
+                }
             }
 
             // 3.  Loop forever until they are all in a terminal state (succeeded or failed)
