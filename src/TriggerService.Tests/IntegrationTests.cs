@@ -30,7 +30,7 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task RunScaleTestWithMutect2WaitTilDoneAsync()
         {
-            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/mattmcl4475/long-running-int-test/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
+            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/long-running-int-test/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
 
             await RunIntegrationTestAsync(new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) });
