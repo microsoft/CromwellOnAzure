@@ -269,7 +269,7 @@ namespace TriggerService.Tests
                 var triggerFileJson = await (await httpClient.GetAsync(triggerFile.triggerFileBlobUrl)).Content.ReadAsStringAsync();
 
                 // 2.  Start the workflows by uploading new trigger files
-                
+
                 var date = $"{startTime.Year}-{startTime.Month}-{startTime.Day}-{startTime.Hour}-{startTime.Minute}";
                 Console.WriteLine($"Starting {countOfWorkflowsToRun} workflows...");
 
