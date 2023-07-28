@@ -29,17 +29,17 @@ spec:
       containers:
         - env:
             - name: Deployment__OrganizationName
-              value: {{ .Values.deployment.organizationName }}
+              value: {{ .Values.config.deployment.organizationName }}
             - name: Deployment__OrganizationUrl
-              value: {{ .Values.deployment.organizationUrl }}
+              value: {{ .Values.config.deployment.organizationUrl }}
             - name: Deployment__ContactUri
-              value: {{ .Values.deployment.contactUri }}
+              value: {{ .Values.config.deployment.contactUri }}
             - name: Deployment__Environment
-              value: {{ .Values.deployment.environment }}
+              value: {{ .Values.config.deployment.environment }}
             - name: Deployment__Created
-              value: {{ .Values.deployment.created }}
+              value: {{ .Values.config.deployment.created }}
             - name: Deployment__Updated
-              value: {{ .Values.deployment.updated }}
+              value: {{ .Values.config.deployment.updated }}
             - name: Deployment__TesImage
               value: {{ .Values.images.tes }}
             - name: TesPostgreSql__ServerName
