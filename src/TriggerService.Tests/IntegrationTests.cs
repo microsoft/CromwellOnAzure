@@ -28,20 +28,6 @@ namespace TriggerService.Tests
         /// <returns></returns>
         [TestCategory("Integration")]
         [TestMethod]
-        public async Task RunScaleTestWithMutect2WaitTilDoneAsync()
-        {
-            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
-            const string workflowFriendlyName = $"mutect2";
-
-            await RunIntegrationTestAsync(new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) });
-        }
-
-        /// <summary>
-        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken
-        /// </summary>
-        /// <returns></returns>
-        [TestCategory("Integration")]
-        [TestMethod]
         public async Task RunAllCommonWorkflowsWaitTilDoneAsync()
         {
             var workflowTriggerFiles = new List<(string triggerFileBlobUrl, string workflowFriendlyName)> {
@@ -200,7 +186,7 @@ namespace TriggerService.Tests
             Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Succeeded) == 1);
         }
 
-        private async Task RunIntegrationTestAsync(List<(string triggerFileBlobUrl, string workflowFriendlyName)> triggerFiles)
+        public static async Task RunIntegrationTestAsync(List<(string triggerFileBlobUrl, string workflowFriendlyName)> triggerFiles)
         {
             // This is set in the Azure Devops pipeline, which writes the file to the .csproj directory
             // The current working directory is this: /mnt/vss/_work/r1/a/CoaArtifacts/AllSource/TriggerService.Tests/bin/Debug/net7.0/
@@ -229,7 +215,7 @@ namespace TriggerService.Tests
             await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFiles, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
         }
 
-        private async Task StartWorkflowsAsync(
+        public static async Task StartWorkflowsAsync(
             int countOfWorkflowsToRun,
             List<(string triggerFileBlobUrl, string workflowFriendlyName)> triggerFiles,
             string storageAccountName,
@@ -271,7 +257,7 @@ namespace TriggerService.Tests
                 // 2.  Start the workflows by uploading new trigger files
                 
                 var date = $"{startTime.Year}-{startTime.Month}-{startTime.Day}-{startTime.Hour}-{startTime.Minute}";
-                Console.WriteLine($"Starting {countOfWorkflowsToRun} workflows...");
+                Console.WriteLine($"Starting ({countOfWorkflowsToRun}) [{triggerFile.workflowFriendlyName}] workflows...");
 
                 for (var i = 1; i <= countOfWorkflowsToRun; i++)
                 {
@@ -289,7 +275,7 @@ namespace TriggerService.Tests
             }
         }
 
-        private async Task<List<string>> ListContainerBlobNamesAsync(BlobContainerClient container)
+        public static async Task<List<string>> ListContainerBlobNamesAsync(BlobContainerClient container)
         {
             var enumerator = container.GetBlobsAsync().GetAsyncEnumerator();
             var existingBlobNames = new List<string>();
@@ -304,12 +290,12 @@ namespace TriggerService.Tests
             return existingBlobNames;
         }
 
-        private int CountWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
+        public static int CountWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
         {
             return GetWorkflowsByState(originalBlobNames, currentBlobNames, state).Count();
         }
 
-        private List<string> GetWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
+        public static List<string> GetWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
         {
             var stateString = state.ToString().ToLowerInvariant();
 
@@ -343,7 +329,7 @@ namespace TriggerService.Tests
 
 
 
-        private async Task WaitTilAllWorkflowsInTerminalStateAsync(int countOfWorkflowsToRun, DateTime startTime, BlobContainerClient container, List<string> originalBlobNames)
+        public static async Task WaitTilAllWorkflowsInTerminalStateAsync(int countOfWorkflowsToRun, DateTime startTime, BlobContainerClient container, List<string> originalBlobNames)
         {
             int succeededCount = 0;
             int failedCount = 0;
