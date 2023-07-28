@@ -28,6 +28,20 @@ spec:
       terminationGracePeriodSeconds: 90
       containers:
         - env:
+            - name: Deployment__OrganizationName
+              value: {{ .Values.deployment.organizationName }}
+            - name: Deployment__OrganizationUrl
+              value: {{ .Values.deployment.organizationUrl }}
+            - name: Deployment__ContactUri
+              value: {{ .Values.deployment.contactUri }}
+            - name: Deployment__Environment
+              value: {{ .Values.deployment.environment }}
+            - name: Deployment__Created
+              value: {{ .Values.deployment.created }}
+            - name: Deployment__Updated
+              value: {{ .Values.deployment.updated }}
+            - name: Deployment__TesImage
+              value: {{ .Values.images.tes }}
             - name: TesPostgreSql__ServerName
               value: {{ .Values.tesDatabase.serverName }}
             - name: TesPostgreSql__ServerNameSuffix

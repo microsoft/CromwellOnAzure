@@ -4,6 +4,14 @@
     <TargetFramework>net7.0</TargetFramework>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.9" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.1" />

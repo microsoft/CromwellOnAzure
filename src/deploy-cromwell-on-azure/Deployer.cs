@@ -284,10 +284,6 @@ namespace CromwellOnAzureDeployer
 
                             var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
 
-                            //if (installedVersion is null || installedVersion < new Version(4, 1))
-                            //{
-                            //}
-
                             if (installedVersion is null || installedVersion < new Version(4, 4))
                             {
                                 // Ensure all storage containers are created.
@@ -298,6 +294,18 @@ namespace CromwellOnAzureDeployer
                                     settings["BatchNodesSubnetId"] = await UpdateVnetWithBatchSubnet();
                                 }
                             }
+
+                            if (installedVersion is null || installedVersion < new Version(4, 5))
+                            {
+                                if (string.IsNullOrWhiteSpace(settings["DeploymentCreated"]))
+                                {
+                                    settings["DeploymentCreated"] = settings["DeploymentUpdated"];
+                                }
+                            }
+
+                            //if (installedVersion is null || installedVersion < new Version(4, x))
+                            //{
+                            //}
 
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
                             kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup);
@@ -784,9 +792,11 @@ namespace CromwellOnAzureDeployer
         {
             settings ??= new();
             var defaults = GetDefaultValues(new[] { "env-00-coa-version.txt", "env-01-account-names.txt", "env-02-internal-images.txt", "env-03-external-images.txt", "env-04-settings.txt" });
+            var currentTime = DateTime.UtcNow;
 
             // We always overwrite the CoA version
             UpdateSetting(settings, defaults, "CromwellOnAzureVersion", default(string), ignoreDefaults: false);
+            UpdateSetting(settings, defaults, "DeploymentUpdated", currentTime.ToString("O"), ignoreDefaults: false);
 
             // Process images
             UpdateSetting(settings, defaults, "CromwellImageName", configuration.CromwellVersion, v => $"broadinstitute/cromwell:{v}",
@@ -799,6 +809,10 @@ namespace CromwellOnAzureDeployer
             UpdateSetting(settings, defaults, "BatchNodesSubnetId", configuration.BatchNodesSubnetId);
             UpdateSetting(settings, defaults, "DockerInDockerImageName", configuration.DockerInDockerImageName);
             UpdateSetting(settings, defaults, "DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress, b => b.GetValueOrDefault().ToString(), configuration.DisableBatchNodesPublicIpAddress.GetValueOrDefault().ToString());
+            UpdateSetting(settings, defaults, "DeploymentOrganizationName", configuration.DeploymentOrganizationName);
+            UpdateSetting(settings, defaults, "DeploymentOrganizationUrl", configuration.DeploymentOrganizationUrl);
+            UpdateSetting(settings, defaults, "DeploymentContactUri", configuration.DeploymentContactUri);
+            UpdateSetting(settings, defaults, "DeploymentEnvironment", configuration.DeploymentEnvironment);
 
             if (installedVersion is null)
             {
@@ -822,6 +836,7 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseUserLogin", GetFormattedPostgresqlUser(isCromwellPostgresUser: true), ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "PostgreSqlCromwellDatabaseUserPassword", configuration.PostgreSqlCromwellUserPassword, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "UsePostgreSqlSingleServer", configuration.UsePostgreSqlSingleServer.ToString(), ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "DeploymentCreated", currentTime.ToString("O"), ignoreDefaults: true);
             }
 
             BackFillSettings(settings, defaults);
@@ -2000,7 +2015,12 @@ namespace CromwellOnAzureDeployer
 
             if (!string.IsNullOrWhiteSpace(configuration.BatchNodesSubnetId) && !string.IsNullOrWhiteSpace(configuration.BatchSubnetName))
             {
-                throw new Exception("Invalid configuration options BatchNodesSubnetId and BatchSubnetName are mutually exclusive.");
+                throw new ValidationException("Invalid configuration options BatchNodesSubnetId and BatchSubnetName are mutually exclusive.");
+            }
+
+            if (string.IsNullOrWhiteSpace(configuration.DeploymentOrganizationName) != string.IsNullOrWhiteSpace(configuration.DeploymentOrganizationUrl))
+            {
+                throw new ValidationException("Invalid configuration options DeploymentOrganizationName and DeploymentOrganizationUrl must both be provided together.");
             }
         }
 

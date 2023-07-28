@@ -21,6 +21,13 @@ config:
     useLegacyAutopools: "False"
     poolRotationForcedDays: "7"
     prefix: RUNTIME_PARAMETER
+  deployment:
+    organizationName: RUNTIME_PARAMETER
+    organizationUrl: RUNTIME_PARAMETER
+    contactUri: RUNTIME_PARAMETER
+    environment: RUNTIME_PARAMETER
+    created: RUNTIME_PARAMETER
+    updated: RUNTIME_PARAMETER
   nodeImages:
     docker: RUNTIME_PARAMETER
   batchImageGen2:
