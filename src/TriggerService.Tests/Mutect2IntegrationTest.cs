@@ -4,7 +4,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace TriggerService.Tests
 {
-    internal class Mutect2IntegrationTest
+    public class Mutect2IntegrationTest
     {
         [TestCategory("Integration")]
         [TestMethod]
