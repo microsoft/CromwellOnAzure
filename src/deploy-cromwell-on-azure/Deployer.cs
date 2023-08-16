@@ -166,6 +166,7 @@ namespace CromwellOnAzureDeployer
                 IStorageAccount storageAccount = null;
                 var keyVaultUri = string.Empty;
                 IIdentity managedIdentity = null;
+                IIdentity aksNodepoolIdentity = null;
                 IPrivateDnsZone postgreSqlDnsZone = null;
                 IKubernetes kubernetesClient = null;
 
@@ -324,6 +325,12 @@ namespace CromwellOnAzureDeployer
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
                         aksCluster = await ValidateAndGetExistingAKSClusterAsync();
+
+                        if (aksCluster is not null)
+                        {
+                            aksNodepoolIdentity = await GetUserManagedIdentityAsync(aksCluster.Identity.UserAssignedIdentities.First().Value.PrincipalId);
+                        }
+
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
                         var keyVault = await ValidateAndGetExistingKeyVault();
 
@@ -430,6 +437,13 @@ namespace CromwellOnAzureDeployer
                             await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                             await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+
+                            if (aksNodepoolIdentity is not null)
+                            {
+                                await AssignVmAsContributorToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
+                                await AssignVmAsDataReaderToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
+                                await AssignManagedIdOperatorToResourceAsync(aksNodepoolIdentity, resourceGroup);
+                            }
                         });
 
                         if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
@@ -1586,6 +1600,11 @@ namespace CromwellOnAzureDeployer
                         .WithRegion(configuration.RegionName)
                         .WithExistingResourceGroup(resourceGroup)
                         .CreateAsync());
+        }
+
+        private async Task<IIdentity> GetUserManagedIdentityAsync(string principalId)
+        {
+            return (await azureSubscriptionClient.Identities.ListAsync()).SingleOrDefault(x => string.Equals(x.PrincipalId, principalId, StringComparison.OrdinalIgnoreCase));
         }
 
         private async Task DeleteResourceGroupAsync()
