@@ -459,7 +459,15 @@ namespace CromwellOnAzureDeployer
 
                         if (postgreSqlFlexServer is null)
                         {
-                            postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
+                            if (configuration.VnetResourceGroupName is not null)
+                            {
+                                postgreSqlDnsZone = await GetExistingPrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com");
+                            }
+
+                            if (postgreSqlDnsZone is null)
+                            {
+                                postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
+                            }
                         }
 
                         await Task.WhenAll(new Task[]
@@ -1371,6 +1379,16 @@ namespace CromwellOnAzureDeployer
             {
                 return $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{dbName} -c \"{sqlCommand}\"";
             }
+        }
+
+        private async Task<IPrivateDnsZone> GetExistingPrivateDnsZoneAsync(INetwork virtualNetwork, string name)
+        {
+            var dnsZone = (await azureSubscriptionClient.PrivateDnsZones
+                .ListByResourceGroupAsync(configuration.VnetResourceGroupName))
+                .SingleOrDefault(a => a.Name.Equals(name, StringComparison.OrdinalIgnoreCase) 
+                    && (a.VirtualNetworkLinks.List().Where(x => string.Equals(x.ReferencedVirtualNetworkId, virtualNetwork.Id, StringComparison.OrdinalIgnoreCase)).Count() > 0));
+
+            return dnsZone;
         }
 
         private Task<IPrivateDnsZone> CreatePrivateDnsZoneAsync(INetwork virtualNetwork, string name, string title)
