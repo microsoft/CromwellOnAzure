@@ -330,7 +330,7 @@ namespace CromwellOnAzureDeployer
                         if (aksCluster is not null)
                         {
                             aksNodepoolIdentity = await GetUserManagedIdentityAsync(aksCluster.Identity.UserAssignedIdentities.First().Value.PrincipalId);
-                            
+
                             var aksSubnet = aksCluster.AgentPoolProfiles.Where(x => string.Equals(x.Mode, "System", StringComparison.OrdinalIgnoreCase)).First().VnetSubnetID;
                             var aksVnetString = aksSubnet.Remove(aksSubnet.IndexOf("/subnets/"));
                             aksVnet = await azureSubscriptionClient.Networks.GetByIdAsync(aksVnetString);
@@ -1398,7 +1398,7 @@ namespace CromwellOnAzureDeployer
         {
             var dnsZones = (await azureSubscriptionClient.PrivateDnsZones.ListAsync()).Where(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             var dnsZonesMap = new Dictionary<string, IPrivateDnsZone>();
-            
+
             foreach (var zone in dnsZones)
             {
                 var pairs = zone.VirtualNetworkLinks.List().Select(x => new KeyValuePair<string, IPrivateDnsZone>(x.ReferencedVirtualNetworkId, zone));
