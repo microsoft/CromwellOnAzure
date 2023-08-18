@@ -2060,6 +2060,11 @@ namespace CromwellOnAzureDeployer
             {
                 throw new Exception("Invalid configuration options BatchNodesSubnetId and BatchSubnetName are mutually exclusive.");
             }
+
+            if (!string.IsNullOrWhiteSpace(configuration.AksClusterName) && !configuration.UsePostgreSqlSingleServer)
+            {
+                throw new Exception("If providing an existing AKS cluster, --UsePostgreSqlSingleServer must be set to true.");
+            }
         }
 
         private static void DisplayValidationExceptionAndExit(ValidationException validationException)
