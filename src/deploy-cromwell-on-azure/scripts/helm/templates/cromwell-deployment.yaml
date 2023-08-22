@@ -20,11 +20,6 @@ spec:
       annotations:
         container.apparmor.security.beta.kubernetes.io/cromwell: runtime/default
     spec:
-      securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
-        supplementalGroups: [1000]
       containers:
         - args:
             -  java -Djava.io.tmpdir=/cromwell-tmp/ -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server
