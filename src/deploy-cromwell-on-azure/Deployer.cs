@@ -1163,6 +1163,7 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
                         new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
                         new Utility.ConfigReplaceTextItem("{StorageAccount}", configuration.StorageAccountName),
+                        new Utility.ConfigReplaceTextItem("{Subscription}", configuration.SubscriptionId),
                     }, "scripts", CromwellConfigurationFileName));
 
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
