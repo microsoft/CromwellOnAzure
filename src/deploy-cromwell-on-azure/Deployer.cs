@@ -150,7 +150,7 @@ namespace CromwellOnAzureDeployer
                     tokenCredentials = new(tokenProvider);
                     azureCredentials = new(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
                     azureClient = GetAzureClient(azureCredentials);
-                    armClient = new ArmClient(new DefaultAzureCredential());
+                    armClient = new ArmClient(new AzureCliCredential());
                     azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                     subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
                     resourceManagerClient = GetResourceManagerClient(azureCredentials);
@@ -172,6 +172,8 @@ namespace CromwellOnAzureDeployer
                 IStorageAccount storageAccount = null;
                 var keyVaultUri = string.Empty;
                 IIdentity managedIdentity = null;
+                IIdentity aksNodepoolIdentity = null;
+                INetwork aksVnet = null;
                 IPrivateDnsZone postgreSqlDnsZone = null;
                 IKubernetes kubernetesClient = null;
 
@@ -306,7 +308,7 @@ namespace CromwellOnAzureDeployer
                             }
 
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
-                            kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup);
+                            kubernetesClient = await PerformHelmDeploymentAsync(existingAksCluster);
                         }
                         else
                         {
@@ -330,6 +332,16 @@ namespace CromwellOnAzureDeployer
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
                         aksCluster = await ValidateAndGetExistingAKSClusterAsync();
+
+                        if (aksCluster is not null)
+                        {
+                            aksNodepoolIdentity = await GetUserManagedIdentityAsync(aksCluster.Identity.UserAssignedIdentities.First().Value.PrincipalId);
+
+                            var aksSubnet = aksCluster.AgentPoolProfiles.Where(x => string.Equals(x.Mode, "System", StringComparison.OrdinalIgnoreCase)).First().VnetSubnetID;
+                            var aksVnetString = aksSubnet.Remove(aksSubnet.IndexOf("/subnets/"));
+                            aksVnet = await azureSubscriptionClient.Networks.GetByIdAsync(aksVnetString);
+                        }
+
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
                         var keyVault = await ValidateAndGetExistingKeyVault();
 
@@ -419,6 +431,11 @@ namespace CromwellOnAzureDeployer
                             }
                         }
 
+                        if (aksVnet is null)
+                        {
+                            aksVnet = vnetAndSubnet.Value.virtualNetwork;
+                        }
+
                         if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
                         {
                             var workspaceName = SdkContext.RandomResourceName(configuration.MainIdentifierPrefix, 15);
@@ -436,6 +453,13 @@ namespace CromwellOnAzureDeployer
                             await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                             await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+
+                            if (aksNodepoolIdentity is not null)
+                            {
+                                await AssignVmAsContributorToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
+                                await AssignVmAsDataReaderToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
+                                await AssignManagedIdOperatorToResourceAsync(aksNodepoolIdentity, resourceGroup);
+                            }
                         });
 
                         if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
@@ -451,7 +475,12 @@ namespace CromwellOnAzureDeployer
 
                         if (postgreSqlFlexServer is null)
                         {
-                            postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
+                            postgreSqlDnsZone = await GetExistingPrivateDnsZoneAsync(aksVnet, $"privatelink.postgres.database.azure.com");
+
+                            if (postgreSqlDnsZone is null)
+                            {
+                                postgreSqlDnsZone = await CreatePrivateDnsZoneAsync(aksVnet, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
+                            }
                         }
 
                         await Task.WhenAll(new Task[]
@@ -469,7 +498,13 @@ namespace CromwellOnAzureDeployer
                             Task.Run(async () => {
                                 if (configuration.UsePostgreSqlSingleServer)
                                 {
-                                    postgreSqlSingleServer ??= await CreateSinglePostgreSqlServerAndDatabaseAsync(postgreSqlSingleManagementClient, vnetAndSubnet.Value.vmSubnet, postgreSqlDnsZone);
+                                    var peSubnet = vnetAndSubnet.Value.vmSubnet;
+                                    if (aksVnet is not null)
+                                    {
+                                       peSubnet = aksVnet.Subnets.First().Value;
+                                    }
+
+                                    postgreSqlSingleServer ??= await CreateSinglePostgreSqlServerAndDatabaseAsync(postgreSqlSingleManagementClient, peSubnet, postgreSqlDnsZone);
                                 }
                                 else
                                 {
@@ -483,11 +518,11 @@ namespace CromwellOnAzureDeployer
 
                         if (aksCluster is null && !configuration.ManualHelmDeployment)
                         {
-                            await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
+                            aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
                         }
 
                         await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity, containersToMount);
-                        kubernetesClient = await PerformHelmDeploymentAsync(resourceGroup,
+                        kubernetesClient = await PerformHelmDeploymentAsync(aksCluster,
                             new[]
                             {
                                 "Run the following postgresql command to setup the database.",
@@ -601,7 +636,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task<IKubernetes> PerformHelmDeploymentAsync(IResourceGroup resourceGroup, IEnumerable<string> manualPrecommands = default, Func<IKubernetes, Task> asyncTask = default)
+        private async Task<IKubernetes> PerformHelmDeploymentAsync(ManagedCluster aksCluster, IEnumerable<string> manualPrecommands = default, Func<IKubernetes, Task> asyncTask = default)
         {
             if (configuration.ManualHelmDeployment)
             {
@@ -619,7 +654,7 @@ namespace CromwellOnAzureDeployer
             }
             else
             {
-                var kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(resourceGroup);
+                var kubernetesClient = await kubernetesManager.GetKubernetesClientAsync(aksCluster);
                 await (asyncTask?.Invoke(kubernetesClient) ?? Task.CompletedTask);
                 await kubernetesManager.DeployHelmChartToClusterAsync();
                 return kubernetesClient;
@@ -730,6 +765,18 @@ namespace CromwellOnAzureDeployer
             {
                 { "kubeletidentity", new ManagedClusterPropertiesIdentityProfileValue(managedIdentity.Id, managedIdentity.ClientId, managedIdentity.PrincipalId) }
             };
+
+            if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
+            {
+                cluster.EnableRBAC = true;
+                cluster.AadProfile = new ManagedClusterAADProfile()
+                {
+                    AdminGroupObjectIDs = configuration.AadGroupIds.Split(",", StringSplitOptions.RemoveEmptyEntries),
+                    EnableAzureRBAC = false,
+                    Managed = true
+                };
+            }
+
             cluster.AgentPoolProfiles = new List<ManagedClusterAgentPoolProfile>
             {
                 new ManagedClusterAgentPoolProfile()
@@ -1422,6 +1469,24 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private async Task<IPrivateDnsZone> GetExistingPrivateDnsZoneAsync(INetwork virtualNetwork, string name)
+        {
+            var dnsZones = (await azureSubscriptionClient.PrivateDnsZones.ListAsync()).Where(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            var dnsZonesMap = new Dictionary<string, IPrivateDnsZone>();
+
+            foreach (var zone in dnsZones)
+            {
+                var pairs = zone.VirtualNetworkLinks.List().Select(x => new KeyValuePair<string, IPrivateDnsZone>(x.ReferencedVirtualNetworkId, zone));
+                foreach (var pair in pairs)
+                {
+                    dnsZonesMap.Add(pair.Key, pair.Value);
+                }
+            }
+
+            dnsZonesMap.TryGetValue(virtualNetwork.Id, out var privateDnsZone);
+            return privateDnsZone;
+        }
+
         private Task<IPrivateDnsZone> CreatePrivateDnsZoneAsync(INetwork virtualNetwork, string name, string title)
             => Execute(
                 $"Creating private DNS Zone for {title}...",
@@ -1649,6 +1714,11 @@ namespace CromwellOnAzureDeployer
                         .WithRegion(configuration.RegionName)
                         .WithExistingResourceGroup(resourceGroup)
                         .CreateAsync());
+        }
+
+        private async Task<IIdentity> GetUserManagedIdentityAsync(string principalId)
+        {
+            return (await azureSubscriptionClient.Identities.ListAsync()).SingleOrDefault(x => string.Equals(x.PrincipalId, principalId, StringComparison.OrdinalIgnoreCase));
         }
 
         private async Task DeleteResourceGroupAsync()
@@ -2065,6 +2135,11 @@ namespace CromwellOnAzureDeployer
             {
                 throw new Exception("Invalid configuration options BatchNodesSubnetId and BatchSubnetName are mutually exclusive.");
             }
+
+            if (!string.IsNullOrWhiteSpace(configuration.AksClusterName) && !configuration.UsePostgreSqlSingleServer)
+            {
+                throw new Exception("If providing an existing AKS cluster, --UsePostgreSqlSingleServer must be set to true.");
+            }
         }
 
         private static void DisplayValidationExceptionAndExit(ValidationException validationException)
@@ -2171,12 +2246,19 @@ namespace CromwellOnAzureDeployer
             {
                 try
                 {
-                    var succeeded = container.GetBlobs(prefix: $"succeeded/{id}").Count() == 1;
-                    var failed = container.GetBlobs(prefix: $"failed/{id}").Count() == 1;
+                    var hasSucceeded = container.GetBlobs(prefix: $"succeeded/{id}").Count() == 1;
+                    var failedWorkflowTriggerFileBlobs = container.GetBlobs(prefix: $"failed/{id}").ToList();
+                    var hasFailed = failedWorkflowTriggerFileBlobs.Count == 1;
 
-                    if (succeeded || failed)
+                    if (hasSucceeded || hasFailed)
                     {
-                        return succeeded && !failed;
+                        if (hasFailed)
+                        {
+                            var failedContent = (await container.GetBlobClient(failedWorkflowTriggerFileBlobs.First().Name).DownloadContentAsync()).Value.Content.ToString();
+                            ConsoleEx.WriteLine($"Failed workflow trigger JSON: {failedContent}");
+                        }
+
+                        return hasSucceeded && !hasFailed;
                     }
                 }
                 catch (Exception exc)

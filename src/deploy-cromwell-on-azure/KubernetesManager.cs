@@ -10,13 +10,14 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.Core;
 using k8s;
 using k8s.Models;
 using Microsoft.Azure.Management.ContainerService;
 using Microsoft.Azure.Management.ContainerService.Fluent;
+using Microsoft.Azure.Management.ContainerService.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Management.Storage.Fluent;
 using Newtonsoft.Json;
 using Polly;
@@ -31,15 +32,15 @@ namespace CromwellOnAzureDeployer
     {
         private static readonly AsyncRetryPolicy WorkloadReadyRetryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryAsync(40, retryAttempt => TimeSpan.FromSeconds(15));
+            .WaitAndRetryAsync(40, retryAttempt => System.TimeSpan.FromSeconds(15));
 
         private static readonly AsyncRetryPolicy KubeExecRetryPolicy = Policy
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
-            .WaitAndRetryAsync(8, retryAttempt => TimeSpan.FromSeconds(5));
+            .WaitAndRetryAsync(8, retryAttempt => System.TimeSpan.FromSeconds(5));
 
         // "master" is used despite not being a best practice: https://github.com/kubernetes-sigs/blob-csi-driver/issues/783
         private const string BlobCsiDriverGithubReleaseBranch = "master";
-        private const string BlobCsiDriverGithubReleaseVersion = "v1.18.0";
+        private const string BlobCsiDriverGithubReleaseVersion = "v1.22.1";
         private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseBranch}/charts";
         private const string AadPluginGithubReleaseVersion = "v1.8.13";
         private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
@@ -63,9 +64,10 @@ namespace CromwellOnAzureDeployer
             CreateAndInitializeWorkingDirectoriesAsync().Wait();
         }
 
-        public async Task<IKubernetes> GetKubernetesClientAsync(IResource resourceGroupObject)
+        public async Task<IKubernetes> GetKubernetesClientAsync(ManagedCluster aksCluster)
         {
-            var resourceGroup = resourceGroupObject.Name;
+            var r = new ResourceIdentifier(aksCluster.Id);
+            var resourceGroup = r.ResourceGroupName;
             var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
@@ -133,8 +135,8 @@ namespace CromwellOnAzureDeployer
             }
 
             await ExecHelmProcessAsync($"repo update");
-            await ExecHelmProcessAsync($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig \"{kubeConfigPath}\"");
-            await ExecHelmProcessAsync($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig \"{kubeConfigPath}\"");
+            await ExecHelmProcessAsync($"upgrade --install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig \"{kubeConfigPath}\"");
+            await ExecHelmProcessAsync($"upgrade --install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig \"{kubeConfigPath}\"");
         }
 
         public async Task DeployHelmChartToClusterAsync()
@@ -191,7 +193,6 @@ namespace CromwellOnAzureDeployer
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
         }
-
 
         public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount, Version previousVersion)
         {
