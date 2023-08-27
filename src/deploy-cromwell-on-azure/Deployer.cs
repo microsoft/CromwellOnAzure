@@ -503,7 +503,6 @@ namespace CromwellOnAzureDeployer
                     if (kubernetesClient is not null)
                     {
                         await kubernetesManager.WaitForCromwellAsync(kubernetesClient);
-                        await WarmUpCromwellBlobfuse(kubernetesClient, "cromwell", configuration.AksCoANamespace);
                     }
                 }
                 finally
@@ -1407,21 +1406,6 @@ namespace CromwellOnAzureDeployer
 
                     await kubernetesManager.ExecuteCommandsOnPodAsync(kubernetesClient, podName, commands, aksNamespace);
                 });
-
-        private Task WarmUpCromwellBlobfuse(IKubernetes kubernetesClient, string podName, string aksNamespace)
-    => Execute(
-        $"Executing script to create users in tes_db and cromwell_db...",
-        async () =>
-        {
-            var commands = new List<string[]> {
-                new string[] { "bash", "-lic", "ls /cromwell-executions/" },
-                new string[] { "bash", "-lic", "echo hello > /cromwell-executions/hello.txt" },
-                new string[] { "bash", "-lic", "ls /cromwell-executions/" },
-                new string[] { "bash", "-lic", "cat /cromwell-executions/hello.txt" },
-            };
-
-            await kubernetesManager.ExecuteCommandsOnPodAsync(kubernetesClient, podName, commands, aksNamespace);
-        });
 
         private static async Task SetStorageKeySecret(string vaultUrl, string secretName, string secretValue)
         {
