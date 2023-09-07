@@ -1325,21 +1325,29 @@ namespace CromwellOnAzureDeployer
                 $"Creating virtual network and subnets: {configuration.VnetName}...",
                 async () =>
                 {
+                    var vmNsg = await CreateNetworkSecurityGroupAsync(resourceGroup, $"{configuration.VnetName}-{configuration.VmSubnetName}-nsg");
+                    var dbNsg = await CreateNetworkSecurityGroupAsync(resourceGroup, $"{configuration.VnetName}-{configuration.PostgreSqlSubnetName}-nsg");
+                    var batchNsg = await CreateNetworkSecurityGroupAsync(resourceGroup, $"{configuration.VnetName}-{configuration.BatchSubnetName}-nsg");
+
                     var vnetDefinition = azureSubscriptionClient.Networks
                         .Define(configuration.VnetName)
                         .WithRegion(configuration.RegionName)
                         .WithExistingResourceGroup(resourceGroup)
                         .WithAddressSpace(configuration.VnetAddressSpace)
                         .DefineSubnet(configuration.VmSubnetName)
-                        .WithAddressPrefix(configuration.VmSubnetAddressSpace).Attach();
+                        .WithAddressPrefix(configuration.VmSubnetAddressSpace)
+                        .WithExistingNetworkSecurityGroup(vmNsg)
+                        .Attach();
 
                     vnetDefinition = vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName)
                         .WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace)
+                        .WithExistingNetworkSecurityGroup(dbNsg)
                         .WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers")
                         .Attach();
 
                     vnetDefinition = vnetDefinition.DefineSubnet(configuration.BatchSubnetName)
                         .WithAddressPrefix(configuration.BatchNodesSubnetAddressSpace)
+                        .WithExistingNetworkSecurityGroup(batchNsg)
                         .Attach();
 
                     var vnet = await vnetDefinition.CreateAsync();
@@ -1357,6 +1365,14 @@ namespace CromwellOnAzureDeployer
                         vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value,
                         batchSubnet);
                 });
+
+        private Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync(IResourceGroup resourceGroup, string networkSecurityGroupName)
+        {
+            return azureSubscriptionClient.NetworkSecurityGroups.Define(networkSecurityGroupName)
+                    .WithRegion(configuration.RegionName)
+                    .WithExistingResourceGroup(resourceGroup)
+                    .CreateAsync(cts.Token);
+        }
 
         private string GetFormattedPostgresqlUser(bool isCromwellPostgresUser)
         {
