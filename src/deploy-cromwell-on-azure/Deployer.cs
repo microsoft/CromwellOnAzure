@@ -785,6 +785,7 @@ namespace CromwellOnAzureDeployer
                     EnableNodePublicIP = false,
                     OsType = "Linux",
                     Mode = "System",
+                    OsSKU = "CBLMariner",
                     VnetSubnetID = virtualNetwork.Subnets[subnetName].Inner.Id,
                 }
             };
