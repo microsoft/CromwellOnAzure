@@ -1325,9 +1325,7 @@ namespace CromwellOnAzureDeployer
                 $"Creating virtual network and subnets: {configuration.VnetName}...",
                 async () =>
                 {
-                    var vmNsg = await CreateNetworkSecurityGroupAsync(resourceGroup, $"{configuration.VnetName}-{configuration.VmSubnetName}-nsg");
-                    var dbNsg = await CreateNetworkSecurityGroupAsync(resourceGroup, $"{configuration.VnetName}-{configuration.PostgreSqlSubnetName}-nsg");
-                    var batchNsg = await CreateNetworkSecurityGroupAsync(resourceGroup, $"{configuration.VnetName}-{configuration.BatchSubnetName}-nsg");
+                    var defaultNsg = await CreateNetworkSecurityGroupAsync(resourceGroup, $"{configuration.VnetName}-default-nsg");
 
                     var vnetDefinition = azureSubscriptionClient.Networks
                         .Define(configuration.VnetName)
@@ -1336,18 +1334,18 @@ namespace CromwellOnAzureDeployer
                         .WithAddressSpace(configuration.VnetAddressSpace)
                         .DefineSubnet(configuration.VmSubnetName)
                         .WithAddressPrefix(configuration.VmSubnetAddressSpace)
-                        .WithExistingNetworkSecurityGroup(vmNsg)
+                        .WithExistingNetworkSecurityGroup(defaultNsg)
                         .Attach();
 
                     vnetDefinition = vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName)
                         .WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace)
-                        .WithExistingNetworkSecurityGroup(dbNsg)
+                        .WithExistingNetworkSecurityGroup(defaultNsg)
                         .WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers")
                         .Attach();
 
                     vnetDefinition = vnetDefinition.DefineSubnet(configuration.BatchSubnetName)
                         .WithAddressPrefix(configuration.BatchNodesSubnetAddressSpace)
-                        .WithExistingNetworkSecurityGroup(batchNsg)
+                        .WithExistingNetworkSecurityGroup(defaultNsg)
                         .Attach();
 
                     var vnet = await vnetDefinition.CreateAsync();
