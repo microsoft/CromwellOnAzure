@@ -17,6 +17,7 @@ using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Network;
 using Azure.ResourceManager.Network.Models;
+using Azure.ResourceManager.Resources;
 using Azure.Security.KeyVault.Secrets;
 using Azure.Storage;
 using Azure.Storage.Blobs;
@@ -104,6 +105,11 @@ namespace CromwellOnAzureDeployer
             "Microsoft.Network",
             "Microsoft.Storage",
             "Microsoft.DBforPostgreSQL"
+        };
+
+        private readonly Dictionary<string, List<string>> requiredResourceProviderFeatures = new Dictionary<string, List<string>>()
+        {
+            { "Microsoft.Compute", new List<string> { "EncryptionAtHost" } }
         };
 
         private Configuration configuration { get; set; }
@@ -374,7 +380,7 @@ namespace CromwellOnAzureDeployer
                         }
 
                         await RegisterResourceProvidersAsync();
-                        await ValidateVmAsync();
+                        await RegisterResourceProviderFeaturesAsync();
 
                         if (batchAccount is null)
                         {
@@ -780,6 +786,7 @@ namespace CromwellOnAzureDeployer
                     VmSize = configuration.VmSize,
                     OsDiskSizeGB = 128,
                     OsDiskType = OSDiskType.Managed,
+                    EnableEncryptionAtHost = true,
                     Type = "VirtualMachineScaleSets",
                     EnableAutoScaling = false,
                     EnableNodePublicIP = false,
@@ -1059,6 +1066,74 @@ namespace CromwellOnAzureDeployer
             return notRegisteredResourceProviders;
         }
 
+        private async Task RegisterResourceProviderFeaturesAsync()
+        {
+            var unregisteredFeatures = new List<FeatureResource>();
+            try
+            {
+                await Execute(
+                    $"Registering resource provider features...",
+                    async () =>
+                    {
+                        var subscription = armClient.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{configuration.SubscriptionId}"));
+
+                        foreach (var rpName in requiredResourceProviderFeatures.Keys)
+                        {
+                            var rp = await subscription.GetResourceProviderAsync(rpName);
+
+                            foreach (var featureName in requiredResourceProviderFeatures[rpName])
+                            {
+                                var feature = await rp.Value.GetFeatureAsync(featureName);
+
+                                if (!string.Equals(feature.Value.Data.FeatureState, "Registered", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    unregisteredFeatures.Add(feature);
+                                    _ = await feature.Value.RegisterAsync();
+                                }
+                            }
+                        }
+
+                        while (!cts.IsCancellationRequested)
+                        {
+                            if (unregisteredFeatures.Count == 0)
+                            {
+                                break;
+                            }
+
+                            await Task.Delay(System.TimeSpan.FromSeconds(30));
+                            var finished = new List<FeatureResource>();
+
+                            foreach (var feature in unregisteredFeatures)
+                            {
+                                var update = await feature.GetAsync();
+
+                                if (string.Equals(update.Value.Data.FeatureState, "Registered", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    finished.Add(feature);
+                                }
+                            }
+                            unregisteredFeatures.RemoveAll(x => finished.Contains(x));
+                        }
+                    });
+            }
+            catch (Microsoft.Rest.Azure.CloudException ex) when (ex.ToCloudErrorType() == CloudErrorType.AuthorizationFailed)
+            {
+                ConsoleEx.WriteLine();
+                ConsoleEx.WriteLine("Unable to programatically register the required features.", ConsoleColor.Red);
+                ConsoleEx.WriteLine("This can happen if you don't have the Owner or Contributor role assignment for the subscription.", ConsoleColor.Red);
+                ConsoleEx.WriteLine();
+                ConsoleEx.WriteLine("Please contact the Owner or Contributor of your Azure subscription, and have them:", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine();
+                ConsoleEx.WriteLine("1. For each of the following, execute 'az feature register --namespace {RESOURCE_PROVIDER_NAME} --name {FEATURE_NAME}'", ConsoleColor.Yellow);
+                ConsoleEx.WriteLine();
+                unregisteredFeatures.ForEach(f => ConsoleEx.WriteLine($"- {f.Data.Name}", ConsoleColor.Yellow));
+                ConsoleEx.WriteLine();
+                ConsoleEx.WriteLine("After completion, please re-attempt deployment.");
+
+                Environment.Exit(1);
+            }
+        }
+
         private Task AssignManagedIdOperatorToResourceAsync(IIdentity managedIdentity, IResource resource)
         {
             // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#managed-identity-operator
@@ -1325,21 +1400,27 @@ namespace CromwellOnAzureDeployer
                 $"Creating virtual network and subnets: {configuration.VnetName}...",
                 async () =>
                 {
+                    var defaultNsg = await CreateNetworkSecurityGroupAsync(resourceGroup, $"{configuration.VnetName}-default-nsg");
+
                     var vnetDefinition = azureSubscriptionClient.Networks
                         .Define(configuration.VnetName)
                         .WithRegion(configuration.RegionName)
                         .WithExistingResourceGroup(resourceGroup)
                         .WithAddressSpace(configuration.VnetAddressSpace)
                         .DefineSubnet(configuration.VmSubnetName)
-                        .WithAddressPrefix(configuration.VmSubnetAddressSpace).Attach();
+                        .WithAddressPrefix(configuration.VmSubnetAddressSpace)
+                        .WithExistingNetworkSecurityGroup(defaultNsg)
+                        .Attach();
 
                     vnetDefinition = vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName)
                         .WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace)
+                        .WithExistingNetworkSecurityGroup(defaultNsg)
                         .WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers")
                         .Attach();
 
                     vnetDefinition = vnetDefinition.DefineSubnet(configuration.BatchSubnetName)
                         .WithAddressPrefix(configuration.BatchNodesSubnetAddressSpace)
+                        .WithExistingNetworkSecurityGroup(defaultNsg)
                         .Attach();
 
                     var vnet = await vnetDefinition.CreateAsync();
@@ -1357,6 +1438,14 @@ namespace CromwellOnAzureDeployer
                         vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value,
                         batchSubnet);
                 });
+
+        private Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync(IResourceGroup resourceGroup, string networkSecurityGroupName)
+        {
+            return azureSubscriptionClient.NetworkSecurityGroups.Define(networkSecurityGroupName)
+                    .WithRegion(configuration.RegionName)
+                    .WithExistingResourceGroup(resourceGroup)
+                    .CreateAsync(cts.Token);
+        }
 
         private string GetFormattedPostgresqlUser(bool isCromwellPostgresUser)
         {
