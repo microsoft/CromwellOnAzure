@@ -40,7 +40,7 @@ namespace CromwellOnAzureDeployer
 
         // "master" is used despite not being a best practice: https://github.com/kubernetes-sigs/blob-csi-driver/issues/783
         private const string BlobCsiDriverGithubReleaseBranch = "master";
-        private const string BlobCsiDriverGithubReleaseVersion = "v1.18.0";
+        private const string BlobCsiDriverGithubReleaseVersion = "v1.21.4";
         private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseBranch}/charts";
         private const string AadPluginGithubReleaseVersion = "v1.8.13";
         private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
