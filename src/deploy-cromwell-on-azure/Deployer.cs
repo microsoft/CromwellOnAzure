@@ -556,28 +556,28 @@ namespace CromwellOnAzureDeployer
 
                 batchAccount = await GetExistingBatchAccountAsync(configuration.BatchAccountName);
                 var maxPerFamilyQuota = batchAccount.DedicatedCoreQuotaPerVMFamilyEnforced ? batchAccount.DedicatedCoreQuotaPerVMFamily.Select(q => q.CoreQuota).Where(q => 0 != q) : Enumerable.Repeat(batchAccount.DedicatedCoreQuota ?? 0, 1);
-                var isBatchQuotaAvailable = batchAccount.LowPriorityCoreQuota > 0 || (batchAccount.DedicatedCoreQuota > 0 && maxPerFamilyQuota.Append(0).Max() > 0);
-                var isBatchPoolQuotaAvailable = batchAccount.PoolQuota > 0;
-
+                bool isBatchQuotaAvailable = batchAccount.LowPriorityCoreQuota > 0 || (batchAccount.DedicatedCoreQuota > 0 && maxPerFamilyQuota.Append(0).Max() > 0);
+                bool isBatchPoolQuotaAvailable = batchAccount.PoolQuota > 0;
+                bool isBatchJobQuotaAvailable = batchAccount.ActiveJobAndJobScheduleQuota > 0;
+                var insufficientQuotas = new List<string>();
                 int exitCode;
 
-                if (!isBatchQuotaAvailable || !isBatchPoolQuotaAvailable)
+                if (!isBatchQuotaAvailable) insufficientQuotas.Add("core");
+                if (!isBatchPoolQuotaAvailable) insufficientQuotas.Add("pool");
+                if (!isBatchJobQuotaAvailable) insufficientQuotas.Add("job");
+
+                if (insufficientQuotas.Any())
                 {
                     if (!configuration.SkipTestWorkflow)
                     {
-                        ConsoleEx.WriteLine($"Could not run the test workflow.", ConsoleColor.Yellow);
+                        ConsoleEx.WriteLine("Could not run the test workflow.", ConsoleColor.Yellow);
                     }
 
-                    string quotaMessage = !isBatchQuotaAvailable ? "core" : "";
-
-                    if (!isBatchPoolQuotaAvailable)
-                    {
-                        quotaMessage = string.IsNullOrEmpty(quotaMessage) ? "pool" : "core and pool";
-                    }
-
+                    string quotaMessage = string.Join(" and ", insufficientQuotas);
                     ConsoleEx.WriteLine($"Deployment was successful, but Batch account {configuration.BatchAccountName} does not have sufficient {quotaMessage} quota to run workflows.", ConsoleColor.Yellow);
                     ConsoleEx.WriteLine($"Request Batch {quotaMessage} quota: https://docs.microsoft.com/en-us/azure/batch/batch-quota-limit", ConsoleColor.Yellow);
-                    ConsoleEx.WriteLine($"After receiving the quota, read the docs to run a test workflow and confirm successful deployment.", ConsoleColor.Yellow);
+                    ConsoleEx.WriteLine("After receiving the quota, read the docs to run a test workflow and confirm successful deployment.", ConsoleColor.Yellow);
+
                     exitCode = 2;
                 }
                 else
