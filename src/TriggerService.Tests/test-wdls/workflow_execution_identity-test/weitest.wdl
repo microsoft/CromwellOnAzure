@@ -10,7 +10,7 @@ task CreateUUID {
   runtime {
     docker: 'mcr.microsoft.com/mirror/docker/library/ubuntu:22.04'
     preemptible: true
-    workflow_execution_identity: ""
+    workflow_execution_identity: "workflow_execution_identity"
   }
 }
 
