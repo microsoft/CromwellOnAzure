@@ -97,7 +97,7 @@ spec:
             - name: BatchNodes__GlobalStartTask
               value: {{ .Values.config.batchNodes.globalStartTask }}
             - name: BatchNodes__GlobalManagedIdentity
-              value: {{ .Values.config.batchNodes.globalManagedIdentity }}
+              value: {{ .Values.identity.resourceId }}
             - name: Storage__ExternalStorageContainers
 {{- $containers  := list -}}
 {{- range .Values.externalSasContainers }}
