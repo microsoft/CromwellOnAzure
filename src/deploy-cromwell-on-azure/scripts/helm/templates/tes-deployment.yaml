@@ -52,8 +52,6 @@ spec:
               value: {{ .Values.config.applicationInsightsAccountName }}
             - name: AzureOfferDurableId
               value: {{ .Values.config.azureOfferDurableId }}
-            - name: BatchScheduling__UseLegacyAutopools
-              value: {{ .Values.config.batchScheduling.useLegacyAutopools | quote }}
             - name: BatchAccount__AccountName
               value: {{ .Values.config.batchAccount.accountName }}
             - name: BatchNodes__SubnetId

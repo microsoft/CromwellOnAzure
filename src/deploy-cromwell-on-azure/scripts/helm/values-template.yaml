@@ -18,7 +18,6 @@ config:
   batchScheduling:
     disable: RUNTIME_PARAMETER
     usePreemptibleVmsOnly: RUNTIME_PARAMETER
-    useLegacyAutopools: "False"
     poolRotationForcedDays: "7"
     prefix: RUNTIME_PARAMETER
   nodeImages:
