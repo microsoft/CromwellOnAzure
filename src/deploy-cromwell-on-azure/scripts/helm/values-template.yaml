@@ -14,7 +14,7 @@ config:
     subnetId: RUNTIME_PARAMETER
     disablePublicIpAddress: RUNTIME_PARAMETER
     globalStartTask: /configuration/start-task.sh
-    globalManagedIdentity:
+    globalManagedIdentity: RUNTIME_PARAMETER
   batchScheduling:
     disable: RUNTIME_PARAMETER
     usePreemptibleVmsOnly: RUNTIME_PARAMETER
