@@ -290,7 +290,7 @@ namespace CromwellOnAzureDeployer
                                 throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.");
                             }
 
-                            var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
+                            var settings = ConfigureSettings(managedIdentity, aksValues, installedVersion);
 
                             //if (installedVersion is null || installedVersion < new Version(4, 1))
                             //{
@@ -513,8 +513,7 @@ namespace CromwellOnAzureDeployer
                             })
                         });
 
-                        var clientId = managedIdentity.ClientId;
-                        var settings = ConfigureSettings(clientId);
+                        var settings = ConfigureSettings(managedIdentity);
 
                         if (aksCluster is null && !configuration.ManualHelmDeployment)
                         {
@@ -830,7 +829,7 @@ namespace CromwellOnAzureDeployer
             return settings;
         }
 
-        private Dictionary<string, string> ConfigureSettings(string managedIdentityClientId, Dictionary<string, string> settings = null, Version installedVersion = null)
+        private Dictionary<string, string> ConfigureSettings(IIdentity managedIdentity, Dictionary<string, string> settings = null, Version installedVersion = null)
         {
             settings ??= new();
             var defaults = GetDefaultValues(new[] { "env-00-coa-version.txt", "env-01-account-names.txt", "env-02-internal-images.txt", "env-03-external-images.txt", "env-04-settings.txt" });
@@ -856,8 +855,9 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "ManagedIdentityClientId", managedIdentityClientId, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "AzureServicesAuthConnectionString", managedIdentityClientId, s => $"RunAs=App;AppId={s}", ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "ManagedIdentityClientId", managedIdentity.ClientId, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "GlobalManagedIdentity", managedIdentity.Id, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "AzureServicesAuthConnectionString", managedIdentity.ClientId, s => $"RunAs=App;AppId={s}", ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "KeyVaultName", configuration.KeyVaultName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "AksCoANamespace", configuration.AksCoANamespace, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "CrossSubscriptionAKSDeployment", configuration.CrossSubscriptionAKSDeployment);
