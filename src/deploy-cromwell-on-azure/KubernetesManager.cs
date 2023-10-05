@@ -421,7 +421,6 @@ namespace CromwellOnAzureDeployer
             values.Config["applicationInsightsAccountName"] = GetValueOrDefault(settings, "ApplicationInsightsAccountName");
             batchAccount["accountName"] = GetValueOrDefault(settings, "BatchAccountName");
             batchNodes["subnetId"] = GetValueOrDefault(settings, "BatchNodesSubnetId");
-            batchNodes["globalManagedIdentity"] = GetValueOrDefault(settings, "GlobalManagedIdentity");
             values.Config["coaNamespace"] = GetValueOrDefault(settings, "AksCoANamespace");
             batchNodes["disablePublicIpAddress"] = GetValueOrDefault(settings, "DisableBatchNodesPublicIpAddress");
             batchScheduling["disable"] = GetValueOrDefault(settings, "DisableBatchScheduling");
@@ -502,7 +501,6 @@ namespace CromwellOnAzureDeployer
                 ["BatchNodesSubnetId"] = GetValueOrDefault(batchNodes, "subnetId"),
                 ["AksCoANamespace"] = GetValueOrDefault(values.Config, "coaNamespace") as string,
                 ["DisableBatchNodesPublicIpAddress"] = GetValueOrDefault(batchNodes, "disablePublicIpAddress"),
-                ["GlobalManagedIdentity"] = GetValueOrDefault(batchNodes, "globalManagedIdentity"),
                 ["DisableBatchScheduling"] = GetValueOrDefault(batchScheduling, "disable"),
                 ["UsePreemptibleVmsOnly"] = GetValueOrDefault(batchScheduling, "usePreemptibleVmsOnly"),
                 ["DockerInDockerImageName"] = GetValueOrDefault(nodeImages, "docker"),
