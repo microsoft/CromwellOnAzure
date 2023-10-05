@@ -450,14 +450,14 @@ namespace CromwellOnAzureDeployer
                             await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                             await WritePersonalizedFilesToStorageAccountAsync(storageAccount, managedIdentity.Name);
                             await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
-                            await AssignVmAsDataReaderToStorageAccountAsync(managedIdentity, storageAccount);
+                            await AssignVmAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                             await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
 
                             if (aksNodepoolIdentity is not null)
                             {
                                 await AssignVmAsContributorToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
-                                await AssignVmAsDataReaderToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
+                                await AssignVmAsDataOwnerToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
                                 await AssignManagedIdOperatorToResourceAsync(aksNodepoolIdentity, resourceGroup);
                             }
                         });
@@ -1172,10 +1172,10 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(cts.Token)));
         }
 
-        private Task AssignVmAsDataReaderToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
+        private Task AssignVmAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
         {
-            // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-reader
-            var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1";
+            // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-owner
+            var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/b7e6dc6d-f1e8-4753-8033-0f276bb0955b";
 
             return Execute(
                 $"Assigning Storage Blob Data Reader role for user-managed identity to Storage Account resource scope...",
