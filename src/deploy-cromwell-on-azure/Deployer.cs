@@ -513,7 +513,7 @@ namespace CromwellOnAzureDeployer
                             })
                         });
 
-                        var settings = ConfigureSettings(managedIdentity);
+                        var settings = ConfigureSettings(managedIdentity.ClientId);
 
                         if (aksCluster is null && !configuration.ManualHelmDeployment)
                         {
