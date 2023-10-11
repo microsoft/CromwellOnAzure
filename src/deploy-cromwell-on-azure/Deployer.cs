@@ -301,10 +301,19 @@ namespace CromwellOnAzureDeployer
                                 // Ensure all storage containers are created.
                                 await CreateDefaultStorageContainersAsync(storageAccount);
 
+                                // Always place the compute nodes into the new batch subnet (needed for simplified communication with batch and is faster/cheaper for azure services access).
+                                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+
                                 if (string.IsNullOrWhiteSpace(settings["BatchNodesSubnetId"]))
                                 {
                                     settings["BatchNodesSubnetId"] = await UpdateVnetWithBatchSubnet();
                                 }
+                            }
+
+                            if (installedVersion is null || installedVersion < new Version(4, 7))
+                            {
+                                // Storage account now requires Storage Blob Data Owner
+                                await AssignVmAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
                             }
 
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
