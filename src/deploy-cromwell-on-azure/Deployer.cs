@@ -310,7 +310,7 @@ namespace CromwellOnAzureDeployer
                             if (installedVersion < new Version(4, 6))
                             {
                                 await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
-                                ConsoleEx.WriteLine("Waiting 5 minutes role assignment propagation...");
+                                ConsoleEx.WriteLine("Waiting 5 minutes for role assignment propagation...");
                                 await Task.Delay(System.TimeSpan.FromMinutes(5));
                             }
 
