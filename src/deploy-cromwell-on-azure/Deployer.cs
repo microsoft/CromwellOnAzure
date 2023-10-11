@@ -307,6 +307,11 @@ namespace CromwellOnAzureDeployer
                                 }
                             }
 
+                            if (installedVersion < new Version(4, 6))
+                            {
+                                await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                            }
+
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
                             kubernetesClient = await PerformHelmDeploymentAsync(existingAksCluster);
                         }
@@ -1157,7 +1162,22 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(cts.Token)));
         }
 
-        private Task AssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource)
+        private async Task<bool> TryAssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource)
+        {
+            try
+            {
+                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resource, cancelOnException: false);
+                return true;
+            }
+            catch (Exception)
+            {
+                // Already exists
+                ConsoleEx.WriteLine("Network Contributor role for the managed id likely already exists.  Skipping", ConsoleColor.Yellow);
+                return false;
+            }
+        }
+
+        private Task AssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource, bool cancelOnException = true)
         {
             // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#network-contributor
             var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7";
@@ -1169,7 +1189,7 @@ namespace CromwellOnAzureDeployer
                         .ForObjectId(managedIdentity.PrincipalId)
                         .WithRoleDefinition(roleDefinitionId)
                         .WithResourceScope(resource)
-                        .CreateAsync(cts.Token)));
+                        .CreateAsync(cts.Token)), cancelOnException: cancelOnException);
         }
 
         private Task AssignVmAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
@@ -2296,7 +2316,7 @@ namespace CromwellOnAzureDeployer
         public Task Execute(string message, Func<Task> func)
             => Execute(message, async () => { await func(); return false; });
 
-        private async Task<T> Execute<T>(string message, Func<Task<T>> func)
+        private async Task<T> Execute<T>(string message, Func<Task<T>> func, bool cancelOnException = true)
         {
             const int retryCount = 3;
 
@@ -2323,13 +2343,23 @@ namespace CromwellOnAzureDeployer
                 catch (Exception ex)
                 {
                     line.Write($" Failed. {ex.GetType().Name}: {ex.Message}", ConsoleColor.Red);
-                    cts.Cancel();
+
+                    if (cancelOnException)
+                    {
+                        cts.Cancel();
+                    }
+
                     throw;
                 }
             }
 
             line.Write($" Failed", ConsoleColor.Red);
-            cts.Cancel();
+
+            if (cancelOnException)
+            {
+                cts.Cancel();
+            }
+
             throw new Exception($"Failed after {retryCount} attempts");
         }
 
