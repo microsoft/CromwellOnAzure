@@ -1,3 +1,4 @@
 [submodule "src/ga4gh-tes"]
 	path = src/ga4gh-tes
 	url = https://github.com/microsoft/ga4gh-tes.git
+	branch = jsaun/fix-upgrade-test
