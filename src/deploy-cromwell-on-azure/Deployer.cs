@@ -39,7 +39,6 @@ using Microsoft.Azure.Management.KeyVault.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
 using Microsoft.Azure.Management.Network;
 using Microsoft.Azure.Management.Network.Fluent;
-using Microsoft.Azure.Management.Network.Fluent.Models;
 using Microsoft.Azure.Management.Network.Models;
 using Microsoft.Azure.Management.PostgreSQL;
 using Microsoft.Azure.Management.PrivateDns.Fluent;
@@ -314,6 +313,13 @@ namespace CromwellOnAzureDeployer
                             {
                                 // Storage account now requires Storage Blob Data Owner
                                 await AssignVmAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
+                            }
+
+                            // TODO: (purpetually) update the upper stated version to one less than the last version that performs role assignment changes.
+                            if (installedVersion is null || installedVersion < new Version(4, 4) || (installedVersion < new Version(targetVersion) && installedVersion > new Version(4, 6)))
+                            {
+                                ConsoleEx.WriteLine("Waiting 5 minutes for role assignment propagation...");
+                                await Task.Delay(System.TimeSpan.FromMinutes(5));
                             }
 
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
