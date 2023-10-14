@@ -315,8 +315,10 @@ namespace CromwellOnAzureDeployer
                                 await AssignVmAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
                             }
 
-                            // TODO: (purpetually) update the upper stated version to one less than the last version that performs role assignment changes.
-                            if (installedVersion is null || installedVersion < new Version(4, 4) || (installedVersion < new Version(targetVersion) && installedVersion > new Version(4, 6)))
+                            // TODO: (purpetually) update the stated version in the next line to the next-to-last version that performed role assignment changes.
+                            if (installedVersion is null || installedVersion < new Version(4, 4) ||
+                                // TODO: (purpetually) update the stated version in the next line to one less than the last version that performs role assignment changes.
+                                (installedVersion < new Version(targetVersion) && installedVersion > new Version(4, 6)))
                             {
                                 ConsoleEx.WriteLine("Waiting 5 minutes for role assignment propagation...");
                                 await Task.Delay(System.TimeSpan.FromMinutes(5));
@@ -360,7 +362,7 @@ namespace CromwellOnAzureDeployer
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
                         var keyVault = await ValidateAndGetExistingKeyVault();
 
-                        ConsoleEx.WriteLine($"Deploying Cromwell on Azure version {Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-00-tes-version.txt")).GetValueOrDefault("TesOnAzureVersion")} into resource group '{resourceGroup.Name}'...");
+                        ConsoleEx.WriteLine($"Deploying Cromwell on Azure version {Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion")}...");
 
                         if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName))
                         {
