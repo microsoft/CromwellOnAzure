@@ -1,6 +1,6 @@
 {
   "WorkflowUrl": "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/az2.7.0/mutect2.wdl",
-  "WorkflowInputsUrl": "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/src/TriggerService.Tests/test-wdls/mutect2/mutect2.inputs.json",
+  "WorkflowInputsUrl": "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/move-mutect-to-south-central/src/TriggerService.Tests/test-wdls/mutect2/mutect2.inputs.json",
   "WorkflowOptionsUrl": null,
   "WorkflowDependenciesUrl": null
 }
