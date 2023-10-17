@@ -290,10 +290,7 @@ namespace CromwellOnAzureDeployer
                             }
 
                             var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
-
-                            //if (installedVersion is null || installedVersion < new Version(4, 1))
-                            //{
-                            //}
+                            var waitForRoleAssignmentPropagation = false;
 
                             if (installedVersion is null || installedVersion < new Version(4, 4))
                             {
@@ -302,6 +299,7 @@ namespace CromwellOnAzureDeployer
 
                                 // Always place the compute nodes into the new batch subnet (needed for simplified communication with batch and is faster/cheaper for azure services access).
                                 await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                                waitForRoleAssignmentPropagation = true;
 
                                 if (string.IsNullOrWhiteSpace(settings["BatchNodesSubnetId"]))
                                 {
@@ -309,16 +307,23 @@ namespace CromwellOnAzureDeployer
                                 }
                             }
 
-                            if (installedVersion is null || installedVersion < new Version(4, 7))
+                            if (installedVersion is null || installedVersion < new Version(4, 6))
                             {
+                                if (installedVersion >= new Version(4, 4))
+                                {
+                                    waitForRoleAssignmentPropagation |= await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                                }
+
                                 // Storage account now requires Storage Blob Data Owner
                                 await AssignVmAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
+                                waitForRoleAssignmentPropagation = true;
                             }
 
-                            // TODO: (purpetually) update the stated version in the next line to the next-to-last version that performed role assignment changes.
-                            if (installedVersion is null || installedVersion < new Version(4, 4) ||
-                                // TODO: (purpetually) update the stated version in the next line to one less than the last version that performs role assignment changes.
-                                (installedVersion < new Version(targetVersion) && installedVersion > new Version(4, 6)))
+                            //if (installedVersion is null || installedVersion < new Version(4, 7))
+                            //{
+                            //}
+
+                            if (waitForRoleAssignmentPropagation)
                             {
                                 ConsoleEx.WriteLine("Waiting 5 minutes for role assignment propagation...");
                                 await Task.Delay(System.TimeSpan.FromMinutes(5));
@@ -1176,7 +1181,22 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(cts.Token)));
         }
 
-        private Task AssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource)
+        private async Task<bool> TryAssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource)
+        {
+            try
+            {
+                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resource, cancelOnException: false);
+                return true;
+            }
+            catch (Exception)
+            {
+                // Already exists
+                ConsoleEx.WriteLine("Network Contributor role for the managed id likely already exists.  Skipping", ConsoleColor.Yellow);
+                return false;
+            }
+        }
+
+        private Task AssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource, bool cancelOnException = true)
         {
             // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#network-contributor
             var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7";
@@ -1188,7 +1208,7 @@ namespace CromwellOnAzureDeployer
                         .ForObjectId(managedIdentity.PrincipalId)
                         .WithRoleDefinition(roleDefinitionId)
                         .WithResourceScope(resource)
-                        .CreateAsync(cts.Token)));
+                        .CreateAsync(cts.Token)), cancelOnException: cancelOnException);
         }
 
         private Task AssignVmAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
@@ -2315,7 +2335,7 @@ namespace CromwellOnAzureDeployer
         public Task Execute(string message, Func<Task> func)
             => Execute(message, async () => { await func(); return false; });
 
-        private async Task<T> Execute<T>(string message, Func<Task<T>> func)
+        private async Task<T> Execute<T>(string message, Func<Task<T>> func, bool cancelOnException = true)
         {
             const int retryCount = 3;
 
@@ -2342,13 +2362,23 @@ namespace CromwellOnAzureDeployer
                 catch (Exception ex)
                 {
                     line.Write($" Failed. {ex.GetType().Name}: {ex.Message}", ConsoleColor.Red);
-                    cts.Cancel();
+
+                    if (cancelOnException)
+                    {
+                        cts.Cancel();
+                    }
+
                     throw;
                 }
             }
 
             line.Write($" Failed", ConsoleColor.Red);
-            cts.Cancel();
+
+            if (cancelOnException)
+            {
+                cts.Cancel();
+            }
+
             throw new Exception($"Failed after {retryCount} attempts");
         }
 
