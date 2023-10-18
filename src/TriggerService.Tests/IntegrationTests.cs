@@ -175,6 +175,7 @@ namespace TriggerService.Tests
                     && pool.TargetDedicatedComputeNodes == 0)
                 {
                     Console.WriteLine($"Deleting Batch pool {pool.Id}...");
+                    await batchClient.JobOperations.DeleteJobAsync(pool.Id);
                     await batchClient.PoolOperations.DeletePoolAsync(pool.Id);
                     count++;
                 }
