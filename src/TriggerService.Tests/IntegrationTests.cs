@@ -104,7 +104,7 @@ namespace TriggerService.Tests
         public async Task RunScaleTestWithMutect2Async()
         {
             const int countOfWorkflowsToRun = 100;
-            const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
+            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
             var triggerFiles = new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) };
             await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFiles, testStorageAccountName);
