@@ -309,8 +309,10 @@ namespace CromwellOnAzureDeployer
 
                             if (installedVersion < new Version(4, 6))
                             {
-                                if (await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup)
-                                    || await TryAssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount))
+                                var hasAssignedNetworkContributor = await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                                var hasAssignedDataOwner = await TryAssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
+
+                                if (hasAssignedNetworkContributor || hasAssignedDataOwner)
                                 {
                                     ConsoleEx.WriteLine("Waiting 5 minutes for role assignment propagation...");
                                     await Task.Delay(System.TimeSpan.FromMinutes(5));
