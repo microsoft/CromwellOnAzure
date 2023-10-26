@@ -448,6 +448,7 @@ namespace CromwellOnAzureDeployer
             values.Images["cromwell"] = GetValueOrDefault(settings, "CromwellImageName");
 
             values.Persistence["storageAccount"] = GetValueOrDefault(settings, "DefaultStorageAccountName");
+            values.Persistence["executionsContainerName"] = "cromwell-executions";
 
             values.TesDatabase["serverName"] = GetValueOrDefault(settings, "PostgreSqlServerName");
             values.TesDatabase["serverNameSuffix"] = GetValueOrDefault(settings, "PostgreSqlServerNameSuffix");

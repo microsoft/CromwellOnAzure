@@ -99,6 +99,7 @@ persistence:
   blobPvcSize: 32Gi
   cromwellTmpSize: 32Gi
   storageAccount: RUNTIME_PARAMETER
+  executionsContainerName: RUNTIME_PARAMETER
 
 identity:
   name: RUNTIME_PARAMETER
