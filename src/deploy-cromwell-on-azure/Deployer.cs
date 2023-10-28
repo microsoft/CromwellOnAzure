@@ -309,14 +309,13 @@ namespace CromwellOnAzureDeployer
 
                             if (installedVersion is null || installedVersion < new Version(4, 6))
                             {
-                                if (installedVersion >= new Version(4, 4))
+                                var hasAssignedNetworkContributor = await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                                var hasAssignedDataOwner = await TryAssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
+
+                                if (hasAssignedNetworkContributor || hasAssignedDataOwner)
                                 {
                                     waitForRoleAssignmentPropagation |= await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
                                 }
-
-                                // Storage account now requires Storage Blob Data Owner
-                                await AssignVmAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
-                                waitForRoleAssignmentPropagation = true;
                             }
 
                             //if (installedVersion is null || installedVersion < new Version(4, 7))
@@ -474,14 +473,14 @@ namespace CromwellOnAzureDeployer
                             await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                             await WritePersonalizedFilesToStorageAccountAsync(storageAccount, managedIdentity.Name);
                             await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
-                            await AssignVmAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
+                            await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
                             await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                             await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
 
                             if (aksNodepoolIdentity is not null)
                             {
                                 await AssignVmAsContributorToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
-                                await AssignVmAsDataOwnerToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
+                                await AssignMIAsDataOwnerToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
                                 await AssignManagedIdOperatorToResourceAsync(aksNodepoolIdentity, resourceGroup);
                             }
                         });
@@ -1211,7 +1210,22 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(cts.Token)), cancelOnException: cancelOnException);
         }
 
-        private Task AssignVmAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
+        private async Task<bool> TryAssignMIAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
+        {
+            try
+            {
+                await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount, cancelOnException: false);
+                return true;
+            }
+            catch (Exception)
+            {
+                // Already exists
+                ConsoleEx.WriteLine("Storage Blob Data Owner role for the managed id likely already exists.  Skipping", ConsoleColor.Yellow);
+                return false;
+            }
+        }
+
+        private Task AssignMIAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount, bool cancelOnException = true)
         {
             //https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-owner
             var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/b7e6dc6d-f1e8-4753-8033-0f276bb0955b";
@@ -1224,7 +1238,7 @@ namespace CromwellOnAzureDeployer
                         .ForObjectId(managedIdentity.PrincipalId)
                         .WithRoleDefinition(roleDefinitionId)
                         .WithResourceScope(storageAccount)
-                        .CreateAsync(cts.Token)));
+                        .CreateAsync(cts.Token)), cancelOnException: cancelOnException);
         }
 
         private Task AssignVmAsContributorToStorageAccountAsync(IIdentity managedIdentity, IResource storageAccount)
