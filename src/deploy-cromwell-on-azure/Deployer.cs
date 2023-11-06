@@ -39,7 +39,6 @@ using Microsoft.Azure.Management.KeyVault.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
 using Microsoft.Azure.Management.Network;
 using Microsoft.Azure.Management.Network.Fluent;
-using Microsoft.Azure.Management.Network.Fluent.Models;
 using Microsoft.Azure.Management.Network.Models;
 using Microsoft.Azure.Management.PostgreSQL;
 using Microsoft.Azure.Management.PrivateDns.Fluent;
@@ -181,12 +180,12 @@ namespace CromwellOnAzureDeployer
 
                 try
                 {
+                    var targetVersion = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
+
                     if (configuration.Update)
                     {
                         resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
                         configuration.RegionName = resourceGroup.RegionName;
-
-                        var targetVersion = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
 
                         ConsoleEx.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
@@ -291,10 +290,7 @@ namespace CromwellOnAzureDeployer
                             }
 
                             var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
-
-                            //if (installedVersion is null || installedVersion < new Version(4, 1))
-                            //{
-                            //}
+                            var waitForRoleAssignmentPropagation = false;
 
                             if (installedVersion is null || installedVersion < new Version(4, 4))
                             {
@@ -307,16 +303,22 @@ namespace CromwellOnAzureDeployer
                                 }
                             }
 
-                            if (installedVersion < new Version(4, 6))
+                            if (installedVersion is null || installedVersion < new Version(4, 6))
                             {
                                 var hasAssignedNetworkContributor = await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
                                 var hasAssignedDataOwner = await TryAssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
 
-                                if (hasAssignedNetworkContributor || hasAssignedDataOwner)
-                                {
-                                    ConsoleEx.WriteLine("Waiting 5 minutes for role assignment propagation...");
-                                    await Task.Delay(System.TimeSpan.FromMinutes(5));
-                                }
+                                waitForRoleAssignmentPropagation |= hasAssignedNetworkContributor || hasAssignedDataOwner;
+                            }
+
+                            //if (installedVersion is null || installedVersion < new Version(4, 7))
+                            //{
+                            //}
+
+                            if (waitForRoleAssignmentPropagation)
+                            {
+                                await Execute("Waiting 5 minutes for role assignment propagation...",
+                                    () => Task.Delay(System.TimeSpan.FromMinutes(5)));
                             }
 
                             await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
@@ -356,6 +358,8 @@ namespace CromwellOnAzureDeployer
 
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
                         var keyVault = await ValidateAndGetExistingKeyVault();
+
+                        ConsoleEx.WriteLine($"Deploying Cromwell on Azure version {targetVersion}...");
 
                         if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName))
                         {
