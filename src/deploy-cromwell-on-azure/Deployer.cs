@@ -81,6 +81,7 @@ namespace CromwellOnAzureDeployer
 
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
+        public const string TesInternalContainerName = "tes-internal";
         public const string CromwellConfigurationFileName = "cromwell-application.conf";
         public const string AllowedVmSizesFileName = "allowed-vm-sizes";
         public const string InputsContainerName = "inputs";
@@ -180,12 +181,12 @@ namespace CromwellOnAzureDeployer
 
                 try
                 {
+                    var targetVersion = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
+
                     if (configuration.Update)
                     {
                         resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName);
                         configuration.RegionName = resourceGroup.RegionName;
-
-                        var targetVersion = Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion");
 
                         ConsoleEx.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
@@ -307,15 +308,19 @@ namespace CromwellOnAzureDeployer
                                 }
                             }
 
-                            if (installedVersion is null || installedVersion < new Version(4, 6))
+                            if (installedVersion is null || installedVersion < new Version(4, 7))
                             {
                                 var hasAssignedNetworkContributor = await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
                                 var hasAssignedDataOwner = await TryAssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
 
-                                if (hasAssignedNetworkContributor || hasAssignedDataOwner)
-                                {
-                                    waitForRoleAssignmentPropagation |= await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
-                                }
+                                await Execute($"Moving {AllowedVmSizesFileName} file to new location: {TesInternalContainerName}/{ConfigurationContainerName}/{AllowedVmSizesFileName}", () => MoveAllowedVmSizesFileAsync(storageAccount));
+                                waitForRoleAssignmentPropagation |= hasAssignedNetworkContributor || hasAssignedDataOwner;
+                            }
+
+                            if (waitForRoleAssignmentPropagation)
+                            {
+                                await Execute("Waiting 5 minutes for role assignment propagation...",
+                                    () => Task.Delay(System.TimeSpan.FromMinutes(5)));
                             }
 
                             //if (installedVersion is null || installedVersion < new Version(4, 7))
@@ -366,7 +371,7 @@ namespace CromwellOnAzureDeployer
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
                         var keyVault = await ValidateAndGetExistingKeyVault();
 
-                        ConsoleEx.WriteLine($"Deploying Cromwell on Azure version {Utility.DelimitedTextToDictionary(Utility.GetFileContent("scripts", "env-00-coa-version.txt")).GetValueOrDefault("CromwellOnAzureVersion")}...");
+                        ConsoleEx.WriteLine($"Deploying Cromwell on Azure version {targetVersion}...");
 
                         if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName))
                         {
@@ -664,6 +669,39 @@ namespace CromwellOnAzureDeployer
                 WriteGeneralRetryMessageToConsole();
                 await DeleteResourceGroupIfUserConsentsAsync();
                 return 1;
+            }
+        }
+
+        private async Task MoveAllowedVmSizesFileAsync(IStorageAccount storageAccount)
+        {
+            var allowedVmSizesFileContent = Utility.GetFileContent("scripts", AllowedVmSizesFileName);
+            var existingAllowedVmSizesBlobClient = (await GetBlobClientAsync(storageAccount))
+                .GetBlobContainerClient(ConfigurationContainerName)
+                .GetBlobClient(AllowedVmSizesFileName);
+
+            bool isExistingFile = false;
+
+            // Get existing content if it exists
+            if (await existingAllowedVmSizesBlobClient.ExistsAsync())
+            {
+                isExistingFile = true;
+
+                var existingAllowedVmSizesContent = (await existingAllowedVmSizesBlobClient.DownloadContentAsync()).Value.Content.ToString();
+
+                if (!string.IsNullOrWhiteSpace(existingAllowedVmSizesContent))
+                {
+                    // Use existing content
+                    allowedVmSizesFileContent = existingAllowedVmSizesContent;
+                }
+            }
+
+            // Upload to new location
+            await UploadTextToStorageAccountAsync(storageAccount, TesInternalContainerName, $"{ConfigurationContainerName}/{AllowedVmSizesFileName}", allowedVmSizesFileContent);
+
+            if (isExistingFile)
+            {
+                // Delete old file to prevent user confusion about source of truth
+                await existingAllowedVmSizesBlobClient.DeleteAsync();
             }
         }
 
@@ -1334,7 +1372,7 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
                     }, "scripts", CromwellConfigurationFileName));
 
-                    await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, AllowedVmSizesFileName, Utility.GetFileContent("scripts", AllowedVmSizesFileName));
+                    await UploadTextToStorageAccountAsync(storageAccount, TesInternalContainerName, $"{ConfigurationContainerName}/{AllowedVmSizesFileName}", Utility.GetFileContent("scripts", AllowedVmSizesFileName));
                 });
 
         private Task AssignVmAsContributorToBatchAccountAsync(IIdentity managedIdentity, BatchAccount batchAccount)
