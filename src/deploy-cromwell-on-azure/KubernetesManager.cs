@@ -448,6 +448,7 @@ namespace CromwellOnAzureDeployer
             values.Images["cromwell"] = GetValueOrDefault(settings, "CromwellImageName");
 
             values.Persistence["storageAccount"] = GetValueOrDefault(settings, "DefaultStorageAccountName");
+            values.Persistence["executionsContainerName"] = GetValueOrDefault(settings, "ExecutionsContainerName");
 
             values.TesDatabase["serverName"] = GetValueOrDefault(settings, "PostgreSqlServerName");
             values.TesDatabase["serverNameSuffix"] = GetValueOrDefault(settings, "PostgreSqlServerNameSuffix");
@@ -525,6 +526,7 @@ namespace CromwellOnAzureDeployer
                 ["TriggerServiceImageName"] = GetValueOrDefault(values.Images, "triggerservice"),
                 ["CromwellImageName"] = GetValueOrDefault(values.Images, "cromwell"),
                 ["DefaultStorageAccountName"] = GetValueOrDefault(values.Persistence, "storageAccount"),
+                ["ExecutionsContainerName"] = GetValueOrDefault(values.Persistence, "executionsContainerName"),
 
                 // This is only defined once, so use the TesDatabase values
                 ["PostgreSqlServerName"] = GetValueOrDefault(values.TesDatabase, "serverName"),

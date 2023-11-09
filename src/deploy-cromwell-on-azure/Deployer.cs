@@ -82,6 +82,7 @@ namespace CromwellOnAzureDeployer
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
         public const string TesInternalContainerName = "tes-internal";
+        public const string ExecutionsContainerName = "cromwell-executions";
         public const string CromwellConfigurationFileName = "cromwell-application.conf";
         public const string AllowedVmSizesFileName = "allowed-vm-sizes";
         public const string InputsContainerName = "inputs";
@@ -312,6 +313,16 @@ namespace CromwellOnAzureDeployer
                                 await Execute($"Moving {AllowedVmSizesFileName} file to new location: {TesInternalContainerName}/{ConfigurationContainerName}/{AllowedVmSizesFileName}", () => MoveAllowedVmSizesFileAsync(storageAccount));
                                 waitForRoleAssignmentPropagation |= hasAssignedNetworkContributor || hasAssignedDataOwner;
                             }
+
+                            if (installedVersion is null || installedVersion < new Version(4, 8))
+                            {
+                                settings["ExecutionsContainerName"] = ExecutionsContainerName;
+                            }
+
+                            //if (installedVersion is null || installedVersion < new Version(4, 9))
+                            //{
+
+                            //}
 
                             if (waitForRoleAssignmentPropagation)
                             {
@@ -901,6 +912,7 @@ namespace CromwellOnAzureDeployer
             {
                 UpdateSetting(settings, defaults, "BatchPrefix", configuration.BatchPrefix, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "ExecutionsContainerName", ExecutionsContainerName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ManagedIdentityClientId", managedIdentityClientId, ignoreDefaults: true);
@@ -1330,7 +1342,7 @@ namespace CromwellOnAzureDeployer
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
 
-            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", "tes-internal", ConfigurationContainerName };
+            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, ExecutionsContainerName, "cromwell-workflow-logs", "outputs", "tes-internal", ConfigurationContainerName };
             await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
         }
 
