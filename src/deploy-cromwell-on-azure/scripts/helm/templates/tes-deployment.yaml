@@ -115,8 +115,8 @@ spec:
               cpu: "0.5"
               memory: "1Gi"
             limits:
-              cpu: "0.5"
-              memory: "1Gi"
+              cpu: "1"
+              memory: "2Gi"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
