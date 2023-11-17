@@ -1,0 +1,6 @@
+{
+  "WorkflowUrl": "https://raw.githubusercontent.com/PacificBiosciences/HiFi-human-WGS-WDL/main/workflows/main.wdl",
+  "WorkflowInputsUrl": "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/mattmcl4475/addPacbioIntegrationTest/src/TriggerService.Tests/test-wdls/pacbio/pacbio-hifi-human-wgs-inputs-hg005-trio.json",
+  "WorkflowOptionsUrl": null,
+  "WorkflowDependenciesUrl": null
+}

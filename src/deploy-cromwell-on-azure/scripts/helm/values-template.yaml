@@ -99,6 +99,14 @@ externalSasContainers:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Public example, not confidential")]
     sasToken: "sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D"
     containerName: dataset
+  - accountName: datasetgiab
+    containerName: dataset
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Public example, not confidential")]
+    sasToken: sv=2021-06-08&ss=bfqt&srt=sco&spr=https&st=2023-03-01T15%3A32%3A33Z&se=2026-03-01T23%3A32%3A33Z&sp=rltfx&sig=3YfSUw5bLIrgQn8zLrZtJZK7%2FA09qYcyJ5x7FK3HtFk%3D
+  - accountName: datasetpbrarediseases
+    containerName: dataset
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Public example, not confidential")]
+    sasToken: sv=2021-06-08&spr=https&si=public&sr=c&sig=o6OkcqWWlGcGOOr8I8gCA%2BJwlpA%2FYsRz0DMB8CCtCJk%3D
 
 persistence:
   blobPvcSize: 32Gi

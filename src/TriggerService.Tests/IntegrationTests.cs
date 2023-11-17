@@ -42,6 +42,22 @@ namespace TriggerService.Tests
         /// <returns></returns>
         [TestCategory("Integration")]
         [TestMethod]
+        public async Task RunPacbioHiFiHumanWgsWorkflowsWaitTilDoneAsync()
+        {
+            const string branchName = "mattmcl4475/addPacbioIntegrationTest";
+            var workflowTriggerFiles = new List<(string triggerFileBlobUrl, string workflowFriendlyName)> {
+            ($"https://raw.githubusercontent.com/microsoft/CromwellOnAzure/{branchName}/src/TriggerService.Tests/test-wdls/pacbio/pacbio-hifi-human-wgs-inputs-hg005-solo-trigger.json", "pacbio-hifi-wgs-solo"),
+            ($"https://raw.githubusercontent.com/microsoft/CromwellOnAzure/{branchName}/src/TriggerService.Tests/test-wdls/pacbio/pacbio-hifi-human-wgs-inputs-hg005-trio-trigger.json", "pacbio-hifi-wgs-trio")};
+
+            await RunIntegrationTestAsync(workflowTriggerFiles);
+        }
+
+        /// <summary>
+        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken
+        /// </summary>
+        /// <returns></returns>
+        [TestCategory("Integration")]
+        [TestMethod]
         public async Task RunAllCommonWorkflowsWaitTilDoneAsync()
         {
             var workflowTriggerFiles = new List<(string triggerFileBlobUrl, string workflowFriendlyName)> {
