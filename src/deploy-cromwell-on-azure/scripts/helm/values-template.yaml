@@ -91,6 +91,10 @@ externalContainers:
 #    resourceGroup: resourceGroup1
 
 externalSasContainers:
+  - accountName: datasettestinputssouthc
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Public example, not confidential")]
+    sasToken: "si=coa&spr=https&sv=2022-11-02&sr=c&sig=Updk4aRmzWJai%2BhtQaLjNJAVq5jwc5M4frsCBTjIj%2FM%3D"
+    containerName: dataset
   - accountName: datasettestinputs
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Public example, not confidential")]
     sasToken: "sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D"
