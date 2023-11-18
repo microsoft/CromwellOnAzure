@@ -530,7 +530,6 @@ namespace TriggerService
 
         private async Task<WorkflowFailureInfo> GetWorkflowFailureInfoAsync(Guid workflowId, string metadata)
         {
-            const string BatchExecutionDirectoryName = "__batch";
             const int maxFailureMessageLength = 4096;
 
             var metadataFailures = string.IsNullOrWhiteSpace(metadata)
@@ -549,7 +548,7 @@ namespace TriggerService
                 }
             }
 
-            var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
+            var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString(), CancellationToken.None);
 
             // Select the last attempt of each Cromwell task, and then select only the failed ones
             // If CromwellResultCode is > 0, point to Cromwell stderr/out. Otherwise, if batch exit code > 0, point to Batch stderr/out
@@ -562,8 +561,9 @@ namespace TriggerService
                     var cromwellScriptFailed = t.CromwellResultCode.GetValueOrDefault() != 0;
                     var batchTaskFailed = (t.Logs?.LastOrDefault()?.Logs?.LastOrDefault()?.ExitCode).GetValueOrDefault() != 0;
                     var executor = t.Executors?.LastOrDefault();
-                    var executionDirectoryPath = GetParentPath(executor?.Stdout);
-                    var batchExecutionDirectoryPath = executionDirectoryPath is not null ? $"{executionDirectoryPath}/{BatchExecutionDirectoryName}" : null;
+                    var batchExecutionDirectoryPath = t.Resources?.BackendParameters?.ContainsKey(nameof(TesResources.SupportedBackendParameters.internal_path_prefix)) ?? false
+                        ? $"/{t.Resources.BackendParameters[nameof(TesResources.SupportedBackendParameters.internal_path_prefix)].Trim('/')}"
+                        : $"/tes-internal/{t.Id}";
                     var batchStdOut = batchExecutionDirectoryPath is not null ? $"{batchExecutionDirectoryPath}/stdout.txt" : null;
                     var batchStdErr = batchExecutionDirectoryPath is not null ? $"{batchExecutionDirectoryPath}/stderr.txt" : null;
 
@@ -592,7 +592,7 @@ namespace TriggerService
 
         private async Task<List<TaskWarning>> GetWorkflowTaskWarningsAsync(Guid workflowId)
         {
-            var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString());
+            var tesTasks = await tesTaskRepository.GetItemsAsync(t => t.WorkflowId == workflowId.ToString(), CancellationToken.None);
 
             // Select the last attempt of each Cromwell task, and then select only those that have a warning
             var taskWarnings = tesTasks

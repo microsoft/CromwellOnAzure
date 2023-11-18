@@ -60,8 +60,8 @@ namespace TriggerService.Tests
             Assert.AreEqual("FailureExitCode", failedTask?.FailureReason);
             Assert.AreEqual(1, failedTask?.SystemLogs?.Count);
             Assert.AreEqual("The task process exited with an unexpected exit code", failedTask?.SystemLogs.First());
-            Assert.AreEqual("execution/__batch/stdout.txt", failedTask.StdOut);
-            Assert.AreEqual("execution/__batch/stderr.txt", failedTask.StdErr);
+            Assert.AreEqual($"/tes-internal/{tesTasks.First().Id}/stdout.txt", failedTask.StdOut);
+            Assert.AreEqual($"/tes-internal/{tesTasks.First().Id}/stderr.txt", failedTask.StdErr);
         }
 
         [TestMethod]
@@ -393,7 +393,7 @@ namespace TriggerService.Tests
                 .Returns(Task.FromResult(new GetTimingResponse()));
 
             repository
-                .Setup(r => r.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()))
+                .Setup(r => r.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>(), It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(Task.FromResult(tesTasks));
 
             var logger = new Mock<ILogger<TriggerHostedService>>().Object;

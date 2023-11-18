@@ -10,14 +10,16 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.Core;
 using k8s;
 using k8s.Models;
 using Microsoft.Azure.Management.ContainerService;
 using Microsoft.Azure.Management.ContainerService.Fluent;
+using Microsoft.Azure.Management.ContainerService.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Azure.Management.Storage.Fluent;
+using Newtonsoft.Json;
 using Polly;
 using Polly.Retry;
 
@@ -30,15 +32,15 @@ namespace CromwellOnAzureDeployer
     {
         private static readonly AsyncRetryPolicy WorkloadReadyRetryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryAsync(40, retryAttempt => TimeSpan.FromSeconds(15));
+            .WaitAndRetryAsync(40, retryAttempt => System.TimeSpan.FromSeconds(15));
 
         private static readonly AsyncRetryPolicy KubeExecRetryPolicy = Policy
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
-            .WaitAndRetryAsync(8, retryAttempt => TimeSpan.FromSeconds(5));
+            .WaitAndRetryAsync(8, retryAttempt => System.TimeSpan.FromSeconds(5));
 
         // "master" is used despite not being a best practice: https://github.com/kubernetes-sigs/blob-csi-driver/issues/783
         private const string BlobCsiDriverGithubReleaseBranch = "master";
-        private const string BlobCsiDriverGithubReleaseVersion = "v1.18.0";
+        private const string BlobCsiDriverGithubReleaseVersion = "v1.21.4";
         private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseBranch}/charts";
         private const string AadPluginGithubReleaseVersion = "v1.8.13";
         private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
@@ -62,9 +64,10 @@ namespace CromwellOnAzureDeployer
             CreateAndInitializeWorkingDirectoriesAsync().Wait();
         }
 
-        public async Task<IKubernetes> GetKubernetesClientAsync(IResource resourceGroupObject)
+        public async Task<IKubernetes> GetKubernetesClientAsync(ManagedCluster aksCluster)
         {
-            var resourceGroup = resourceGroupObject.Name;
+            var r = new ResourceIdentifier(aksCluster.Id);
+            var resourceGroup = r.ResourceGroupName;
             var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
@@ -132,8 +135,8 @@ namespace CromwellOnAzureDeployer
             }
 
             await ExecHelmProcessAsync($"repo update");
-            await ExecHelmProcessAsync($"install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig \"{kubeConfigPath}\"");
-            await ExecHelmProcessAsync($"install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig \"{kubeConfigPath}\"");
+            await ExecHelmProcessAsync($"upgrade --install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig \"{kubeConfigPath}\"");
+            await ExecHelmProcessAsync($"upgrade --install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig \"{kubeConfigPath}\"");
         }
 
         public async Task DeployHelmChartToClusterAsync()
@@ -155,7 +158,7 @@ namespace CromwellOnAzureDeployer
             {
                 values.InternalContainersKeyVaultAuth = new List<Dictionary<string, string>>();
 
-                foreach (var container in values.DefaultContainers)
+                foreach (var container in values.DefaultContainers.Union(values.CromwellContainers, StringComparer.OrdinalIgnoreCase))
                 {
                     var containerConfig = new Dictionary<string, string>()
                     {
@@ -172,7 +175,7 @@ namespace CromwellOnAzureDeployer
             {
                 values.InternalContainersMIAuth = new List<Dictionary<string, string>>();
 
-                foreach (var container in values.DefaultContainers)
+                foreach (var container in values.DefaultContainers.Union(values.CromwellContainers, StringComparer.OrdinalIgnoreCase))
                 {
                     var containerConfig = new Dictionary<string, string>()
                     {
@@ -191,15 +194,24 @@ namespace CromwellOnAzureDeployer
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
         }
 
-
-        public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount)
+        public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount, Version previousVersion)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cts));
             UpdateValuesFromSettings(values, settings);
             MergeContainers(containersToMount, values);
+            ProcessHelmValuesUpdates(values, previousVersion);
             var valuesString = KubernetesYaml.Serialize(values);
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cts.Token);
+        }
+
+        private void ProcessHelmValuesUpdates(HelmValues values, Version previousVersion)
+        {
+            if (previousVersion < new Version(4, 3))
+            {
+                values.CromwellContainers = new List<string>() { "configuration", "cromwell-executions", "cromwell-workflow-logs", "outputs" };
+                values.DefaultContainers = new List<string>() { "inputs" };
+            }
         }
 
         public async Task<Dictionary<string, string>> GetAKSSettingsAsync(IStorageAccount storageAccount)
@@ -241,13 +253,18 @@ namespace CromwellOnAzureDeployer
                 }
             });
 
-            var pods = await client.CoreV1.ListNamespacedPodAsync(aksNamespace);
-            var workloadPod = pods.Items.Where(x => x.Metadata.Name.Contains(podName)).FirstOrDefault();
-
             if (!await WaitForWorkloadAsync(client, podName, aksNamespace, cts.Token))
             {
+                if (configuration.DebugLogging)
+                {
+                    await WritePodLogsAndEventsToDisk(client, podName, aksNamespace);
+                }
+
                 throw new Exception($"Timed out waiting for {podName} to start.");
             }
+
+            var pods = await client.CoreV1.ListNamespacedPodAsync(aksNamespace);
+            var workloadPod = pods.Items.Where(x => x.Metadata.Name.Contains(podName)).FirstOrDefault();
 
             // Pod Exec can fail even after the pod is marked ready.
             // Retry on WebSocketExceptions for up to 40 secs.
@@ -261,7 +278,68 @@ namespace CromwellOnAzureDeployer
 
             if (result.Outcome != OutcomeType.Successful && result.FinalException is not null)
             {
-                throw result.FinalException;
+                if (configuration.DebugLogging)
+                {
+                    await WritePodLogsAndEventsToDisk(client, podName, aksNamespace);
+                }
+
+                throw new Exception($"Pod failed to run commands after being marked ready.", result.FinalException);
+            }
+        }
+
+        /// <summary>
+        /// Writes pod logs and events to disk, as well as all events for the AKS cluster. 
+        /// </summary>
+        /// <param name="client">IKubernetes client</param>
+        /// <param name="podName">Name of pod to get the logs.</param>
+        /// <param name="aksNamespace">Namespace where the pod is running.</param>
+        /// <returns></returns>
+        public async Task WritePodLogsAndEventsToDisk(IKubernetes client, string podName, string aksNamespace)
+        {
+            try
+            {
+                var pods = await client.CoreV1.ListNamespacedPodAsync(aksNamespace);
+                var workloadPod = pods.Items.Where(x => x.Metadata.Name.Contains(podName)).FirstOrDefault();
+                ConsoleEx.WriteLine($"Pod {podName} Status:\n\t{JsonConvert.SerializeObject(workloadPod.Status)}");
+            }
+            catch (Exception e)
+            {
+                ConsoleEx.WriteLine($"Exception thrown retrieving {podName} pod status.");
+                ConsoleEx.WriteLine(e.Message);
+            }
+
+            try
+            {
+                var logStream = await client.CoreV1.ReadNamespacedPodLogAsync(podName, aksNamespace);
+                var podTempFile = Path.GetTempFileName();
+
+                var reader = new StreamReader(logStream);
+                var logs = await reader.ReadToEndAsync();
+                await File.WriteAllTextAsync(podTempFile, logs);
+                ConsoleEx.WriteLine($"Pod {podName} Logs: {podTempFile}");
+            }
+            catch (Exception e)
+            {
+                ConsoleEx.WriteLine($"Exception thrown retrieving {podName} pod log.");
+                ConsoleEx.WriteLine(e.Message);
+            }
+
+            try
+            {
+                var events = await client.CoreV1.ListEventForAllNamespacesAsync();
+                var podEventsFile = Path.GetTempFileName();
+                var allEventsFile = Path.GetTempFileName();
+
+                await File.WriteAllTextAsync(podEventsFile, string.Join("\n", events.Items.Where(x => x.InvolvedObject.Name.Contains(podName)).Select(x => JsonConvert.SerializeObject(x))));
+                ConsoleEx.WriteLine($"Pod {podName} Events: {podEventsFile}");
+
+                await File.WriteAllTextAsync(allEventsFile, string.Join("\n", events.Items.Select(x => JsonConvert.SerializeObject(x))));
+                ConsoleEx.WriteLine($"All Events: {allEventsFile}");
+            }
+            catch (Exception e)
+            {
+                ConsoleEx.WriteLine($"Exception thrown retrieving AKS events.");
+                ConsoleEx.WriteLine(e.Message);
             }
         }
 
@@ -347,7 +425,6 @@ namespace CromwellOnAzureDeployer
             batchNodes["disablePublicIpAddress"] = GetValueOrDefault(settings, "DisableBatchNodesPublicIpAddress");
             batchScheduling["disable"] = GetValueOrDefault(settings, "DisableBatchScheduling");
             batchScheduling["usePreemptibleVmsOnly"] = GetValueOrDefault(settings, "UsePreemptibleVmsOnly");
-            nodeImages["blobxfer"] = GetValueOrDefault(settings, "BlobxferImageName");
             nodeImages["docker"] = GetValueOrDefault(settings, "DockerInDockerImageName");
             batchImageGen2["offer"] = GetValueOrDefault(settings, "Gen2BatchImageOffer");
             batchImageGen2["publisher"] = GetValueOrDefault(settings, "Gen2BatchImagePublisher");
@@ -426,7 +503,6 @@ namespace CromwellOnAzureDeployer
                 ["DisableBatchNodesPublicIpAddress"] = GetValueOrDefault(batchNodes, "disablePublicIpAddress"),
                 ["DisableBatchScheduling"] = GetValueOrDefault(batchScheduling, "disable"),
                 ["UsePreemptibleVmsOnly"] = GetValueOrDefault(batchScheduling, "usePreemptibleVmsOnly"),
-                ["BlobxferImageName"] = GetValueOrDefault(nodeImages, "blobxfer"),
                 ["DockerInDockerImageName"] = GetValueOrDefault(nodeImages, "docker"),
                 ["Gen2BatchImageOffer"] = GetValueOrDefault(batchImageGen2, "offer"),
                 ["Gen2BatchImagePublisher"] = GetValueOrDefault(batchImageGen2, "publisher"),
@@ -561,6 +637,7 @@ namespace CromwellOnAzureDeployer
             public Dictionary<string, string> TesDatabase { get; set; }
             public Dictionary<string, string> CromwellDatabase { get; set; }
             public Dictionary<string, string> Images { get; set; }
+            public List<string> CromwellContainers { get; set; }
             public List<string> DefaultContainers { get; set; }
             public List<Dictionary<string, string>> InternalContainersMIAuth { get; set; }
             public List<Dictionary<string, string>> InternalContainersKeyVaultAuth { get; set; }

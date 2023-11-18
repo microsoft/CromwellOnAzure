@@ -24,6 +24,7 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlFlexibleVersion { get; set; } = "14";
         public string PostgreSqlSingleServerVersion { get; set; } = "11";
         public string DefaultPostgreSqlSubnetName { get; set; } = "sqlsubnet";
+        public string DefaultBatchSubnetName { get; set; } = "batchsubnet";
         public int PostgreSqlStorageSize { get; set; } = 128;  // GiB
     }
 
@@ -42,6 +43,7 @@ namespace CromwellOnAzureDeployer
         public string KubernetesServiceCidr = "10.1.4.0/22"; // 10.1.4.0 -> 10.1.7.255, 1024 IPs
         public string KubernetesDnsServiceIP = "10.1.4.10";
         public string KubernetesDockerBridgeCidr = "172.17.0.1/16"; // 172.17.0.0 - 172.17.255.255, 65536 IPs
+        public string BatchNodesSubnetAddressSpace { get; set; } = "10.1.128.0/17"; // 10.1.128.0 - 10.1.255.255, 32768 IPs
 
         public string ResourceGroupName { get; set; }
         public string BatchAccountName { get; set; }
@@ -66,11 +68,11 @@ namespace CromwellOnAzureDeployer
         public string SubnetName { get; set; }
         public string VmSubnetName { get; set; }
         public string PostgreSqlSubnetName { get; set; }
+        public string BatchSubnetName { get; set; }
         public bool? PrivateNetworking { get; set; } = null;
         public string Tags { get; set; } = null;
         public string BatchNodesSubnetId { get; set; } = null;
         public string DockerInDockerImageName { get; set; } = null;
-        public string BlobxferImageName { get; set; } = null;
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
         public bool DebugLogging { get; set; } = false;
         public string PostgreSqlServerName { get; set; }
@@ -80,6 +82,7 @@ namespace CromwellOnAzureDeployer
         public bool UsePostgreSqlSingleServer { get; set; } = false;
         public string KeyVaultName { get; set; }
         public string ContainersToMountPath { get; set; }
+        public string AadGroupIds { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {
