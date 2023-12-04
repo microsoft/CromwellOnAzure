@@ -8,10 +8,12 @@
 
   <ItemGroup>
     <None Remove="globtest.wdl" />
+    <None Remove="test-wdls\privateacr\privateacr.wdl" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="test-wdls\globtest\globtest.wdl" />
+    <EmbeddedResource Include="test-wdls\privateacr\privateacr.wdl" />
   </ItemGroup>
 
   <ItemGroup>

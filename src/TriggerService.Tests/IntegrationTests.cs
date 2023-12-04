@@ -28,6 +28,20 @@ namespace TriggerService.Tests
         /// <returns></returns>
         [TestCategory("Integration")]
         [TestMethod]
+        public async Task RunPrivateAcrTestWaitTilDoneAsync()
+        {
+            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/mattmcl4475/private-acr-test/src/TriggerService.Tests/test-wdls/privateacr/privateacr.trigger.json";
+            const string workflowFriendlyName = $"privateacr";
+
+            await RunIntegrationTestAsync(new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) });
+        }
+
+        /// <summary>
+        /// To run this test, specify a testStorageAccountName, a workflowsContainerSasToken
+        /// </summary>
+        /// <returns></returns>
+        [TestCategory("Integration")]
+        [TestMethod]
         public async Task RunScaleTestWithMutect2WaitTilDoneAsync()
         {
             const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
