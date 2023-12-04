@@ -1,0 +1,6 @@
+{
+  "WorkflowUrl": "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/mattmcl4475/private-acr-test/src/TriggerService.Tests/test-wdls/privateacr/privateacr.wdl",
+  "WorkflowInputsUrl": "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/mattmcl4475/private-acr-test/src/TriggerService.Tests/test-wdls/privateacr/privateacr.inputs.json",
+  "WorkflowOptionsUrl": null,
+  "WorkflowDependenciesUrl": null
+}
