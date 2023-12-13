@@ -140,10 +140,12 @@ namespace CromwellOnAzureDeployer
         }
 
         public async Task DeployHelmChartToClusterAsync()
+        {
             // https://helm.sh/docs/helm/helm_upgrade/
             // The chart argument can be either: a chart reference('example/mariadb'), a path to a chart directory, a packaged chart, or a fully qualified URL
-            => await ExecHelmProcessAsync($"upgrade --install cromwellonazure ./helm --kubeconfig \"{kubeConfigPath}\" --namespace {configuration.AksCoANamespace} --create-namespace",
+            await ExecHelmProcessAsync($"upgrade --install cromwellonazure ./helm --kubeconfig \"{kubeConfigPath}\" --namespace {configuration.AksCoANamespace} --create-namespace",
                 workingDirectory: workingDirectoryTemp);
+        }
 
         public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId, List<MountableContainer> containersToMount)
         {
@@ -209,7 +211,7 @@ namespace CromwellOnAzureDeployer
         {
             if (previousVersion < new Version(4, 3))
             {
-                values.CromwellContainers = new List<string>() { Deployer.ConfigurationContainerName,  Deployer.ExecutionsContainerName, Deployer.LogsContainerName, Deployer.OutputsContainerName };
+                values.CromwellContainers = new List<string>() { Deployer.ConfigurationContainerName, Deployer.ExecutionsContainerName, Deployer.LogsContainerName, Deployer.OutputsContainerName };
                 values.DefaultContainers = new List<string>() { Deployer.InputsContainerName };
             }
         }
