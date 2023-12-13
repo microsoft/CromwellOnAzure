@@ -46,12 +46,12 @@ spec:
               value: http://0.0.0.0:{{ .Values.service.tesPort }}/
             - name: Storage__DefaultAccountName
               value: {{ .Values.persistence.storageAccount }}
+            - name: Storage__ExecutionsContainerName
+              value: {{ .Values.persistence.executionsContainerName }}
             - name: AzureServicesAuthConnectionString
               value: {{ .Values.config.azureServicesAuthConnectionString }}
             - name: ApplicationInsights__AccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
-            - name: AzureOfferDurableId
-              value: {{ .Values.config.azureOfferDurableId }}
             - name: BatchScheduling__UseLegacyAutopools
               value: {{ .Values.config.batchScheduling.useLegacyAutopools | quote }}
             - name: BatchAccount__AccountName
@@ -60,10 +60,6 @@ spec:
               value: {{ .Values.config.batchNodes.subnetId }}
             - name: BatchNodes__DisablePublicIpAddress
               value: {{ .Values.config.batchNodes.disablePublicIpAddress | quote }}
-            - name: BatchScheduling__Disable
-              value: {{ .Values.config.batchScheduling.disable | quote }}
-            - name: NodeImages__Docker
-              value: {{ .Values.config.nodeImages.docker }}
             - name: BatchImageGen2__Offer
               value: {{ .Values.config.batchImageGen2.offer }}
             - name: BatchImageGen2__Publisher

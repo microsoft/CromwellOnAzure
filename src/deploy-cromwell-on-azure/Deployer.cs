@@ -22,6 +22,7 @@ using Azure.Security.KeyVault.Secrets;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using Common;
+using CommonUtilities;
 using k8s;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
@@ -85,6 +86,9 @@ namespace CromwellOnAzureDeployer
         public const string CromwellConfigurationFileName = "cromwell-application.conf";
         public const string AllowedVmSizesFileName = "allowed-vm-sizes";
         public const string InputsContainerName = "inputs";
+        public const string OutputsContainerName = "outputs";
+        public const string LogsContainerName = "cromwell-workflow-logs";
+        public const string ExecutionsContainerName = "cromwell-executions";
         public const string CromwellAzureRootDir = "/data/cromwellazure";
         public const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
         public const string StorageAccountKeySecretName = "CoAStorageKey";
@@ -160,7 +164,7 @@ namespace CromwellOnAzureDeployer
                 });
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
-                kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts);
+                kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts.Token);
 
                 IResourceGroup resourceGroup = null;
                 ManagedCluster aksCluster = null;
@@ -190,142 +194,140 @@ namespace CromwellOnAzureDeployer
 
                         ConsoleEx.WriteLine($"Upgrading Cromwell on Azure instance in resource group '{resourceGroup.Name}' to version {targetVersion}...");
 
-                        if (!string.IsNullOrEmpty(configuration.StorageAccountName))
-                        {
-                            storageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName)
-                                ?? throw new ValidationException($"Storage account {configuration.StorageAccountName}, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
-                        }
-                        else
+                        if (string.IsNullOrEmpty(configuration.StorageAccountName))
                         {
                             var storageAccounts = (await azureSubscriptionClient.StorageAccounts.ListByResourceGroupAsync(configuration.ResourceGroupName)).ToList();
 
-                            if (!storageAccounts.Any())
+                            storageAccount = storageAccounts.Count switch
                             {
-                                throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any storage accounts.");
-                            }
-                            if (storageAccounts.Count > 1)
-                            {
-                                throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple storage accounts. {nameof(configuration.StorageAccountName)} must be provided.");
-                            }
-
-                            storageAccount = storageAccounts.First();
+                                0 => throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any storage accounts.", displayExample: false),
+                                1 => storageAccounts.Single(),
+                                _ => throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple storage accounts. {nameof(configuration.StorageAccountName)} must be provided.", displayExample: false),
+                            };
                         }
-
-                        // If the previous installation was pre 4.0, we probably will error out below this line but before we make any changes. If not, we will guard below anyway.
+                        else
+                        {
+                            storageAccount = await GetExistingStorageAccountAsync(configuration.StorageAccountName)
+                                ?? throw new ValidationException($"Storage account {configuration.StorageAccountName}, does not exist in region {configuration.RegionName} or is not accessible to the current user.", displayExample: false);
+                        }
 
                         var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccount);
 
                         if (!aksValues.Any())
                         {
-                            throw new ValidationException($"Could not retrieve account names");
+                            throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.", displayExample: false);
                         }
 
                         if (!aksValues.TryGetValue("BatchAccountName", out var batchAccountName))
                         {
-                            throw new ValidationException($"Could not retrieve the Batch account name");
+                            throw new ValidationException($"Could not retrieve the Batch account name", displayExample: false);
                         }
 
                         batchAccount = await GetExistingBatchAccountAsync(batchAccountName)
-                            ?? throw new ValidationException($"Batch account {batchAccountName}, referenced by the VM configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.");
+                            ?? throw new ValidationException($"Batch account {batchAccountName}, referenced by the stored configuration, does not exist in region {configuration.RegionName} or is not accessible to the current user.", displayExample: false);
 
                         configuration.BatchAccountName = batchAccountName;
 
-                        aksValues.TryGetValue("PostgreSqlServerName", out var postgreSqlServerName);
+                        if (!aksValues.TryGetValue("PostgreSqlServerName", out var postgreSqlServerName))
+                        {
+                            throw new ValidationException($"Could not retrieve the PostgreSqlServer account name from stored configuration in {storageAccount.Name}.", displayExample: false);
+                        }
 
                         configuration.PostgreSqlServerName = postgreSqlServerName;
-                        //postgreSqlFlexServer = GetExistingPostgresqlService(postgreSqlServerName); // TODO: Get existing postgresql server
 
                         ManagedCluster existingAksCluster = default;
 
-                        if (!string.IsNullOrEmpty(configuration.AksClusterName))
-                        {
-                            existingAksCluster = await ValidateAndGetExistingAKSClusterAsync();
-                        }
-                        else
+                        if (string.IsNullOrEmpty(configuration.AksClusterName))
                         {
                             using var client = new ContainerServiceClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId };
                             var aksClusters = (await client.ManagedClusters.ListByResourceGroupAsync(configuration.ResourceGroupName)).ToList();
 
-                            if (!aksClusters.Any())
+                            existingAksCluster = aksClusters.Count switch
                             {
-                                throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any AKS clusters.");
-                            }
-                            if (aksClusters.Count > 1)
-                            {
-                                throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple AKS clusters. {nameof(configuration.AksClusterName)} must be provided.");
-                            }
+                                0 => throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any AKS clusters.", displayExample: false),
+                                1 => aksClusters.Single(),
+                                _ => throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple AKS clusters. {nameof(configuration.AksClusterName)} must be provided.", displayExample: false),
+                            };
 
-                            existingAksCluster = aksClusters.First();
                             configuration.AksClusterName = existingAksCluster.Name;
-                        }
-
-                        if (existingAksCluster is not null)
-                        {
-                            if (aksValues.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
-                            {
-                                _ = bool.TryParse(crossSubscriptionAKSDeployment, out var parsed);
-                                configuration.CrossSubscriptionAKSDeployment = parsed;
-                            }
-
-                            if (aksValues.TryGetValue("KeyVaultName", out var keyVaultName))
-                            {
-                                var keyVault = await GetKeyVaultAsync(keyVaultName);
-                                keyVaultUri = keyVault.Properties.VaultUri;
-                            }
-
-                            if (!aksValues.TryGetValue("ManagedIdentityClientId", out var managedIdentityClientId))
-                            {
-                                throw new ValidationException($"Could not retrieve ManagedIdentityClientId.");
-                            }
-
-                            managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
-                                ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.");
-
-                            // Override any configuration that is used by the update.
-                            var versionString = aksValues["CromwellOnAzureVersion"];
-                            var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
-
-                            if (installedVersion is null || installedVersion < new Version(4, 0))
-                            {
-                                throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.");
-                            }
-
-                            var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
-                            var waitForRoleAssignmentPropagation = false;
-
-                            if (installedVersion is null || installedVersion < new Version(4, 4))
-                            {
-                                // Ensure all storage containers are created.
-                                await CreateDefaultStorageContainersAsync(storageAccount);
-
-                                if (string.IsNullOrWhiteSpace(settings["BatchNodesSubnetId"]))
-                                {
-                                    settings["BatchNodesSubnetId"] = await UpdateVnetWithBatchSubnet();
-                                }
-                            }
-
-                            if (installedVersion is null || installedVersion < new Version(4, 7))
-                            {
-                                var hasAssignedNetworkContributor = await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
-                                var hasAssignedDataOwner = await TryAssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
-
-                                await Execute($"Moving {AllowedVmSizesFileName} file to new location: {TesInternalContainerName}/{ConfigurationContainerName}/{AllowedVmSizesFileName}", () => MoveAllowedVmSizesFileAsync(storageAccount));
-                                waitForRoleAssignmentPropagation |= hasAssignedNetworkContributor || hasAssignedDataOwner;
-                            }
-
-                            if (waitForRoleAssignmentPropagation)
-                            {
-                                await Execute("Waiting 5 minutes for role assignment propagation...",
-                                    () => Task.Delay(System.TimeSpan.FromMinutes(5)));
-                            }
-
-                            await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
-                            kubernetesClient = await PerformHelmDeploymentAsync(existingAksCluster);
                         }
                         else
                         {
+                            existingAksCluster = await ValidateAndGetExistingAKSClusterAsync()
+                                ?? throw new ValidationException($"AKS cluster {configuration.AksClusterName} does not exist in region {configuration.RegionName} or is not accessible to the current user.", displayExample: false);
+                        }
+
+                        if (aksValues.TryGetValue("CrossSubscriptionAKSDeployment", out var crossSubscriptionAKSDeployment))
+                        {
+                            configuration.CrossSubscriptionAKSDeployment = bool.TryParse(crossSubscriptionAKSDeployment, out var parsed) ? parsed : null;
+                        }
+
+                        if (aksValues.TryGetValue("KeyVaultName", out var keyVaultName))
+                        {
+                            var keyVault = await GetKeyVaultAsync(keyVaultName);
+                            keyVaultUri = keyVault.Properties.VaultUri;
+                        }
+
+                        if (!aksValues.TryGetValue("ManagedIdentityClientId", out var managedIdentityClientId))
+                        {
+                            throw new ValidationException($"Could not retrieve ManagedIdentityClientId.", displayExample: false);
+                        }
+
+                        managedIdentity = azureSubscriptionClient.Identities.ListByResourceGroup(configuration.ResourceGroupName).Where(id => id.ClientId == managedIdentityClientId).FirstOrDefault()
+                            ?? throw new ValidationException($"Managed Identity {managedIdentityClientId} does not exist in region {configuration.RegionName} or is not accessible to the current user.", displayExample: false);
+
+                        // Override any configuration that is used by the update.
+                        var versionString = aksValues["CromwellOnAzureVersion"];
+                        var installedVersion = !string.IsNullOrEmpty(versionString) && Version.TryParse(versionString, out var version) ? version : null;
+
+                        if (installedVersion is null || installedVersion < new Version(4, 0))
+                        {
                             throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.");
                         }
+
+                        var settings = ConfigureSettings(managedIdentity.ClientId, aksValues, installedVersion);
+                        var waitForRoleAssignmentPropagation = false;
+
+                        if (installedVersion is null || installedVersion < new Version(4, 4))
+                        {
+                            // Ensure all storage containers are created.
+                            await CreateDefaultStorageContainersAsync(storageAccount);
+
+                            if (string.IsNullOrWhiteSpace(settings["BatchNodesSubnetId"]))
+                            {
+                                settings["BatchNodesSubnetId"] = await UpdateVnetWithBatchSubnet();
+                            }
+                        }
+
+                        if (installedVersion is null || installedVersion < new Version(4, 7))
+                        {
+                            var hasAssignedNetworkContributor = await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                            var hasAssignedDataOwner = await TryAssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
+
+                            await Execute($"Moving {AllowedVmSizesFileName} file to new location: {TesInternalContainerName}/{ConfigurationContainerName}/{AllowedVmSizesFileName}", () => MoveAllowedVmSizesFileAsync(storageAccount));
+                            waitForRoleAssignmentPropagation |= hasAssignedNetworkContributor || hasAssignedDataOwner;
+                        }
+
+                        if (installedVersion is null || installedVersion < new Version(5, 0, 1))
+                        {
+                            if (!settings.ContainsKey("ExecutionsContainerName"))
+                            {
+                                settings["ExecutionsContainerName"] = ExecutionsContainerName;
+                            }
+                        }
+
+                        //if (installedVersion is null || installedVersion < new Version(5, 0, 2))
+                        //{
+                        //}
+
+                        if (waitForRoleAssignmentPropagation)
+                        {
+                            await Execute("Waiting 5 minutes for role assignment propagation...",
+                                () => Task.Delay(System.TimeSpan.FromMinutes(5)));
+                        }
+
+                        await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
+                        kubernetesClient = await PerformHelmDeploymentAsync(existingAksCluster);
 
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                     }
@@ -364,9 +366,9 @@ namespace CromwellOnAzureDeployer
                             configuration.PostgreSqlServerName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
                         }
 
-                        configuration.PostgreSqlAdministratorPassword = Utility.GeneratePassword();
-                        configuration.PostgreSqlCromwellUserPassword = Utility.GeneratePassword();
-                        configuration.PostgreSqlTesUserPassword = Utility.GeneratePassword();
+                        configuration.PostgreSqlAdministratorPassword = PasswordGenerator.GeneratePassword();
+                        configuration.PostgreSqlCromwellUserPassword = PasswordGenerator.GeneratePassword();
+                        configuration.PostgreSqlTesUserPassword = PasswordGenerator.GeneratePassword();
 
                         if (string.IsNullOrWhiteSpace(configuration.BatchAccountName))
                         {
@@ -894,13 +896,13 @@ namespace CromwellOnAzureDeployer
 
             // Additional non-personalized settings
             UpdateSetting(settings, defaults, "BatchNodesSubnetId", configuration.BatchNodesSubnetId);
-            UpdateSetting(settings, defaults, "DockerInDockerImageName", configuration.DockerInDockerImageName);
             UpdateSetting(settings, defaults, "DisableBatchNodesPublicIpAddress", configuration.DisableBatchNodesPublicIpAddress, b => b.GetValueOrDefault().ToString(), configuration.DisableBatchNodesPublicIpAddress.GetValueOrDefault().ToString());
 
             if (installedVersion is null)
             {
                 UpdateSetting(settings, defaults, "BatchPrefix", configuration.BatchPrefix, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "ExecutionsContainerName", ExecutionsContainerName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ManagedIdentityClientId", managedIdentityClientId, ignoreDefaults: true);
@@ -1330,7 +1332,7 @@ namespace CromwellOnAzureDeployer
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
 
-            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", "tes-internal", ConfigurationContainerName };
+            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, ExecutionsContainerName, LogsContainerName, OutputsContainerName, TesInternalContainerName, ConfigurationContainerName };
             await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
         }
 
@@ -2423,12 +2425,12 @@ namespace CromwellOnAzureDeployer
         private static void WriteExecutionTime(ConsoleEx.Line line, DateTime startTime)
             => line.Write($" Completed in {DateTime.UtcNow.Subtract(startTime).TotalSeconds:n0}s", ConsoleColor.Green);
 
-        public static async Task<string> DownloadTextFromStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, CancellationTokenSource cts)
+        public static async Task<string> DownloadTextFromStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, CancellationToken cancellationToken)
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
             var container = blobClient.GetBlobContainerClient(containerName);
 
-            return (await container.GetBlobClient(blobName).DownloadContentAsync(cts.Token)).Value.Content.ToString();
+            return (await container.GetBlobClient(blobName).DownloadContentAsync(cancellationToken)).Value.Content.ToString();
         }
 
         private async Task UploadTextToStorageAccountAsync(IStorageAccount storageAccount, string containerName, string blobName, string content)
