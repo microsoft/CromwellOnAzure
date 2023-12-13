@@ -86,6 +86,8 @@ namespace CromwellOnAzureDeployer
         public const string CromwellConfigurationFileName = "cromwell-application.conf";
         public const string AllowedVmSizesFileName = "allowed-vm-sizes";
         public const string InputsContainerName = "inputs";
+        public const string OutputsContainerName = "outputs";
+        public const string LogsContainerName = "cromwell-workflow-logs";
         public const string ExecutionsContainerName = "cromwell-executions";
         public const string CromwellAzureRootDir = "/data/cromwellazure";
         public const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
@@ -1330,7 +1332,7 @@ namespace CromwellOnAzureDeployer
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
 
-            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, ExecutionsContainerName, "cromwell-workflow-logs", "outputs", "tes-internal", ConfigurationContainerName };
+            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, ExecutionsContainerName, LogsContainerName, OutputsContainerName, TesInternalContainerName, ConfigurationContainerName };
             await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
         }
 
