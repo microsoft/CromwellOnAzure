@@ -86,6 +86,7 @@ namespace CromwellOnAzureDeployer
         public const string CromwellConfigurationFileName = "cromwell-application.conf";
         public const string AllowedVmSizesFileName = "allowed-vm-sizes";
         public const string InputsContainerName = "inputs";
+        public const string ExecutionsContainerName = "cromwell-executions";
         public const string CromwellAzureRootDir = "/data/cromwellazure";
         public const string CromwellAzureRootDirSymLink = "/cromwellazure";    // This path is present in all CoA versions
         public const string StorageAccountKeySecretName = "CoAStorageKey";
@@ -307,9 +308,9 @@ namespace CromwellOnAzureDeployer
 
                         if (installedVersion is null || installedVersion < new Version(5, 0, 1))
                         {
-                            if (string.IsNullOrWhiteSpace(settings["ExecutionsContainerName"]))
+                            if (!settings.ContainsKey("ExecutionsContainerName"))
                             {
-                                settings["ExecutionsContainerName"] = TesInternalContainerName;
+                                settings["ExecutionsContainerName"] = ExecutionsContainerName;
                             }
                         }
 
@@ -899,7 +900,7 @@ namespace CromwellOnAzureDeployer
             {
                 UpdateSetting(settings, defaults, "BatchPrefix", configuration.BatchPrefix, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "DefaultStorageAccountName", configuration.StorageAccountName, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "ExecutionsContainerName", TesInternalContainerName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "ExecutionsContainerName", ExecutionsContainerName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ManagedIdentityClientId", managedIdentityClientId, ignoreDefaults: true);
@@ -1329,7 +1330,7 @@ namespace CromwellOnAzureDeployer
         {
             var blobClient = await GetBlobClientAsync(storageAccount);
 
-            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, "cromwell-executions", "cromwell-workflow-logs", "outputs", "tes-internal", ConfigurationContainerName };
+            var defaultContainers = new List<string> { WorkflowsContainerName, InputsContainerName, ExecutionsContainerName, "cromwell-workflow-logs", "outputs", "tes-internal", ConfigurationContainerName };
             await Task.WhenAll(defaultContainers.Select(c => blobClient.GetBlobContainerClient(c).CreateIfNotExistsAsync(cancellationToken: cts.Token)));
         }
 
