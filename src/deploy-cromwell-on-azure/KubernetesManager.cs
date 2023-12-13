@@ -407,7 +407,6 @@ namespace CromwellOnAzureDeployer
             batchNodes["subnetId"] = GetValueOrDefault(settings, "BatchNodesSubnetId");
             values.Config["coaNamespace"] = GetValueOrDefault(settings, "AksCoANamespace");
             batchNodes["disablePublicIpAddress"] = GetValueOrDefault(settings, "DisableBatchNodesPublicIpAddress");
-            batchScheduling["disable"] = GetValueOrDefault(settings, "DisableBatchScheduling");
             batchScheduling["usePreemptibleVmsOnly"] = GetValueOrDefault(settings, "UsePreemptibleVmsOnly");
             batchImageGen2["offer"] = GetValueOrDefault(settings, "Gen2BatchImageOffer");
             batchImageGen2["publisher"] = GetValueOrDefault(settings, "Gen2BatchImagePublisher");
@@ -482,7 +481,6 @@ namespace CromwellOnAzureDeployer
                 ["BatchNodesSubnetId"] = GetValueOrDefault(batchNodes, "subnetId"),
                 ["AksCoANamespace"] = GetValueOrDefault(values.Config, "coaNamespace") as string,
                 ["DisableBatchNodesPublicIpAddress"] = GetValueOrDefault(batchNodes, "disablePublicIpAddress"),
-                ["DisableBatchScheduling"] = GetValueOrDefault(batchScheduling, "disable"),
                 ["UsePreemptibleVmsOnly"] = GetValueOrDefault(batchScheduling, "usePreemptibleVmsOnly"),
                 ["Gen2BatchImageOffer"] = GetValueOrDefault(batchImageGen2, "offer"),
                 ["Gen2BatchImagePublisher"] = GetValueOrDefault(batchImageGen2, "publisher"),
