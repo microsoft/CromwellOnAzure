@@ -1598,7 +1598,7 @@ namespace CromwellOnAzureDeployer
                         Properties = new()
                         {
                             TenantId = new(tenantId),
-                            Sku = new (SkuName.Standard),
+                            Sku = new(SkuName.Standard),
                             NetworkAcls = new()
                             {
                                 DefaultAction = configuration.PrivateNetworking.GetValueOrDefault() ? "Deny" : "Allow"
