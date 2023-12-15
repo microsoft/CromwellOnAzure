@@ -78,7 +78,6 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlServerNameSuffix { get; set; } = ".postgres.database.azure.com";
         public int PostgreSqlServerPort { get; set; } = 5432;
         public string PostgreSqlServerSslMode { get; set; } = "VerifyFull";
-        public bool UsePostgreSqlSingleServer { get; set; } = false;
         public string KeyVaultName { get; set; }
         public string ContainersToMountPath { get; set; }
         public string AadGroupIds { get; set; }
