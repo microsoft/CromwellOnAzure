@@ -11,7 +11,7 @@ namespace CromwellApiClient
     {
         string GetUrl();
         Task<PostWorkflowResponse> PostWorkflowAsync(
-            string workflowSourceFilename, byte[] workflowSourceData,
+            string workflowUrl,
             List<string> workflowInputsFilename, List<byte[]> workflowInputsData,
             string workflowOptionsFilename = null, byte[] workflowOptionsData = null,
             string workflowDependenciesFilename = null, byte[] workflowDependenciesData = null);
