@@ -2,16 +2,12 @@
   "SubscriptionId": "",
   "RegionName": "westus2",
   "MainIdentifierPrefix": "coa",
-  "VmOsVersion": "18.04-LTS",
-  "VmSize": "Standard_D3_v2",
-  "VnetAddressSpace": "10.0.0.0/24",
-  "VmUsername": "vmadmin",
-  "VmPassword": "",
+  "VmSize": "Standard_D4s_v3",
+  "VnetAddressSpace": "10.0.0.0/16",
   "ResourceGroupName": "",
   "BatchAccountName": "",
   "StorageAccountName": "",
   "ApplicationInsightsAccountName": "",
-  "VmName": "",
   "Silent": false,
-  "DeleteResourceGroupOnFailure":  false
+  "DeleteResourceGroupOnFailure": false
 }

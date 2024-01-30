@@ -7,7 +7,6 @@ config:
   resourceGroup: RUNTIME_PARAMETER
   azureServicesAuthConnectionString: RUNTIME_PARAMETER
   applicationInsightsAccountName: RUNTIME_PARAMETER
-  azureOfferDurableId: MS-AZR-0003p
   batchAccount:
     accountName: RUNTIME_PARAMETER
   batchNodes:
@@ -15,12 +14,9 @@ config:
     disablePublicIpAddress: RUNTIME_PARAMETER
     globalStartTask: /configuration/start-task.sh
   batchScheduling:
-    disable: RUNTIME_PARAMETER
     usePreemptibleVmsOnly: RUNTIME_PARAMETER
     poolRotationForcedDays: "7"
     prefix: RUNTIME_PARAMETER
-  nodeImages:
-    docker: RUNTIME_PARAMETER
   batchImageGen2:
     offer: RUNTIME_PARAMETER
     publisher: RUNTIME_PARAMETER
@@ -103,6 +99,7 @@ persistence:
   blobPvcSize: 32Gi
   cromwellTmpSize: 32Gi
   storageAccount: RUNTIME_PARAMETER
+  executionsContainerName: RUNTIME_PARAMETER
 
 identity:
   name: RUNTIME_PARAMETER
