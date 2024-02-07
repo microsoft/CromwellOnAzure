@@ -34,7 +34,7 @@ namespace CromwellOnAzureDeployer
         public string SubscriptionId { get; set; }
         public string RegionName { get; set; }
         public string MainIdentifierPrefix { get; set; } = "coa";
-        public string VmSize { get; set; } = "Standard_D4s_v3";
+        public string VmSize { get; set; } = "Standard_B4ms";
         public string VnetAddressSpace { get; set; } = "10.1.0.0/16"; // 10.1.0.0 - 10.1.255.255, 65536 IPs
         // Address space for CoA services.
         public string VmSubnetAddressSpace { get; set; } = "10.1.0.0/24"; // 10.1.0.0 - 10.1.0.255, 256 IPs
