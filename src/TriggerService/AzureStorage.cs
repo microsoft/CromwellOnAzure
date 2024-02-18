@@ -193,12 +193,7 @@ namespace TriggerService
             return blobList;
         }
 
-
-
-
         private static async Task<string> GetAzureAccessTokenAsync()
             => (await (new DefaultAzureCredential()).GetTokenAsync(new Azure.Core.TokenRequestContext())).Token;
-
-
     }
 }
