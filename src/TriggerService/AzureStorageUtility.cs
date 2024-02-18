@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Azure.Identity;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Services.AppAuthentication;
@@ -81,8 +82,8 @@ namespace TriggerService
             return (await storageAccount.GetKeysAsync())[0].Value;
         }
 
-        private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
-            => new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
+        private static async Task<string> GetAzureAccessTokenAsync()
+            => (await (new DefaultAzureCredential()).GetTokenAsync(new Azure.Core.TokenRequestContext())).Token;
 
         /// <summary>
         /// Gets an authenticated Azure Client instance
