@@ -160,7 +160,7 @@ namespace TriggerService
         /// <returns>An authenticated Azure Client instance</returns>
         private static async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync()
         {
-            var accessToken = await GetAzureAccessTokenAsync();
+            var accessToken = await AzureStorageUtility.GetAzureAccessTokenAsync();
             var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, AzureEnvironment.AzureGlobalCloud);
             var azureClient = FluentAzure.Authenticate(azureCredentials);
 
@@ -192,8 +192,5 @@ namespace TriggerService
 
             return blobList;
         }
-
-        private static async Task<string> GetAzureAccessTokenAsync()
-            => (await (new DefaultAzureCredential()).GetTokenAsync(new Azure.Core.TokenRequestContext())).Token;
     }
 }

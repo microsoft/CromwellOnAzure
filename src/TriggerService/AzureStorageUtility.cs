@@ -82,8 +82,8 @@ namespace TriggerService
             return (await storageAccount.GetKeysAsync())[0].Value;
         }
 
-        private static async Task<string> GetAzureAccessTokenAsync()
-            => (await (new DefaultAzureCredential()).GetTokenAsync(new Azure.Core.TokenRequestContext())).Token;
+        public static async Task<string> GetAzureAccessTokenAsync(string scope = "https://management.azure.com/.default")
+            => (await (new DefaultAzureCredential()).GetTokenAsync(new Azure.Core.TokenRequestContext(new string[] { scope }))).Token;
 
         /// <summary>
         /// Gets an authenticated Azure Client instance
