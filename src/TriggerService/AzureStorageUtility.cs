@@ -82,7 +82,7 @@ namespace TriggerService
             return (await storageAccount.GetKeysAsync())[0].Value;
         }
 
-        public static async Task<string> GetAzureAccessTokenAsync(string scope = "https://management.azure.com/.default")
+        public static async Task<string> GetAzureAccessTokenAsync(string scope = "https://management.azure.com//.default")
             => (await (new DefaultAzureCredential()).GetTokenAsync(new Azure.Core.TokenRequestContext(new string[] { scope }))).Token;
 
         /// <summary>
