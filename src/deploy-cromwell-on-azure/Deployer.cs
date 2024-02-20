@@ -873,7 +873,7 @@ namespace CromwellOnAzureDeployer
             var data = new FederatedIdentityCredentialData()
             {
                 IssuerUri = new Uri(aksOidcIssuer),
-                Subject = $"system:serviceaccount:\"{configuration.AksCoANamespace}\":\"{managedIdentity.Name}-sa\""
+                Subject = $"system:serviceaccount:{configuration.AksCoANamespace}:{managedIdentity.Name}-sa"
             };
             data.Audiences.Add("api://AzureADTokenExchange");
 
