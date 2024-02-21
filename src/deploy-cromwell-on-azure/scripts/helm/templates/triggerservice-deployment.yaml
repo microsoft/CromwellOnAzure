@@ -50,10 +50,10 @@ spec:
           name: triggerservice
           resources:
             requests:
-              cpu: "0.5"
+              cpu: "0.25"
               memory: "256Mi"
             limits:
-              cpu: "2.0"
+              cpu: "1.0"
               memory: "1024Mi"
           securityContext:
             allowPrivilegeEscalation: false
