@@ -15,6 +15,9 @@ using System.Threading.Tasks;
 using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
+using Azure.ResourceManager.ContainerService;
+using Azure.ResourceManager.ManagedServiceIdentities;
+using Azure.ResourceManager.ManagedServiceIdentities.Models;
 using Azure.ResourceManager.Network;
 using Azure.ResourceManager.Network.Models;
 using Azure.ResourceManager.Resources;
@@ -308,9 +311,11 @@ namespace CromwellOnAzureDeployer
                             }
                         }
 
-                        //if (installedVersion is null || installedVersion < new Version(5, 0, 2))
-                        //{
-                        //}
+                        if (installedVersion is null || installedVersion < new Version(5, 2, 0))
+                        {
+                            await EnableWorkloadIdentity(existingAksCluster, managedIdentity, resourceGroup);
+                            await kubernetesManager.RemovePodAadChart();
+                        }
 
                         if (waitForRoleAssignmentPropagation)
                         {
@@ -491,6 +496,7 @@ namespace CromwellOnAzureDeployer
                                 if (aksCluster is null && !configuration.ManualHelmDeployment)
                                 {
                                     aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
+                                    await EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup);
                                 }
                             }),
                             Task.Run(async () =>
@@ -849,6 +855,29 @@ namespace CromwellOnAzureDeployer
             return await Execute(
                 $"Creating AKS Cluster: {configuration.AksClusterName}...",
                 () => containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksClusterName, cluster, cts.Token));
+        }
+
+        private async Task EnableWorkloadIdentity(ManagedCluster aksCluster, IIdentity managedIdentity, IResourceGroup resourceGroup)
+        {
+            // Use the new ResourceManager sdk enable workload identity.
+            var armCluster = (await armClient.GetContainerServiceManagedClusterResource(new ResourceIdentifier(aksCluster.Id)).GetAsync(cancellationToken: cts.Token)).Value;
+            armCluster.Data.SecurityProfile.IsWorkloadIdentityEnabled = true;
+            armCluster.Data.OidcIssuerProfile.IsEnabled = true;
+            var coaRg = armClient.GetResourceGroupResource(new ResourceIdentifier(resourceGroup.Id));
+            var aksClusterCollection = coaRg.GetContainerServiceManagedClusters();
+            var cluster = await aksClusterCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, armCluster.Data.Name, armCluster.Data, cts.Token);
+            var aksOidcIssuer = cluster.Value.Data.OidcIssuerProfile.IssuerUriInfo;
+            var uami = armClient.GetUserAssignedIdentityResource(new ResourceIdentifier(managedIdentity.Id));
+
+            var federatedCredentialsCollection = uami.GetFederatedIdentityCredentials();
+            var data = new FederatedIdentityCredentialData()
+            {
+                IssuerUri = new Uri(aksOidcIssuer),
+                Subject = $"system:serviceaccount:{configuration.AksCoANamespace}:{managedIdentity.Name}-sa"
+            };
+            data.Audiences.Add("api://AzureADTokenExchange");
+
+            await federatedCredentialsCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, "coaFederatedIdentity", data, cts.Token);
         }
 
         private static Dictionary<string, string> GetDefaultValues(string[] files)

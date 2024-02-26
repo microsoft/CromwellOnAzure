@@ -42,9 +42,6 @@ namespace CromwellOnAzureDeployer
         private const string BlobCsiDriverGithubReleaseBranch = "master";
         private const string BlobCsiDriverGithubReleaseVersion = "v1.21.4";
         private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseBranch}/charts";
-        private const string AadPluginGithubReleaseVersion = "v1.8.17";
-        private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
-        private const string AadPluginVersion = "4.1.18";
 
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
@@ -124,18 +121,12 @@ namespace CromwellOnAzureDeployer
         {
             var helmRepoList = await ExecHelmProcessAsync($"repo list", workingDirectory: null, throwOnNonZeroExitCode: false);
 
-            if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("aad-pod-identity", StringComparison.OrdinalIgnoreCase))
-            {
-                await ExecHelmProcessAsync($"repo add aad-pod-identity {AadPluginRepo}");
-            }
-
             if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("blob-csi-driver", StringComparison.OrdinalIgnoreCase))
             {
                 await ExecHelmProcessAsync($"repo add blob-csi-driver {BlobCsiRepo}");
             }
 
             await ExecHelmProcessAsync($"repo update");
-            await ExecHelmProcessAsync($"upgrade --install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig \"{kubeConfigPath}\"");
             await ExecHelmProcessAsync($"upgrade --install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig \"{kubeConfigPath}\"");
         }
 
@@ -220,6 +211,11 @@ namespace CromwellOnAzureDeployer
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cancellationToken));
             return ValuesToSettings(values);
+        }
+
+        public async Task RemovePodAadChart()
+        {
+            await ExecHelmProcessAsync($"uninstall aad-pod-identity", throwOnNonZeroExitCode: false);
         }
 
         public async Task ExecuteCommandsOnPodAsync(IKubernetes client, string podName, IEnumerable<string[]> commands, string aksNamespace)
