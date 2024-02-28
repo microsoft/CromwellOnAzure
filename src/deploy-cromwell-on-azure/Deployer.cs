@@ -311,7 +311,7 @@ namespace CromwellOnAzureDeployer
                             }
                         }
 
-                        if (installedVersion is null || installedVersion < new Version(5, 2, 0))
+                        if (installedVersion is null || installedVersion < new Version(5, 2, 2))
                         {
                             await EnableWorkloadIdentity(existingAksCluster, managedIdentity, resourceGroup);
                             await kubernetesManager.RemovePodAadChart();
