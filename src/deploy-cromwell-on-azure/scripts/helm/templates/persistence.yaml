@@ -62,6 +62,9 @@ parameters:
   containerName: {{ .containerName }}
 mountOptions:
   - -o allow_other
+  {{- if .isAdlsGen2 }} 
+  - --use-adls=true
+  {{- end }}
   - --file-cache-timeout-in-seconds=120
 ---
 apiVersion: v1
@@ -101,6 +104,9 @@ spec:
   storageClassName: {{ $namespace }}-blob-fuse
   mountOptions:
     - -o allow_other
+    {{- if .isAdlsGen2 }} 
+    - --use-adls=true
+    {{- end }}
     - --file-cache-timeout-in-seconds=120
   csi:
     driver: blob.csi.azure.com
@@ -152,6 +158,9 @@ parameters:
   containerName: {{ .containerName }}
 mountOptions:
   - -o allow_other
+  {{- if .isAdlsGen2 }} 
+  - --use-adls=true
+  {{- end }}
   - --file-cache-timeout-in-seconds=120
 ---
 apiVersion: v1
@@ -190,6 +199,9 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   mountOptions:
     - -o allow_other
+    {{- if .isAdlsGen2 }} 
+    - --use-adls=true
+    {{- end }}
     - --file-cache-timeout-in-seconds=120
   csi:
     driver: blob.csi.azure.com
