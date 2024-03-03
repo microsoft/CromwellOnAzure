@@ -8,6 +8,7 @@ using Azure.Identity;
 using CommonUtilities.AzureCloud;
 using CromwellApiClient;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
+using Microsoft.Azure.Management.Compute.Fluent.Models;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,18 +50,9 @@ namespace TriggerService
                     else if (!string.IsNullOrWhiteSpace(triggerServiceOptions.ApplicationInsightsAccountName))
                     {
                         Console.WriteLine($"Getting Azure subscriptions and Application Insights Connection string");
+
                         // name was specified, get the subscription, then the connection string from the account
-                        var accessToken = new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) }).GetTokenAsync(new Azure.Core.TokenRequestContext([azureCloudConfig.DefaultTokenScope])).Result.Token;
-                        var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, azureCloudConfig.AzureEnvironment);
-                        var azureManagementClient = FluentAzure.Authenticate(azureCredentials);
-                        var subscriptionId = azureManagementClient.Subscriptions.List().Select(s => s.SubscriptionId).First();
-                        Console.WriteLine($"Running in subscriptionId: {subscriptionId}");
-                        var applicationInsightsManagementClient = new ApplicationInsightsManagementClient(azureCredentials) { SubscriptionId = subscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
-                        applicationInsightsConnectionString = applicationInsightsManagementClient
-                            .Components
-                            .List()
-                            .First(c => c.ApplicationId.Equals(triggerServiceOptions.ApplicationInsightsAccountName, StringComparison.OrdinalIgnoreCase))
-                            .ConnectionString;
+                        applicationInsightsConnectionString = GetApplicationInsightsConnectionString(azureCloudConfig, triggerServiceOptions);
 
                         Console.WriteLine($"Successfully retrieved applicationInsightsConnectionString: {!string.IsNullOrWhiteSpace(applicationInsightsConnectionString)}");
                     }
@@ -100,6 +92,32 @@ namespace TriggerService
                 configuration.Bind(TriggerServiceOptions.TriggerServiceOptionsSectionName, options);
                 Console.WriteLine($"TriggerServiceOptions.AzureCloudName: {options.AzureCloudName}");
                 return AzureCloudConfig.CreateAsync(options.AzureCloudName, options.AzureCloudMetadataUrlApiVersion).Result;
+            }
+        }
+
+        private static string GetApplicationInsightsConnectionString(AzureCloudConfig azureCloudConfig, TriggerServiceOptions triggerServiceOptions)
+        {
+            try
+            {
+                string applicationInsightsConnectionString;
+                var accessToken = new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) }).GetTokenAsync(new Azure.Core.TokenRequestContext([azureCloudConfig.DefaultTokenScope])).Result.Token;
+                var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, azureCloudConfig.AzureEnvironment);
+                var azureManagementClient = FluentAzure.Authenticate(azureCredentials);
+                var subscriptionId = azureManagementClient.Subscriptions.List().Select(s => s.SubscriptionId).First();
+                Console.WriteLine($"Running in subscriptionId: {subscriptionId}");
+                var applicationInsightsManagementClient = new ApplicationInsightsManagementClient(azureCredentials) { SubscriptionId = subscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
+                applicationInsightsConnectionString = applicationInsightsManagementClient
+                    .Components
+                    .List()
+                    .First(c => c.ApplicationId.Equals(triggerServiceOptions.ApplicationInsightsAccountName, StringComparison.OrdinalIgnoreCase))
+                    .ConnectionString;
+
+                return applicationInsightsConnectionString;
+            }
+            catch (Exception exc)
+            {
+                Console.WriteLine($"Exception in {nameof(GetApplicationInsightsConnectionString)}: {exc.Message} {exc}");
+                throw;
             }
         }
     }
