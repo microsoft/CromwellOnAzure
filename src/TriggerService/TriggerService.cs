@@ -8,7 +8,6 @@ using Azure.Identity;
 using CommonUtilities.AzureCloud;
 using CromwellApiClient;
 using Microsoft.Azure.Management.ApplicationInsights.Management;
-using Microsoft.Azure.Management.Compute.Fluent.Models;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,10 +25,11 @@ namespace TriggerService
         public TriggerService()
             => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
+        internal static string applicationInsightsConnectionString = "";
+
         public static async Task Main()
         {
             AzureCloudConfig azureCloudConfig = null;
-            string applicationInsightsConnectionString = "";
 
             await Host.CreateDefaultBuilder()
                 .ConfigureAppConfiguration((hostBuilderContext, configurationBuilder) =>
@@ -39,7 +39,7 @@ namespace TriggerService
                     var config = configurationBuilder.Build();
                     azureCloudConfig = GetAzureCloudConfig(config);
                     var triggerServiceOptions = new TriggerServiceOptions();
-                    hostBuilderContext.Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName).Bind(triggerServiceOptions);
+                    config.Bind(TriggerServiceOptions.TriggerServiceOptionsSectionName, triggerServiceOptions);
 
                     if (!string.IsNullOrWhiteSpace(config["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
                     {
