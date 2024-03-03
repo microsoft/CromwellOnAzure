@@ -165,7 +165,7 @@ namespace CromwellOnAzureDeployer
                 });
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
-                kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts.Token);
+                kubernetesManager = new KubernetesManager(configuration, azureCredentials, azureCloudConfig, cts.Token);
 
                 IResourceGroup resourceGroup = null;
                 ManagedCluster aksCluster = null;

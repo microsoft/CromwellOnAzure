@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Core;
+using CommonUtilities.AzureCloud;
 using k8s;
 using k8s.Models;
 using Microsoft.Azure.Management.ContainerService;
@@ -45,6 +46,7 @@ namespace CromwellOnAzureDeployer
 
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
+        private AzureCloudConfig azureCloudConfig { get; set; }
         private CancellationToken cancellationToken { get; set; }
         private string workingDirectoryTemp { get; set; }
         private string kubeConfigPath { get; set; }
@@ -52,8 +54,9 @@ namespace CromwellOnAzureDeployer
         public string helmScriptsRootDirectory { get; set; }
         public string TempHelmValuesYamlPath { get; set; }
 
-        public KubernetesManager(Configuration config, AzureCredentials credentials, CancellationToken cancellationToken)
+        public KubernetesManager(Configuration config, AzureCredentials credentials, AzureCloudConfig azureCloudConfig, CancellationToken cancellationToken)
         {
+            this.azureCloudConfig = azureCloudConfig;
             this.cancellationToken = cancellationToken;
             configuration = config;
             azureCredentials = credentials;
@@ -65,7 +68,7 @@ namespace CromwellOnAzureDeployer
         {
             var r = new ResourceIdentifier(aksCluster.Id);
             var resourceGroup = r.ResourceGroupName;
-            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
             var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup, configuration.AksClusterName, cancellationToken: cancellationToken);
@@ -90,7 +93,6 @@ namespace CromwellOnAzureDeployer
                 apiVersion: apps/v1
                 kind: Deployment
                 metadata:
-                  creationTimestamp: null
                   labels:
                     io.kompose.service: ubuntu
                   name: ubuntu
@@ -99,21 +101,16 @@ namespace CromwellOnAzureDeployer
                   selector:
                     matchLabels:
                       io.kompose.service: ubuntu
-                  strategy: {}
                   template:
                     metadata:
-                      creationTimestamp: null
                       labels:
                         io.kompose.service: ubuntu
                     spec:
                       containers:
                         - name: ubuntu
-                          image: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-                          command: [ "/bin/bash", "-c", "--" ]
-                          args: [ "while true; do sleep 30; done;" ]
-                          resources: {}
-                      restartPolicy: Always
-                status: {}
+                          image: ubuntu
+                          command: ["/bin/bash", "-c", "--"]
+                          args: ["while true; do sleep 30; done;"]
                 """));
         }
 
