@@ -1990,7 +1990,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task ValidateBatchAccountQuotaAsync()
         {
-            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId };
+            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
             var accountQuota = (await batchManagementClient.Location.GetQuotasAsync(configuration.RegionName, cts.Token)).AccountQuota;
             var existingBatchAccountCount = await (await batchManagementClient.BatchAccount.ListAsync(cts.Token)).ToAsyncEnumerable(batchManagementClient.BatchAccount.ListNextAsync)
                 .CountAsync(b => b.Location.Equals(configuration.RegionName), cts.Token);
