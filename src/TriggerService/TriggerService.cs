@@ -48,12 +48,13 @@ namespace TriggerService
                     }
                     else if (!string.IsNullOrWhiteSpace(triggerServiceOptions.ApplicationInsightsAccountName))
                     {
-                        Console.WriteLine("Getting Azure subscriptions and Application Insights Connection string...");
+                        Console.WriteLine($"Getting Azure subscriptions and Application Insights Connection string");
                         // name was specified, get the subscription, then the connection string from the account
                         var accessToken = new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) }).GetTokenAsync(new Azure.Core.TokenRequestContext([azureCloudConfig.DefaultTokenScope])).Result.Token;
                         var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, azureCloudConfig.AzureEnvironment);
                         var azureManagementClient = FluentAzure.Authenticate(azureCredentials);
                         var subscriptionId = azureManagementClient.Subscriptions.List().Select(s => s.SubscriptionId).First();
+                        Console.WriteLine($"Running in subscriptionId: {subscriptionId}");
                         var applicationInsightsManagementClient = new ApplicationInsightsManagementClient(azureCredentials) { SubscriptionId = subscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
                         applicationInsightsConnectionString = applicationInsightsManagementClient
                             .Components
