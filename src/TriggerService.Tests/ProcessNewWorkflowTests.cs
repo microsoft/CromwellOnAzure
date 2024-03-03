@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Common;
+using CommonUtilities.AzureCloud;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -113,13 +114,14 @@ namespace TriggerService.Tests
             storageUtility
                 .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
                 .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
-
+            var azureCloudConfig = AzureCloudConfig.CreateAsync().Result;
             var cromwellOnAzureEnvironment = new TriggerHostedService(
                 logger,
                 optionsMock.Object,
                 cromwellApiClient,
                 tesTaskRepository,
-                storageUtility.Object);
+                storageUtility.Object,
+                azureCloudConfig);
 
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
 
@@ -194,12 +196,15 @@ namespace TriggerService.Tests
                 .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
                 .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
 
+            var azureCloudConfig = AzureCloudConfig.CreateAsync().Result;
+
             var cromwellOnAzureEnvironment = new TriggerHostedService(
                 logger,
                 triggerServiceOptions.Object,
                 cromwellApiClient2,
                 tesTaskRepository,
-                storageUtility.Object);
+                storageUtility.Object,
+                azureCloudConfig);
 
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
             Assert.IsTrue(newTriggerName.StartsWith("failed/"));

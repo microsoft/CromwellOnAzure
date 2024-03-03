@@ -11,6 +11,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Common;
+using CommonUtilities.AzureCloud;
 using CromwellApiClient;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -34,6 +35,7 @@ namespace TriggerService
         private readonly List<IAzureStorage> storageAccounts;
         private readonly ILogger<TriggerHostedService> logger;
         private readonly IRepository<TesTask> tesTaskRepository;
+        private readonly AzureCloudConfig azureCloudConfig;
         private readonly AvailabilityTracker cromwellAvailability = new();
         private readonly AvailabilityTracker azStorageAvailability = new();
         private readonly TimeSpan mainInterval;
@@ -44,8 +46,10 @@ namespace TriggerService
             IOptions<TriggerServiceOptions> triggerServiceOptions,
             ICromwellApiClient cromwellApiClient,
             IRepository<TesTask> tesTaskRepository,
-            IAzureStorageUtility azureStorageUtility)
+            IAzureStorageUtility azureStorageUtility,
+            AzureCloudConfig azureCloudConfig)
         {
+            this.azureCloudConfig = azureCloudConfig;
             mainInterval = TimeSpan.FromMilliseconds(triggerServiceOptions.Value.MainRunIntervalMilliseconds);
             availabilityCheckInterval = TimeSpan.FromMilliseconds(triggerServiceOptions.Value.AvailabilityCheckIntervalMilliseconds);
             this.cromwellApiClient = cromwellApiClient;
@@ -55,6 +59,7 @@ namespace TriggerService
             (storageAccounts, storage) = azureStorageUtility.GetStorageAccountsUsingMsiAsync(triggerServiceOptions.Value.DefaultStorageAccountName).Result;
 
             this.tesTaskRepository = tesTaskRepository;
+            
         }
 
         public Task StartAsync(CancellationToken cancellationToken)

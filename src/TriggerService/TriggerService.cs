@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading.Tasks;
+using CommonUtilities.AzureCloud;
 using CromwellApiClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,6 +60,7 @@ namespace TriggerService
                     serviceCollection.Configure<CromwellApiClientOptions>(hostBuilderContext.Configuration.GetSection(CromwellApiClientOptions.CromwellApiClientOptionsSectionName));
                     serviceCollection.Configure<TriggerServiceOptions>(hostBuilderContext.Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName));
                     serviceCollection.Configure<PostgreSqlOptions>(hostBuilderContext.Configuration.GetSection(PostgreSqlOptions.GetConfigurationSectionName("Tes")));
+                    serviceCollection.AddSingleton(AzureCloudConfig.CreateAsync().Result);
                     serviceCollection.AddSingleton<ICromwellApiClient, CromwellApiClient.CromwellApiClient>();
                     serviceCollection.AddSingleton<IRepository<TesTask>, TesTaskPostgreSqlRepository>();
                     serviceCollection.AddSingleton<IAzureStorageUtility, AzureStorageUtility>();
