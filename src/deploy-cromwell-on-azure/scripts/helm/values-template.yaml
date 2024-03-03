@@ -7,6 +7,7 @@ config:
   resourceGroup: RUNTIME_PARAMETER
   azureServicesAuthConnectionString: RUNTIME_PARAMETER
   applicationInsightsAccountName: RUNTIME_PARAMETER
+  azureCloudName: RUNTIME_PARAMETER
   batchAccount:
     accountName: RUNTIME_PARAMETER
   batchNodes:

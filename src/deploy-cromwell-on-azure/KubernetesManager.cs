@@ -401,6 +401,7 @@ namespace CromwellOnAzureDeployer
             values.Config["cromwellOnAzureVersion"] = GetValueOrDefault(settings, "CromwellOnAzureVersion");
             values.Config["azureServicesAuthConnectionString"] = GetValueOrDefault(settings, "AzureServicesAuthConnectionString");
             values.Config["applicationInsightsAccountName"] = GetValueOrDefault(settings, "ApplicationInsightsAccountName");
+            values.Config["azureCloudName"] = GetValueOrDefault(settings, "AzureCloudName");
             batchAccount["accountName"] = GetValueOrDefault(settings, "BatchAccountName");
             batchNodes["subnetId"] = GetValueOrDefault(settings, "BatchNodesSubnetId");
             values.Config["coaNamespace"] = GetValueOrDefault(settings, "AksCoANamespace");
@@ -476,6 +477,7 @@ namespace CromwellOnAzureDeployer
                 ["CromwellOnAzureVersion"] = GetValueOrDefault(values.Config, "cromwellOnAzureVersion") as string,
                 ["AzureServicesAuthConnectionString"] = GetValueOrDefault(values.Config, "azureServicesAuthConnectionString") as string,
                 ["ApplicationInsightsAccountName"] = GetValueOrDefault(values.Config, "applicationInsightsAccountName") as string,
+                ["AzureCloudName"] = GetValueOrDefault(values.Config, "azureCloudName") as string,
                 ["BatchAccountName"] = GetValueOrDefault(batchAccount, "accountName"),
                 ["BatchNodesSubnetId"] = GetValueOrDefault(batchNodes, "subnetId"),
                 ["AksCoANamespace"] = GetValueOrDefault(values.Config, "coaNamespace") as string,
