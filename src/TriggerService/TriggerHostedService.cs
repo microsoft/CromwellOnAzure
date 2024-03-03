@@ -59,7 +59,6 @@ namespace TriggerService
             (storageAccounts, storage) = azureStorageUtility.GetStorageAccountsUsingMsiAsync(triggerServiceOptions.Value.DefaultStorageAccountName).Result;
 
             this.tesTaskRepository = tesTaskRepository;
-            
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
