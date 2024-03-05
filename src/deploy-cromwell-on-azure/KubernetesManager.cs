@@ -18,6 +18,7 @@ using Microsoft.Azure.Management.ContainerService;
 using Microsoft.Azure.Management.ContainerService.Fluent;
 using Microsoft.Azure.Management.ContainerService.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.Storage.Fluent;
 using Newtonsoft.Json;
@@ -38,6 +39,8 @@ namespace CromwellOnAzureDeployer
         private static readonly AsyncRetryPolicy KubeExecRetryPolicy = Policy
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
             .WaitAndRetryAsync(200, retryAttempt => System.TimeSpan.FromSeconds(5));
+
+        private static readonly HashSet<string> testStorageAccounts = new HashSet<string> { "datasettestinputs", "datasettestinputssouthc" };
 
         // "master" is used despite not being a best practice: https://github.com/kubernetes-sigs/blob-csi-driver/issues/783
         private const string BlobCsiDriverGithubReleaseBranch = "master";
@@ -360,7 +363,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private static void MergeContainers(List<MountableContainer> containersToMount, HelmValues values)
+        private void MergeContainers(List<MountableContainer> containersToMount, HelmValues values)
         {
             if (containersToMount is null)
             {
@@ -386,7 +389,7 @@ namespace CromwellOnAzureDeployer
             values.ExternalSasContainers = sasContainers.Select(x => x.ToDictionary()).ToList();
         }
 
-        private static void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)
+        private void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)
         {
             var batchAccount = GetObjectFromConfig(values, "batchAccount") ?? new Dictionary<string, string>();
             var batchNodes = GetObjectFromConfig(values, "batchNodes") ?? new Dictionary<string, string>();
@@ -427,6 +430,7 @@ namespace CromwellOnAzureDeployer
 
             values.Persistence["storageAccount"] = GetValueOrDefault(settings, "DefaultStorageAccountName");
             values.Persistence["executionsContainerName"] = GetValueOrDefault(settings, "ExecutionsContainerName");
+            values.Persistence["storageEndpointSuffix"] = azureCloudConfig.Suffixes.StorageSuffix;
 
             values.TesDatabase["serverName"] = GetValueOrDefault(settings, "PostgreSqlServerName");
             values.TesDatabase["serverNameSuffix"] = GetValueOrDefault(settings, "PostgreSqlServerNameSuffix");
@@ -502,6 +506,7 @@ namespace CromwellOnAzureDeployer
                 ["CromwellImageName"] = GetValueOrDefault(values.Images, "cromwell"),
                 ["DefaultStorageAccountName"] = GetValueOrDefault(values.Persistence, "storageAccount"),
                 ["ExecutionsContainerName"] = GetValueOrDefault(values.Persistence, "executionsContainerName"),
+                ["StorageEndpointSuffix"] = GetValueOrDefault(values.Persistence, "storageEndpointSuffix"),
 
                 // This is only defined once, so use the TesDatabase values
                 ["PostgreSqlServerName"] = GetValueOrDefault(values.TesDatabase, "serverName"),

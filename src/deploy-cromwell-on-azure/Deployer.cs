@@ -357,7 +357,7 @@ namespace CromwellOnAzureDeployer
 
                         if (aksCluster is null && !configuration.ManualHelmDeployment)
                         {
-                            await ValidateVmAsync();
+                            //await ValidateVmAsync();
                         }
 
                         ConsoleEx.WriteLine($"Deploying Cromwell on Azure version {targetVersion}...");
