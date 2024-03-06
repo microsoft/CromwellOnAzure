@@ -386,7 +386,12 @@ namespace CromwellOnAzureDeployer
             }
 
             values.InternalContainersMIAuth = internalContainersMIAuth.Select(x => x.ToDictionary()).ToList();
-            values.ExternalSasContainers = sasContainers.Select(x => x.ToDictionary()).ToList();
+            values.ExternalSasContainers = new List<Dictionary<string, string>>();
+
+            if (azureCloudConfig.AzureEnvironment == AzureEnvironment.AzureGlobalCloud)
+            {
+                values.ExternalSasContainers = sasContainers.Select(x => x.ToDictionary()).ToList();
+            }
         }
 
         private void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)
