@@ -40,12 +40,13 @@ namespace TriggerService
                     azureCloudConfig = GetAzureCloudConfig(config);
                     var triggerServiceOptions = new TriggerServiceOptions();
                     config.Bind(TriggerServiceOptions.TriggerServiceOptionsSectionName, triggerServiceOptions);
+                    const string legacyApplicationInsightsConnectionStringKey = "APPLICATIONINSIGHTS_CONNECTION_STRING";
 
-                    if (!string.IsNullOrWhiteSpace(config["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+                    if (!string.IsNullOrWhiteSpace(config[legacyApplicationInsightsConnectionStringKey]))
                     {
                         // Legacy CoA setting
-                        Console.WriteLine("Using APPLICATIONINSIGHTS_CONNECTION_STRING");
-                        applicationInsightsConnectionString = config["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+                        Console.WriteLine($"Using {legacyApplicationInsightsConnectionStringKey}");
+                        applicationInsightsConnectionString = config[legacyApplicationInsightsConnectionStringKey];
                     }
                     else if (!string.IsNullOrWhiteSpace(triggerServiceOptions.ApplicationInsightsAccountName))
                     {
