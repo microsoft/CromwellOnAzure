@@ -439,6 +439,7 @@ namespace TriggerService
         private async Task RunAsync()
         {
             logger.LogInformation("Trigger Service successfully started.");
+            logger.LogInformation($"Running in AzureEnvironment: {azureCloudConfig.AzureEnvironment}");
 
             await Task.WhenAll(
                 RunContinuouslyAsync(UpdateExistingWorkflowsAsync, nameof(UpdateExistingWorkflowsAsync)),

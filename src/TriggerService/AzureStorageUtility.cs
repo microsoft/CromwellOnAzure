@@ -57,11 +57,13 @@ namespace TriggerService
             {
                 var key = await GetStorageAccountKeyAsync(account);
                 var storageCredentials = new Microsoft.WindowsAzure.Storage.Auth.StorageCredentials(account.Name, key);
-                var storageAccount = new CloudStorageAccount(storageCredentials, true);
+                var storageAccount = new CloudStorageAccount(storageCredentials, account.Name, azureCloudConfig.Suffixes.StorageSuffix, true);
+
                 if (account.Name == accountName)
                 {
                     defaultAccount = storageAccount;
                 }
+
                 return storageAccount;
             }
         }
