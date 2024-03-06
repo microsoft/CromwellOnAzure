@@ -1352,7 +1352,7 @@ namespace CromwellOnAzureDeployer
             {
                 try
                 {
-                    var client = new BatchManagementClient(tokenCredentials) { SubscriptionId = s };
+                    var client = new BatchManagementClient(tokenCredentials) { SubscriptionId = s, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
                     return (await client.BatchAccount.ListAsync(cts.Token))
                         .ToAsyncEnumerable(client.BatchAccount.ListNextAsync);
                 }
