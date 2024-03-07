@@ -17,7 +17,6 @@ using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.ContainerService;
 using Azure.ResourceManager.ManagedServiceIdentities;
-using Azure.ResourceManager.ManagedServiceIdentities.Models;
 using Azure.ResourceManager.Network;
 using Azure.ResourceManager.Network.Models;
 using Azure.ResourceManager.Resources;
@@ -327,6 +326,11 @@ namespace CromwellOnAzureDeployer
                             await kubernetesManager.RemovePodAadChart();
                         }
 
+                        if (installedVersion < new Version(5, 3, 0))
+                        {
+                            settings["AzureCloudName"] = configuration.AzureCloudName;
+                        }
+
                         if (waitForRoleAssignmentPropagation)
                         {
                             await Execute("Waiting 5 minutes for role assignment propagation...",
@@ -431,7 +435,6 @@ namespace CromwellOnAzureDeployer
                         {
                             managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
                         }
-                        
 
                         if (vnetAndSubnet is not null)
                         {
@@ -992,25 +995,29 @@ namespace CromwellOnAzureDeployer
             var installedTag = installed?[(installed.LastIndexOf(':') + 1)..];
             bool? result;
 
+            // Check if the installed image is not customized and matches a version tag
             IsInstalledNotCustomized ??= new(tag =>
-                // Is the tag a version (without decorations)?
-                Version.TryParse(tag, out var version) &&
-                // Is the image's version the same as the installed version?
-                version.Equals(installedVersion));
+            {
+                // Attempt to parse the tag as a version (ignoring any decorations)
+                return Version.TryParse(tag, out var version) &&
+                       // Check if the parsed version matches the installed version
+                       version.Equals(installedVersion);
+            });
 
             try
             {
-                // Is this our official prepository/image?
+                // Determine if the installed image is from our official repository
                 result = installed.StartsWith(defaultPath + ":")
-                    // Is the installed tag customized?
-                    && IsInstalledNotCustomized(installedTag)
-                    // Upgrade image
-                    ? false
-                    // Preserve configured image
-                    : null;
+                            // Check if the installed tag has not been customized
+                            && IsInstalledNotCustomized(installedTag)
+                            // If not customized, consider it as not requiring an upgrade
+                            ? false
+                            // If customized, preserve the configured image without upgrading
+                            : null;
             }
             catch (ArgumentException)
             {
+                // In case of an argument exception, default to preserving the image
                 result = null;
             }
 
