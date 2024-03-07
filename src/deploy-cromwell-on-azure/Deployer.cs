@@ -327,6 +327,11 @@ namespace CromwellOnAzureDeployer
                             await kubernetesManager.RemovePodAadChart();
                         }
 
+                        if (installedVersion < new Version(5, 3, 0))
+                        {
+                            settings["AzureCloudName"] = configuration.AzureCloudName;
+                        }
+
                         if (waitForRoleAssignmentPropagation)
                         {
                             await Execute("Waiting 5 minutes for role assignment propagation...",
