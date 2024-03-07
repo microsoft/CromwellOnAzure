@@ -70,7 +70,7 @@ namespace TriggerService
                             {
                                 configuration.ConnectionString = applicationInsightsConnectionString;
                             },
-                            options => {});
+                            options => { });
 
                     })
                 .ConfigureServices((hostBuilderContext, serviceCollection) =>
