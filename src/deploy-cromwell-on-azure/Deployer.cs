@@ -422,7 +422,16 @@ namespace CromwellOnAzureDeployer
                             resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName, cts.Token);
                         }
 
-                        managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
+                        if (!string.IsNullOrWhiteSpace(configuration.IdentityResourceId))
+                        {
+                            ConsoleEx.WriteLine($"Using existing user-assigned managed identity: {configuration.IdentityResourceId}");
+                            managedIdentity = await GetUserManagedIdentityAsync(configuration.IdentityResourceId);
+                        }
+                        else
+                        {
+                            managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
+                        }
+                        
 
                         if (vnetAndSubnet is not null)
                         {
@@ -1793,7 +1802,7 @@ namespace CromwellOnAzureDeployer
             var managedIdentityName = $"{resourceGroup.Name.Replace(".", "-").Replace("(", "-").Replace(")", "-")}-identity";
 
             return Execute(
-                $"Obtaining user-managed identity: {managedIdentityName}...",
+                $"Obtaining user-assigned managed identity: {managedIdentityName}...",
                 async () => await azureSubscriptionClient.Identities.GetByResourceGroupAsync(configuration.ResourceGroupName, managedIdentityName, cts.Token)
                     ?? await azureSubscriptionClient.Identities.Define(managedIdentityName)
                         .WithRegion(configuration.RegionName)
@@ -1801,10 +1810,10 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(cts.Token));
         }
 
-        private async Task<IIdentity> GetUserManagedIdentityAsync(string principalId)
+        private async Task<IIdentity> GetUserManagedIdentityAsync(string resourceId)
         {
             return await (await azureSubscriptionClient.Identities.ListAsync(cancellationToken: cts.Token)).ToAsyncEnumerable()
-                .SingleOrDefaultAsync(x => string.Equals(x.PrincipalId, principalId, StringComparison.OrdinalIgnoreCase), cts.Token);
+                .SingleOrDefaultAsync(x => string.Equals(x.Id, resourceId, StringComparison.OrdinalIgnoreCase), cts.Token);
         }
 
         private async Task DeleteResourceGroupAsync()
