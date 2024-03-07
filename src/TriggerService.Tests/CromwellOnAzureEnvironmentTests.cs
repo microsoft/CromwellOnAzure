@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CommonUtilities.AzureCloud;
 using CromwellApiClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -157,8 +158,9 @@ namespace TriggerService.Tests
                 DefaultStorageAccountName = "fakestorage",
                 ApplicationInsightsAccountName = "fakeappinsights"
             });
-            var environment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository, storageUtility.Object);
 
+            var azureCloudConfig = AzureCloudConfig.CreateAsync().Result;
+            var environment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository, storageUtility.Object, azureCloudConfig);
             return environment;
         }
 

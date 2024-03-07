@@ -26,6 +26,7 @@ using Azure.Storage;
 using Azure.Storage.Blobs;
 using Common;
 using CommonUtilities;
+using CommonUtilities.AzureCloud;
 using k8s;
 using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
@@ -123,6 +124,7 @@ namespace CromwellOnAzureDeployer
         private IEnumerable<string> subscriptionIds { get; set; }
         private bool isResourceGroupCreated { get; set; }
         private KubernetesManager kubernetesManager { get; set; }
+        internal static AzureCloudConfig azureCloudConfig { get; set; }
 
         public Deployer(Configuration configuration)
         {
@@ -135,27 +137,35 @@ namespace CromwellOnAzureDeployer
 
             try
             {
-                ValidateInitialCommandLineArgsAsync();
-
                 ConsoleEx.WriteLine("Running...");
+
+                await Execute($"Getting cloud configuration for {configuration.AzureCloudName}...", async () =>
+                {
+                    azureCloudConfig = await AzureCloudConfig.CreateAsync(configuration.AzureCloudName);
+                });
+
+                await Execute("Validating command line arguments...", async () =>
+                {
+                    ValidateInitialCommandLineArgs();
+                });
 
                 await ValidateTokenProviderAsync();
 
                 await Execute("Connecting to Azure Services...", async () =>
                 {
-                    tokenProvider = new RefreshableAzureServiceTokenProvider("https://management.azure.com/");
+                    tokenProvider = new RefreshableAzureServiceTokenProvider(azureCloudConfig.ResourceManagerUrl, null, azureCloudConfig.Authentication.LoginEndpointUrl);
                     tokenCredentials = new(tokenProvider);
-                    azureCredentials = new(tokenCredentials, null, null, AzureEnvironment.AzureGlobalCloud);
+                    azureCredentials = new(tokenCredentials, null, null, azureCloudConfig.AzureEnvironment);
                     azureClient = GetAzureClient(azureCredentials);
-                    armClient = new ArmClient(new AzureCliCredential());
+                    armClient = new ArmClient(new AzureCliCredential(), null, new ArmClientOptions { Environment = azureCloudConfig.ArmEnvironment });
                     azureSubscriptionClient = azureClient.WithSubscription(configuration.SubscriptionId);
                     subscriptionIds = await (await azureClient.Subscriptions.ListAsync(cancellationToken: cts.Token)).ToAsyncEnumerable().Select(s => s.SubscriptionId).ToListAsync(cts.Token);
                     resourceManagerClient = GetResourceManagerClient(azureCredentials);
-                    postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, LongRunningOperationRetryTimeout = 1200 };
+                    postgreSqlFlexManagementClient = new FlexibleServer.PostgreSQLManagementClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl), LongRunningOperationRetryTimeout = 1200 };
                 });
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
-                kubernetesManager = new KubernetesManager(configuration, azureCredentials, cts.Token);
+                kubernetesManager = new KubernetesManager(configuration, azureCredentials, azureCloudConfig, cts.Token);
 
                 IResourceGroup resourceGroup = null;
                 ManagedCluster aksCluster = null;
@@ -347,10 +357,15 @@ namespace CromwellOnAzureDeployer
 
                         if (aksCluster is null && !configuration.ManualHelmDeployment)
                         {
-                            await ValidateVmAsync();
+                            //await ValidateVmAsync();
                         }
 
                         ConsoleEx.WriteLine($"Deploying Cromwell on Azure version {targetVersion}...");
+
+                        if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerNameSuffix))
+                        {
+                            configuration.PostgreSqlServerNameSuffix = $".{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}";
+                        }
 
                         if (string.IsNullOrWhiteSpace(configuration.PostgreSqlServerName))
                         {
@@ -407,7 +422,16 @@ namespace CromwellOnAzureDeployer
                             resourceGroup = await azureSubscriptionClient.ResourceGroups.GetByNameAsync(configuration.ResourceGroupName, cts.Token);
                         }
 
-                        managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
+                        if (!string.IsNullOrWhiteSpace(configuration.IdentityResourceId))
+                        {
+                            ConsoleEx.WriteLine($"Using existing user-assigned managed identity: {configuration.IdentityResourceId}");
+                            managedIdentity = await GetUserManagedIdentityAsync(configuration.IdentityResourceId);
+                        }
+                        else
+                        {
+                            managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
+                        }
+                        
 
                         if (vnetAndSubnet is not null)
                         {
@@ -484,9 +508,9 @@ namespace CromwellOnAzureDeployer
 
                         if (postgreSqlFlexServer is null)
                         {
-                            postgreSqlDnsZone = await GetExistingPrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com");
+                            postgreSqlDnsZone = await GetExistingPrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}");
 
-                            postgreSqlDnsZone ??= await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.postgres.database.azure.com", "PostgreSQL Server");
+                            postgreSqlDnsZone ??= await CreatePrivateDnsZoneAsync(vnetAndSubnet.Value.virtualNetwork, $"privatelink.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}", "PostgreSQL Server");
                         }
 
                         await Task.WhenAll(new Task[]
@@ -783,7 +807,7 @@ namespace CromwellOnAzureDeployer
         {
             var resourceGroup = resourceGroupObject.Name;
             var nodePoolName = "nodepool1";
-            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
             var cluster = new ManagedCluster
             {
                 AddonProfiles = new Dictionary<string, ManagedClusterAddonProfile>
@@ -918,6 +942,7 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "ExecutionsContainerName", ExecutionsContainerName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "BatchAccountName", configuration.BatchAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "AzureCloudName", configuration.AzureCloudName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ManagedIdentityClientId", managedIdentityClientId, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "AzureServicesAuthConnectionString", managedIdentityClientId, s => $"RunAs=App;AppId={s}", ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "KeyVaultName", configuration.KeyVaultName, ignoreDefaults: true);
@@ -1336,7 +1361,7 @@ namespace CromwellOnAzureDeployer
             {
                 try
                 {
-                    var client = new BatchManagementClient(tokenCredentials) { SubscriptionId = s };
+                    var client = new BatchManagementClient(tokenCredentials) { SubscriptionId = s, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
                     return (await client.BatchAccount.ListAsync(cts.Token))
                         .ToAsyncEnumerable(client.BatchAccount.ListNextAsync);
                 }
@@ -1378,7 +1403,7 @@ namespace CromwellOnAzureDeployer
                     // Configure Cromwell config file for PostgreSQL on Azure.
                     await UploadTextToStorageAccountAsync(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName, Utility.PersonalizeContent(new[]
                     {
-                        new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.postgres.database.azure.com/{configuration.PostgreSqlCromwellDatabaseName}?sslmode=require\""),
+                        new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}/{configuration.PostgreSqlCromwellDatabaseName}?sslmode=require\""),
                         new Utility.ConfigReplaceTextItem("{DatabaseUser}", $"\"{configuration.PostgreSqlCromwellUserLogin}\""),
                         new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),
                         new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
@@ -1526,7 +1551,7 @@ namespace CromwellOnAzureDeployer
 
         private string GetPostgreSQLCreateCromwellUserCommand(string dbName, string sqlCommand)
         {
-            return $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.postgres.database.azure.com/{dbName} -c \"{sqlCommand}\"";
+            return $"psql postgresql://{configuration.PostgreSqlAdministratorLogin}:{configuration.PostgreSqlAdministratorPassword}@{configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}/{dbName} -c \"{sqlCommand}\"";
         }
 
         private async Task<IPrivateDnsZone> GetExistingPrivateDnsZoneAsync(INetwork virtualNetwork, string name)
@@ -1575,14 +1600,14 @@ namespace CromwellOnAzureDeployer
                 {
                     var cromwellScript = GetCreateCromwellUserString();
                     var tesScript = GetCreateTesUserString();
-                    var serverPath = $"{configuration.PostgreSqlServerName}.postgres.database.azure.com";
+                    var serverPath = $"{configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}";
                     var adminUser = configuration.PostgreSqlAdministratorLogin;
 
                     var commands = new List<string[]> {
                         new string[] { "apt", "-qq", "update" },
                         new string[] { "apt", "-qq", "install", "-y", "postgresql-client" },
-                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlCromwellDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" },
-                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.postgres.database.azure.com:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlTesDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} >> ~/.pgpass" },
+                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlCromwellDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" },
+                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlTesDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} >> ~/.pgpass" },
                         new string[] { "bash", "-lic", "chmod 0600 ~/.pgpass" },
                         new string[] { "/usr/bin/psql", "-h", serverPath, "-U", adminUser, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", cromwellScript },
                         new string[] { "/usr/bin/psql", "-h", serverPath, "-U", adminUser, "-d", configuration.PostgreSqlTesDatabaseName, "-c", tesScript }
@@ -1593,7 +1618,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task SetStorageKeySecret(string vaultUrl, string secretName, string secretValue)
         {
-            var client = new SecretClient(new Uri(vaultUrl), new DefaultAzureCredential());
+            var client = new SecretClient(new Uri(vaultUrl), new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) }));
             await client.SetSecretAsync(secretName, secretValue, cts.Token);
         }
 
@@ -1745,7 +1770,7 @@ namespace CromwellOnAzureDeployer
         private Task<BatchAccount> CreateBatchAccountAsync(string storageAccountId)
             => Execute(
                 $"Creating Batch Account: {configuration.BatchAccountName}...",
-                () => new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId }
+                () => new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) }
                     .BatchAccount
                     .CreateAsync(
                         configuration.ResourceGroupName,
@@ -1777,7 +1802,7 @@ namespace CromwellOnAzureDeployer
             var managedIdentityName = $"{resourceGroup.Name.Replace(".", "-").Replace("(", "-").Replace(")", "-")}-identity";
 
             return Execute(
-                $"Obtaining user-managed identity: {managedIdentityName}...",
+                $"Obtaining user-assigned managed identity: {managedIdentityName}...",
                 async () => await azureSubscriptionClient.Identities.GetByResourceGroupAsync(configuration.ResourceGroupName, managedIdentityName, cts.Token)
                     ?? await azureSubscriptionClient.Identities.Define(managedIdentityName)
                         .WithRegion(configuration.RegionName)
@@ -1785,10 +1810,10 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(cts.Token));
         }
 
-        private async Task<IIdentity> GetUserManagedIdentityAsync(string principalId)
+        private async Task<IIdentity> GetUserManagedIdentityAsync(string resourceId)
         {
             return await (await azureSubscriptionClient.Identities.ListAsync(cancellationToken: cts.Token)).ToAsyncEnumerable()
-                .SingleOrDefaultAsync(x => string.Equals(x.PrincipalId, principalId, StringComparison.OrdinalIgnoreCase), cts.Token);
+                .SingleOrDefaultAsync(x => string.Equals(x.Id, resourceId, StringComparison.OrdinalIgnoreCase), cts.Token);
         }
 
         private async Task DeleteResourceGroupAsync()
@@ -1979,7 +2004,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task ValidateBatchAccountQuotaAsync()
         {
-            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId };
+            var batchManagementClient = new BatchManagementClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
             var accountQuota = (await batchManagementClient.Location.GetQuotasAsync(configuration.RegionName, cts.Token)).AccountQuota;
             var existingBatchAccountCount = await (await batchManagementClient.BatchAccount.ListAsync(cts.Token)).ToAsyncEnumerable(batchManagementClient.BatchAccount.ListNextAsync)
                 .CountAsync(b => b.Location.Equals(configuration.RegionName), cts.Token);
@@ -2086,7 +2111,7 @@ namespace CromwellOnAzureDeployer
 
         private static async Task<BlobServiceClient> GetBlobClientAsync(IStorageAccount storageAccount, CancellationToken cancellationToken)
             => new(
-                new Uri($"https://{storageAccount.Name}.blob.core.windows.net"),
+                new($"https://{storageAccount.Name}.blob.{azureCloudConfig.Suffixes.StorageSuffix}"),
                 new StorageSharedKeyCredential(
                     storageAccount.Name,
                     (await storageAccount.GetKeysAsync(cancellationToken))[0].Value));
@@ -2106,7 +2131,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private void ValidateInitialCommandLineArgsAsync()
+        private void ValidateInitialCommandLineArgs()
         {
             void ThrowIfProvidedForUpdate(object attributeValue, string attributeName)
             {

@@ -28,6 +28,8 @@ spec:
       terminationGracePeriodSeconds: 90
       containers:
         - env:
+            - name: General__AzureCloudName
+              value: {{ .Values.config.azureCloudName }}
             - name: TesPostgreSql__ServerName
               value: {{ .Values.tesDatabase.serverName }}
             - name: TesPostgreSql__ServerNameSuffix
@@ -52,8 +54,6 @@ spec:
               value: {{ .Values.config.azureServicesAuthConnectionString }}
             - name: ApplicationInsights__AccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
-            - name: BatchScheduling__UseLegacyAutopools
-              value: {{ .Values.config.batchScheduling.useLegacyAutopools | quote }}
             - name: BatchAccount__AccountName
               value: {{ .Values.config.batchAccount.accountName }}
             - name: BatchNodes__SubnetId

@@ -7,9 +7,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Azure.Identity;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
+using CommonUtilities.AzureCloud;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
-using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage;
 using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
@@ -24,6 +23,13 @@ namespace TriggerService
 
     public class AzureStorageUtility : IAzureStorageUtility
     {
+        private readonly AzureCloudConfig azureCloudConfig;
+
+        public AzureStorageUtility(AzureCloudConfig azureCloudConfig)
+        {
+            this.azureCloudConfig = azureCloudConfig;
+        }
+
         public async Task<(List<IAzureStorage>, IAzureStorage)> GetStorageAccountsUsingMsiAsync(string accountName)
         {
             IAzureStorage defaultAzureStorage = default;
@@ -41,7 +47,7 @@ namespace TriggerService
             }
         }
 
-        private static async Task<(IList<CloudStorageAccount>, CloudStorageAccount)> GetCloudStorageAccountsUsingMsiAsync(string accountName)
+        private async Task<(IList<CloudStorageAccount>, CloudStorageAccount)> GetCloudStorageAccountsUsingMsiAsync(string accountName)
         {
             CloudStorageAccount defaultAccount = default;
             var accounts = await GetAccessibleStorageAccountsAsync();
@@ -51,16 +57,18 @@ namespace TriggerService
             {
                 var key = await GetStorageAccountKeyAsync(account);
                 var storageCredentials = new Microsoft.WindowsAzure.Storage.Auth.StorageCredentials(account.Name, key);
-                var storageAccount = new CloudStorageAccount(storageCredentials, true);
+                var storageAccount = new CloudStorageAccount(storageCredentials, account.Name, azureCloudConfig.Suffixes.StorageSuffix, true);
+
                 if (account.Name == accountName)
                 {
                     defaultAccount = storageAccount;
                 }
+
                 return storageAccount;
             }
         }
 
-        private static async Task<List<StorageAccountInfo>> GetAccessibleStorageAccountsAsync()
+        private async Task<List<StorageAccountInfo>> GetAccessibleStorageAccountsAsync()
         {
             var azureClient = await GetAzureManagementClientAsync();
 
@@ -74,7 +82,7 @@ namespace TriggerService
                 .ToList();
         }
 
-        private static async Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
+        private async Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
         {
             var azureClient = await GetAzureManagementClientAsync();
             var storageAccount = await azureClient.WithSubscription(storageAccountInfo.SubscriptionId).StorageAccounts.GetByIdAsync(storageAccountInfo.Id);
@@ -82,17 +90,17 @@ namespace TriggerService
             return (await storageAccount.GetKeysAsync())[0].Value;
         }
 
-        public static async Task<string> GetAzureAccessTokenAsync(string scope = "https://management.azure.com//.default")
-            => (await (new DefaultAzureCredential()).GetTokenAsync(new Azure.Core.TokenRequestContext(new string[] { scope }))).Token;
+        public async Task<string> GetAzureAccessTokenAsync()
+            => (await new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) }).GetTokenAsync(new Azure.Core.TokenRequestContext([azureCloudConfig.DefaultTokenScope]))).Token;
 
         /// <summary>
         /// Gets an authenticated Azure Client instance
         /// </summary>
         /// <returns>An authenticated Azure Client instance</returns>
-        private static async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync()
+        private async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync()
         {
             var accessToken = await GetAzureAccessTokenAsync();
-            var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, AzureEnvironment.AzureGlobalCloud);
+            var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, azureCloudConfig.AzureEnvironment);
             var azureClient = FluentAzure.Authenticate(azureCredentials);
 
             return azureClient;
