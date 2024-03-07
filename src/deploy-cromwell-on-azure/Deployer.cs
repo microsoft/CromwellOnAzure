@@ -435,7 +435,7 @@ namespace CromwellOnAzureDeployer
                         {
                             managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
                         }
-                        
+
                         if (vnetAndSubnet is not null)
                         {
                             ConsoleEx.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.vmSubnet.Name}");
