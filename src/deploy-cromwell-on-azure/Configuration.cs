@@ -31,6 +31,7 @@ namespace CromwellOnAzureDeployer
 
     public abstract class UserAccessibleConfiguration
     {
+        public string AksNodeResourceGroupName { get; set; }
         public string IdentityResourceId { get; set; }
         public string AzureCloudName { get; set; } = AzureCloudConfig.DefaultAzureCloudName;
         public string BatchPrefix { get; set; }

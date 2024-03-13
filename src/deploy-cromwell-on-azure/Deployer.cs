@@ -522,7 +522,7 @@ namespace CromwellOnAzureDeployer
                             {
                                 if (aksCluster is null && !configuration.ManualHelmDeployment)
                                 {
-                                    aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
+                                    aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault(), configuration.AksNodeResourceGroupName);
                                     await EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup);
                                 }
                             }),
@@ -806,7 +806,7 @@ namespace CromwellOnAzureDeployer
                 cts.Token);
         }
 
-        private async Task<ManagedCluster> ProvisionManagedCluster(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, bool privateNetworking)
+        private async Task<ManagedCluster> ProvisionManagedCluster(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, bool privateNetworking, string nodeResourceGroupName)
         {
             var resourceGroup = resourceGroupObject.Name;
             var nodePoolName = "nodepool1";
@@ -830,7 +830,8 @@ namespace CromwellOnAzureDeployer
                 Identity = new(managedIdentity.PrincipalId, managedIdentity.TenantId, Microsoft.Azure.Management.ContainerService.Models.ResourceIdentityType.UserAssigned)
                 {
                     UserAssignedIdentities = new Dictionary<string, ManagedClusterIdentityUserAssignedIdentitiesValue>()
-                }
+                },
+                NodeResourceGroup = nodeResourceGroupName
             };
 
             cluster.Identity.UserAssignedIdentities.Add(managedIdentity.Id, new(managedIdentity.PrincipalId, managedIdentity.ClientId));
