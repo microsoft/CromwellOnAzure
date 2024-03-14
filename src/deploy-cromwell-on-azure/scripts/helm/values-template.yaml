@@ -16,7 +16,6 @@ config:
     globalStartTask: /configuration/start-task.sh
   batchScheduling:
     usePreemptibleVmsOnly: RUNTIME_PARAMETER
-    useLegacyAutopools: "False"
     poolRotationForcedDays: "7"
     prefix: RUNTIME_PARAMETER
   batchImageGen2:

@@ -19,7 +19,7 @@ namespace TriggerService
         private readonly CloudStorageAccount account;
         private readonly CloudBlobClient blobClient;
         private readonly HttpClient httpClient;
-        private readonly HashSet<string> createdContainers = new();
+        private readonly HashSet<string> createdContainers = [];
 
         public AzureStorage(CloudStorageAccount account, HttpClient httpClient)
         {
@@ -31,7 +31,7 @@ namespace TriggerService
 
             blobClient = account.CreateCloudBlobClient();
             var host = account.BlobStorageUri.PrimaryUri.Host;
-            AccountName = host[..host.IndexOf(".")];
+            AccountName = host[..host.IndexOf('.')];
         }
 
         public string AccountName { get; }
