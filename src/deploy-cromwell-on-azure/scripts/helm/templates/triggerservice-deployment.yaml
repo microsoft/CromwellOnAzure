@@ -46,6 +46,8 @@ spec:
               value: {{ .Values.config.azureServicesAuthConnectionString }}
             - name: TriggerService__ApplicationInsightsAccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
+            - name: TriggerService__AzureCloudName
+              value: {{ .Values.config.azureCloudName }}
           image: {{ .Values.images.triggerservice }}
           name: triggerservice
           resources:

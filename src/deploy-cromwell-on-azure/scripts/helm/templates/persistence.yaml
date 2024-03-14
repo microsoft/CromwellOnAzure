@@ -1,4 +1,5 @@
-﻿{{- $namespace := .Values.config.coaNamespace -}}
+﻿{{- $storageEndpointSuffix  := .Values.persistence.storageEndpointSuffix -}}
+{{- $namespace := .Values.config.coaNamespace -}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -20,7 +21,8 @@ metadata:
   name: {{ $namespace }}-blob-fuse
 provisioner: blob.csi.azure.com
 parameters:
-  skuName: Premium_LRS  # available values: Standard_LRS, Premium_LRS, Standard_GRS, Standard_RAGRS
+  skuName: Standard_LRS  # available values: Standard_LRS, Premium_LRS, Standard_GRS, Standard_RAGRS
+  storageEndpointSuffix: {{ $storageEndpointSuffix }}
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
@@ -60,6 +62,7 @@ parameters:
   resourceGroup: {{ .resourceGroup }}
   storageAccount: {{ .accountName }}
   containerName: {{ .containerName }}
+  storageEndpointSuffix: {{ $storageEndpointSuffix }}
 mountOptions:
   - -o allow_other
   {{- if .isAdlsGen2 }} 
@@ -156,6 +159,7 @@ parameters:
   resourceGroup: {{ .resourceGroup }}
   storageAccount: {{ .accountName }}
   containerName: {{ .containerName }}
+  storageEndpointSuffix: {{ $storageEndpointSuffix }}
 mountOptions:
   - -o allow_other
   {{- if .isAdlsGen2 }} 
