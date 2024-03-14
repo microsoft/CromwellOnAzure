@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   labels:
     io.kompose.service: tes
-    aadpodidbinding: {{ .Values.identity.name }}
   name: tes
 spec:
   replicas: 1
@@ -16,10 +15,11 @@ spec:
     metadata:
       labels:
         io.kompose.service: tes
-        aadpodidbinding: {{ .Values.identity.name }}
+        azure.workload.identity/use: "true"
       annotations:
         container.apparmor.security.beta.kubernetes.io/tes: runtime/default
     spec:
+      serviceAccountName: {{ .Values.identity.name }}-sa
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -28,6 +28,8 @@ spec:
       terminationGracePeriodSeconds: 90
       containers:
         - env:
+            - name: General__AzureCloudName
+              value: {{ .Values.config.azureCloudName }}
             - name: TesPostgreSql__ServerName
               value: {{ .Values.tesDatabase.serverName }}
             - name: TesPostgreSql__ServerNameSuffix

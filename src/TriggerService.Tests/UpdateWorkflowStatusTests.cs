@@ -7,6 +7,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Common;
+using CommonUtilities.AzureCloud;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -410,7 +411,9 @@ namespace TriggerService.Tests
             storageUtility
                 .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
                 .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
-            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient.Object, repository.Object, storageUtility.Object);
+
+            var azureCloudConfig = AzureCloudConfig.CreateAsync().Result;
+            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient.Object, repository.Object, storageUtility.Object, azureCloudConfig);
 
             await cromwellOnAzureEnvironment.UpdateWorkflowStatusesAsync();
 
