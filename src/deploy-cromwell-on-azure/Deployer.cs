@@ -146,6 +146,7 @@ namespace CromwellOnAzureDeployer
                 await Execute("Validating command line arguments...", async () =>
                 {
                     ValidateInitialCommandLineArgs();
+                    return Task.CompletedTask;
                 });
 
                 await ValidateTokenProviderAsync();
