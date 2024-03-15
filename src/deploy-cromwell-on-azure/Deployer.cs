@@ -438,7 +438,7 @@ namespace CromwellOnAzureDeployer
 
                         if (vnetAndSubnet is not null && vnetAndSubnet.Value.virtualNetwork is not null)
                         {
-                            ConsoleEx.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.vmSubnet.Name}");
+                            ConsoleEx.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name}");
                         }
 
                         if (vnetAndSubnet is not null && vnetAndSubnet.Value.vmSubnet is not null)
