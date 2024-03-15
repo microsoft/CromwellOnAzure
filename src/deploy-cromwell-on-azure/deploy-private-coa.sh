@@ -1,5 +1,14 @@
 #!/bin/bash
 
+# This script deploys a private instance of Cromwell on Azure (CoA) within a specified Azure subscription
+# and location. It sets up necessary Azure resources including a resource group, virtual network, subnets,
+# managed identity, storage account, and a container registry. It supports custom prefixes and allows
+# deployment to different Azure clouds (e.g., Azure US Government, Azure China) with configurable options
+# for private networking. The script handles resource creation, assigns necessary permissions to the
+# managed identity, prepares a VM jumpbox for deployment from within the virtual network, and executes
+# the CoA deployment binary. This script is designed to ensure a secure and isolated environment for running
+# Cromwell on Azure, suitable for sensitive or regulated workloads.
+
 # Usage: deploy-private-coa.sh <subscription> <location> <prefix> <azure_cloud_name>
 
 subscription=$1
@@ -19,6 +28,7 @@ aks_name="${prefix}coaaks"
 aks_resource_group_name="${prefix}-coa-aks-nodes"
 vnet_name="${prefix}-coa-vnet"
 subnet_name="${prefix}-coa-subnet"
+deployer_subnet_name="${prefix}-coa-deployer-subnet"
 vmsubnet_name="${prefix}-coa-aks-subnet"
 batchsubnet_name="${prefix}-coa-batch-subnet"
 sqlsubnet_name="${prefix}-sql-subnet"
@@ -70,13 +80,33 @@ sleep 10 # Waits for 10 seconds
 echo "Assigning owner to identity..."
 az role assignment create --assignee-principal-type "ServicePrincipal" --assignee-object-id $(az identity show --name $managed_identity_name --resource-group $resource_group_name --query "principalId" -o tsv) --role "Owner" --scope /subscriptions/$subscription/resourceGroups/$resource_group_name
 
+echo "Creating virtual network..."
+# Create VNet and Subnet
+az network vnet create \
+    --resource-group $resource_group_name \
+    --name $vnet_name \
+    --address-prefixes 10.1.0.0/16 \
+    --subnet-name $deployer_subnet_name \
+    --subnet-prefixes 10.1.200.0/24
+
+echo "Creating deployer subnet..."
+# Get the subnet ID for the VM creation
+deployer_subnet_id=$(az network vnet subnet show \
+    --resource-group $resource_group_name \
+    --vnet-name $vnet_name \
+    --name $deployer_subnet_name \
+    --query id -o tsv)
+
 echo "Creating VM jumpbox within the virtual network to deploy from..."
+
+# Create the VM and specify the VNet's subnet by using the subnet ID
 vm_public_ip=$(az vm create \
     --resource-group $resource_group_name \
     --name $temp_deployer_vm_name \
     --image Ubuntu2204 \
     --admin-username azureuser \
     --generate-ssh-keys \
+    --subnet $deployer_subnet_id \
     --query publicIpAddress -o tsv)
 
 echo "Opening port 22 for SSH access..."
