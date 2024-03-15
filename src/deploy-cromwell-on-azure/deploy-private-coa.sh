@@ -48,7 +48,7 @@ create_resource_group_if_not_exists() {
   fi
 }
 
-rm ../ga4gh-tes/nuget.config
+rm -f ../ga4gh-tes/nuget.config
 
 if [ -f "./deploy-cromwell-on-azure-linux" ]; then
     coa_binary="deploy-cromwell-on-azure-linux"
