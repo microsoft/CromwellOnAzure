@@ -16,6 +16,7 @@ using Moq;
 using Newtonsoft.Json;
 using Tes.Models;
 using Tes.Repository;
+using Tes.TaskSubmitters;
 
 namespace TriggerService.Tests
 {
@@ -291,7 +292,7 @@ namespace TriggerService.Tests
             {
                 Description = $"{workflowId}:BackendJobDescriptorKey_CommandCallNode_BamToUnmappedBams.SortSam:{shard}:{attempt}",
                 Executors = [new() { Stdout = "execution/stdout", Stderr = "execution/stderr" }],
-                Inputs = [new() { Name = "commandScript", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/script" }],
+                Inputs = [new() { Name = "commandScript", Description = "workflow1.Task1.commandScript", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/script", Type = TesFileType.FILEEnum }],
                 Outputs =
                 [
                     new() { Name = "commandScript", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/script" },
