@@ -84,7 +84,7 @@ az network vnet create \
     --name $vnet_name \
     --address-prefixes 10.1.0.0/16 \
     --subnet-name $deployer_subnet_name \
-    --subnet-prefixes 10.1.200.0/24
+    --subnet-prefixes 10.1.100.0/24
 
 echo "Creating deployer subnet..."
 # Get the subnet ID for the VM creation
