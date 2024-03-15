@@ -1,8 +1,17 @@
 #!/bin/bash
 
-azure_cloud_name="AzureCloud"
-subscription=""
-location="eastus"
+# Usage: deploy-private-coa.sh <azure_cloud_name> <subscription> <location>
+
+azure_cloud_name=$1
+subscription=$2
+location=$3
+
+# Ensure that all arguments are provided
+if [ -z "$azure_cloud_name" ] || [ -z "$subscription" ] || [ -z "$location" ]; then
+    echo "Usage: $0 <azure_cloud_name> <subscription> <location>"
+    exit 1
+fi
+
 prefix="coa"
 coa_identifier="${prefix}coa"
 resource_group_name="${prefix}-coa-main"
@@ -43,8 +52,11 @@ create_resource_group_if_not_exists() {
 rm ../ga4gh-tes/nuget.config
 
 if [ -f "./deploy-cromwell-on-azure-linux" ]; then
-    # use pre-existing deployer binary in same folder
+    # use pre-existing deployer binary for Linux in the same folder
     coa_binary="deploy-cromwell-on-azure-linux"
+elif [ -f "./deploy-cromwell-on-azure" ]; then
+    # use pre-existing generic deployer binary in the same folder
+    coa_binary="deploy-cromwell-on-azure"
 else
     # publish a new deployer binary
     dotnet publish -r linux-x64 -c Release -o ./ /p:PublishSingleFile=true /p:DebugType=none /p:IncludeNativeLibrariesForSelfExtract=true
@@ -82,10 +94,7 @@ sleep 10 # Waits for 10 seconds
 
 echo "Installing AZ CLI and logging in..."
 ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash; az cloud set -n $azure_cloud_name; az login --use-device-code"
-echo "Please login with the device code and then press any key to continue."
-read -n1 -s
 
-echo "Thank you. Now creating directory for CoA deployment binary..."
 ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "mkdir -p /tmp/coa"
 
 echo "Copying CoA deployment binary..."
