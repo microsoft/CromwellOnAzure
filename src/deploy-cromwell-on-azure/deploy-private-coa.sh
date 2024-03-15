@@ -1,18 +1,19 @@
 #!/bin/bash
 
-# Usage: deploy-private-coa.sh <azure_cloud_name> <subscription> <location>
+# Usage: deploy-private-coa.sh <subscription> <location> <prefix> <azure_cloud_name>
 
-azure_cloud_name=$1
-subscription=$2
-location=$3
+subscription=$1
+location=$2
+prefix=${3:-"coa"}
+azure_cloud_name=${4:-"azurecloud"} # azureusgovernment, azurechinacloud
 
-# Ensure that all arguments are provided
-if [ -z "$azure_cloud_name" ] || [ -z "$subscription" ] || [ -z "$location" ]; then
-    echo "Usage: $0 <azure_cloud_name> <subscription> <location>"
+# Ensure that essential arguments are provided
+if [ -z "$subscription" ] || [ -z "$location" ]; then
+    echo "Usage: $0 [azure_cloud_name] <subscription> <location> [prefix]"
+    echo "Note: azure_cloud_name defaults to 'azurecloud' and prefix defaults to 'coa' if not provided."
     exit 1
 fi
 
-prefix="coa"
 coa_identifier="${prefix}coa"
 resource_group_name="${prefix}-coa-main"
 aks_name="${prefix}coaaks"
