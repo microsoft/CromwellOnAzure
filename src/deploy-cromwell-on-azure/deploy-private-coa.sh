@@ -77,9 +77,6 @@ managed_identity_id=$(az identity create -g $resource_group_name -n $managed_ide
 echo "Waiting for identity to propagate..."
 sleep 10 # Waits for 10 seconds
 
-echo "Assigning owner to identity..."
-az role assignment create --assignee-principal-type "ServicePrincipal" --assignee-object-id $(az identity show --name $managed_identity_name --resource-group $resource_group_name --query "principalId" -o tsv) --role "Owner" --scope /subscriptions/$subscription/resourceGroups/$resource_group_name
-
 echo "Creating virtual network..."
 # Create VNet and Subnet
 az network vnet create \
