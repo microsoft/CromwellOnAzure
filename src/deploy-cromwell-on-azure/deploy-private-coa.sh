@@ -3,7 +3,7 @@
 # Usage: deploy-private-coa.sh <subscription> <location> <prefix> <azure_cloud_name>
 
 subscription=$1
-location=$2
+location=$2 #eastus, usgovarizona
 prefix=${3:-"coa"}
 azure_cloud_name=${4:-"azurecloud"} # azureusgovernment, azurechinacloud
 
