@@ -457,7 +457,7 @@ namespace CromwellOnAzureDeployer
                             {
                                 if (vnetAndSubnet is null)
                                 {
-                                    configuration.VnetName = SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15);
+                                    configuration.VnetName = string.IsNullOrEmpty(configuration.VnetName) ? SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15) : configuration.VnetName;
                                     configuration.PostgreSqlSubnetName = string.IsNullOrEmpty(configuration.PostgreSqlSubnetName) ? configuration.DefaultPostgreSqlSubnetName : configuration.PostgreSqlSubnetName;
                                     configuration.BatchSubnetName = string.IsNullOrEmpty(configuration.BatchSubnetName) ? configuration.DefaultBatchSubnetName : configuration.BatchSubnetName;
                                     configuration.VmSubnetName = string.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
@@ -1980,7 +1980,7 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.VmSubnetName}'");
             }
 
-            var resourceGraphClient = new ResourceGraphClient(tokenCredentials);
+            var resourceGraphClient = new ResourceGraphClient(new Uri(azureCloudConfig.ResourceManagerUrl), tokenCredentials);
             var postgreSqlSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
 
             if (postgreSqlSubnet is null)
