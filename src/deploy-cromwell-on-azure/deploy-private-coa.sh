@@ -7,7 +7,6 @@ location=$2
 prefix=${3:-"coa"}
 azure_cloud_name=${4:-"azurecloud"} # azureusgovernment, azurechinacloud
 
-# Ensure that essential arguments are provided
 if [ -z "$subscription" ] || [ -z "$location" ]; then
     echo "Usage: $0 [azure_cloud_name] <subscription> <location> [prefix]"
     echo "Note: azure_cloud_name defaults to 'azurecloud' and prefix defaults to 'coa' if not provided."
@@ -37,11 +36,10 @@ temp_deployer_vm_name="${prefix}-coa-deploy"
 coa_binary="deploy-cromwell-on-azure"
 coa_binary_path="/tmp/coa"
 
-# Function to create a resource group if it doesn't exist
 create_resource_group_if_not_exists() {
   local rg_name=$1
   local rg_location=$2
-  # Check if the resource group exists
+
   if [ $(az group exists --name "$rg_name") = false ]; then
     echo "Creating resource group '$rg_name' in location '$rg_location'."
     az group create --name "$rg_name" --location "$rg_location"
@@ -53,22 +51,19 @@ create_resource_group_if_not_exists() {
 rm ../ga4gh-tes/nuget.config
 
 if [ -f "./deploy-cromwell-on-azure-linux" ]; then
-    # use pre-existing deployer binary for Linux in the same folder
     coa_binary="deploy-cromwell-on-azure-linux"
 elif [ -f "./deploy-cromwell-on-azure" ]; then
-    # use pre-existing generic deployer binary in the same folder
     coa_binary="deploy-cromwell-on-azure"
 else
     # publish a new deployer binary
     dotnet publish -r linux-x64 -c Release -o ./ /p:PublishSingleFile=true /p:DebugType=none /p:IncludeNativeLibrariesForSelfExtract=true
 fi
 
-# Create the resource group if it doesn't exist
 create_resource_group_if_not_exists $resource_group_name $location
 
 echo "Creating identity..."
 managed_identity_id=$(az identity create -g $resource_group_name -n $managed_identity_name -l $location --query id --output tsv)
-# Assign the 'Owner' role to the managed identity for the resource group
+
 echo "Waiting for identity to propagate..."
 sleep 10 # Waits for 10 seconds
 
@@ -84,18 +79,16 @@ vm_public_ip=$(az vm create \
     --generate-ssh-keys \
     --query publicIpAddress -o tsv)
 
-#echo "Assigning identity to VM..."
-#az vm identity assign --resource-group $resource_group_name --name $temp_deployer_vm_name --identities $managed_identity_id
-
 echo "Opening port 22 for SSH access..."
 az vm open-port --port 22 --resource-group $resource_group_name --name $temp_deployer_vm_name
 
 echo "Waiting for port to open..."
-sleep 10 # Waits for 10 seconds
+sleep 10
 
 echo "Installing AZ CLI and logging in..."
 ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash; az cloud set -n $azure_cloud_name; az login --use-device-code"
 
+echo "Creating directory..."
 ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "mkdir -p /tmp/coa"
 
 echo "Copying CoA deployment binary..."
@@ -106,6 +99,7 @@ ssh -o StrictHostKeyChecking=no azureuser@${vm_public_ip} "curl -fsSL https://ra
 
 echo "Setting CoA deployer binary to executable..."
 ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "chmod +x $coa_binary_path/$coa_binary"
+
 echo "Executing CoA deployer binary..."
 ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "$coa_binary_path/$coa_binary \
     --IdentityResourceId $managed_identity_id \
