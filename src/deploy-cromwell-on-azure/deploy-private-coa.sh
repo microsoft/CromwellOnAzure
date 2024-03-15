@@ -3,7 +3,7 @@
 azure_cloud_name="AzureCloud"
 subscription=""
 location="eastus"
-prefix="ca"
+prefix="coa"
 coa_identifier="${prefix}coa"
 resource_group_name="${prefix}-coa-main"
 aks_name="${prefix}coaaks"
@@ -50,11 +50,8 @@ else
     dotnet publish -r linux-x64 -c Release -o ./ /p:PublishSingleFile=true /p:DebugType=none /p:IncludeNativeLibrariesForSelfExtract=true
 fi
 
-
-
-# Create the resource groups if they don't exist
+# Create the resource group if it doesn't exist
 create_resource_group_if_not_exists $resource_group_name $location
-create_resource_group_if_not_exists $aks_resource_group_name $location
 
 echo "Creating identity..."
 managed_identity_id=$(az identity create -g $resource_group_name -n $managed_identity_name -l $location --query id --output tsv)
