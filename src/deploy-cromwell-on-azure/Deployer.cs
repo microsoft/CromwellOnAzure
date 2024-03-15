@@ -436,9 +436,14 @@ namespace CromwellOnAzureDeployer
                             managedIdentity = await CreateUserManagedIdentityAsync(resourceGroup);
                         }
 
-                        if (vnetAndSubnet is not null)
+                        if (vnetAndSubnet is not null && vnetAndSubnet.Value.virtualNetwork is not null)
                         {
                             ConsoleEx.WriteLine($"Creating VM in existing virtual network {vnetAndSubnet.Value.virtualNetwork.Name} and subnet {vnetAndSubnet.Value.vmSubnet.Name}");
+                        }
+
+                        if (vnetAndSubnet is not null && vnetAndSubnet.Value.vmSubnet is not null)
+                        {
+                            ConsoleEx.WriteLine($"Using existing subnet {vnetAndSubnet.Value.vmSubnet.Name}");
                         }
 
                         if (storageAccount is not null)
@@ -455,19 +460,32 @@ namespace CromwellOnAzureDeployer
                         {
                             Task.Run(async () =>
                             {
-                                if (vnetAndSubnet is null)
+                                if (vnetAndSubnet.Value.virtualNetwork is null)
                                 {
                                     configuration.VnetName = string.IsNullOrEmpty(configuration.VnetName) ? SdkContext.RandomResourceName($"{configuration.MainIdentifierPrefix}-", 15) : configuration.VnetName;
-                                    configuration.PostgreSqlSubnetName = string.IsNullOrEmpty(configuration.PostgreSqlSubnetName) ? configuration.DefaultPostgreSqlSubnetName : configuration.PostgreSqlSubnetName;
-                                    configuration.BatchSubnetName = string.IsNullOrEmpty(configuration.BatchSubnetName) ? configuration.DefaultBatchSubnetName : configuration.BatchSubnetName;
-                                    configuration.VmSubnetName = string.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
-                                    vnetAndSubnet = await CreateVnetAndSubnetsAsync(resourceGroup);
-
-                                    if (string.IsNullOrEmpty(this.configuration.BatchNodesSubnetId))
-                                    {
-                                        this.configuration.BatchNodesSubnetId = vnetAndSubnet.Value.batchSubnet.Inner.Id;
-                                    }
                                 }
+
+                                if (vnetAndSubnet.Value.postgreSqlSubnet is null)
+                                {
+                                    configuration.PostgreSqlSubnetName = string.IsNullOrEmpty(configuration.PostgreSqlSubnetName) ? configuration.DefaultPostgreSqlSubnetName : configuration.PostgreSqlSubnetName;
+                                }
+
+                                if (vnetAndSubnet.Value.batchSubnet is null)
+                                {
+                                    configuration.BatchSubnetName = string.IsNullOrEmpty(configuration.BatchSubnetName) ? configuration.DefaultBatchSubnetName : configuration.BatchSubnetName;
+                                }
+
+                                if (vnetAndSubnet.Value.vmSubnet is null)
+                                {
+                                    configuration.VmSubnetName = string.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
+                                }
+                                
+                                vnetAndSubnet = await CreateOrUseExistingVnetAndSubnetsAsync(resourceGroup);
+
+                                if (string.IsNullOrEmpty(this.configuration.BatchNodesSubnetId))
+                                {
+                                    this.configuration.BatchNodesSubnetId = vnetAndSubnet.Value.batchSubnet.Inner.Id;
+                                }                            
                             }),
                             Task.Run(async () =>
                             {
@@ -1488,49 +1506,72 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(ct),
                     cts.Token));
 
-        private Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet, ISubnet batchSubnet)> CreateVnetAndSubnetsAsync(IResourceGroup resourceGroup)
-          => Execute(
-                $"Creating virtual network and subnets: {configuration.VnetName}...",
-                async () =>
+        private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet, ISubnet batchSubnet)> CreateOrUseExistingVnetAndSubnetsAsync(IResourceGroup resourceGroup)
+        {
+            var networkSecurityGroup = await CreateNetworkSecurityGroupAsync(resourceGroup, $"{configuration.VnetName}-default-nsg");
+
+            // Check for existing VNet
+            INetwork vnet = await azureSubscriptionClient.Networks.GetByResourceGroupAsync(resourceGroup.Name, configuration.VnetName)
+                ?? await DefineAndCreateVnetWithSubnets(resourceGroup, networkSecurityGroup);
+
+            // Ensure subnets are correctly set up
+            var vmSubnet = await EnsureSubnet(vnet, configuration.VmSubnetName, configuration.VmSubnetAddressSpace, networkSecurityGroup);
+            var postgreSqlSubnet = await EnsureSubnet(vnet, configuration.PostgreSqlSubnetName, configuration.PostgreSqlSubnetAddressSpace, networkSecurityGroup, true);
+            var batchSubnet = await EnsureSubnet(vnet, configuration.BatchSubnetName, configuration.BatchNodesSubnetAddressSpace, networkSecurityGroup);
+
+            return (vnet, vmSubnet, postgreSqlSubnet, batchSubnet);
+        }
+
+        async Task<INetwork> DefineAndCreateVnetWithSubnets(IResourceGroup resourceGroup, INetworkSecurityGroup defaultNsg)
+        {
+            var vnetDefinition = azureSubscriptionClient.Networks
+                .Define(configuration.VnetName)
+                .WithRegion(configuration.RegionName)
+                .WithExistingResourceGroup(resourceGroup)
+                .WithAddressSpace(configuration.VnetAddressSpace)
+                .DefineSubnet(configuration.VmSubnetName)
+                    .WithAddressPrefix(configuration.VmSubnetAddressSpace)
+                    .WithExistingNetworkSecurityGroup(defaultNsg)
+                    .Attach()
+                .DefineSubnet(configuration.PostgreSqlSubnetName)
+                    .WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace)
+                    .WithExistingNetworkSecurityGroup(defaultNsg)
+                    .WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers")
+                    .Attach()
+                .DefineSubnet(configuration.BatchSubnetName)
+                    .WithAddressPrefix(configuration.BatchNodesSubnetAddressSpace)
+                    .WithExistingNetworkSecurityGroup(defaultNsg)
+                    .Attach();
+
+            return await vnetDefinition.CreateAsync(cts.Token);
+        }
+
+        async Task<ISubnet> EnsureSubnet(INetwork vnet, string subnetName, string subnetAddressSpace, INetworkSecurityGroup nsg, bool requiresDelegation = false)
+        {
+            // Check if subnet exists
+            if (!vnet.Subnets.TryGetValue(subnetName, out var subnet))
+            {
+                // Create or update the VNet with a new subnet if it doesn't exist
+                var vnetUpdate = vnet.Update()
+                    .DefineSubnet(subnetName)
+                        .WithAddressPrefix(subnetAddressSpace)
+                        .Attach();
+
+                // Add delegation if required
+                if (requiresDelegation)
                 {
-                    var defaultNsg = await CreateNetworkSecurityGroupAsync(resourceGroup, $"{configuration.VnetName}-default-nsg");
-
-                    var vnetDefinition = azureSubscriptionClient.Networks
-                        .Define(configuration.VnetName)
-                        .WithRegion(configuration.RegionName)
-                        .WithExistingResourceGroup(resourceGroup)
-                        .WithAddressSpace(configuration.VnetAddressSpace)
-                        .DefineSubnet(configuration.VmSubnetName)
-                        .WithAddressPrefix(configuration.VmSubnetAddressSpace)
-                        .WithExistingNetworkSecurityGroup(defaultNsg)
-                        .Attach();
-
-                    vnetDefinition = vnetDefinition.DefineSubnet(configuration.PostgreSqlSubnetName)
-                        .WithAddressPrefix(configuration.PostgreSqlSubnetAddressSpace)
-                        .WithExistingNetworkSecurityGroup(defaultNsg)
+                    vnetUpdate.UpdateSubnet(subnetName)
                         .WithDelegation("Microsoft.DBforPostgreSQL/flexibleServers")
-                        .Attach();
+                        .Parent();
+                }
 
-                    vnetDefinition = vnetDefinition.DefineSubnet(configuration.BatchSubnetName)
-                        .WithAddressPrefix(configuration.BatchNodesSubnetAddressSpace)
-                        .WithExistingNetworkSecurityGroup(defaultNsg)
-                        .Attach();
+                vnet = await vnetUpdate.ApplyAsync();
+                subnet = vnet.Subnets[subnetName];
+            }
 
-                    var vnet = await vnetDefinition.CreateAsync(cts.Token);
-                    var batchSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.BatchSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
-
-                    // Use the new ResourceManager sdk to add the ACR service endpoint since it is absent from the fluent sdk.
-                    var armBatchSubnet = (await armClient.GetSubnetResource(new ResourceIdentifier(batchSubnet.Inner.Id)).GetAsync(cancellationToken: cts.Token)).Value;
-
-                    AddServiceEndpointsToSubnet(armBatchSubnet.Data);
-
-                    await armBatchSubnet.UpdateAsync(Azure.WaitUntil.Completed, armBatchSubnet.Data, cts.Token);
-
-                    return (vnet,
-                        vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value,
-                        vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value,
-                        batchSubnet);
-                });
+            return subnet;
+        }
+        
 
         private Task<INetworkSecurityGroup> CreateNetworkSecurityGroupAsync(IResourceGroup resourceGroup, string networkSecurityGroupName)
         {
@@ -1930,82 +1971,78 @@ namespace CromwellOnAzureDeployer
                 ?? throw new ValidationException($"If BatchAccountName is provided, the batch account must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
         }
 
-        private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet, ISubnet batchSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
-        {
-            static bool AllOrNoneSet(params string[] values) => values.All(v => !string.IsNullOrEmpty(v)) || values.All(v => string.IsNullOrEmpty(v));
-            static bool NoneSet(params string[] values) => values.All(v => string.IsNullOrEmpty(v));
+        private static bool AllOrNoneSet(params string[] values) => values.All(v => !string.IsNullOrEmpty(v)) || values.All(v => string.IsNullOrEmpty(v));
 
-            if (NoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName))
+        private static bool NoneSet(params string[] values) => values.All(v => string.IsNullOrEmpty(v));
+
+        private async Task<INetwork> ValidateAndGetVirtualNetworkAsync()
+        {
+            if (NoneSet(configuration.VnetResourceGroupName, configuration.VnetName))
             {
                 if (configuration.PrivateNetworking.GetValueOrDefault())
                 {
-                    throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)} and {nameof(configuration.VmSubnetName)} are required when using private networking.");
+                    throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)} are required when using private networking.");
                 }
 
                 return null;
             }
 
-            if (!AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName, configuration.PostgreSqlSubnetName))
-            {
-                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)}, {nameof(configuration.VmSubnetName)} and {nameof(configuration.PostgreSqlSubnetName)} are required when using an existing virtual network.");
-            }
-
-            if (!AllOrNoneSet(configuration.VnetResourceGroupName, configuration.VnetName, configuration.VmSubnetName))
-            {
-                throw new ValidationException($"{nameof(configuration.VnetResourceGroupName)}, {nameof(configuration.VnetName)} and {nameof(configuration.VmSubnetName)} are required when using an existing virtual network.");
-            }
-
-            if (!await (await azureSubscriptionClient.ResourceGroups.ListAsync(true, cts.Token)).ToAsyncEnumerable().AnyAsync(rg => rg.Name.Equals(configuration.VnetResourceGroupName, StringComparison.OrdinalIgnoreCase), cts.Token))
+            if (!await ResourceGroupExists(configuration.VnetResourceGroupName))
             {
                 throw new ValidationException($"Resource group '{configuration.VnetResourceGroupName}' does not exist.");
             }
 
             var vnet = await azureSubscriptionClient.Networks.GetByResourceGroupAsync(configuration.VnetResourceGroupName, configuration.VnetName, cts.Token);
-
-            if (vnet is null)
-            {
-                return null;
-                //throw new ValidationException($"Virtual network '{configuration.VnetName}' does not exist in resource group '{configuration.VnetResourceGroupName}'.");
-            }
-
-            if (vnet!=null && !vnet.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase))
+            if (vnet != null && !vnet.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase))
             {
                 throw new ValidationException($"Virtual network '{configuration.VnetName}' must be in the same region that you are deploying to ({configuration.RegionName}).");
             }
 
-            var vmSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
+            return vnet;
+        }
 
-            if (vmSubnet is null)
+        private async Task<bool> ResourceGroupExists(string resourceGroupName)
+        {
+            return await (await azureSubscriptionClient.ResourceGroups.ListAsync(true, cts.Token)).ToAsyncEnumerable().AnyAsync(rg => rg.Name.Equals(resourceGroupName, StringComparison.OrdinalIgnoreCase), cts.Token);
+        }
+
+        private async Task<ISubnet> ValidateAndGetSubnetAsync(INetwork virtualNetwork, string subnetName, string expectedDelegation = null)
+        {
+            var subnet = virtualNetwork?.Subnets.FirstOrDefault(s => s.Key.Equals(subnetName, StringComparison.OrdinalIgnoreCase)).Value;
+            
+            if (subnet == null)
             {
-                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.VmSubnetName}'");
+                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{subnetName}'");
             }
 
-            var resourceGraphClient = new ResourceGraphClient(new Uri(azureCloudConfig.ResourceManagerUrl), tokenCredentials);
-            var postgreSqlSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
-
-            if (postgreSqlSubnet is null)
+            if (!string.IsNullOrEmpty(expectedDelegation))
             {
-                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.PostgreSqlSubnetName}'");
+                var delegatedServices = subnet.Inner.Delegations.Select(d => d.ServiceName);
+                var hasIncorrectDelegations = expectedDelegation != null && !delegatedServices.Contains(expectedDelegation);
+                if (hasIncorrectDelegations)
+                {
+                    throw new ValidationException($"Subnet '{subnetName}' must have '{expectedDelegation}' delegation.");
+                }
             }
 
-            var delegatedServices = postgreSqlSubnet.Inner.Delegations.Select(d => d.ServiceName);
-            var hasOtherDelegations = delegatedServices.Any(s => s != "Microsoft.DBforPostgreSQL/flexibleServers");
-            var hasNoDelegations = !delegatedServices.Any();
+            return subnet;
+        }
 
-            if (hasOtherDelegations)
+        private async Task<(INetwork virtualNetwork, ISubnet vmSubnet, ISubnet postgreSqlSubnet, ISubnet batchSubnet)?> ValidateAndGetExistingVirtualNetworkAsync()
+        {
+            var vnet = await ValidateAndGetVirtualNetworkAsync();
+            if (vnet == null) return null;
+
+            ISubnet vmSubnet = null;
+            ISubnet postgreSqlSubnet = null;
+            ISubnet batchSubnet = null;
+
+            if (!configuration.PrivateNetworking.GetValueOrDefault())
             {
-                throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' can have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation only.");
+                vmSubnet = await ValidateAndGetSubnetAsync(vnet, configuration.VmSubnetName);
+                postgreSqlSubnet = await ValidateAndGetSubnetAsync(vnet, configuration.PostgreSqlSubnetName, "Microsoft.DBforPostgreSQL/flexibleServers");
+                batchSubnet = await ValidateAndGetSubnetAsync(vnet, configuration.BatchSubnetName);
             }
-
-            var resourcesInPostgreSqlSubnetQuery = $"where type =~ 'Microsoft.Network/networkInterfaces' | where properties.ipConfigurations[0].properties.subnet.id == '{postgreSqlSubnet.Inner.Id}'";
-            var resourcesExist = (await resourceGraphClient.ResourcesAsync(new QueryRequest(new[] { configuration.SubscriptionId }, resourcesInPostgreSqlSubnetQuery), cts.Token)).TotalRecords > 0;
-
-            if (hasNoDelegations && resourcesExist)
-            {
-                throw new ValidationException($"Subnet '{configuration.PostgreSqlSubnetName}' must be either empty or have 'Microsoft.DBforPostgreSQL/flexibleServers' delegation.");
-            }
-
-            var batchSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.BatchSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
 
             return (vnet, vmSubnet, postgreSqlSubnet, batchSubnet);
         }
