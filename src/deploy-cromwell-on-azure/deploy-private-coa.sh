@@ -1,9 +1,9 @@
 #!/bin/bash
 
-azure_cloud_name=""
+azure_cloud_name="AzureCloud"
 subscription=""
-location=""
-prefix="mm"
+location="eastus"
+prefix="ca"
 coa_identifier="${prefix}coa"
 resource_group_name="${prefix}-coa-main"
 aks_name="${prefix}coaaks"
@@ -24,7 +24,7 @@ private_cr_zone_name="privatelink.azurecr.io"
 tes_image_name="mcr.microsoft.com/CromwellOnAzure/tes:5.3.0.10760"
 trigger_service_image_name="mcr.microsoft.com/CromwellOnAzure/triggerservice:5.3.0.10760"
 temp_deployer_vm_name="${prefix}-coa-deploy"
-coa_binary="deploy-cromwell-on-azure-linux"
+coa_binary="deploy-cromwell-on-azure"
 coa_binary_path="/tmp/coa"
 
 # Function to create a resource group if it doesn't exist
@@ -40,6 +40,18 @@ create_resource_group_if_not_exists() {
   fi
 }
 
+rm ../ga4gh-tes/nuget.config
+
+if [ -f "./deploy-cromwell-on-azure-linux" ]; then
+    # use pre-existing deployer binary in same folder
+    coa_binary="deploy-cromwell-on-azure-linux"
+else
+    # publish a new deployer binary
+    dotnet publish -r linux-x64 -c Release -o ./ /p:PublishSingleFile=true /p:DebugType=none /p:IncludeNativeLibrariesForSelfExtract=true
+fi
+
+
+
 # Create the resource groups if they don't exist
 create_resource_group_if_not_exists $resource_group_name $location
 create_resource_group_if_not_exists $aks_resource_group_name $location
@@ -51,7 +63,7 @@ echo "Waiting for identity to propagate..."
 sleep 10 # Waits for 10 seconds
 
 echo "Assigning owner to identity..."
-az role assignment create --assignee-object-id $(az identity show --name $managed_identity_name --resource-group $resource_group_name --query "principalId" -o tsv) --role "Owner" --scope /subscriptions/$subscription/resourceGroups/$resource_group_name
+az role assignment create --assignee-principal-type "ServicePrincipal" --assignee-object-id $(az identity show --name $managed_identity_name --resource-group $resource_group_name --query "principalId" -o tsv) --role "Owner" --scope /subscriptions/$subscription/resourceGroups/$resource_group_name
 
 echo "Creating VM jumpbox within the virtual network to deploy from..."
 vm_public_ip=$(az vm create \
@@ -85,9 +97,10 @@ scp -o StrictHostKeyChecking=no $coa_binary azureuser@$vm_public_ip:/tmp/coa/$co
 echo "Installing Helm..."
 ssh -o StrictHostKeyChecking=no azureuser@${vm_public_ip} "curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
 
+echo "Setting CoA deployer binary to executable..."
+ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "chmod +x $coa_binary_path/$coa_binary"
 echo "Executing CoA deployer binary..."
-# Execute command with extracted variables
-ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "chmod +x $coa_binary_path/$coa_binary && $coa_binary_path/$coa_binary \
+ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "$coa_binary_path/$coa_binary \
     --IdentityResourceId $managed_identity_id \
     --SubscriptionId $subscription \
     --ResourceGroupName $resource_group_name \
@@ -105,7 +118,7 @@ ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "chmod +x $coa_binary_pa
     --VmSubnetName $vmsubnet_name \
     --BatchSubnetName $batchsubnet_name \
     --PostgreSqlSubnetName $sqlsubnet_name \
-    --HelmBinaryPath /usr/sbin/helm \
+    --HelmBinaryPath /usr/local/bin/helm \
     --TesImageName $tes_image_name \
     --TriggerServiceImageName $trigger_service_image_name \
     --DebugLogging true"

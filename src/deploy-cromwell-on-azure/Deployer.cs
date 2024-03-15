@@ -1916,8 +1916,7 @@ namespace CromwellOnAzureDeployer
                 return null;
             }
 
-            return (await GetExistingStorageAccountAsync(configuration.StorageAccountName))
-                ?? throw new ValidationException($"If StorageAccountName is provided, the storage account must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+            return await GetExistingStorageAccountAsync(configuration.StorageAccountName);
         }
 
         private async Task<BatchAccount> ValidateAndGetExistingBatchAccountAsync()
@@ -1965,10 +1964,11 @@ namespace CromwellOnAzureDeployer
 
             if (vnet is null)
             {
-                throw new ValidationException($"Virtual network '{configuration.VnetName}' does not exist in resource group '{configuration.VnetResourceGroupName}'.");
+                return null;
+                //throw new ValidationException($"Virtual network '{configuration.VnetName}' does not exist in resource group '{configuration.VnetResourceGroupName}'.");
             }
 
-            if (!vnet.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase))
+            if (vnet!=null && !vnet.RegionName.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase))
             {
                 throw new ValidationException($"Virtual network '{configuration.VnetName}' must be in the same region that you are deploying to ({configuration.RegionName}).");
             }
