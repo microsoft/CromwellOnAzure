@@ -10,13 +10,11 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Azure.Core;
+using Azure.ResourceManager.ContainerService;
 using CommonUtilities.AzureCloud;
 using k8s;
 using k8s.Models;
 using Microsoft.Azure.Management.ContainerService;
-using Microsoft.Azure.Management.ContainerService.Fluent;
-using Microsoft.Azure.Management.ContainerService.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
@@ -67,10 +65,9 @@ namespace CromwellOnAzureDeployer
             CreateAndInitializeWorkingDirectoriesAsync().Wait(cancellationToken);
         }
 
-        public async Task<IKubernetes> GetKubernetesClientAsync(ManagedCluster aksCluster)
+        public async Task<IKubernetes> GetKubernetesClientAsync(ContainerServiceManagedClusterResource aksCluster)
         {
-            var r = new ResourceIdentifier(aksCluster.Id);
-            var resourceGroup = r.ResourceGroupName;
+            var resourceGroup = aksCluster.Id.ResourceGroupName;
             var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
