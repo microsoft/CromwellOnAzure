@@ -136,5 +136,13 @@ namespace CromwellOnAzureDeployer
 
         private static Stream GetBinaryFileContent(params string[] pathComponentsRelativeToAppBase)
             => typeof(Deployer).Assembly.GetManifestResourceStream($"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}");
+
+        public static void ForEach<T>(this IEnumerable<T> values, Action<T> action)
+        {
+            foreach (var item in values)
+            {
+                action(item);
+            }
+        }
     }
 }
