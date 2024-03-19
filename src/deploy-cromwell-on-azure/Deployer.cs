@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.ClientModel.Primitives;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
@@ -18,6 +19,7 @@ using Azure.ResourceManager;
 using Azure.ResourceManager.ContainerService;
 using Azure.ResourceManager.ContainerService.Models;
 using Azure.ResourceManager.ManagedServiceIdentities;
+using Azure.ResourceManager.Models;
 using Azure.ResourceManager.Network;
 using Azure.ResourceManager.Network.Models;
 using Azure.ResourceManager.Resources;
@@ -809,6 +811,7 @@ namespace CromwellOnAzureDeployer
             var nodePoolName = "nodepool1";
             ContainerServiceManagedClusterData cluster = new(new(configuration.RegionName))
             {
+                ClusterIdentity = new() { ResourceIdentityType = ManagedServiceIdentityType.UserAssigned },
                 DnsPrefix = configuration.AksClusterName,
                 NetworkProfile = new()
                 {
@@ -818,14 +821,13 @@ namespace CromwellOnAzureDeployer
                     DockerBridgeCidr = configuration.KubernetesDockerBridgeCidr,
                     NetworkPolicy = ContainerServiceNetworkPolicy.Azure
                 },
-                Identity = new(Azure.ResourceManager.Models.ManagedServiceIdentityType.UserAssigned),
                 NodeResourceGroup = nodeResourceGroupName
             };
 
-            Azure.ResourceManager.ContainerService.Models.ManagedClusterAddonProfile clusterAddonProfile = new(isEnabled: true);
+            ManagedClusterAddonProfile clusterAddonProfile = new(isEnabled: true);
             clusterAddonProfile.Config.Add("logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id);
             cluster.AddonProfiles.Add("omsagent", clusterAddonProfile);
-            cluster.Identity.UserAssignedIdentities.Add(uami.Id, new());
+            cluster.ClusterIdentity.UserAssignedIdentities.Add(new(uami.Id, PopulateUserAssignedIdentity(uami.Data)));
             cluster.IdentityProfile.Add("kubeletidentity", new() { ResourceId = uami.Id, ClientId = uami.Data.ClientId, ObjectId = uami.Data.PrincipalId });
 
             if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
@@ -847,12 +849,12 @@ namespace CromwellOnAzureDeployer
                 OSDiskSizeInGB = 128,
                 OSDiskType = ContainerServiceOSDiskType.Managed,
                 EnableEncryptionAtHost = true,
-                AgentPoolType = Azure.ResourceManager.ContainerService.Models.AgentPoolType.VirtualMachineScaleSets,
+                AgentPoolType = AgentPoolType.VirtualMachineScaleSets,
                 EnableAutoScaling = false,
                 EnableNodePublicIP = false,
                 OSType = ContainerServiceOSType.Linux,
                 OSSku = ContainerServiceOSSku.AzureLinux,
-                Mode = Azure.ResourceManager.ContainerService.Models.AgentPoolMode.System,
+                Mode = AgentPoolMode.System,
                 VnetSubnetId = new(virtualNetwork.Subnets[subnetName].Inner.Id),
             });
 
@@ -870,7 +872,17 @@ namespace CromwellOnAzureDeployer
             return await Execute(
                 $"Creating AKS Cluster: {configuration.AksClusterName}...",
                 async () => (await resourceGroup.GetContainerServiceManagedClusters().CreateOrUpdateAsync(Azure.WaitUntil.Completed, configuration.AksClusterName, cluster, cts.Token)).Value);
+
+            static UserAssignedIdentity PopulateUserAssignedIdentity(UserAssignedIdentityData data)
+            {
+                UserAssignedIdentityJson json = new(data.PrincipalId.Value, data.ClientId.Value);
+                System.Text.Json.Utf8JsonReader reader = new(System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(json, jsonSerializerWebOptions)));
+                return ((IJsonModel<UserAssignedIdentity>)new UserAssignedIdentity()).Create(ref reader, ModelReaderWriterOptions.Json);
+            }
         }
+
+        private static readonly System.Text.Json.JsonSerializerOptions jsonSerializerWebOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+        private record struct UserAssignedIdentityJson(Guid PrincipalId, Guid ClientId);
 
         private async Task EnableWorkloadIdentity(ContainerServiceManagedClusterResource aksCluster, IIdentity managedIdentity, IResourceGroup resourceGroup)
         {
