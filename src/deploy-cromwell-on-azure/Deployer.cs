@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.ClientModel.Primitives;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
@@ -825,7 +826,7 @@ namespace CromwellOnAzureDeployer
             Azure.ResourceManager.ContainerService.Models.ManagedClusterAddonProfile clusterAddonProfile = new(isEnabled: true);
             clusterAddonProfile.Config.Add("logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id);
             cluster.AddonProfiles.Add("omsagent", clusterAddonProfile);
-            cluster.Identity.UserAssignedIdentities.Add(uami.Id, new());
+            cluster.Identity.UserAssignedIdentities.Add(uami.Id, PopulateUserAssignedIdentity(uami.Data));
             cluster.IdentityProfile.Add("kubeletidentity", new() { ResourceId = uami.Id, ClientId = uami.Data.ClientId, ObjectId = uami.Data.PrincipalId });
 
             if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
@@ -870,7 +871,23 @@ namespace CromwellOnAzureDeployer
             return await Execute(
                 $"Creating AKS Cluster: {configuration.AksClusterName}...",
                 async () => (await resourceGroup.GetContainerServiceManagedClusters().CreateOrUpdateAsync(Azure.WaitUntil.Completed, configuration.AksClusterName, cluster, cts.Token)).Value);
+
+            Azure.ResourceManager.Models.UserAssignedIdentity PopulateUserAssignedIdentity(UserAssignedIdentityData data)
+            {
+                System.Text.Json.JsonSerializerOptions options = new(System.Text.Json.JsonSerializerDefaults.Web);
+                UserAssignedIdentityJson json = new(data.PrincipalId.Value, data.ClientId.Value);
+
+                {
+                    using MemoryStream stream = new();
+                    {
+                        System.Text.Json.Utf8JsonReader reader = new(System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(json, options)));
+                        return ((IJsonModel<Azure.ResourceManager.Models.UserAssignedIdentity>)new Azure.ResourceManager.Models.UserAssignedIdentity()).Create(ref reader, new("J"));
+                    }
+                }
+            }
         }
+
+        private record struct UserAssignedIdentityJson(Guid PrincipalId, Guid ClientId);
 
         private async Task EnableWorkloadIdentity(ContainerServiceManagedClusterResource aksCluster, IIdentity managedIdentity, IResourceGroup resourceGroup)
         {
