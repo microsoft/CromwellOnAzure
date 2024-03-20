@@ -300,13 +300,13 @@ namespace CromwellOnAzureDeployer
 
                         if (installedVersion is null || installedVersion < new Version(4, 7))
                         {
-                            var hasAssignedNetworkContributor = await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
-                            var hasAssignedDataOwner = await TryAssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
+                            await TryExecuteAssignmentAsync(AssignMIAsNetworkContributorToResourceAsync, managedIdentity, resourceGroup, true);
+                            await TryExecuteAssignmentAsync(AssignMIAsDataOwnerToStorageAccountAsync, managedIdentity, storageAccount, true);
 
                             await Execute($"Moving {AllowedVmSizesFileName} file to new location: {TesInternalContainerName}/{ConfigurationContainerName}/{AllowedVmSizesFileName}",
                                 () => MoveAllowedVmSizesFileAsync(storageAccount));
 
-                            waitForRoleAssignmentPropagation |= hasAssignedNetworkContributor || hasAssignedDataOwner;
+                            waitForRoleAssignmentPropagation = true;
                         }
 
                         if (installedVersion is null || installedVersion < new Version(5, 0, 1))
@@ -1254,21 +1254,6 @@ namespace CromwellOnAzureDeployer
                     cts.Token));
         }
 
-        private async Task<bool> TryAssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource)
-        {
-            try
-            {
-                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resource, cancelOnException: false);
-                return true;
-            }
-            catch (Exception)
-            {
-                // Already exists
-                ConsoleEx.WriteLine("Network Contributor role for the managed id likely already exists.  Skipping", ConsoleColor.Yellow);
-                return false;
-            }
-        }
-
         private Task AssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource, bool cancelOnException = true)
         {
             // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#network-contributor
@@ -1286,46 +1271,27 @@ namespace CromwellOnAzureDeployer
                 cancelOnException: cancelOnException);
         }
 
-        private async Task<bool> TryAssignMIAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
-        {
-            try
-            {
-                await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount, cancelOnException: false);
-                return true;
-            }
-            catch (Exception)
-            {
-                // Already exists
-                ConsoleEx.WriteLine("Storage Blob Data Owner role for the managed id likely already exists.  Skipping", ConsoleColor.Yellow);
-                return false;
-            }
-        }
-
-        private async Task<bool> TryExecuteAssignmentAsync<TIdentity, TResource>(Func<TIdentity, TResource, Task> assignmentAction, TIdentity identity, TResource resource)
+        private async Task TryExecuteAssignmentAsync<TIdentity, TResource>(Func<TIdentity, TResource, Task> assignmentAction, TIdentity identity, TResource resource)
         {
             try
             {
                 await assignmentAction(identity, resource);
-                return true;
             }
             catch (Exception ex)
             {
                 ConsoleEx.WriteLine($"An error occurred during the assignment operation: {ex.Message}. Skipping.", ConsoleColor.Yellow);
-                return false;
             }
         }
 
-        private async Task<bool> TryExecuteAssignmentAsync<TIdentity, TResource>(Func<TIdentity, TResource, bool, Task> assignmentAction, TIdentity identity, TResource resource, bool cancelOnException)
+        private async Task TryExecuteAssignmentAsync<TIdentity, TResource>(Func<TIdentity, TResource, bool, Task> assignmentAction, TIdentity identity, TResource resource, bool cancelOnException)
         {
             try
             {
                 await assignmentAction(identity, resource, cancelOnException);
-                return true;
             }
             catch (Exception ex)
             {
                 ConsoleEx.WriteLine($"An error occurred during the assignment operation: {ex.Message}. Skipping.", ConsoleColor.Yellow);
-                return false;
             }
         }
 
