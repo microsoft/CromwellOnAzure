@@ -468,10 +468,12 @@ namespace CromwellOnAzureDeployer
                             }),
                             Task.Run(async () =>
                             {
-                                if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
+                                logAnalyticsWorkspace = await GetLogAnalyticsWorkspaceAsync(configuration.LogAnalyticsArmId);
+
+                                if (logAnalyticsWorkspace == null)
                                 {
                                     var workspaceName = SdkContext.RandomResourceName(configuration.MainIdentifierPrefix, 15);
-                                    logAnalyticsWorkspace = await CreateLogAnalyticsWorkspaceResourceAsync(workspaceName);
+                                    logAnalyticsWorkspace = await CreateLogAnalyticsWorkspaceAsync(workspaceName);
                                     configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
                                 }
                             }),
@@ -1735,22 +1737,52 @@ namespace CromwellOnAzureDeployer
                     }
                 });
 
-        private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
-            => Execute(
-                $"Creating Log Analytics Workspace: {workspaceName}...",
-                () => ResourceManager
+        private async Task<IGenericResource> GetLogAnalyticsWorkspaceAsync(string resourceId)
+        {
+            if (string.IsNullOrWhiteSpace(resourceId))
+            {
+                return null;
+            }
+
+            try
+            {
+                var resourceManager = ResourceManager
+                    .Configure()
+                    .Authenticate(azureCredentials)
+                    .WithSubscription(configuration.SubscriptionId);
+
+                return await resourceManager.GenericResources.GetByIdAsync(resourceId, "2020-08-01", cts.Token);
+            }
+            catch
+            {
+                ConsoleEx.WriteLine($"{resourceId} not found.");
+                return null;
+            }
+        }
+
+        private async Task<IGenericResource> CreateLogAnalyticsWorkspaceAsync(string workspaceName)
+        {
+            return await Execute($"Creating Log Analytics workspace {workspaceName}...", async () =>
+            {
+                const string resourceProviderNamespace = "Microsoft.OperationalInsights";
+                const string resourceType = "workspaces";
+
+                return await ResourceManager
                     .Configure()
                     .Authenticate(azureCredentials)
                     .WithSubscription(configuration.SubscriptionId)
                     .GenericResources.Define(workspaceName)
                     .WithRegion(configuration.RegionName)
                     .WithExistingResourceGroup(configuration.ResourceGroupName)
-                    .WithResourceType("workspaces")
-                    .WithProviderNamespace("Microsoft.OperationalInsights")
+                    .WithResourceType(resourceType)
+                    .WithProviderNamespace(resourceProviderNamespace)
                     .WithoutPlan()
                     .WithApiVersion("2020-08-01")
                     .WithParentResource(string.Empty)
-                    .CreateAsync(cts.Token));
+                    .CreateAsync(cts.Token);
+            });
+        }
+
 
         private Task<IGenericResource> CreateAppInsightsResourceAsync(string logAnalyticsArmId)
             => Execute(
