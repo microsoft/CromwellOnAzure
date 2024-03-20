@@ -1764,9 +1764,6 @@ namespace CromwellOnAzureDeployer
         {
             return await Execute($"Creating Log Analytics workspace {workspaceName}...", async () =>
             {
-                const string resourceProviderNamespace = "Microsoft.OperationalInsights";
-                const string resourceType = "workspaces";
-
                 return await ResourceManager
                     .Configure()
                     .Authenticate(azureCredentials)
@@ -1774,8 +1771,8 @@ namespace CromwellOnAzureDeployer
                     .GenericResources.Define(workspaceName)
                     .WithRegion(configuration.RegionName)
                     .WithExistingResourceGroup(configuration.ResourceGroupName)
-                    .WithResourceType(resourceType)
-                    .WithProviderNamespace(resourceProviderNamespace)
+                    .WithResourceType("workspaces")
+                    .WithProviderNamespace("Microsoft.OperationalInsights")
                     .WithoutPlan()
                     .WithApiVersion("2020-08-01")
                     .WithParentResource(string.Empty)
