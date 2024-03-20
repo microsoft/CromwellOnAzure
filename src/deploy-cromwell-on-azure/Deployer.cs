@@ -483,16 +483,18 @@ namespace CromwellOnAzureDeployer
                                 await CreateDefaultStorageContainersAsync(storageAccount);
                                 await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                                 await WritePersonalizedFilesToStorageAccountAsync(storageAccount);
-                                await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
-                                await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
-                                await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
-                                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+
+                                await TryExecuteAssignmentAsync(AssignVmAsContributorToStorageAccountAsync, managedIdentity, storageAccount);
+                                await TryExecuteAssignmentAsync(AssignVmAsContributorToStorageAccountAsync, managedIdentity, storageAccount);
+                                await TryExecuteAssignmentAsync(AssignMIAsDataOwnerToStorageAccountAsync, managedIdentity, storageAccount, true);
+                                await TryExecuteAssignmentAsync(AssignManagedIdOperatorToResourceAsync, managedIdentity, resourceGroup);
+                                await TryExecuteAssignmentAsync(AssignMIAsNetworkContributorToResourceAsync, managedIdentity, resourceGroup, true);
 
                                 if (aksNodepoolIdentity is not null)
                                 {
-                                    await AssignVmAsContributorToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
-                                    await AssignMIAsDataOwnerToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
-                                    await AssignManagedIdOperatorToResourceAsync(aksNodepoolIdentity, resourceGroup);
+                                    await TryExecuteAssignmentAsync(AssignVmAsContributorToStorageAccountAsync, aksNodepoolIdentity, storageAccount);
+                                    await TryExecuteAssignmentAsync(AssignMIAsDataOwnerToStorageAccountAsync, aksNodepoolIdentity, storageAccount, true);
+                                    await TryExecuteAssignmentAsync(AssignManagedIdOperatorToResourceAsync, aksNodepoolIdentity, resourceGroup);
                                 }
                             }),
                         });
@@ -528,12 +530,12 @@ namespace CromwellOnAzureDeployer
                             Task.Run(async () =>
                             {
                                 batchAccount ??= await CreateBatchAccountAsync(storageAccount.Id);
-                                await AssignVmAsContributorToBatchAccountAsync(managedIdentity, batchAccount);
+                                await TryExecuteAssignmentAsync(AssignVmAsContributorToBatchAccountAsync, managedIdentity, batchAccount);
                             }),
                             Task.Run(async () =>
                             {
                                 appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId);
-                                await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
+                                await TryExecuteAssignmentAsync(AssignVmAsContributorToAppInsightsAsync, managedIdentity, appInsights);
                             }),
                             Task.Run(async () => {
                                 postgreSqlFlexServer ??= await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlFlexManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone);
@@ -1299,7 +1301,35 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private Task AssignMIAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount, bool cancelOnException = true)
+        private async Task<bool> TryExecuteAssignmentAsync<TIdentity, TResource>(Func<TIdentity, TResource, Task> assignmentAction, TIdentity identity, TResource resource)
+        {
+            try
+            {
+                await assignmentAction(identity, resource);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ConsoleEx.WriteLine($"An error occurred during the assignment operation: {ex.Message}. Skipping.", ConsoleColor.Yellow);
+                return false;
+            }
+        }
+
+        private async Task<bool> TryExecuteAssignmentAsync<TIdentity, TResource>(Func<TIdentity, TResource, bool, Task> assignmentAction, TIdentity identity, TResource resource, bool cancelOnException)
+        {
+            try
+            {
+                await assignmentAction(identity, resource, cancelOnException);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ConsoleEx.WriteLine($"An error occurred during the assignment operation: {ex.Message}. Skipping.", ConsoleColor.Yellow);
+                return false;
+            }
+        }
+
+        private Task AssignMIAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IResource storageAccount, bool cancelOnException = true)
         {
             //https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-owner
             var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/b7e6dc6d-f1e8-4753-8033-0f276bb0955b";
