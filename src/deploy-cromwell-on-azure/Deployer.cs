@@ -300,8 +300,8 @@ namespace CromwellOnAzureDeployer
 
                         if (installedVersion is null || installedVersion < new Version(4, 7))
                         {
-                            await TryExecuteAssignmentAsync(AssignMIAsNetworkContributorToResourceAsync, managedIdentity, resourceGroup, true);
-                            await TryExecuteAssignmentAsync(AssignMIAsDataOwnerToStorageAccountAsync, managedIdentity, storageAccount, true);
+                            await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                            await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
 
                             await Execute($"Moving {AllowedVmSizesFileName} file to new location: {TesInternalContainerName}/{ConfigurationContainerName}/{AllowedVmSizesFileName}",
                                 () => MoveAllowedVmSizesFileAsync(storageAccount));
@@ -484,17 +484,16 @@ namespace CromwellOnAzureDeployer
                                 await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                                 await WritePersonalizedFilesToStorageAccountAsync(storageAccount);
 
-                                await TryExecuteAssignmentAsync(AssignVmAsContributorToStorageAccountAsync, managedIdentity, storageAccount);
-                                await TryExecuteAssignmentAsync(AssignVmAsContributorToStorageAccountAsync, managedIdentity, storageAccount);
-                                await TryExecuteAssignmentAsync(AssignMIAsDataOwnerToStorageAccountAsync, managedIdentity, storageAccount, true);
-                                await TryExecuteAssignmentAsync(AssignManagedIdOperatorToResourceAsync, managedIdentity, resourceGroup);
-                                await TryExecuteAssignmentAsync(AssignMIAsNetworkContributorToResourceAsync, managedIdentity, resourceGroup, true);
+                                await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
+                                await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount, true);
+                                await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
+                                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup, true);
 
                                 if (aksNodepoolIdentity is not null)
                                 {
-                                    await TryExecuteAssignmentAsync(AssignVmAsContributorToStorageAccountAsync, aksNodepoolIdentity, storageAccount);
-                                    await TryExecuteAssignmentAsync(AssignMIAsDataOwnerToStorageAccountAsync, aksNodepoolIdentity, storageAccount, true);
-                                    await TryExecuteAssignmentAsync(AssignManagedIdOperatorToResourceAsync, aksNodepoolIdentity, resourceGroup);
+                                    await AssignVmAsContributorToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
+                                    await AssignMIAsDataOwnerToStorageAccountAsync(aksNodepoolIdentity, storageAccount, true);
+                                    await AssignManagedIdOperatorToResourceAsync(aksNodepoolIdentity, resourceGroup);
                                 }
                             }),
                         });
@@ -530,12 +529,12 @@ namespace CromwellOnAzureDeployer
                             Task.Run(async () =>
                             {
                                 batchAccount ??= await CreateBatchAccountAsync(storageAccount.Id);
-                                await TryExecuteAssignmentAsync(AssignVmAsContributorToBatchAccountAsync, managedIdentity, batchAccount);
+                                await AssignVmAsContributorToBatchAccountAsync(managedIdentity, batchAccount);
                             }),
                             Task.Run(async () =>
                             {
                                 appInsights = await CreateAppInsightsResourceAsync(configuration.LogAnalyticsArmId);
-                                await TryExecuteAssignmentAsync(AssignVmAsContributorToAppInsightsAsync, managedIdentity, appInsights);
+                                await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
                             }),
                             Task.Run(async () => {
                                 postgreSqlFlexServer ??= await CreatePostgreSqlServerAndDatabaseAsync(postgreSqlFlexManagementClient, vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone);
@@ -1269,30 +1268,6 @@ namespace CromwellOnAzureDeployer
                         .CreateAsync(ct),
                     cts.Token),
                 cancelOnException: cancelOnException);
-        }
-
-        private async Task TryExecuteAssignmentAsync<TIdentity, TResource>(Func<TIdentity, TResource, Task> assignmentAction, TIdentity identity, TResource resource)
-        {
-            try
-            {
-                await assignmentAction(identity, resource);
-            }
-            catch (Exception ex)
-            {
-                ConsoleEx.WriteLine($"An error occurred during the assignment operation: {ex.Message}. Skipping.", ConsoleColor.Yellow);
-            }
-        }
-
-        private async Task TryExecuteAssignmentAsync<TIdentity, TResource>(Func<TIdentity, TResource, bool, Task> assignmentAction, TIdentity identity, TResource resource, bool cancelOnException)
-        {
-            try
-            {
-                await assignmentAction(identity, resource, cancelOnException);
-            }
-            catch (Exception ex)
-            {
-                ConsoleEx.WriteLine($"An error occurred during the assignment operation: {ex.Message}. Skipping.", ConsoleColor.Yellow);
-            }
         }
 
         private Task AssignMIAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IResource storageAccount, bool cancelOnException = true)
@@ -2419,6 +2394,11 @@ namespace CromwellOnAzureDeployer
                 }
                 catch (Microsoft.Rest.Azure.CloudException cloudException) when (cloudException.ToCloudErrorType() == CloudErrorType.ExpiredAuthenticationToken)
                 {
+                }
+                catch (Microsoft.Rest.Azure.CloudException cloudException) when (cloudException.ToCloudErrorType() == CloudErrorType.RoleAssignmentExists)
+                {
+                    line.Write($" skipped. Role assignment already exists.", ConsoleColor.Yellow);
+                    return default;
                 }
                 catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
                 {
