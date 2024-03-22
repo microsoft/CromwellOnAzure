@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.ClientModel.Primitives;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
@@ -16,7 +17,9 @@ using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.ContainerService;
+using Azure.ResourceManager.ContainerService.Models;
 using Azure.ResourceManager.ManagedServiceIdentities;
+using Azure.ResourceManager.Models;
 using Azure.ResourceManager.Network;
 using Azure.ResourceManager.Network.Models;
 using Azure.ResourceManager.Resources;
@@ -31,9 +34,6 @@ using Microsoft.Azure.Management.Batch;
 using Microsoft.Azure.Management.Batch.Models;
 using Microsoft.Azure.Management.Compute.Fluent;
 using Microsoft.Azure.Management.ContainerRegistry.Fluent;
-using Microsoft.Azure.Management.ContainerService;
-using Microsoft.Azure.Management.ContainerService.Fluent;
-using Microsoft.Azure.Management.ContainerService.Models;
 using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent;
 using Microsoft.Azure.Management.Graph.RBAC.Fluent.Models;
@@ -143,9 +143,10 @@ namespace CromwellOnAzureDeployer
                     azureCloudConfig = await AzureCloudConfig.CreateAsync(configuration.AzureCloudName);
                 });
 
-                await Execute("Validating command line arguments...", async () =>
+                await Execute("Validating command line arguments...", () =>
                 {
                     ValidateInitialCommandLineArgs();
+                    return Task.CompletedTask;
                 });
 
                 await ValidateTokenProviderAsync();
@@ -167,7 +168,7 @@ namespace CromwellOnAzureDeployer
                 kubernetesManager = new KubernetesManager(configuration, azureCredentials, azureCloudConfig, cts.Token);
 
                 IResourceGroup resourceGroup = null;
-                ManagedCluster aksCluster = null;
+                ContainerServiceManagedClusterResource aksCluster = null;
                 BatchAccount batchAccount = null;
                 IGenericResource logAnalyticsWorkspace = null;
                 IGenericResource appInsights = null;
@@ -234,27 +235,23 @@ namespace CromwellOnAzureDeployer
 
                         configuration.PostgreSqlServerName = postgreSqlServerName;
 
-                        ManagedCluster existingAksCluster = default;
-
                         if (string.IsNullOrEmpty(configuration.AksClusterName))
                         {
-                            using var client = new ContainerServiceClient(tokenCredentials) { SubscriptionId = configuration.SubscriptionId };
-                            var aksClusters = await (await client.ManagedClusters.ListByResourceGroupAsync(configuration.ResourceGroupName, cts.Token))
-                                .ToAsyncEnumerable(client.ManagedClusters.ListByResourceGroupNextAsync).ToListAsync(cts.Token);
+                            var client = armClient.GetResourceGroupResource(new(resourceGroup.Id));
+                            var aksClusters = await client.GetContainerServiceManagedClusters().GetAllAsync(cts.Token).ToListAsync(cts.Token);
 
-                            existingAksCluster = aksClusters.Count switch
+                            aksCluster = aksClusters.Count switch
                             {
                                 0 => throw new ValidationException($"Update was requested but resource group {configuration.ResourceGroupName} does not contain any AKS clusters.", displayExample: false),
-                                1 => aksClusters.Single(),
+                                1 => (await aksClusters.Single().GetAsync()).Value,
                                 _ => throw new ValidationException($"Resource group {configuration.ResourceGroupName} contains multiple AKS clusters. {nameof(configuration.AksClusterName)} must be provided.", displayExample: false),
                             };
 
-                            configuration.AksClusterName = existingAksCluster.Name;
+                            configuration.AksClusterName = aksCluster.Data.Name;
                         }
-
-                        if (existingAksCluster is not null)
+                        else
                         {
-                            existingAksCluster = await ValidateAndGetExistingAKSClusterAsync()
+                            aksCluster = await ValidateAndGetExistingAKSClusterAsync()
                                 ?? throw new ValidationException($"AKS cluster {configuration.AksClusterName} does not exist in region {configuration.RegionName} or is not accessible to the current user.", displayExample: false);
                         }
 
@@ -303,13 +300,13 @@ namespace CromwellOnAzureDeployer
 
                         if (installedVersion is null || installedVersion < new Version(4, 7))
                         {
-                            var hasAssignedNetworkContributor = await TryAssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
-                            var hasAssignedDataOwner = await TryAssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
+                            await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                            await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
 
                             await Execute($"Moving {AllowedVmSizesFileName} file to new location: {TesInternalContainerName}/{ConfigurationContainerName}/{AllowedVmSizesFileName}",
                                 () => MoveAllowedVmSizesFileAsync(storageAccount));
 
-                            waitForRoleAssignmentPropagation |= hasAssignedNetworkContributor || hasAssignedDataOwner;
+                            waitForRoleAssignmentPropagation = true;
                         }
 
                         if (installedVersion is null || installedVersion < new Version(5, 0, 1))
@@ -322,7 +319,7 @@ namespace CromwellOnAzureDeployer
 
                         if (installedVersion is null || installedVersion < new Version(5, 2, 2))
                         {
-                            await EnableWorkloadIdentity(existingAksCluster, managedIdentity, resourceGroup);
+                            await EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup);
                             await kubernetesManager.RemovePodAadChart();
                         }
 
@@ -338,7 +335,7 @@ namespace CromwellOnAzureDeployer
                         }
 
                         await kubernetesManager.UpgradeValuesYamlAsync(storageAccount, settings, containersToMount, installedVersion);
-                        kubernetesClient = await PerformHelmDeploymentAsync(existingAksCluster);
+                        kubernetesClient = await PerformHelmDeploymentAsync(aksCluster);
 
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                     }
@@ -471,10 +468,12 @@ namespace CromwellOnAzureDeployer
                             }),
                             Task.Run(async () =>
                             {
-                                if (string.IsNullOrWhiteSpace(configuration.LogAnalyticsArmId))
+                                logAnalyticsWorkspace = await GetLogAnalyticsWorkspaceAsync(configuration.LogAnalyticsArmId);
+
+                                if (logAnalyticsWorkspace == null)
                                 {
                                     var workspaceName = SdkContext.RandomResourceName(configuration.MainIdentifierPrefix, 15);
-                                    logAnalyticsWorkspace = await CreateLogAnalyticsWorkspaceResourceAsync(workspaceName);
+                                    logAnalyticsWorkspace = await CreateLogAnalyticsWorkspaceAsync(workspaceName);
                                     configuration.LogAnalyticsArmId = logAnalyticsWorkspace.Id;
                                 }
                             }),
@@ -484,15 +483,16 @@ namespace CromwellOnAzureDeployer
                                 await CreateDefaultStorageContainersAsync(storageAccount);
                                 await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccount);
                                 await WritePersonalizedFilesToStorageAccountAsync(storageAccount);
+
                                 await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
-                                await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
+                                await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount, true);
                                 await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
-                                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+                                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup, true);
 
                                 if (aksNodepoolIdentity is not null)
                                 {
                                     await AssignVmAsContributorToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
-                                    await AssignMIAsDataOwnerToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
+                                    await AssignMIAsDataOwnerToStorageAccountAsync(aksNodepoolIdentity, storageAccount, true);
                                     await AssignManagedIdOperatorToResourceAsync(aksNodepoolIdentity, resourceGroup);
                                 }
                             }),
@@ -522,7 +522,7 @@ namespace CromwellOnAzureDeployer
                             {
                                 if (aksCluster is null && !configuration.ManualHelmDeployment)
                                 {
-                                    aksCluster = await ProvisionManagedCluster(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault());
+                                    aksCluster = await ProvisionManagedClusterAsync(resourceGroup, managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.virtualNetwork, vnetAndSubnet?.vmSubnet.Name, configuration.PrivateNetworking.GetValueOrDefault(), configuration.AksNodeResourceGroupName);
                                     await EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup);
                                 }
                             }),
@@ -701,7 +701,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private async Task<IKubernetes> PerformHelmDeploymentAsync(ManagedCluster aksCluster, IEnumerable<string> manualPrecommands = default, Func<IKubernetes, Task> asyncTask = default)
+        private async Task<IKubernetes> PerformHelmDeploymentAsync(ContainerServiceManagedClusterResource aksCluster, IEnumerable<string> manualPrecommands = default, Func<IKubernetes, Task> asyncTask = default)
         {
             if (configuration.ManualHelmDeployment)
             {
@@ -748,7 +748,7 @@ namespace CromwellOnAzureDeployer
                 ?? throw new ValidationException($"If Postgresql server name is provided, the server must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
         }
 
-        private async Task<ManagedCluster> ValidateAndGetExistingAKSClusterAsync()
+        private async Task<ContainerServiceManagedClusterResource> ValidateAndGetExistingAKSClusterAsync()
         {
             if (string.IsNullOrWhiteSpace(configuration.AksClusterName))
             {
@@ -783,14 +783,14 @@ namespace CromwellOnAzureDeployer
                 cts.Token);
         }
 
-        private async Task<ManagedCluster> GetExistingAKSClusterAsync(string aksClusterName)
+        private async Task<ContainerServiceManagedClusterResource> GetExistingAKSClusterAsync(string aksClusterName)
         {
-            return await subscriptionIds.ToAsyncEnumerable().SelectAwait(async s =>
+            return await subscriptionIds.ToAsyncEnumerable().Select(s =>
             {
                 try
                 {
-                    var client = new ContainerServiceClient(tokenCredentials) { SubscriptionId = s };
-                    return (await client.ManagedClusters.ListAsync(cts.Token)).ToAsyncEnumerable(client.ManagedClusters.ListNextAsync);
+                    var client = armClient.GetSubscriptionResource(new(s));
+                    return client.GetContainerServiceManagedClustersAsync(cts.Token);
                 }
                 catch (Exception e)
                 {
@@ -800,94 +800,96 @@ namespace CromwellOnAzureDeployer
             })
             .Where(a => a is not null)
             .SelectMany(a => a)
+            .SelectAwaitWithCancellation(async (a, ct) => (await a.GetAsync(ct)).Value)
             .SingleOrDefaultAsync(a =>
-                    a.Name.Equals(aksClusterName, StringComparison.OrdinalIgnoreCase) &&
-                    a.Location.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase),
+                    a.Data.Name.Equals(aksClusterName, StringComparison.OrdinalIgnoreCase) &&
+                    a.Data.Location.Name.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase),
                 cts.Token);
         }
 
-        private async Task<ManagedCluster> ProvisionManagedCluster(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, bool privateNetworking)
+        private async Task<ContainerServiceManagedClusterResource> ProvisionManagedClusterAsync(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, bool privateNetworking, string nodeResourceGroupName)
         {
-            var resourceGroup = resourceGroupObject.Name;
+            var uami = (await armClient.GetUserAssignedIdentityResource(new(managedIdentity.Id)).GetAsync(cts.Token)).Value;
+            var resourceGroup = armClient.GetResourceGroupResource(new(resourceGroupObject.Id));
             var nodePoolName = "nodepool1";
-            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
-            var cluster = new ManagedCluster
+            ContainerServiceManagedClusterData cluster = new(new(configuration.RegionName))
             {
-                AddonProfiles = new Dictionary<string, ManagedClusterAddonProfile>
-                {
-                    { "omsagent", new(true, new Dictionary<string, string>() { { "logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id } }) }
-                },
-                Location = configuration.RegionName,
+                ClusterIdentity = new() { ResourceIdentityType = ManagedServiceIdentityType.UserAssigned },
                 DnsPrefix = configuration.AksClusterName,
                 NetworkProfile = new()
                 {
-                    NetworkPlugin = NetworkPlugin.Azure,
+                    NetworkPlugin = ContainerServiceNetworkPlugin.Azure,
                     ServiceCidr = configuration.KubernetesServiceCidr,
                     DnsServiceIP = configuration.KubernetesDnsServiceIP,
                     DockerBridgeCidr = configuration.KubernetesDockerBridgeCidr,
-                    NetworkPolicy = NetworkPolicy.Azure
+                    NetworkPolicy = ContainerServiceNetworkPolicy.Azure
                 },
-                Identity = new(managedIdentity.PrincipalId, managedIdentity.TenantId, Microsoft.Azure.Management.ContainerService.Models.ResourceIdentityType.UserAssigned)
-                {
-                    UserAssignedIdentities = new Dictionary<string, ManagedClusterIdentityUserAssignedIdentitiesValue>()
-                }
+                NodeResourceGroup = nodeResourceGroupName
             };
 
-            cluster.Identity.UserAssignedIdentities.Add(managedIdentity.Id, new(managedIdentity.PrincipalId, managedIdentity.ClientId));
-            cluster.IdentityProfile = new Dictionary<string, ManagedClusterPropertiesIdentityProfileValue>
-            {
-                { "kubeletidentity", new(managedIdentity.Id, managedIdentity.ClientId, managedIdentity.PrincipalId) }
-            };
+            ManagedClusterAddonProfile clusterAddonProfile = new(isEnabled: true);
+            clusterAddonProfile.Config.Add("logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id);
+            cluster.AddonProfiles.Add("omsagent", clusterAddonProfile);
+            cluster.ClusterIdentity.UserAssignedIdentities.Add(new(uami.Id, PopulateUserAssignedIdentity(uami.Data)));
+            cluster.IdentityProfile.Add("kubeletidentity", new() { ResourceId = uami.Id, ClientId = uami.Data.ClientId, ObjectId = uami.Data.PrincipalId });
 
             if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
             {
-                cluster.EnableRBAC = true;
+                cluster.EnableRbac = true;
                 cluster.AadProfile = new()
                 {
-                    AdminGroupObjectIDs = configuration.AadGroupIds.Split(",", StringSplitOptions.RemoveEmptyEntries),
-                    EnableAzureRBAC = false,
-                    Managed = true
+                    IsAzureRbacEnabled = false,
+                    IsManagedAadEnabled = true
                 };
+
+                configuration.AadGroupIds.Split(",", StringSplitOptions.RemoveEmptyEntries).Select(Guid.Parse).ForEach(cluster.AadProfile.AdminGroupObjectIds.Add);
             }
 
-            cluster.AgentPoolProfiles = new List<ManagedClusterAgentPoolProfile>
+            cluster.AgentPoolProfiles.Add(new(nodePoolName)
             {
-                new()
-                {
-                    Name = nodePoolName,
-                    Count = configuration.AksPoolSize,
-                    VmSize = configuration.VmSize,
-                    OsDiskSizeGB = 128,
-                    OsDiskType = OSDiskType.Managed,
-                    EnableEncryptionAtHost = true,
-                    Type = "VirtualMachineScaleSets",
-                    EnableAutoScaling = false,
-                    EnableNodePublicIP = false,
-                    OsType = "Linux",
-                    OsSKU = "AzureLinux",
-                    Mode = "System",
-                    VnetSubnetID = virtualNetwork.Subnets[subnetName].Inner.Id,
-                }
-            };
+                Count = configuration.AksPoolSize,
+                VmSize = configuration.VmSize,
+                OSDiskSizeInGB = 128,
+                OSDiskType = ContainerServiceOSDiskType.Managed,
+                EnableEncryptionAtHost = true,
+                AgentPoolType = AgentPoolType.VirtualMachineScaleSets,
+                EnableAutoScaling = false,
+                EnableNodePublicIP = false,
+                OSType = ContainerServiceOSType.Linux,
+                OSSku = ContainerServiceOSSku.AzureLinux,
+                Mode = AgentPoolMode.System,
+                VnetSubnetId = new(virtualNetwork.Subnets[subnetName].Inner.Id),
+            });
 
             if (privateNetworking)
             {
                 cluster.ApiServerAccessProfile = new()
                 {
                     EnablePrivateCluster = true,
-                    EnablePrivateClusterPublicFQDN = true
+                    EnablePrivateClusterPublicFqdn = true
                 };
+
+                cluster.PublicNetworkAccess = ContainerServicePublicNetworkAccess.Disabled;
             }
 
             return await Execute(
                 $"Creating AKS Cluster: {configuration.AksClusterName}...",
-                () => containerServiceClient.ManagedClusters.CreateOrUpdateAsync(resourceGroup, configuration.AksClusterName, cluster, cts.Token));
+                async () => (await resourceGroup.GetContainerServiceManagedClusters().CreateOrUpdateAsync(Azure.WaitUntil.Completed, configuration.AksClusterName, cluster, cts.Token)).Value);
+
+            static UserAssignedIdentity PopulateUserAssignedIdentity(UserAssignedIdentityData data)
+            {
+                UserAssignedIdentityJson json = new(data.PrincipalId.Value, data.ClientId.Value);
+                System.Text.Json.Utf8JsonReader reader = new(System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(json, jsonSerializerWebOptions)));
+                return ((IJsonModel<UserAssignedIdentity>)new UserAssignedIdentity()).Create(ref reader, ModelReaderWriterOptions.Json);
+            }
         }
 
-        private async Task EnableWorkloadIdentity(ManagedCluster aksCluster, IIdentity managedIdentity, IResourceGroup resourceGroup)
+        private static readonly System.Text.Json.JsonSerializerOptions jsonSerializerWebOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+        private record struct UserAssignedIdentityJson(Guid PrincipalId, Guid ClientId);
+
+        private async Task EnableWorkloadIdentity(ContainerServiceManagedClusterResource aksCluster, IIdentity managedIdentity, IResourceGroup resourceGroup)
         {
-            // Use the new ResourceManager sdk enable workload identity.
-            var armCluster = (await armClient.GetContainerServiceManagedClusterResource(new ResourceIdentifier(aksCluster.Id)).GetAsync(cancellationToken: cts.Token)).Value;
+            var armCluster = aksCluster.HasData ? aksCluster : (await aksCluster.GetAsync(cancellationToken: cts.Token)).Value;
             armCluster.Data.SecurityProfile.IsWorkloadIdentityEnabled = true;
             armCluster.Data.OidcIssuerProfile.IsEnabled = true;
             var coaRg = armClient.GetResourceGroupResource(new ResourceIdentifier(resourceGroup.Id));
@@ -1251,21 +1253,6 @@ namespace CromwellOnAzureDeployer
                     cts.Token));
         }
 
-        private async Task<bool> TryAssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource)
-        {
-            try
-            {
-                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resource, cancelOnException: false);
-                return true;
-            }
-            catch (Exception)
-            {
-                // Already exists
-                ConsoleEx.WriteLine("Network Contributor role for the managed id likely already exists.  Skipping", ConsoleColor.Yellow);
-                return false;
-            }
-        }
-
         private Task AssignMIAsNetworkContributorToResourceAsync(IIdentity managedIdentity, IResource resource, bool cancelOnException = true)
         {
             // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#network-contributor
@@ -1283,22 +1270,7 @@ namespace CromwellOnAzureDeployer
                 cancelOnException: cancelOnException);
         }
 
-        private async Task<bool> TryAssignMIAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount)
-        {
-            try
-            {
-                await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount, cancelOnException: false);
-                return true;
-            }
-            catch (Exception)
-            {
-                // Already exists
-                ConsoleEx.WriteLine("Storage Blob Data Owner role for the managed id likely already exists.  Skipping", ConsoleColor.Yellow);
-                return false;
-            }
-        }
-
-        private Task AssignMIAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IStorageAccount storageAccount, bool cancelOnException = true)
+        private Task AssignMIAsDataOwnerToStorageAccountAsync(IIdentity managedIdentity, IResource storageAccount, bool cancelOnException = true)
         {
             //https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-owner
             var roleDefinitionId = $"/subscriptions/{configuration.SubscriptionId}/providers/Microsoft.Authorization/roleDefinitions/b7e6dc6d-f1e8-4753-8033-0f276bb0955b";
@@ -1736,10 +1708,34 @@ namespace CromwellOnAzureDeployer
                     }
                 });
 
-        private Task<IGenericResource> CreateLogAnalyticsWorkspaceResourceAsync(string workspaceName)
-            => Execute(
-                $"Creating Log Analytics Workspace: {workspaceName}...",
-                () => ResourceManager
+        private async Task<IGenericResource> GetLogAnalyticsWorkspaceAsync(string resourceId)
+        {
+            if (string.IsNullOrWhiteSpace(resourceId))
+            {
+                return null;
+            }
+
+            try
+            {
+                var resourceManager = ResourceManager
+                    .Configure()
+                    .Authenticate(azureCredentials)
+                    .WithSubscription(configuration.SubscriptionId);
+
+                return await resourceManager.GenericResources.GetByIdAsync(resourceId, "2020-08-01", cts.Token);
+            }
+            catch
+            {
+                ConsoleEx.WriteLine($"{resourceId} not found.");
+                return null;
+            }
+        }
+
+        private async Task<IGenericResource> CreateLogAnalyticsWorkspaceAsync(string workspaceName)
+        {
+            return await Execute($"Creating Log Analytics workspace {workspaceName}...", async () =>
+            {
+                return await ResourceManager
                     .Configure()
                     .Authenticate(azureCredentials)
                     .WithSubscription(configuration.SubscriptionId)
@@ -1751,7 +1747,10 @@ namespace CromwellOnAzureDeployer
                     .WithoutPlan()
                     .WithApiVersion("2020-08-01")
                     .WithParentResource(string.Empty)
-                    .CreateAsync(cts.Token));
+                    .CreateAsync(cts.Token);
+            });
+        }
+
 
         private Task<IGenericResource> CreateAppInsightsResourceAsync(string logAnalyticsArmId)
             => Execute(
@@ -1979,7 +1978,7 @@ namespace CromwellOnAzureDeployer
                 throw new ValidationException($"Virtual network '{configuration.VnetName}' does not contain subnet '{configuration.VmSubnetName}'");
             }
 
-            var resourceGraphClient = new ResourceGraphClient(tokenCredentials);
+            var resourceGraphClient = new ResourceGraphClient(new Uri(azureCloudConfig.ResourceManagerUrl), tokenCredentials);
             var postgreSqlSubnet = vnet.Subnets.FirstOrDefault(s => s.Key.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)).Value;
 
             if (postgreSqlSubnet is null)
@@ -2395,6 +2394,11 @@ namespace CromwellOnAzureDeployer
                 }
                 catch (Microsoft.Rest.Azure.CloudException cloudException) when (cloudException.ToCloudErrorType() == CloudErrorType.ExpiredAuthenticationToken)
                 {
+                }
+                catch (Microsoft.Rest.Azure.CloudException cloudException) when (cloudException.ToCloudErrorType() == CloudErrorType.RoleAssignmentExists)
+                {
+                    line.Write($" skipped. Role assignment already exists.", ConsoleColor.Yellow);
+                    return default;
                 }
                 catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
                 {
