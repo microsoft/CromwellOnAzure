@@ -16,6 +16,7 @@ using Moq;
 using Newtonsoft.Json;
 using Tes.Models;
 using Tes.Repository;
+using Tes.TaskSubmitters;
 
 namespace TriggerService.Tests
 {
@@ -286,45 +287,60 @@ namespace TriggerService.Tests
         }
 
         private static TesTask GetTesTask(string workflowId, int shard, int attempt, params TesTaskLog[] tesTaskLogs)
-            => new()
+        {
+            TesTask task = new()
             {
-                WorkflowId = $"{workflowId}",
-                Description = $"BackendJobDescriptorKey_CommandCallNode_BamToUnmappedBams.SortSam:{shard}:{attempt}",
-                Executors = new List<TesExecutor> { new TesExecutor { Stdout = "execution/stdout", Stderr = "execution/stderr" } },
-                Logs = tesTaskLogs.ToList()
+                Description = $"{workflowId}:BackendJobDescriptorKey_CommandCallNode_BamToUnmappedBams.SortSam:{shard}:{attempt}",
+                Executors = [new() { Stdout = "execution/stdout", Stderr = "execution/stderr" }],
+                Inputs = [new() { Name = "commandScript", Description = "workflow1.Task1.commandScript", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/script", Type = TesFileType.FILEEnum }],
+                Outputs =
+                [
+                    new() { Name = "commandScript", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/script" },
+                    new() { Name = "stderr", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/stderr" },
+                    new() { Name = "stdout", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/stdout" },
+                    new() { Name = "rc", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/rc" },
+                ],
+                Logs = [.. tesTaskLogs]
             };
+
+            task.TaskSubmitter = TaskSubmitter.Parse(task);
+            return task;
+
+            static string ShardString(int shard) =>
+                shard == -1 ? string.Empty : $"shard-{shard}/";
+        }
 
         private static TesTaskLog TesTaskLogForBatchTaskFailure => new()
         {
-            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 1 } },
-            SystemLogs = new List<string> { "FailureExitCode", "The task process exited with an unexpected exit code" },
+            Logs = [new() { ExitCode = 1 }],
+            SystemLogs = ["FailureExitCode", "The task process exited with an unexpected exit code"],
             FailureReason = "FailureExitCode"
         };
 
         private static TesTaskLog TesTaskLogForBatchNodeAllocationFailure => new()
         {
-            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = null } },
+            Logs = [new() { ExitCode = null }],
             FailureReason = "NodeAllocationFailed"
         };
 
         private static TesTaskLog TesTaskLogForCromwellScriptFailure => new()
         {
-            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
+            Logs = [new() { ExitCode = 0 }],
             FailureReason = null,
             CromwellResultCode = 1
         };
 
         private static TesTaskLog TesTaskLogForSuccessfulTask => new()
         {
-            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
+            Logs = [new() { ExitCode = 0 }],
             FailureReason = null,
             CromwellResultCode = 0
         };
 
         private static TesTaskLog TesTaskLogForSuccessfulTaskWithWarning => new()
         {
-            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
-            SystemLogs = new List<string> { "Warning1", "Warning1Details" },
+            Logs = [new() { ExitCode = 0 }],
+            SystemLogs = ["Warning1", "Warning1Details"],
             Warning = "Warning1"
         };
 

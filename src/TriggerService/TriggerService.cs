@@ -62,7 +62,7 @@ namespace TriggerService
                         Console.WriteLine("No ApplicationInsights configuration found!");
                     }
                 })
-                .ConfigureLogging(async (hostBuilderContext, loggingBuilder) =>
+                .ConfigureLogging((hostBuilderContext, loggingBuilder) =>
                     {
                         loggingBuilder.AddConsole();
                         loggingBuilder.AddApplicationInsights(
@@ -101,7 +101,7 @@ namespace TriggerService
             try
             {
                 string applicationInsightsConnectionString;
-                var accessToken = new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) }).GetTokenAsync(new Azure.Core.TokenRequestContext([azureCloudConfig.DefaultTokenScope])).Result.Token;
+                var accessToken = new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) }).GetTokenAsync(new Azure.Core.TokenRequestContext([azureCloudConfig.DefaultTokenScope])).AsTask().GetAwaiter().GetResult().Token;
                 var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, azureCloudConfig.AzureEnvironment);
                 var azureManagementClient = FluentAzure.Authenticate(azureCredentials);
                 var subscriptionId = azureManagementClient.Subscriptions.List().Select(s => s.SubscriptionId).First();
