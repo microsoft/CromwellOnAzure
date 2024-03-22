@@ -9,6 +9,7 @@ await InitializeAndDeployAsync(args);
 
 static async Task InitializeAndDeployAsync(string[] args)
 {
+    System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
     Configuration configuration = null;
 
     try
