@@ -541,8 +541,7 @@ namespace CromwellOnAzureDeployer
                             })
                         });
 
-                        var clientId = managedIdentity.ClientId;
-                        var settings = ConfigureSettings(clientId);
+                        var settings = ConfigureSettings(managedIdentity.ClientId);
 
                         await kubernetesManager.UpdateHelmValuesAsync(storageAccount, keyVaultUri, resourceGroup.Name, settings, managedIdentity, containersToMount);
                         kubernetesClient = await PerformHelmDeploymentAsync(aksCluster,
@@ -1387,6 +1386,9 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),
                         new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
                         new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
+                        new Utility.ConfigReplaceTextItem("{StorageAccount}", configuration.StorageAccountName),
+                        new Utility.ConfigReplaceTextItem("{Subscription}", configuration.SubscriptionId),
+                        new Utility.ConfigReplaceTextItem("{StorageSuffix}", azureCloudConfig.Suffixes.StorageSuffix),
                     }, "scripts", CromwellConfigurationFileName));
 
                     await UploadTextToStorageAccountAsync(storageAccount, TesInternalContainerName, $"{ConfigurationContainerName}/{AllowedVmSizesFileName}", Utility.GetFileContent("scripts", AllowedVmSizesFileName));
