@@ -1,4 +1,6 @@
-﻿apiVersion: v1
+﻿{{- $storageEndpointSuffix  := .Values.persistence.storageEndpointSuffix -}}
+{{- $namespace := .Values.config.coaNamespace -}}
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   creationTimestamp: null
@@ -16,10 +18,11 @@ status: {}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: blob-fuse
+  name: {{ $namespace }}-blob-fuse
 provisioner: blob.csi.azure.com
 parameters:
-  skuName: Premium_LRS  # available values: Standard_LRS, Premium_LRS, Standard_GRS, Standard_RAGRS
+  skuName: Standard_LRS  # available values: Standard_LRS, Premium_LRS, Standard_GRS, Standard_RAGRS
+  storageEndpointSuffix: {{ $storageEndpointSuffix }}
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
@@ -35,7 +38,7 @@ mountOptions:
   - --cache-size-mb=1000  # Default will be 80% of available memory, eviction will happen beyond that.
 ---
 {{- $rg  := .Values.config.resourceGroup -}}
-{{- $namespace := .Values.config.coaNamespace -}}
+
 {{- $storageAccount  := .Values.persistence.storageAccount -}}
 {{- $size  := .Values.persistence.blobPvcSize -}}
 {{- $cromwellContainers  := .Values.cromwellContainers -}}
@@ -51,7 +54,7 @@ mountOptions:
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: {{ $storageClassName }}
+  name: {{ $namespace }}-{{ $storageClassName }}
 provisioner: blob.csi.azure.com
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
@@ -59,21 +62,25 @@ parameters:
   resourceGroup: {{ .resourceGroup }}
   storageAccount: {{ .accountName }}
   containerName: {{ .containerName }}
+  storageEndpointSuffix: {{ $storageEndpointSuffix }}
 mountOptions:
   - -o allow_other
+  {{- if .isAdlsGen2 }} 
+  - --use-adls=true
+  {{- end }}
   - --file-cache-timeout-in-seconds=120
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ $claimName }}
+  name: {{ $namespace }}-{{ $claimName }}
 spec:
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: {{ $size }}
-  storageClassName: {{ $storageClassName }}
+  storageClassName: {{ $namespace }}-{{ $storageClassName }}
 ---
 {{- end }}
 
@@ -90,16 +97,19 @@ spec:
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: {{ $pvName }}
+  name: {{ $namespace }}-{{ $pvName }}
 spec:
   capacity:
     storage: {{ $size }}
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain  # If set as "Delete" container would be removed after pvc deletion
-  storageClassName: blob-fuse
+  storageClassName: {{ $namespace }}-blob-fuse
   mountOptions:
     - -o allow_other
+    {{- if .isAdlsGen2 }} 
+    - --use-adls=true
+    {{- end }}
     - --file-cache-timeout-in-seconds=120
   csi:
     driver: blob.csi.azure.com
@@ -116,15 +126,15 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ $claimName }}
+  name: {{ $namespace }}-{{ $claimName }}
 spec:
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: {{ $size }}
-  volumeName: {{ $pvName }}
-  storageClassName: blob-fuse
+  volumeName: {{ $namespace }}-{{ $pvName }}
+  storageClassName: {{ $namespace }}-blob-fuse
 ---
 {{- end }}
 
@@ -135,13 +145,13 @@ data:
   azurestorageaccountkey: {{.accountKey | b64enc}}
 kind: Secret
 metadata:
-  name: sa-secret-{{ .accountName }}-{{.containerName}}
+  name: {{ $namespace }}-sa-secret-{{ .accountName }}-{{.containerName}}
 type: Opaque
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: blob-{{ .accountName }}-{{.containerName}}
+  name: {{ $namespace }}-blob-{{ .accountName }}-{{.containerName}}
 provisioner: blob.csi.azure.com
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
@@ -149,21 +159,25 @@ parameters:
   resourceGroup: {{ .resourceGroup }}
   storageAccount: {{ .accountName }}
   containerName: {{ .containerName }}
+  storageEndpointSuffix: {{ $storageEndpointSuffix }}
 mountOptions:
   - -o allow_other
+  {{- if .isAdlsGen2 }} 
+  - --use-adls=true
+  {{- end }}
   - --file-cache-timeout-in-seconds=120
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .accountName }}-{{ .containerName }}-claim1
+  name: {{ $namespace }}-{{ .accountName }}-{{ .containerName }}-claim1
 spec:
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: {{ $size }}
-  storageClassName: blob-{{ .accountName }}-{{.containerName}}
+  storageClassName: {{ $namespace }}-blob-{{ .accountName }}-{{.containerName}}
 ---
 {{- end }}
 
@@ -174,13 +188,13 @@ data:
   azurestorageaccountsastoken: {{.sasToken | b64enc}}
 kind: Secret
 metadata:
-  name: sa-secret-{{ .accountName }}-{{ .containerName }}
+  name: {{ $namespace }}-sa-secret-{{ .accountName }}-{{ .containerName }}
 type: Opaque
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-blob-{{ .accountName }}-{{ .containerName }}
+  name: {{ $namespace }}-pv-blob-{{ .accountName }}-{{ .containerName }}
 spec:
   capacity:
     storage: {{ $size }}
@@ -189,28 +203,31 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   mountOptions:
     - -o allow_other
+    {{- if .isAdlsGen2 }} 
+    - --use-adls=true
+    {{- end }}
     - --file-cache-timeout-in-seconds=120
   csi:
     driver: blob.csi.azure.com
     readOnly: false
-    volumeHandle: pv-handle-{{ .accountName }}-{{ .containerName }}
+    volumeHandle: {{ $namespace }}-pv-handle-{{ .accountName }}-{{ .containerName }}
     volumeAttributes:
       containerName: {{ .containerName }}
     nodeStageSecretRef:
-      name: sa-secret-{{ .accountName }}-{{.containerName}}
+      name: {{ $namespace }}-sa-secret-{{ .accountName }}-{{.containerName}}
       namespace: {{ $namespace }}
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: {{ .accountName }}-{{ .containerName }}-claim1
+  name: {{ $namespace }}-{{ .accountName }}-{{ .containerName }}-claim1
 spec:
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: {{ $size }}
-  volumeName: pv-blob-{{ .accountName }}-{{ .containerName }}
+  volumeName: {{ $namespace }}-pv-blob-{{ .accountName }}-{{ .containerName }}
   storageClassName: ""
 ---
 {{- end }}

@@ -30,7 +30,7 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task RunScaleTestWithMutect2WaitTilDoneAsync()
         {
-            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/long-running-int-test/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
+            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
 
             await RunIntegrationTestAsync(new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) });
@@ -104,7 +104,7 @@ namespace TriggerService.Tests
         public async Task RunScaleTestWithMutect2Async()
         {
             const int countOfWorkflowsToRun = 100;
-            const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
+            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
             var triggerFiles = new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) };
             await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFiles, testStorageAccountName);
@@ -175,6 +175,7 @@ namespace TriggerService.Tests
                     && pool.TargetDedicatedComputeNodes == 0)
                 {
                     Console.WriteLine($"Deleting Batch pool {pool.Id}...");
+                    await batchClient.JobOperations.DeleteJobAsync(pool.Id);
                     await batchClient.PoolOperations.DeletePoolAsync(pool.Id);
                     count++;
                 }
@@ -219,18 +220,18 @@ namespace TriggerService.Tests
             string storageAccountName = lines[0].Trim();
             string workflowsContainerSasToken = lines[1].Trim('"');
 
-            int countOfWorkflowsToRun = 1;
+            int countOfEachWorkflowToRun = 1;
 
             if (lines.Length > 2)
             {
-                int.TryParse(lines[2].Trim('"'), out countOfWorkflowsToRun);
+                int.TryParse(lines[2].Trim('"'), out countOfEachWorkflowToRun);
             }
 
-            await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFiles, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
+            await StartWorkflowsAsync(countOfEachWorkflowToRun, triggerFiles, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
         }
 
         private async Task StartWorkflowsAsync(
-            int countOfWorkflowsToRun,
+            int countOfEachWorkflowToRun,
             List<(string triggerFileBlobUrl, string workflowFriendlyName)> triggerFiles,
             string storageAccountName,
             bool waitTilDone = false,
@@ -269,14 +270,13 @@ namespace TriggerService.Tests
                 var triggerFileJson = await (await httpClient.GetAsync(triggerFile.triggerFileBlobUrl)).Content.ReadAsStringAsync();
 
                 // 2.  Start the workflows by uploading new trigger files
-
                 var date = $"{startTime.Year}-{startTime.Month}-{startTime.Day}-{startTime.Hour}-{startTime.Minute}";
-                Console.WriteLine($"Starting {countOfWorkflowsToRun} workflows...");
+                Console.WriteLine($"Starting {countOfEachWorkflowToRun} workflows...");
 
-                for (var i = 1; i <= countOfWorkflowsToRun; i++)
+                for (var i = 1; i <= countOfEachWorkflowToRun; i++)
                 {
                     // example: new/mutect2-001-of-100-2023-4-7-3-9.json
-                    var blobName = $"new/{triggerFile.workflowFriendlyName}-{i:D4}-of-{countOfWorkflowsToRun:D4}-{date}.json";
+                    var blobName = $"new/{triggerFile.workflowFriendlyName}-{i:D4}-of-{countOfEachWorkflowToRun:D4}-{date}.json";
                     blobNames.Add(blobName);
                     await workflowsContainer.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(triggerFileJson), true);
                 }
@@ -285,7 +285,7 @@ namespace TriggerService.Tests
             // 3.  Loop forever until they are all in a terminal state (succeeded or failed)
             if (waitTilDone)
             {
-                await WaitTilAllWorkflowsInTerminalStateAsync(countOfWorkflowsToRun, startTime, workflowsContainer, blobNames);
+                await WaitTilAllWorkflowsInTerminalStateAsync(workflowsContainer, blobNames, startTime);
             }
         }
 
@@ -341,16 +341,14 @@ namespace TriggerService.Tests
             Assert.IsTrue(succeeded.Single() == currentBlobNames.Skip(1).First());
         }
 
-
-
-        private async Task WaitTilAllWorkflowsInTerminalStateAsync(int countOfWorkflowsToRun, DateTime startTime, BlobContainerClient container, List<string> originalBlobNames)
+        private async Task WaitTilAllWorkflowsInTerminalStateAsync(BlobContainerClient container, List<string> originalBlobNames, DateTime startTime)
         {
             int succeededCount = 0;
             int failedCount = 0;
 
             var sw = Stopwatch.StartNew();
 
-            while (succeededCount + failedCount < countOfWorkflowsToRun) // && sw.Elapsed.TotalHours < 5)
+            while (succeededCount + failedCount < originalBlobNames.Count) // && sw.Elapsed.TotalHours < 5)
             {
                 try
                 {
@@ -364,7 +362,7 @@ namespace TriggerService.Tests
                     Console.WriteLine(exc);
                 }
 
-                if (succeededCount + failedCount == countOfWorkflowsToRun)
+                if (succeededCount + failedCount == originalBlobNames.Count)
                 {
                     break;
                 }
@@ -376,7 +374,7 @@ namespace TriggerService.Tests
             Console.WriteLine($"Succeeded count: {succeededCount}");
             Console.WriteLine($"Failed count: {failedCount}");
 
-            Assert.IsTrue(succeededCount + failedCount == countOfWorkflowsToRun);
+            Assert.IsTrue(succeededCount + failedCount == originalBlobNames.Count);
 
             if (failedCount > 0)
             {

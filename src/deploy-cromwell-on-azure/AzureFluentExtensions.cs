@@ -41,6 +41,6 @@ namespace CromwellOnAzureDeployer
     }
     public enum CloudErrorType
     {
-        NotSet, ExpiredAuthenticationToken, AuthorizationFailed, SkuNotAvailable
+        NotSet, ExpiredAuthenticationToken, AuthorizationFailed, SkuNotAvailable, RoleAssignmentExists
     }
 }
