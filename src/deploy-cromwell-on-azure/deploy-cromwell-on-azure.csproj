@@ -11,18 +11,10 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <AssemblyName Condition="'$(Configuration)' == 'win'">deploy-cromwell-on-azure-win</AssemblyName>
     <AssemblyName Condition="'$(Configuration)' == 'linux'">deploy-cromwell-on-azure-linux</AssemblyName>
     <AssemblyName Condition="'$(Configuration)' == 'osx'">deploy-cromwell-on-azure-osx.app</AssemblyName>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Include="..\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.10.4" />
