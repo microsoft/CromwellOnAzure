@@ -400,6 +400,7 @@ namespace CromwellOnAzureDeployer
             var batchImageGen2 = GetObjectFromConfig(values, "batchImageGen2") ?? new Dictionary<string, string>();
             var batchImageGen1 = GetObjectFromConfig(values, "batchImageGen1") ?? new Dictionary<string, string>();
             var martha = GetObjectFromConfig(values, "martha") ?? new Dictionary<string, string>();
+            var deployment = GetObjectFromConfig(values, "deployment") ?? new Dictionary<string, string>();
 
             values.Config["cromwellOnAzureVersion"] = GetValueOrDefault(settings, "CromwellOnAzureVersion");
             values.Config["azureServicesAuthConnectionString"] = GetValueOrDefault(settings, "AzureServicesAuthConnectionString");
@@ -452,6 +453,12 @@ namespace CromwellOnAzureDeployer
             values.CromwellDatabase["databaseName"] = GetValueOrDefault(settings, "PostgreSqlCromwellDatabaseName");
             values.CromwellDatabase["databaseUserLogin"] = GetValueOrDefault(settings, "PostgreSqlCromwellDatabaseUserLogin");
             values.CromwellDatabase["databaseUserPassword"] = GetValueOrDefault(settings, "PostgreSqlCromwellDatabaseUserPassword");
+            deployment["organizationName"] = GetValueOrDefault(settings, "DeploymentOrganizationName");
+            deployment["organizationUrl"] = GetValueOrDefault(settings, "DeploymentOrganizationUrl");
+            deployment["contactUri"] = GetValueOrDefault(settings, "DeploymentContactUri");
+            deployment["environment"] = GetValueOrDefault(settings, "DeploymentEnvironment");
+            deployment["created"] = GetValueOrDefault(settings, "DeploymentCreated");
+            deployment["updated"] = GetValueOrDefault(settings, "DeploymentUpdated");
 
             values.Config["batchAccount"] = batchAccount;
             values.Config["batchNodes"] = batchNodes;
@@ -459,10 +466,11 @@ namespace CromwellOnAzureDeployer
             values.Config["batchImageGen2"] = batchImageGen2;
             values.Config["batchImageGen1"] = batchImageGen1;
             values.Config["martha"] = martha;
+            values.Config["deployment"] = deployment;
         }
 
         private static IDictionary<string, string> GetObjectFromConfig(HelmValues values, string key)
-            => (values?.Config[key] as IDictionary<object, object>)?.ToDictionary(p => p.Key as string, p => p.Value as string);
+            => (values?.Config.TryGetValue(key, out var config) ?? false ? (config as IDictionary<object, object>) : null)?.ToDictionary(p => p.Key as string, p => p.Value as string);
 
         private static T GetValueOrDefault<T>(IDictionary<string, T> propertyBag, string key)
             => propertyBag.TryGetValue(key, out var value) ? value : default;
@@ -475,6 +483,7 @@ namespace CromwellOnAzureDeployer
             var batchImageGen2 = GetObjectFromConfig(values, "batchImageGen2") ?? new Dictionary<string, string>();
             var batchImageGen1 = GetObjectFromConfig(values, "batchImageGen1") ?? new Dictionary<string, string>();
             var martha = GetObjectFromConfig(values, "martha") ?? new Dictionary<string, string>();
+            var deployment = GetObjectFromConfig(values, "deployment") ?? new Dictionary<string, string>();
 
             return new()
             {
@@ -526,6 +535,13 @@ namespace CromwellOnAzureDeployer
                 ["PostgreSqlCromwellDatabaseName"] = GetValueOrDefault(values.CromwellDatabase, "databaseName"),
                 ["PostgreSqlCromwellDatabaseUserLogin"] = GetValueOrDefault(values.CromwellDatabase, "databaseUserLogin"),
                 ["PostgreSqlCromwellDatabaseUserPassword"] = GetValueOrDefault(values.CromwellDatabase, "databaseUserPassword"),
+
+                ["DeploymentOrganizationName"] = GetValueOrDefault(deployment, "organizationName"),
+                ["DeploymentOrganizationUrl"] = GetValueOrDefault(deployment, "organizationUrl"),
+                ["DeploymentContactUri"] = GetValueOrDefault(deployment, "contactUri"),
+                ["DeploymentEnvironment"] = GetValueOrDefault(deployment, "environment"),
+                ["DeploymentCreated"] = GetValueOrDefault(deployment, "created"),
+                ["DeploymentUpdated"] = GetValueOrDefault(deployment, "updated"),
             };
         }
 
