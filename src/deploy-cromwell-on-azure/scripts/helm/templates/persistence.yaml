@@ -18,11 +18,13 @@ status: {}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: {{ $namespace }}-blob-fuse
+  name: {{ $namespace }}-blob-fuse-standard
 provisioner: blob.csi.azure.com
 parameters:
   skuName: Standard_LRS  # available values: Standard_LRS, Premium_LRS, Standard_GRS, Standard_RAGRS
+{{- if ne $storageEndpointSuffix "core.windows.net" }}
   storageEndpointSuffix: {{ $storageEndpointSuffix }}
+{{- end }}
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
@@ -62,7 +64,9 @@ parameters:
   resourceGroup: {{ .resourceGroup }}
   storageAccount: {{ .accountName }}
   containerName: {{ .containerName }}
+{{- if ne $storageEndpointSuffix "core.windows.net" }}
   storageEndpointSuffix: {{ $storageEndpointSuffix }}
+{{- end }}
 mountOptions:
   - -o allow_other
   {{- if .isAdlsGen2 }} 
@@ -104,7 +108,7 @@ spec:
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain  # If set as "Delete" container would be removed after pvc deletion
-  storageClassName: {{ $namespace }}-blob-fuse
+  storageClassName: {{ $namespace }}-blob-fuse-standard
   mountOptions:
     - -o allow_other
     {{- if .isAdlsGen2 }} 
@@ -134,7 +138,7 @@ spec:
     requests:
       storage: {{ $size }}
   volumeName: {{ $namespace }}-{{ $pvName }}
-  storageClassName: {{ $namespace }}-blob-fuse
+  storageClassName: {{ $namespace }}-blob-fuse-standard
 ---
 {{- end }}
 
@@ -159,7 +163,9 @@ parameters:
   resourceGroup: {{ .resourceGroup }}
   storageAccount: {{ .accountName }}
   containerName: {{ .containerName }}
+{{- if ne $storageEndpointSuffix "core.windows.net" }}
   storageEndpointSuffix: {{ $storageEndpointSuffix }}
+{{- end }}
 mountOptions:
   - -o allow_other
   {{- if .isAdlsGen2 }} 

@@ -321,6 +321,8 @@ namespace CromwellOnAzureDeployer
                         {
                             await EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup);
                             await kubernetesManager.RemovePodAadChart();
+                            await Execute("Waiting 2 minutes for federated crendentials propagation...",
+                                () => Task.Delay(System.TimeSpan.FromMinutes(2), cts.Token));
                         }
 
                         if (installedVersion is null || installedVersion < new Version(5, 3, 0))
