@@ -251,7 +251,7 @@ namespace CromwellOnAzureDeployer
                         }
                         else
                         {
-                            aksCluster = await ValidateAndGetExistingAKSClusterAsync()
+                            aksCluster = await GetExistingAKSClusterAsync(configuration.AksClusterName)
                                 ?? throw new ValidationException($"AKS cluster {configuration.AksClusterName} does not exist in region {configuration.RegionName} or is not accessible to the current user.", displayExample: false);
                         }
 
@@ -366,6 +366,7 @@ namespace CromwellOnAzureDeployer
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
                         postgreSqlFlexServer = await ValidateAndGetExistingPostgresqlServer();
+                        aksCluster = await ValidateAndGetExistingAKSClusterAsync();
                         var keyVault = await ValidateAndGetExistingKeyVault();
 
                         if (aksCluster is null && !configuration.ManualHelmDeployment)
@@ -797,26 +798,32 @@ namespace CromwellOnAzureDeployer
 
         private async Task<ContainerServiceManagedClusterResource> GetExistingAKSClusterAsync(string aksClusterName)
         {
-            return await subscriptionIds.ToAsyncEnumerable().Select(s =>
+            return await subscriptionIds.ToAsyncEnumerable()
+                .SelectAwaitWithCancellation((sub, token) => ValueTask.FromResult<IAsyncEnumerable<ContainerServiceManagedClusterResource>>(
+                    armClient.GetSubscriptionResource(SubscriptionResource.CreateResourceIdentifier(sub))
+                        .GetContainerServiceManagedClustersAsync(token)))
+                .Where(a => a is not null)
+                .SelectMany(a => a)
+                .SelectAwaitWithCancellation((resource, token) =>
+                    SafeSelectAsync(async () => (await resource.GetAsync(token)).Value))
+                .Where(a => a is not null)
+                .SingleOrDefaultAsync(a =>
+                        a.Data.Name.Equals(aksClusterName, StringComparison.OrdinalIgnoreCase) &&
+                        a.Data.Location.Name.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase),
+                    cts.Token);
+
+            static async ValueTask<TOut> SafeSelectAsync<TOut>(Func<ValueTask<TOut>> selector) where TOut : class
             {
                 try
                 {
-                    var client = armClient.GetSubscriptionResource(new(s));
-                    return client.GetContainerServiceManagedClustersAsync(cts.Token);
+                    return await selector();
                 }
                 catch (Exception e)
                 {
                     ConsoleEx.WriteLine(e.Message);
                     return null;
                 }
-            })
-            .Where(a => a is not null)
-            .SelectMany(a => a)
-            .SelectAwaitWithCancellation(async (a, ct) => (await a.GetAsync(ct)).Value)
-            .SingleOrDefaultAsync(a =>
-                    a.Data.Name.Equals(aksClusterName, StringComparison.OrdinalIgnoreCase) &&
-                    a.Data.Location.Name.Equals(configuration.RegionName, StringComparison.OrdinalIgnoreCase),
-                cts.Token);
+            }
         }
 
         private async Task<ContainerServiceManagedClusterResource> ProvisionManagedClusterAsync(IResource resourceGroupObject, IIdentity managedIdentity, IGenericResource logAnalyticsWorkspace, INetwork virtualNetwork, string subnetName, bool privateNetworking, string nodeResourceGroupName)
@@ -878,7 +885,7 @@ namespace CromwellOnAzureDeployer
                 cluster.ApiServerAccessProfile = new()
                 {
                     EnablePrivateCluster = true,
-                    EnablePrivateClusterPublicFqdn = true
+                    EnablePrivateClusterPublicFqdn = false
                 };
 
                 cluster.PublicNetworkAccess = ContainerServicePublicNetworkAccess.Disabled;
@@ -1158,7 +1165,7 @@ namespace CromwellOnAzureDeployer
             catch (Microsoft.Rest.Azure.CloudException ex) when (ex.ToCloudErrorType() == CloudErrorType.AuthorizationFailed)
             {
                 ConsoleEx.WriteLine();
-                ConsoleEx.WriteLine("Unable to programatically register the required resource providers.", ConsoleColor.Red);
+                ConsoleEx.WriteLine("Unable to programmatically register the required resource providers.", ConsoleColor.Red);
                 ConsoleEx.WriteLine("This can happen if you don't have the Owner or Contributor role assignment for the subscription.", ConsoleColor.Red);
                 ConsoleEx.WriteLine();
                 ConsoleEx.WriteLine("Please contact the Owner or Contributor of your Azure subscription, and have them:", ConsoleColor.Yellow);
@@ -1241,7 +1248,7 @@ namespace CromwellOnAzureDeployer
             catch (Microsoft.Rest.Azure.CloudException ex) when (ex.ToCloudErrorType() == CloudErrorType.AuthorizationFailed)
             {
                 ConsoleEx.WriteLine();
-                ConsoleEx.WriteLine("Unable to programatically register the required features.", ConsoleColor.Red);
+                ConsoleEx.WriteLine("Unable to programmatically register the required features.", ConsoleColor.Red);
                 ConsoleEx.WriteLine("This can happen if you don't have the Owner or Contributor role assignment for the subscription.", ConsoleColor.Red);
                 ConsoleEx.WriteLine();
                 ConsoleEx.WriteLine("Please contact the Owner or Contributor of your Azure subscription, and have them:", ConsoleColor.Yellow);
@@ -2185,7 +2192,7 @@ namespace CromwellOnAzureDeployer
 
             void ThrowIfProvidedForInstall(object attributeValue, string attributeName)
             {
-                if (configuration.Update && attributeValue is not null)
+                if (!configuration.Update && attributeValue is not null)
                 {
                     throw new ValidationException($"{attributeName} must not be provided when installing.", false);
                 }
