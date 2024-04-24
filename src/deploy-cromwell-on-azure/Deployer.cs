@@ -835,7 +835,6 @@ namespace CromwellOnAzureDeployer
             var nodePoolName = "nodepool1";
             ContainerServiceManagedClusterData cluster = new(new(configuration.RegionName))
             {
-                ClusterIdentity = new() { ResourceIdentityType = ManagedServiceIdentityType.UserAssigned },
                 DnsPrefix = configuration.AksClusterName,
                 NetworkProfile = new()
                 {
@@ -851,7 +850,9 @@ namespace CromwellOnAzureDeployer
             ManagedClusterAddonProfile clusterAddonProfile = new(isEnabled: true);
             clusterAddonProfile.Config.Add("logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id);
             cluster.AddonProfiles.Add("omsagent", clusterAddonProfile);
-            cluster.ClusterIdentity.UserAssignedIdentities.Add(new(uami.Id, PopulateUserAssignedIdentity(uami.Data)));
+            ManagedServiceIdentity identity = new(ManagedServiceIdentityType.UserAssigned);
+            identity.UserAssignedIdentities.Add(uami.Id, new());
+            cluster.Identity = identity;
             cluster.IdentityProfile.Add("kubeletidentity", new() { ResourceId = uami.Id, ClientId = uami.Data.ClientId, ObjectId = uami.Data.PrincipalId });
 
             if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
