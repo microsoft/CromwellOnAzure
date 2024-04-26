@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using System;
@@ -30,10 +30,7 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task RunScaleTestWithMutect2WaitTilDoneAsync()
         {
-            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
-            const string workflowFriendlyName = $"mutect2";
-
-            await RunIntegrationTestAsync(new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) });
+            await RunIntegrationTestAsync([("https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json", "mutect2")]);
         }
 
         /// <summary>
@@ -44,7 +41,8 @@ namespace TriggerService.Tests
         [TestMethod]
         public async Task RunAllCommonWorkflowsWaitTilDoneAsync()
         {
-            var workflowTriggerFiles = new List<(string triggerFileBlobUrl, string workflowFriendlyName)> {
+            await RunIntegrationTestAsync(
+            [
                 ("https://raw.githubusercontent.com/microsoft/gatk4-data-processing-azure/main-azure/processing-for-variant-discovery-gatk4.b37.trigger.json", "preprocessing-b37"),
                 ("https://raw.githubusercontent.com/microsoft/gatk4-data-processing-azure/main-azure/processing-for-variant-discovery-gatk4.hg38.trigger.json", "preprocessing-hg38"),
                 ("https://raw.githubusercontent.com/microsoft/gatk4-genome-processing-pipeline-azure/main-azure/WholeGenomeGermlineSingleSample.trigger.json", "germline"),
@@ -53,9 +51,8 @@ namespace TriggerService.Tests
                 ("https://raw.githubusercontent.com/microsoft/gatk4-cnn-variant-filter-azure/main-azure/cram2filtered.trigger.json", "cram-to-filtered"),
                 ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/interleaved-fastq-to-paired-fastq.trigger.json", "fastq-to-paired"),
                 ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/paired-fastq-to-unmapped-bam.trigger.json", "paired-fastq-to-unmapped-bam"),
-                ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/cram-to-bam.trigger.json", "cram-to-bam") };
-
-            await RunIntegrationTestAsync(workflowTriggerFiles);
+                ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/cram-to-bam.trigger.json", "cram-to-bam")
+            ]);
         }
 
         /// <summary>
@@ -89,7 +86,7 @@ namespace TriggerService.Tests
             var n = DateTime.UtcNow;
             var date = $"{n.Year}-{n.Month}-{n.Day}-{n.Hour}-{n.Minute}";
             var triggerFileBlobName = $"new/globtest-{date}.json";
-            string triggerJson = System.Text.Json.JsonSerializer.Serialize(workflowTrigger).Replace(@"\r\n\", @"\n");
+            var triggerJson = System.Text.Json.JsonSerializer.Serialize(workflowTrigger).Replace(@"\r\n\", @"\n");
             container = blobServiceClient.GetBlobContainerClient("workflows");
             await container.GetBlobClient(triggerFileBlobName).UploadAsync(BinaryData.FromString(triggerJson), true);
         }
@@ -164,7 +161,7 @@ namespace TriggerService.Tests
             var cutoffTime = DateTime.UtcNow.Subtract(maxAge);
             var pools = await batchClient.PoolOperations.ListPools().ToListAsync();
 
-            int count = 0;
+            var count = 0;
 
             foreach (var pool in pools)
             {
@@ -201,7 +198,7 @@ namespace TriggerService.Tests
             Assert.IsTrue(CountWorkflowsByState(originalBlobNames, currentBlobNames, WorkflowState.Succeeded) == 1);
         }
 
-        private async Task RunIntegrationTestAsync(List<(string triggerFileBlobUrl, string workflowFriendlyName)> triggerFiles)
+        private static async Task RunIntegrationTestAsync(List<(string triggerFileBlobUrl, string workflowFriendlyName)> triggerFiles)
         {
             // This is set in the Azure Devops pipeline, which writes the file to the .csproj directory
             // The current working directory is this: /mnt/vss/_work/r1/a/CoaArtifacts/AllSource/TriggerService.Tests/bin/Debug/net7.0/
@@ -217,20 +214,20 @@ namespace TriggerService.Tests
 
             Console.WriteLine($"Found path: {path}");
             var lines = await File.ReadAllLinesAsync(path);
-            string storageAccountName = lines[0].Trim();
-            string workflowsContainerSasToken = lines[1].Trim('"');
+            var storageAccountName = lines[0].Trim();
+            var workflowsContainerSasToken = lines[1].Trim('"');
 
-            int countOfEachWorkflowToRun = 1;
+            var countOfEachWorkflowToRun = 1;
 
             if (lines.Length > 2)
             {
-                int.TryParse(lines[2].Trim('"'), out countOfEachWorkflowToRun);
+                _ = int.TryParse(lines[2].Trim('"'), out countOfEachWorkflowToRun);
             }
 
             await StartWorkflowsAsync(countOfEachWorkflowToRun, triggerFiles, storageAccountName, waitTilDone: true, workflowsContainerSasToken);
         }
 
-        private async Task StartWorkflowsAsync(
+        private static async Task StartWorkflowsAsync(
             int countOfEachWorkflowToRun,
             List<(string triggerFileBlobUrl, string workflowFriendlyName)> triggerFiles,
             string storageAccountName,
@@ -265,9 +262,9 @@ namespace TriggerService.Tests
             using var httpClient = new HttpClient();
             var blobNames = new List<string>();
 
-            foreach (var triggerFile in triggerFiles)
+            foreach (var (triggerFileBlobUrl, workflowFriendlyName) in triggerFiles)
             {
-                var triggerFileJson = await (await httpClient.GetAsync(triggerFile.triggerFileBlobUrl)).Content.ReadAsStringAsync();
+                var triggerFileJson = await (await httpClient.GetAsync(triggerFileBlobUrl)).Content.ReadAsStringAsync();
 
                 // 2.  Start the workflows by uploading new trigger files
                 var date = $"{startTime.Year}-{startTime.Month}-{startTime.Day}-{startTime.Hour}-{startTime.Minute}";
@@ -276,7 +273,7 @@ namespace TriggerService.Tests
                 for (var i = 1; i <= countOfEachWorkflowToRun; i++)
                 {
                     // example: new/mutect2-001-of-100-2023-4-7-3-9.json
-                    var blobName = $"new/{triggerFile.workflowFriendlyName}-{i:D4}-of-{countOfEachWorkflowToRun:D4}-{date}.json";
+                    var blobName = $"new/{workflowFriendlyName}-{i:D4}-of-{countOfEachWorkflowToRun:D4}-{date}.json";
                     blobNames.Add(blobName);
                     await workflowsContainer.GetBlobClient(blobName).UploadAsync(BinaryData.FromString(triggerFileJson), true);
                 }
@@ -289,7 +286,7 @@ namespace TriggerService.Tests
             }
         }
 
-        private async Task<List<string>> ListContainerBlobNamesAsync(BlobContainerClient container)
+        private static async Task<List<string>> ListContainerBlobNamesAsync(BlobContainerClient container)
         {
             var enumerator = container.GetBlobsAsync().GetAsyncEnumerator();
             var existingBlobNames = new List<string>();
@@ -304,12 +301,12 @@ namespace TriggerService.Tests
             return existingBlobNames;
         }
 
-        private int CountWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
+        private static int CountWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
         {
-            return GetWorkflowsByState(originalBlobNames, currentBlobNames, state).Count();
+            return GetWorkflowsByState(originalBlobNames, currentBlobNames, state).Count;
         }
 
-        private List<string> GetWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
+        private static List<string> GetWorkflowsByState(List<string> originalBlobNames, List<string> currentBlobNames, WorkflowState state)
         {
             var stateString = state.ToString().ToLowerInvariant();
 
@@ -341,10 +338,10 @@ namespace TriggerService.Tests
             Assert.IsTrue(succeeded.Single() == currentBlobNames.Skip(1).First());
         }
 
-        private async Task WaitTilAllWorkflowsInTerminalStateAsync(BlobContainerClient container, List<string> originalBlobNames, DateTime startTime)
+        private static async Task WaitTilAllWorkflowsInTerminalStateAsync(BlobContainerClient container, List<string> originalBlobNames, DateTime startTime)
         {
-            int succeededCount = 0;
-            int failedCount = 0;
+            var succeededCount = 0;
+            var failedCount = 0;
 
             var sw = Stopwatch.StartNew();
 
