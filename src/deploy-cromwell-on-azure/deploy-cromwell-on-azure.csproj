@@ -17,12 +17,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Identity" Version="1.11.1" />
+    <PackageReference Include="Azure.Identity" Version="1.11.2" />
     <PackageReference Include="Azure.ResourceManager.ContainerService" Version="1.2.0" />
     <PackageReference Include="Azure.ResourceManager.ManagedServiceIdentities" Version="1.2.1" />
     <PackageReference Include="Azure.ResourceManager.Network" Version="1.7.0" />
     <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.6.0" />
-    <PackageReference Include="KubernetesClient" Version="13.0.26" />
+    <PackageReference Include="KubernetesClient" Version="13.0.37" />
     <PackageReference Include="Microsoft.Azure.Management.KeyVault" Version="4.0.0-preview.1" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
     <PackageReference Include="Microsoft.Azure.Management.Batch" Version="15.0.0" />
