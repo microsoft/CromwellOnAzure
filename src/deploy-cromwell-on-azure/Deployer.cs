@@ -892,6 +892,13 @@ namespace CromwellOnAzureDeployer
                 };
 
                 cluster.PublicNetworkAccess = ContainerServicePublicNetworkAccess.Disabled;
+
+                if (cluster.NetworkProfile is null)
+                {
+                    cluster.NetworkProfile = new();
+                }
+
+                cluster.NetworkProfile.OutboundType = ContainerServiceOutboundType.UserDefinedRouting;
             }
 
             return await Execute(
