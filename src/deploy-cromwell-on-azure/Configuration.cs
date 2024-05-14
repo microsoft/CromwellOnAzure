@@ -74,6 +74,7 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlSubnetName { get; set; }
         public string BatchSubnetName { get; set; }
         public bool? PrivateNetworking { get; set; } = null;
+        public bool? UserDefinedRouting { get; set; } = null;
         public string Tags { get; set; } = null;
         public string BatchNodesSubnetId { get; set; } = null;
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;

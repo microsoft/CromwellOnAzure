@@ -28,9 +28,10 @@ azure_cloud_name=${4:-$azure_cloud_name}
 resource_group_name="${prefix}-main"
 vnet_name="${prefix}-vnet"
 deployer_subnet_name="${prefix}-deployer-subnet"
+nsg_name="${prefix}-aks-nsg"
 route_table_name="${prefix}-route-table"
-tes_image_name="mcr.microsoft.com/CromwellOnAzure/tes:5.3.0.10760"
-trigger_service_image_name="mcr.microsoft.com/CromwellOnAzure/triggerservice:5.3.0.10760"
+tes_image_name="mcr.microsoft.com/CromwellOnAzure/tes:5.3.1.12044"
+trigger_service_image_name="mcr.microsoft.com/CromwellOnAzure/triggerservice:5.3.1.12044"
 temp_deployer_vm_name="${prefix}-coa-deploy"
 coa_binary_path="/tmp/coa"
 coa_binary="deploy-cromwell-on-azure"
@@ -76,6 +77,50 @@ az network route-table create \
     --resource-group $resource_group_name \
     --location $location
 
+echo "Creating Network Security Group for AKS..."
+az network nsg create \
+    --resource-group $resource_group_name \
+    --name $nsg_name \
+    --location $location
+
+echo "Setting NSG Rules for AKS..."
+# Block all inbound traffic from the internet
+az network nsg rule create \
+    --resource-group $resource_group_name \
+    --nsg-name $nsg_name \
+    --name block-internet-inbound \
+    --priority 100 \
+    --access Deny \
+    --direction Inbound \
+    --source-address-prefixes 'Internet' \
+    --destination-port-ranges '*' \
+    --protocol '*'
+
+# Allow all inbound traffic from within the virtual network
+az network nsg rule create \
+    --resource-group $resource_group_name \
+    --nsg-name $nsg_name \
+    --name allow-vnet-inbound \
+    --priority 110 \
+    --access Allow \
+    --direction Inbound \
+    --source-address-prefixes 'VirtualNetwork' \
+    --destination-port-ranges '*' \
+    --protocol '*'
+
+# Allow all outbound traffic
+az network nsg rule create \
+    --resource-group $resource_group_name \
+    --nsg-name $nsg_name \
+    --name allow-all-outbound \
+    --priority 120 \
+    --access Allow \
+    --direction Outbound \
+    --destination-port-ranges '*' \
+    --protocol '*' \
+    --destination-address-prefixes '*'
+
+
 echo "Creating subnets..."
 
 deployer_subnet_id=$(az network vnet subnet show \
@@ -84,7 +129,8 @@ deployer_subnet_id=$(az network vnet subnet show \
     --name $deployer_subnet_name \
     --query id -o tsv)
 
-az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n aks-subnet --address-prefixes 10.1.2.0/24 --route-table $route_table_name
+# Create AKS subnet and associate it with the NSG
+az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n aks-subnet --address-prefixes 10.1.2.0/24 --network-security-group $nsg_name --route-table $route_table_name
 az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n psql-subnet --address-prefixes 10.1.3.0/24
 az network vnet subnet create -g $resource_group_name --vnet-name $vnet_name -n batch-subnet --address-prefixes 10.1.128.0/17
 
