@@ -44,9 +44,9 @@ namespace CromwellOnAzureDeployer
         public string VmSubnetAddressSpace { get; set; } = "10.1.0.0/24"; // 10.1.0.0 - 10.1.0.255, 256 IPs
         public string PostgreSqlSubnetAddressSpace { get; set; } = "10.1.1.0/24"; // 10.1.1.0 - 10.1.1.255, 256 IPs
         // Address space for kubernetes system services, must not overlap with any subnet.
-        public string KubernetesServiceCidr = "10.1.4.0/22"; // 10.1.4.0 -> 10.1.7.255, 1024 IPs
-        public string KubernetesDnsServiceIP = "10.1.4.10";
-        public string KubernetesDockerBridgeCidr = "172.17.0.1/16"; // 172.17.0.0 - 172.17.255.255, 65536 IPs
+        public string KubernetesServiceCidr { get; set; } = "10.1.4.0/22"; // 10.1.4.0 -> 10.1.7.255, 1024 IPs
+        public string KubernetesDnsServiceIP { get; set; } = "10.1.4.10";
+        public string KubernetesDockerBridgeCidr { get; set; } = "172.17.0.1/16"; // 172.17.0.0 - 172.17.255.255, 65536 IPs
         public string BatchNodesSubnetAddressSpace { get; set; } = "10.1.128.0/17"; // 10.1.128.0 - 10.1.255.255, 32768 IPs
 
         public string ResourceGroupName { get; set; }
