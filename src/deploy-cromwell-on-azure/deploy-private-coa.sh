@@ -91,7 +91,7 @@ az network firewall create --name $firewall_name --resource-group $resource_grou
 
 echo "Creating firewall IP configuration..."
 firewall_public_ip_id=$(az network public-ip show --name "${firewall_name}-pip" --resource-group $resource_group_name --query "id" -o tsv)
-az network firewall ip-config create --firewall-name $firewall_name --name "${firewall_name}-config" --public-ip-address $firewall_public_ip_id --resource-group $resource_group_name --vnet-name $vnet_name
+az network firewall ip-config create --firewall-name $firewall_name --name "${firewall_name}-config" --public-ip-address $firewall_public_ip_id --resource-group $resource_group_name --vnet-name $vnet_name --subnet $firewall_subnet_name
 
 firewall_private_ip=$(az network firewall show --name $firewall_name --resource-group $resource_group_name --query "ipConfigurations[0].privateIpAddress" --output tsv)
 
