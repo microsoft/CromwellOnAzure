@@ -13,7 +13,8 @@ azure_cloud_name="azurecloud"
 
 # Network configuration variables
 vnet_cidr="10.1.0.0/16"
-deployer_subnet_cidr="10.1.1.0/24"
+deployer_subnet_cidr="10.1.0.0/24"
+firewall_subnet_cidr="10.1.1.0/24"
 aks_subnet_cidr="10.1.2.0/24"
 psql_subnet_cidr="10.1.3.0/24"
 batch_subnet_cidr="10.1.128.0/17"
@@ -36,6 +37,7 @@ azure_cloud_name=${4:-$azure_cloud_name}
 resource_group_name="${prefix}-main"
 vnet_name="${prefix}-vnet"
 deployer_subnet_name="${prefix}-deployer-subnet"
+firewall_subnet_name="${prefix}-firewall-subnet"
 nsg_name="${prefix}-aks-nsg"
 route_table_name="${prefix}-route-table"
 firewall_name="${prefix}-firewall"
@@ -78,6 +80,9 @@ az network vnet create \
     --address-prefixes $vnet_cidr \
     --subnet-name $deployer_subnet_name \
     --subnet-prefixes $deployer_subnet_cidr
+
+echo "Creating firewall subnet..."
+az network vnet subnet create --resource-group $resource_group_name --vnet-name $vnet_name --name $firewall_subnet_name --address-prefixes $firewall_subnet_cidr
 
 echo "Creating public IP for Azure Firewall..."
 az network public-ip create --name "${firewall_name}-pip" --resource-group $resource_group_name --location $location --sku "Standard" --allocation-method "Static"
