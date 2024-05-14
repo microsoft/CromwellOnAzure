@@ -38,7 +38,6 @@ resource_group_name="${prefix}-main"
 vnet_name="${prefix}-vnet"
 deployer_subnet_name="${prefix}-deployer-subnet"
 firewall_subnet_name="${prefix}-firewall-subnet"
-nsg_name="${prefix}-aks-nsg"
 route_table_name="${prefix}-route-table"
 firewall_name="${prefix}-firewall"
 tes_image_name="mcr.microsoft.com/CromwellOnAzure/tes:5.3.1.12044"
@@ -91,7 +90,8 @@ echo "Creating Azure Firewall..."
 az network firewall create --name $firewall_name --resource-group $resource_group_name --location $location --vnet-name $vnet_name
 
 echo "Creating firewall IP configuration..."
-az network firewall ip-config create --firewall-name $firewall_name --name "${firewall_name}-config" --public-ip-address "${firewall_name}-pip" --resource-group $resource_group_name --vnet-name $vnet_name
+firewall_public_ip_id=$(az network public-ip show --name "${firewall_name}-pip" --resource-group $resource_group_name --query "id" -o tsv)
+az network firewall ip-config create --firewall-name $firewall_name --name "${firewall_name}-config" --public-ip-address $firewall_public_ip_id --resource-group $resource_group_name --vnet-name $vnet_name
 
 firewall_private_ip=$(az network firewall show --name $firewall_name --resource-group $resource_group_name --query "ipConfigurations[0].privateIpAddress" --output tsv)
 
@@ -101,16 +101,8 @@ az network route-table create --name $route_table_name --resource-group $resourc
 echo "Creating route to direct AKS subnet Internet traffic through the Azure Firewall..."
 az network route-table route create --name "route-to-firewall" --route-table-name $route_table_name --resource-group $resource_group_name --address-prefix "0.0.0.0/0" --next-hop-type "VirtualAppliance" --next-hop-ip-address $firewall_private_ip
 
-echo "Creating Network Security Group for AKS..."
-az network nsg create --resource-group $resource_group_name --name $nsg_name --location $location
-
-echo "Setting NSG Rules for AKS..."
-az network nsg rule create --resource-group $resource_group_name --nsg-name $nsg_name --name "block-internet-inbound" --priority 100 --access Deny --direction Inbound --source-address-prefixes 'Internet' --destination-port-ranges '*' --protocol '*'
-az network nsg rule create --resource-group $resource_group_name --nsg-name $nsg_name --name "allow-vnet-inbound" --priority 110 --access Allow --direction Inbound --source-address-prefixes 'VirtualNetwork' --destination-port-ranges '*' --protocol '*'
-az network nsg rule create --resource-group $resource_group_name --nsg-name $nsg_name --name "allow-all-outbound" --priority 120 --access Allow --direction Outbound --destination-port-ranges '*' --protocol '*' --destination-address-prefixes '*'
-
 echo "Creating subnets..."
-az network vnet subnet create --resource-group $resource_group_name --vnet-name $vnet_name -n aks-subnet --address-prefixes $aks_subnet_cidr --network-security-group $nsg_name --route-table $route_table_name
+az network vnet subnet create --resource-group $resource_group_name --vnet-name $vnet_name -n aks-subnet --address-prefixes $aks_subnet_cidr --route-table $route_table_name
 az network vnet subnet create --resource-group $resource_group_name --vnet-name $vnet_name -n psql-subnet --address-prefixes $psql_subnet_cidr
 az network vnet subnet create --resource-group $resource_group_name --vnet-name $vnet_name -n batch-subnet --address-prefixes $batch_subnet_cidr
 
