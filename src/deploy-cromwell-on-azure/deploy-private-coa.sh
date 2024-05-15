@@ -40,7 +40,7 @@ deployer_subnet_name="${prefix}-deployer-subnet"
 firewall_subnet_name="AzureFirewallSubnet" # "${prefix}-firewall-subnet"
 route_table_name="${prefix}-route-table"
 firewall_name="${prefix}-firewall"
-dns_zone_name="${prefix}-aks.myprivatezone.internal"
+dns_zone_name="${prefix}.private.${location}.azmk8s.io"
 tes_image_name="mcr.microsoft.com/CromwellOnAzure/tes:5.3.1.12044"
 trigger_service_image_name="mcr.microsoft.com/CromwellOnAzure/triggerservice:5.3.1.12044"
 temp_deployer_vm_name="${prefix}-coa-deploy"
@@ -83,7 +83,7 @@ az network vnet create \
 
 # DNS Zone setup
 echo "Creating AKS private DNS zone..."
-az network private-dns zone create --resource-group $resource_group_name --name $dns_zone_name
+dns_zone_id=$(az network private-dns zone create --resource-group $resource_group_name --name $dns_zone_name --query "id" -o tsv)
 az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${vnet_name}-dns-link" --virtual-network $vnet_name --registration-enabled false
 
 echo "Creating firewall subnet..."
@@ -164,4 +164,4 @@ ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "$coa_binary_path/$coa_b
     --KubernetesServiceCidr $kubernetes_service_cidr \
     --KubernetesDnsServiceIp $kubernetes_dns_ip \
     --UserDefinedRouting true \
-    --AksPrivateDnsZoneName $dns_zone_name"
+    --AksPrivateDnsZoneResourceId $dns_zone_id"

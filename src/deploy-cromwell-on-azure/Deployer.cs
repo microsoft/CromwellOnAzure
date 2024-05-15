@@ -891,9 +891,9 @@ namespace CromwellOnAzureDeployer
                     EnablePrivateClusterPublicFqdn = false
                 };
 
-                if (!string.IsNullOrWhiteSpace(configuration.AksPrivateDnsZoneName))
+                if (!string.IsNullOrWhiteSpace(configuration.AksPrivateDnsZoneResourceId))
                 {
-                    cluster.ApiServerAccessProfile.PrivateDnsZone = configuration.AksPrivateDnsZoneName;
+                    cluster.ApiServerAccessProfile.PrivateDnsZone = configuration.AksPrivateDnsZoneResourceId;
                 }
 
                 cluster.PublicNetworkAccess = ContainerServicePublicNetworkAccess.Disabled;
