@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using System;
-using System.ClientModel.Primitives;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
@@ -165,6 +164,7 @@ namespace CromwellOnAzureDeployer
                 });
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
+                await ValidateVmAsync();
                 kubernetesManager = new KubernetesManager(configuration, azureCredentials, azureCloudConfig, cts.Token);
 
                 IResourceGroup resourceGroup = null;
