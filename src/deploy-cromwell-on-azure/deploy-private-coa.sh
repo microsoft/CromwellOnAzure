@@ -99,16 +99,7 @@ firewall_public_ip_id=$(az network public-ip show --name "${firewall_name}-pip" 
 
 echo "Started at $(date '+%I:%M:%S%p'): Creating firewall IP configuration (takes about 10 minutes)..."
 az network firewall ip-config create --firewall-name $firewall_name --name "${firewall_name}-config" --public-ip-address $firewall_public_ip_id --resource-group $resource_group_name --vnet-name $vnet_name --subnet $firewall_subnet_name
-
-# Retrieve the private IP address of the Azure Firewall
 firewall_private_ip=$(az network firewall show --name $firewall_name --resource-group $resource_group_name | jq -r '.ipConfigurations[0].privateIPAddress')
-
-if [[ -z "$firewall_private_ip" ]]; then
-    echo "Failed to retrieve Firewall Private IP. Exiting."
-    exit 1
-else
-    echo "Firewall private IP: $firewall_private_ip"
-fi
 
 echo "Creating route table..."
 az network route-table create --name $route_table_name --resource-group $resource_group_name --location $location
@@ -125,6 +116,8 @@ az network vnet subnet update --resource-group $resource_group_name --vnet-name 
 az network vnet subnet update --resource-group $resource_group_name --vnet-name $vnet_name --name batch-subnet --service-endpoints "Microsoft.Storage"
 az network vnet subnet update --name psql-subnet --resource-group $resource_group_name --vnet-name $vnet_name --disable-private-endpoint-network-policies true
 az network vnet subnet update --name batch-subnet --resource-group $resource_group_name --vnet-name $vnet_name --disable-private-link-service-network-policies true
+
+deployer_subnet_id=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $vnet_name --name $deployer_subnet_name --query "id" -o tsv)
 
 echo "Creating VM jumpbox within the virtual network to deploy from..."
 vm_public_ip=$(az vm create --resource-group $resource_group_name --name $temp_deployer_vm_name --image Ubuntu2204 --admin-username azureuser --generate-ssh-keys --subnet $deployer_subnet_id --query publicIpAddress -o tsv)
