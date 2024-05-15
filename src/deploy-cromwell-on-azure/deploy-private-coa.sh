@@ -11,7 +11,6 @@ set -o pipefail
 prefix="coa"
 azure_cloud_name="azurecloud"
 
-
 # Network configuration variables
 vnet_cidr="10.1.0.0/16"
 deployer_subnet_cidr="10.1.0.0/24"
