@@ -363,6 +363,7 @@ namespace CromwellOnAzureDeployer
                         }
 
                         ValidateRegionName(configuration.RegionName);
+                        await ValidateVmAsync();
                         ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
