@@ -8,6 +8,21 @@ set -o pipefail
 
 # Usage: deploy-private-coa.sh <subscription> <location> <prefix> <azure_cloud_name>
 
+# Ensure jq and .NET 8 are installed
+if ! command -v jq &>/dev/null; then
+    echo "jq is not installed. Installing jq..."
+    sudo apt-get update && sudo apt-get install -y jq
+fi
+
+if ! dotnet --list-sdks | grep -q '8\.'; then
+    echo ".NET 8 SDK is not installed. Installing .NET 8 SDK..."
+    wget https://dot.net/v1/dotnet-install.sh
+    chmod +x dotnet-install.sh
+    ./dotnet-install.sh --version 8.0.100
+    # Reload the environment to ensure dotnet is in PATH
+    source ~/.profile
+fi
+
 prefix="coa"
 azure_cloud_name="azurecloud"
 
@@ -97,7 +112,7 @@ az network firewall create --name $firewall_name --resource-group $resource_grou
 
 firewall_public_ip_id=$(az network public-ip show --name "${firewall_name}-pip" --resource-group $resource_group_name --query "id" -o tsv)
 
-echo "Started at $(date '+%I:%M:%S%p'): Creating firewall IP configuration (takes about 10 minutes)..."
+echo "Started at $(date '+%I:%M:%S%p'): Creating firewall IP configuration (takes 10-30 minutes)..."
 az network firewall ip-config create --firewall-name $firewall_name --name "${firewall_name}-config" --public-ip-address $firewall_public_ip_id --resource-group $resource_group_name --vnet-name $vnet_name --subnet $firewall_subnet_name
 firewall_private_ip=$(az network firewall show --name $firewall_name --resource-group $resource_group_name | jq -r '.ipConfigurations[0].privateIPAddress')
 
