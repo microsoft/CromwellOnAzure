@@ -897,13 +897,6 @@ namespace CromwellOnAzureDeployer
             return await Execute(
                 $"Creating AKS Cluster: {configuration.AksClusterName}...",
                 async () => (await resourceGroup.GetContainerServiceManagedClusters().CreateOrUpdateAsync(Azure.WaitUntil.Completed, configuration.AksClusterName, cluster, cts.Token)).Value);
-
-            static UserAssignedIdentity PopulateUserAssignedIdentity(UserAssignedIdentityData data)
-            {
-                UserAssignedIdentityJson json = new(data.PrincipalId.Value, data.ClientId.Value);
-                System.Text.Json.Utf8JsonReader reader = new(System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(json, jsonSerializerWebOptions)));
-                return ((IJsonModel<UserAssignedIdentity>)new UserAssignedIdentity()).Create(ref reader, ModelReaderWriterOptions.Json);
-            }
         }
 
         private static readonly System.Text.Json.JsonSerializerOptions jsonSerializerWebOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
