@@ -164,7 +164,6 @@ namespace CromwellOnAzureDeployer
                 });
 
                 await ValidateSubscriptionAndResourceGroupAsync(configuration);
-                await ValidateVmAsync();
                 kubernetesManager = new KubernetesManager(configuration, azureCredentials, azureCloudConfig, cts.Token);
 
                 IResourceGroup resourceGroup = null;
@@ -364,6 +363,7 @@ namespace CromwellOnAzureDeployer
                         }
 
                         ValidateRegionName(configuration.RegionName);
+                        await ValidateVmAsync();
                         ValidateMainIdentifierPrefix(configuration.MainIdentifierPrefix);
                         storageAccount = await ValidateAndGetExistingStorageAccountAsync();
                         batchAccount = await ValidateAndGetExistingBatchAccountAsync();
