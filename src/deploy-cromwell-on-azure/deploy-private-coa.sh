@@ -93,8 +93,6 @@ temp_deployer_vm_name="${prefix}-coa-deploy"
 coa_binary_path="/tmp/coa"
 coa_binary="deploy-cromwell-on-azure"
 
-rm -f ../ga4gh-tes/nuget.config
-
 if [ -f "./deploy-cromwell-on-azure-linux" ]; then
     coa_binary="deploy-cromwell-on-azure-linux"
 elif [ -f "./deploy-cromwell-on-azure" ]; then
@@ -102,9 +100,11 @@ elif [ -f "./deploy-cromwell-on-azure" ]; then
 else
     # publish a new deployer binary
     echo-green "Building the deployer..."
+    rm -f ../ga4gh-tes/nuget.config
     dotnet publish -r linux-x64 -c Release -o ./ /p:PublishSingleFile=true /p:DebugType=none /p:IncludeNativeLibrariesForSelfExtract=true
 fi
 
+az account set --subscription $subscription
 create_resource_group_if_not_exists $resource_group_name $location
 
 echo-green "Creating HUB virtual network..."
@@ -182,7 +182,7 @@ echo-green "Waiting for port to open..."
 sleep 10
 
 echo-green "Installing AZ CLI and logging in..."
-ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash; az cloud set -n $azure_cloud_name; az login --use-device-code"
+ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash; az cloud set -n $azure_cloud_name; az login --use-device-code; az account set --subscription $subscription"
 
 echo-green "Creating directory..."
 ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "mkdir -p /tmp/coa"
