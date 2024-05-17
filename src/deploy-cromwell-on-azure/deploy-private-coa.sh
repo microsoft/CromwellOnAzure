@@ -207,9 +207,9 @@ ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "$coa_binary_path/$coa_b
     --DisableBatchNodesPublicIpAddress true \
     --VnetName $spoke_vnet_name \
     --VnetResourceGroupName $resource_group_name \
-    --VmSubnetName aks-subnet \
-    --PostgreSqlSubnetName psql-subnet \
-    --BatchSubnetName batch-subnet \
+    --VmSubnetName $aks_subnet_name \
+    --PostgreSqlSubnetName $psql_subnet_name \
+    --BatchSubnetName $batch_subnet_name \
     --HelmBinaryPath /usr/local/bin/helm \
     --TesImageName $tes_image_name \
     --TriggerServiceImageName $trigger_service_image_name \
