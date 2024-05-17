@@ -114,7 +114,7 @@ az network vnet peering create --name Spoke0ToHub --resource-group $resource_gro
 
 echo "Creating AKS private DNS zone..."
 dns_zone_id=$(az network private-dns zone create --resource-group $resource_group_name --name $dns_zone_name --query "id" -o tsv)
-az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${spoke0_vnet_name}-dns-link" --virtual-network $spoke_vnet_name --registration-enabled false
+az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${spoke0_vnet_name}-dns-link" --virtual-network $spoke0_vnet_name --registration-enabled false
 
 #echo "Creating firewall subnet..."
 #az network vnet subnet create --resource-group $resource_group_name --vnet-name $vnet_name --name $firewall_subnet_name --address-prefixes $firewall_subnet_cidr
