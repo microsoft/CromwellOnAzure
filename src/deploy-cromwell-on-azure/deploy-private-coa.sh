@@ -150,7 +150,7 @@ firewall_private_ip=$(az network firewall show --name $firewall_name --resource-
 echo-green "Creating route table..."
 az network route-table create --name $route_table_name --resource-group $resource_group_name --location $location
 
-echo-green "Creating route to direct AKS and Batch subnet Internet traffic through the Azure Firewall..."
+echo-green "Creating route to be used by the AKS and Batch subnet Internet traffic to be routed through the Azure Firewall..."
 az network route-table route create --name "route-to-firewall" --route-table-name $route_table_name --resource-group $resource_group_name --address-prefix "0.0.0.0/0" --next-hop-type "VirtualAppliance" --next-hop-ip-address $firewall_private_ip
 
 echo-green "Creating subnets in SPOKE0 VNET..."
@@ -159,12 +159,16 @@ az network vnet subnet create --resource-group $resource_group_name --vnet-name 
 az network vnet subnet create --resource-group $resource_group_name --vnet-name $spoke0_vnet_name -n $deployer_subnet_name --address-prefixes $deployer_subnet_cidr
 az network vnet subnet create --resource-group $resource_group_name --vnet-name $spoke0_vnet_name -n $batch_subnet_name --address-prefixes $batch_subnet_cidr --route-table $route_table_name
 
+echo-green "Updating $aks_subnet_name to have a service endpoint for Microsoft.Storage..."
 az network vnet subnet update --resource-group $resource_group_name --vnet-name $spoke0_vnet_name --name $aks_subnet_name --service-endpoints "Microsoft.Storage"
+echo-green "Updating $batch_subnet_name to have a service endpoint for Microsoft.Storage..."
 az network vnet subnet update --resource-group $resource_group_name --vnet-name $spoke0_vnet_name --name $batch_subnet_name --service-endpoints "Microsoft.Storage"
 
-# Below needed?
-az network vnet subnet update --resource-group $resource_group_name --vnet-name $spoke0_vnet_name --name $psql_subnet_name --disable-private-endpoint-network-policies true
-az network vnet subnet update --resource-group $resource_group_name --vnet-name $spoke0_vnet_name --name $batch_subnet_name --disable-private-link-service-network-policies true
+# Below needed
+echo-green "Disabling private endpoint network policies for $psql_subnet_name..."
+az network vnet subnet update --resource-group $resource_group_name --vnet-name $spoke0_vnet_name --name $psql_subnet_name --private-endpoint-network-policies Disabled
+echo-green "Disabling private link service network policies for $batch_subnet_name..."
+az network vnet subnet update --resource-group $resource_group_name --vnet-name $spoke0_vnet_name --name $batch_subnet_name --private-link-service-network-policies Disabled
 
 deployer_subnet_id=$(az network vnet subnet show --resource-group $resource_group_name --vnet-name $spoke0_vnet_name --name $deployer_subnet_name --query "id" -o tsv)
 
