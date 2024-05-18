@@ -205,7 +205,7 @@ ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "$coa_binary_path/$coa_b
     --MainIdentifierPrefix $prefix \
     --PrivateNetworking true \
     --DisableBatchNodesPublicIpAddress true \
-    --VnetName $spoke_vnet_name \
+    --VnetName $spoke0_vnet_name \
     --VnetResourceGroupName $resource_group_name \
     --VmSubnetName $aks_subnet_name \
     --PostgreSqlSubnetName $psql_subnet_name \
