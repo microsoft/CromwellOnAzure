@@ -118,7 +118,10 @@ az network vnet create \
 echo-green "Creating Private DNS zone in the HUB VNET..."
 dns_zone_id=$(az network private-dns zone create --resource-group $resource_group_name --name $dns_zone_name --query "id" -o tsv)
 az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${hub_vnet_name}-dns-link" --virtual-network $hub_vnet_name --registration-enabled false
- 
+
+echo-green "Linking DNS zone to Spoke0 VNET..."
+az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${spoke0_vnet_name}-dns-link" --virtual-network $spoke0_vnet_name --registration-enabled false
+
 echo-green "Creating SPOKE0 virtual network..."
 az network vnet create \
     --resource-group $resource_group_name \
@@ -164,7 +167,7 @@ az network vnet subnet update --resource-group $resource_group_name --vnet-name 
 echo-green "Updating $batch_subnet_name to have a service endpoint for Microsoft.Storage..."
 az network vnet subnet update --resource-group $resource_group_name --vnet-name $spoke0_vnet_name --name $batch_subnet_name --service-endpoints "Microsoft.Storage"
 
-# Below needed
+# Below needed?
 echo-green "Disabling private endpoint network policies for $psql_subnet_name..."
 az network vnet subnet update --resource-group $resource_group_name --vnet-name $spoke0_vnet_name --name $psql_subnet_name --private-endpoint-network-policies Disabled
 echo-green "Disabling private link service network policies for $batch_subnet_name..."
