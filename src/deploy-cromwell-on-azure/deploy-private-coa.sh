@@ -115,13 +115,6 @@ az network vnet create \
     --subnet-name $hub_subnet_name \
     --subnet-prefixes $hub_subnet_cidr
 
-echo-green "Creating Private DNS zone in the HUB VNET..."
-dns_zone_id=$(az network private-dns zone create --resource-group $resource_group_name --name $dns_zone_name --query "id" -o tsv)
-az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${hub_vnet_name}-dns-link" --virtual-network $hub_vnet_name --registration-enabled false
-
-echo-green "Linking DNS zone to Spoke0 VNET..."
-az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${spoke0_vnet_name}-dns-link" --virtual-network $spoke0_vnet_name --registration-enabled false
-
 echo-green "Creating SPOKE0 virtual network..."
 az network vnet create \
     --resource-group $resource_group_name \
@@ -134,6 +127,13 @@ echo-green "Peering HUB to SPOKE0..."
 az network vnet peering create --name HubToSpoke0 --resource-group $resource_group_name --vnet-name $hub_vnet_name --remote-vnet $spoke0_vnet_name --allow-vnet-access
 echo-green "Peering SPOKE0 to HUB..."
 az network vnet peering create --name Spoke0ToHub --resource-group $resource_group_name --vnet-name $spoke0_vnet_name --remote-vnet $hub_vnet_name --allow-vnet-access
+
+echo-green "Creating Private DNS zone in the HUB VNET..."
+dns_zone_id=$(az network private-dns zone create --resource-group $resource_group_name --name $dns_zone_name --query "id" -o tsv)
+az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${hub_vnet_name}-dns-link" --virtual-network $hub_vnet_name --registration-enabled false
+
+echo-green "Linking DNS zone to Spoke0 VNET..."
+az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${spoke0_vnet_name}-dns-link" --virtual-network $spoke0_vnet_name --registration-enabled false
 
 #echo-green "Creating firewall subnet..."
 #az network vnet subnet create --resource-group $resource_group_name --vnet-name $vnet_name --name $firewall_subnet_name --address-prefixes $firewall_subnet_cidr
