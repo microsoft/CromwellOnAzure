@@ -36,7 +36,7 @@ if ! dotnet --list-sdks | grep -q '8\.'; then
     echo-green ".NET 8 SDK is not installed. Installing .NET 8 SDK..."
     wget https://dot.net/v1/dotnet-install.sh
     chmod +x dotnet-install.sh
-    ./dotnet-install.sh --version 8.0.100
+    ./dotnet-install.sh --version 8.0.300
     # Reload the environment to ensure dotnet is in PATH
     source ~/.profile
 fi
@@ -66,9 +66,9 @@ spoke0_vnet_cidr="10.100.0.0/16"
 spoke0_subnet_cidr="10.100.0.0/24"
 #firewall_subnet_cidr="10.100.1.0/24"
 aks_subnet_cidr="10.100.1.0/24"
-psql_subnet_cidr="10.100.2.0/24"
-kubernetes_service_cidr="10.100.3.0/24"
-kubernetes_dns_ip="10.100.3.10"
+kubernetes_service_cidr="10.100.2.0/24"
+kubernetes_dns_ip="10.100.2.10"
+psql_subnet_cidr="10.100.3.0/24"
 deployer_subnet_cidr="10.100.99.0/24"
 batch_subnet_cidr="10.100.128.0/17"
 
@@ -130,10 +130,10 @@ az network vnet peering create --name Spoke0ToHub --resource-group $resource_gro
 
 echo-green "Creating Private DNS zone in the HUB VNET..."
 dns_zone_id=$(az network private-dns zone create --resource-group $resource_group_name --name $dns_zone_name --query "id" -o tsv)
-az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${hub_vnet_name}-dns-link" --virtual-network $hub_vnet_name --registration-enabled false
+az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${hub_vnet_name}-dns-link" --virtual-network $hub_vnet_name --registration-enabled true
 
 echo-green "Linking DNS zone to Spoke0 VNET..."
-az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${spoke0_vnet_name}-dns-link" --virtual-network $spoke0_vnet_name --registration-enabled false
+az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${spoke0_vnet_name}-dns-link" --virtual-network $spoke0_vnet_name --registration-enabled true
 
 #echo-green "Creating firewall subnet..."
 #az network vnet subnet create --resource-group $resource_group_name --vnet-name $vnet_name --name $firewall_subnet_name --address-prefixes $firewall_subnet_cidr
@@ -199,8 +199,8 @@ ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "curl -fsSL https://raw.
 echo-green "Setting CoA deployer binary to executable..."
 ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "chmod +x $coa_binary_path/$coa_binary"
 
-echo-green "Executing CoA deployer binary..."
-ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "$coa_binary_path/$coa_binary \
+echo "Executing CoA deployer binary. If it fails, it will start a new bash session for you to troubleshoot..."
+ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "set +e; $coa_binary_path/$coa_binary \
     --SubscriptionId $subscription \
     --ResourceGroupName $resource_group_name \
     --RegionName $location \
@@ -220,4 +220,5 @@ ssh -o StrictHostKeyChecking=no azureuser@$vm_public_ip "$coa_binary_path/$coa_b
     --KubernetesServiceCidr $kubernetes_service_cidr \
     --KubernetesDnsServiceIp $kubernetes_dns_ip \
     --UserDefinedRouting true \
-    --AksPrivateDnsZoneResourceId $dns_zone_id"
+    --AksPrivateDnsZoneResourceId $dns_zone_id; if [ \$? -ne 0 ]; then echo 'Execution failed, starting a bash session for troubleshooting...'; command; exec bash; fi"
+
