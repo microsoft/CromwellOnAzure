@@ -170,9 +170,9 @@ az network vnet subnet create --resource-group $resource_group_name --vnet-name 
 az network vnet subnet create --resource-group $resource_group_name --vnet-name $spoke0_vnet_name -n $batch_subnet_name --address-prefixes $batch_subnet_cidr --route-table $route_table_name
 
 echo-green "Updating $aks_subnet_name to have a service endpoint for Microsoft.Storage..."
-az network vnet subnet update --resource-group $resource_group_name --vnet-name $vnet_name --name batch-subnet --service-endpoints "Microsoft.Storage Microsoft.ContainerRegistry Microsoft.Sql"
+az network vnet subnet update --resource-group $resource_group_name --vnet-name $vnet_name --name $aks_subnet_name --service-endpoints "Microsoft.Storage Microsoft.ContainerRegistry Microsoft.Sql"
 echo-green "Updating $batch_subnet_name to have a service endpoint for Microsoft.Storage..."
-az network vnet subnet update --resource-group $resource_group_name --vnet-name $vnet_name --name batch-subnet --service-endpoints "Microsoft.Storage Microsoft.ContainerRegistry Microsoft.Sql"
+az network vnet subnet update --resource-group $resource_group_name --vnet-name $vnet_name --name $batch_subnet_name --service-endpoints "Microsoft.Storage Microsoft.ContainerRegistry Microsoft.Sql"
 
 # Below needed?
 echo-green "Disabling private endpoint network policies for $psql_subnet_name..."
