@@ -62,7 +62,7 @@ azure_cloud_name=${4:-$azure_cloud_name}
 hub_vnet_cidr="10.0.0.0/16"
 hub_subnet_cidr="10.0.1.0/24"
 # NETWORK - SPOKE0 VNET
-spoke0_vnet_cidr="10.100.0.0/16"
+spoke0_vnet_cidr="10.100.0.0/14"
 spoke0_subnet_cidr="10.100.0.0/24"
 #firewall_subnet_cidr="10.100.1.0/24"
 aks_subnet_cidr="10.100.1.0/24"
@@ -70,7 +70,7 @@ kubernetes_service_cidr="10.100.2.0/24"
 kubernetes_dns_ip="10.100.2.10"
 psql_subnet_cidr="10.100.3.0/24"
 deployer_subnet_cidr="10.100.99.0/24"
-batch_subnet_cidr="10.100.128.0/17"
+batch_subnet_cidr="10.101.0.0/16"
 
 # Resource names
 resource_group_name="${prefix}-main"
