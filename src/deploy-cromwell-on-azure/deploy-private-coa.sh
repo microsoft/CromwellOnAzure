@@ -154,7 +154,20 @@ echo-green "Creating route table..."
 az network route-table create --name $route_table_name --resource-group $resource_group_name --location $location
 
 echo-green "Creating route to be used by the AKS and Batch subnet Internet traffic to be routed through the Azure Firewall..."
-az network route-table route create --name "route-to-firewall" --route-table-name $route_table_name --resource-group $resource_group_name --address-prefix "0.0.0.0/0" --next-hop-type "VirtualAppliance" --next-hop-ip-address $firewall_private_ip
+az network route-table route create --name "default-route" --route-table-name $route_table_name --resource-group $resource_group_name --address-prefix "0.0.0.0/0" --next-hop-type "VirtualAppliance" --next-hop-ip-address $firewall_private_ip
+
+echo-green "Adding broad network rule to allow all outbound traffic..."
+az network firewall network-rule create \
+    --resource-group $resource_group_name \
+    --firewall-name $firewall_name \
+    --collection-name AllowAllOutbound \
+    --name AllowAllTraffic \
+    --protocols "TCP" "UDP" "ICMP" \
+    --source-addresses "*" \
+    --destination-addresses "*" \
+    --destination-ports "*" \
+    --action "Allow" \
+    --priority 100
 
 echo-green "Creating subnets in SPOKE0 VNET..."
 az network vnet subnet create --resource-group $resource_group_name --vnet-name $spoke0_vnet_name -n $aks_subnet_name --address-prefixes $aks_subnet_cidr --route-table $route_table_name
