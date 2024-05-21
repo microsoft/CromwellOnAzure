@@ -64,7 +64,6 @@ hub_subnet_cidr="10.0.1.0/24"
 # NETWORK - SPOKE0 VNET
 spoke0_vnet_cidr="10.100.0.0/14"
 spoke0_subnet_cidr="10.100.0.0/24"
-#firewall_subnet_cidr="10.100.1.0/24"
 aks_subnet_cidr="10.100.1.0/24"
 kubernetes_service_cidr="10.100.2.0/24"
 kubernetes_dns_ip="10.100.2.10"
@@ -82,8 +81,6 @@ deployer_subnet_name="${prefix}-deployer-subnet"
 aks_subnet_name="${prefix}-aks-subnet"
 psql_subnet_name="${prefix}-psql-subnet"
 batch_subnet_name="${prefix}-batch-subnet"
-
-#firewall_subnet_name="AzureFirewallSubnet" # "${prefix}-firewall-subnet"
 route_table_name="${prefix}-route-table"
 firewall_name="${prefix}-firewall"
 dns_zone_name="${prefix}.private.${location}.azmk8s.io"
@@ -134,9 +131,6 @@ az network private-dns link vnet create --resource-group $resource_group_name --
 
 echo-green "Linking DNS zone to Spoke0 VNET..."
 az network private-dns link vnet create --resource-group $resource_group_name --zone-name $dns_zone_name --name "${spoke0_vnet_name}-dns-link" --virtual-network $spoke0_vnet_name --registration-enabled true
-
-#echo-green "Creating firewall subnet..."
-#az network vnet subnet create --resource-group $resource_group_name --vnet-name $vnet_name --name $firewall_subnet_name --address-prefixes $firewall_subnet_cidr
 
 echo-green "Creating public IP for Azure Firewall in HUB VNET..."
 az network public-ip create --name "${firewall_name}-pip" --resource-group $resource_group_name --location $location --sku "Standard" --allocation-method "Static"
