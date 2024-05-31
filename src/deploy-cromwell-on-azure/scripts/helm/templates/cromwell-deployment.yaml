@@ -4,7 +4,6 @@ kind: Deployment
 metadata:
   labels:
     io.kompose.service: cromwell
-    aadpodidbinding: {{ .Values.identity.name }}
   name: cromwell
 spec:
   replicas: 1
@@ -17,10 +16,11 @@ spec:
     metadata:
       labels:
         io.kompose.service: cromwell
-        aadpodidbinding: {{ .Values.identity.name }}
+        azure.workload.identity/use: "true"
       annotations:
         container.apparmor.security.beta.kubernetes.io/cromwell: runtime/default
     spec:
+      serviceAccountName: {{ .Values.identity.name }}-sa
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000

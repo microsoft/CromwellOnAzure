@@ -10,13 +10,13 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Azure.Core;
+using Azure.ResourceManager.ContainerService;
+using CommonUtilities.AzureCloud;
 using k8s;
 using k8s.Models;
 using Microsoft.Azure.Management.ContainerService;
-using Microsoft.Azure.Management.ContainerService.Fluent;
-using Microsoft.Azure.Management.ContainerService.Models;
 using Microsoft.Azure.Management.Msi.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Azure.Management.Storage.Fluent;
 using Newtonsoft.Json;
@@ -38,16 +38,16 @@ namespace CromwellOnAzureDeployer
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
             .WaitAndRetryAsync(200, retryAttempt => System.TimeSpan.FromSeconds(5));
 
+        private static readonly HashSet<string> testStorageAccounts = new HashSet<string> { "datasettestinputs", "datasettestinputssouthc" };
+
         // "master" is used despite not being a best practice: https://github.com/kubernetes-sigs/blob-csi-driver/issues/783
         private const string BlobCsiDriverGithubReleaseBranch = "master";
-        private const string BlobCsiDriverGithubReleaseVersion = "v1.21.4";
+        private const string BlobCsiDriverGithubReleaseVersion = "v1.24.0";
         private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseBranch}/charts";
-        private const string AadPluginGithubReleaseVersion = "v1.8.17";
-        private const string AadPluginRepo = $"https://raw.githubusercontent.com/Azure/aad-pod-identity/{AadPluginGithubReleaseVersion}/charts";
-        private const string AadPluginVersion = "4.1.18";
 
         private Configuration configuration { get; set; }
         private AzureCredentials azureCredentials { get; set; }
+        private AzureCloudConfig azureCloudConfig { get; set; }
         private CancellationToken cancellationToken { get; set; }
         private string workingDirectoryTemp { get; set; }
         private string kubeConfigPath { get; set; }
@@ -55,8 +55,9 @@ namespace CromwellOnAzureDeployer
         public string helmScriptsRootDirectory { get; set; }
         public string TempHelmValuesYamlPath { get; set; }
 
-        public KubernetesManager(Configuration config, AzureCredentials credentials, CancellationToken cancellationToken)
+        public KubernetesManager(Configuration config, AzureCredentials credentials, AzureCloudConfig azureCloudConfig, CancellationToken cancellationToken)
         {
+            this.azureCloudConfig = azureCloudConfig;
             this.cancellationToken = cancellationToken;
             configuration = config;
             azureCredentials = credentials;
@@ -64,11 +65,10 @@ namespace CromwellOnAzureDeployer
             CreateAndInitializeWorkingDirectoriesAsync().Wait(cancellationToken);
         }
 
-        public async Task<IKubernetes> GetKubernetesClientAsync(ManagedCluster aksCluster)
+        public async Task<IKubernetes> GetKubernetesClientAsync(ContainerServiceManagedClusterResource aksCluster)
         {
-            var r = new ResourceIdentifier(aksCluster.Id);
-            var resourceGroup = r.ResourceGroupName;
-            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId };
+            var resourceGroup = aksCluster.Id.ResourceGroupName;
+            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
 
             // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
             var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup, configuration.AksClusterName, cancellationToken: cancellationToken);
@@ -93,7 +93,6 @@ namespace CromwellOnAzureDeployer
                 apiVersion: apps/v1
                 kind: Deployment
                 metadata:
-                  creationTimestamp: null
                   labels:
                     io.kompose.service: ubuntu
                   name: ubuntu
@@ -102,21 +101,16 @@ namespace CromwellOnAzureDeployer
                   selector:
                     matchLabels:
                       io.kompose.service: ubuntu
-                  strategy: {}
                   template:
                     metadata:
-                      creationTimestamp: null
                       labels:
                         io.kompose.service: ubuntu
                     spec:
                       containers:
                         - name: ubuntu
-                          image: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-                          command: [ "/bin/bash", "-c", "--" ]
-                          args: [ "while true; do sleep 30; done;" ]
-                          resources: {}
-                      restartPolicy: Always
-                status: {}
+                          image: ubuntu
+                          command: ["/bin/bash", "-c", "--"]
+                          args: ["while true; do sleep 30; done;"]
                 """));
         }
 
@@ -124,18 +118,12 @@ namespace CromwellOnAzureDeployer
         {
             var helmRepoList = await ExecHelmProcessAsync($"repo list", workingDirectory: null, throwOnNonZeroExitCode: false);
 
-            if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("aad-pod-identity", StringComparison.OrdinalIgnoreCase))
-            {
-                await ExecHelmProcessAsync($"repo add aad-pod-identity {AadPluginRepo}");
-            }
-
             if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("blob-csi-driver", StringComparison.OrdinalIgnoreCase))
             {
                 await ExecHelmProcessAsync($"repo add blob-csi-driver {BlobCsiRepo}");
             }
 
             await ExecHelmProcessAsync($"repo update");
-            await ExecHelmProcessAsync($"upgrade --install aad-pod-identity aad-pod-identity/aad-pod-identity --namespace kube-system --version {AadPluginVersion} --kubeconfig \"{kubeConfigPath}\"");
             await ExecHelmProcessAsync($"upgrade --install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig \"{kubeConfigPath}\"");
         }
 
@@ -191,6 +179,11 @@ namespace CromwellOnAzureDeployer
             }
 
             MergeContainers(containersToMount, values);
+            if (azureCloudConfig.AzureEnvironment != AzureEnvironment.AzureGlobalCloud)
+            {
+                values.ExternalSasContainers = null;
+            }
+
             var valuesString = KubernetesYaml.Serialize(values);
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString, cancellationToken);
             await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cancellationToken);
@@ -220,6 +213,11 @@ namespace CromwellOnAzureDeployer
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cancellationToken));
             return ValuesToSettings(values);
+        }
+
+        public async Task RemovePodAadChart()
+        {
+            await ExecHelmProcessAsync($"uninstall aad-pod-identity", throwOnNonZeroExitCode: false);
         }
 
         public async Task ExecuteCommandsOnPodAsync(IKubernetes client, string podName, IEnumerable<string[]> commands, string aksNamespace)
@@ -367,7 +365,7 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private static void MergeContainers(List<MountableContainer> containersToMount, HelmValues values)
+        private void MergeContainers(List<MountableContainer> containersToMount, HelmValues values)
         {
             if (containersToMount is null)
             {
@@ -390,10 +388,11 @@ namespace CromwellOnAzureDeployer
             }
 
             values.InternalContainersMIAuth = internalContainersMIAuth.Select(x => x.ToDictionary()).ToList();
+            values.ExternalSasContainers = new List<Dictionary<string, string>>();
             values.ExternalSasContainers = sasContainers.Select(x => x.ToDictionary()).ToList();
         }
 
-        private static void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)
+        private void UpdateValuesFromSettings(HelmValues values, Dictionary<string, string> settings)
         {
             var batchAccount = GetObjectFromConfig(values, "batchAccount") ?? new Dictionary<string, string>();
             var batchNodes = GetObjectFromConfig(values, "batchNodes") ?? new Dictionary<string, string>();
@@ -401,10 +400,12 @@ namespace CromwellOnAzureDeployer
             var batchImageGen2 = GetObjectFromConfig(values, "batchImageGen2") ?? new Dictionary<string, string>();
             var batchImageGen1 = GetObjectFromConfig(values, "batchImageGen1") ?? new Dictionary<string, string>();
             var martha = GetObjectFromConfig(values, "martha") ?? new Dictionary<string, string>();
+            var deployment = GetObjectFromConfig(values, "deployment") ?? new Dictionary<string, string>();
 
             values.Config["cromwellOnAzureVersion"] = GetValueOrDefault(settings, "CromwellOnAzureVersion");
             values.Config["azureServicesAuthConnectionString"] = GetValueOrDefault(settings, "AzureServicesAuthConnectionString");
             values.Config["applicationInsightsAccountName"] = GetValueOrDefault(settings, "ApplicationInsightsAccountName");
+            values.Config["azureCloudName"] = GetValueOrDefault(settings, "AzureCloudName");
             batchAccount["accountName"] = GetValueOrDefault(settings, "BatchAccountName");
             batchNodes["subnetId"] = GetValueOrDefault(settings, "BatchNodesSubnetId");
             values.Config["coaNamespace"] = GetValueOrDefault(settings, "AksCoANamespace");
@@ -433,6 +434,7 @@ namespace CromwellOnAzureDeployer
 
             values.Persistence["storageAccount"] = GetValueOrDefault(settings, "DefaultStorageAccountName");
             values.Persistence["executionsContainerName"] = GetValueOrDefault(settings, "ExecutionsContainerName");
+            values.Persistence["storageEndpointSuffix"] = azureCloudConfig.Suffixes.StorageSuffix;
 
             values.TesDatabase["serverName"] = GetValueOrDefault(settings, "PostgreSqlServerName");
             values.TesDatabase["serverNameSuffix"] = GetValueOrDefault(settings, "PostgreSqlServerNameSuffix");
@@ -451,6 +453,12 @@ namespace CromwellOnAzureDeployer
             values.CromwellDatabase["databaseName"] = GetValueOrDefault(settings, "PostgreSqlCromwellDatabaseName");
             values.CromwellDatabase["databaseUserLogin"] = GetValueOrDefault(settings, "PostgreSqlCromwellDatabaseUserLogin");
             values.CromwellDatabase["databaseUserPassword"] = GetValueOrDefault(settings, "PostgreSqlCromwellDatabaseUserPassword");
+            deployment["organizationName"] = GetValueOrDefault(settings, "DeploymentOrganizationName");
+            deployment["organizationUrl"] = GetValueOrDefault(settings, "DeploymentOrganizationUrl");
+            deployment["contactUri"] = GetValueOrDefault(settings, "DeploymentContactUri");
+            deployment["environment"] = GetValueOrDefault(settings, "DeploymentEnvironment");
+            deployment["created"] = GetValueOrDefault(settings, "DeploymentCreated");
+            deployment["updated"] = GetValueOrDefault(settings, "DeploymentUpdated");
 
             values.Config["batchAccount"] = batchAccount;
             values.Config["batchNodes"] = batchNodes;
@@ -458,10 +466,11 @@ namespace CromwellOnAzureDeployer
             values.Config["batchImageGen2"] = batchImageGen2;
             values.Config["batchImageGen1"] = batchImageGen1;
             values.Config["martha"] = martha;
+            values.Config["deployment"] = deployment;
         }
 
         private static IDictionary<string, string> GetObjectFromConfig(HelmValues values, string key)
-            => (values?.Config[key] as IDictionary<object, object>)?.ToDictionary(p => p.Key as string, p => p.Value as string);
+            => (values?.Config.TryGetValue(key, out var config) ?? false ? (config as IDictionary<object, object>) : null)?.ToDictionary(p => p.Key as string, p => p.Value as string);
 
         private static T GetValueOrDefault<T>(IDictionary<string, T> propertyBag, string key)
             => propertyBag.TryGetValue(key, out var value) ? value : default;
@@ -474,12 +483,14 @@ namespace CromwellOnAzureDeployer
             var batchImageGen2 = GetObjectFromConfig(values, "batchImageGen2") ?? new Dictionary<string, string>();
             var batchImageGen1 = GetObjectFromConfig(values, "batchImageGen1") ?? new Dictionary<string, string>();
             var martha = GetObjectFromConfig(values, "martha") ?? new Dictionary<string, string>();
+            var deployment = GetObjectFromConfig(values, "deployment") ?? new Dictionary<string, string>();
 
             return new()
             {
                 ["CromwellOnAzureVersion"] = GetValueOrDefault(values.Config, "cromwellOnAzureVersion") as string,
                 ["AzureServicesAuthConnectionString"] = GetValueOrDefault(values.Config, "azureServicesAuthConnectionString") as string,
                 ["ApplicationInsightsAccountName"] = GetValueOrDefault(values.Config, "applicationInsightsAccountName") as string,
+                ["AzureCloudName"] = GetValueOrDefault(values.Config, "azureCloudName") as string,
                 ["BatchAccountName"] = GetValueOrDefault(batchAccount, "accountName"),
                 ["BatchNodesSubnetId"] = GetValueOrDefault(batchNodes, "subnetId"),
                 ["AksCoANamespace"] = GetValueOrDefault(values.Config, "coaNamespace") as string,
@@ -507,6 +518,7 @@ namespace CromwellOnAzureDeployer
                 ["CromwellImageName"] = GetValueOrDefault(values.Images, "cromwell"),
                 ["DefaultStorageAccountName"] = GetValueOrDefault(values.Persistence, "storageAccount"),
                 ["ExecutionsContainerName"] = GetValueOrDefault(values.Persistence, "executionsContainerName"),
+                ["StorageEndpointSuffix"] = GetValueOrDefault(values.Persistence, "storageEndpointSuffix"),
 
                 // This is only defined once, so use the TesDatabase values
                 ["PostgreSqlServerName"] = GetValueOrDefault(values.TesDatabase, "serverName"),
@@ -523,6 +535,13 @@ namespace CromwellOnAzureDeployer
                 ["PostgreSqlCromwellDatabaseName"] = GetValueOrDefault(values.CromwellDatabase, "databaseName"),
                 ["PostgreSqlCromwellDatabaseUserLogin"] = GetValueOrDefault(values.CromwellDatabase, "databaseUserLogin"),
                 ["PostgreSqlCromwellDatabaseUserPassword"] = GetValueOrDefault(values.CromwellDatabase, "databaseUserPassword"),
+
+                ["DeploymentOrganizationName"] = GetValueOrDefault(deployment, "organizationName"),
+                ["DeploymentOrganizationUrl"] = GetValueOrDefault(deployment, "organizationUrl"),
+                ["DeploymentContactUri"] = GetValueOrDefault(deployment, "contactUri"),
+                ["DeploymentEnvironment"] = GetValueOrDefault(deployment, "environment"),
+                ["DeploymentCreated"] = GetValueOrDefault(deployment, "created"),
+                ["DeploymentUpdated"] = GetValueOrDefault(deployment, "updated"),
             };
         }
 

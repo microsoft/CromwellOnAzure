@@ -8,14 +8,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Microsoft.Azure.Management.ApplicationInsights.Management;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
-using Microsoft.Azure.Services.AppAuthentication;
-using Microsoft.Rest;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
-using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TriggerService
 {
@@ -42,33 +36,6 @@ namespace TriggerService
 
         public string AccountName { get; }
         public string AccountAuthority => account.BlobStorageUri.PrimaryUri.Authority;
-
-        public static async Task<string> GetAppInsightsConnectionStringAsync(string appInsightsApplicationId)
-        {
-            var azureClient = await GetAzureManagementClientAsync();
-            var subscriptionIds = (await azureClient.Subscriptions.ListAsync()).Select(s => s.SubscriptionId);
-
-            var credentials = new TokenCredentials(await GetAzureAccessTokenAsync());
-
-            foreach (var subscriptionId in subscriptionIds)
-            {
-                try
-                {
-                    var app = (await new ApplicationInsightsManagementClient(credentials) { SubscriptionId = subscriptionId }.Components.ListAsync())
-                        .FirstOrDefault(a => a.ApplicationId.Equals(appInsightsApplicationId, StringComparison.OrdinalIgnoreCase));
-
-                    if (app is not null)
-                    {
-                        return app.ConnectionString;
-                    }
-                }
-                catch
-                {
-                }
-            }
-
-            return null;
-        }
 
         public async Task<bool> IsAvailableAsync()
         {
@@ -151,21 +118,6 @@ namespace TriggerService
         public Task DeleteBlobIfExistsAsync(string container, string blobName)
             => blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DeleteIfExistsAsync();
 
-
-
-        /// <summary>
-        /// Gets an authenticated Azure Client instance
-        /// </summary>
-        /// <returns>An authenticated Azure Client instance</returns>
-        private static async Task<FluentAzure.IAuthenticated> GetAzureManagementClientAsync()
-        {
-            var accessToken = await GetAzureAccessTokenAsync();
-            var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, AzureEnvironment.AzureGlobalCloud);
-            var azureClient = FluentAzure.Authenticate(azureCredentials);
-
-            return azureClient;
-        }
-
         private static async Task<IEnumerable<CloudBlockBlob>> GetBlobsWithPrefixAsync(CloudBlobContainer blobContainer, string prefix)
         {
             var blobList = new List<CloudBlockBlob>();
@@ -191,13 +143,5 @@ namespace TriggerService
 
             return blobList;
         }
-
-
-
-
-        private static Task<string> GetAzureAccessTokenAsync(string resource = "https://management.azure.com/")
-            => new AzureServiceTokenProvider().GetAccessTokenAsync(resource);
-
-
     }
 }
