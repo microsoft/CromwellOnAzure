@@ -49,7 +49,7 @@ namespace TriggerService.Tests
                 ("https://raw.githubusercontent.com/microsoft/gatk4-data-processing-azure/main-azure/processing-for-variant-discovery-gatk4.hg38.trigger.json", "preprocessing-hg38"),
                 ("https://raw.githubusercontent.com/microsoft/gatk4-genome-processing-pipeline-azure/main-azure/WholeGenomeGermlineSingleSample.trigger.json", "germline"),
                 ("https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json", "mutect2"),
-                // TODO fix this WDL and uncomment ("https://raw.githubusercontent.com/microsoft/gatk4-rnaseq-germline-snps-indels-azure/jsaun/gatk4-rna-germline-variant-calling.trigger.json", "rna-germline"),
+                ("https://raw.githubusercontent.com/microsoft/gatk4-rnaseq-germline-snps-indels-azure/jsaun/gatk4-rna-germline-variant-calling.trigger.json", "rna-germline"),
                 ("https://raw.githubusercontent.com/microsoft/gatk4-cnn-variant-filter-azure/main-azure/cram2filtered.trigger.json", "cram-to-filtered"),
                 ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/interleaved-fastq-to-paired-fastq.trigger.json", "fastq-to-paired"),
                 ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/paired-fastq-to-unmapped-bam.trigger.json", "paired-fastq-to-unmapped-bam"),
