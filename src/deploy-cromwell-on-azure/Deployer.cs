@@ -890,7 +890,18 @@ namespace CromwellOnAzureDeployer
                     EnablePrivateClusterPublicFqdn = false
                 };
 
+                if (!string.IsNullOrWhiteSpace(configuration.AksPrivateDnsZoneResourceId))
+                {
+                    cluster.ApiServerAccessProfile.PrivateDnsZone = configuration.AksPrivateDnsZoneResourceId;
+                }
+
                 cluster.PublicNetworkAccess = ContainerServicePublicNetworkAccess.Disabled;
+
+                if (configuration?.UserDefinedRouting == true)
+                {
+                    cluster.NetworkProfile ??= new();
+                    cluster.NetworkProfile.OutboundType = ContainerServiceOutboundType.UserDefinedRouting;
+                }
             }
 
             return await Execute(
