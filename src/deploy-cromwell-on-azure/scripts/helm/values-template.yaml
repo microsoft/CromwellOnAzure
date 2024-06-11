@@ -18,7 +18,7 @@ config:
     usePreemptibleVmsOnly: RUNTIME_PARAMETER
     useLegacyAutopools: "False"
     poolRotationForcedDays: "7"
-    taskMaxWallClockTime: "7"
+    taskMaxWallClockTimeDays: "7"
     prefix: RUNTIME_PARAMETER
   deployment:
     organizationName: RUNTIME_PARAMETER
