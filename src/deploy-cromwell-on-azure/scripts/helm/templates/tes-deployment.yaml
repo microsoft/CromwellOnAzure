@@ -96,6 +96,8 @@ spec:
               value: {{ .Values.config.batchImageGen1.nodeAgentSkuId }}
             - name: BatchScheduling__PoolRotationForcedDays
               value: {{ .Values.config.batchScheduling.poolRotationForcedDays | quote }}
+            - name: BatchScheduling__TaskMaxWallClockTime
+              value: {{ .Values.config.batchScheduling.taskMaxWallClockTime | quote }}
             - name: BatchScheduling__Prefix
               value: {{ .Values.config.batchScheduling.prefix | quote }}
             - name: Martha__Url
