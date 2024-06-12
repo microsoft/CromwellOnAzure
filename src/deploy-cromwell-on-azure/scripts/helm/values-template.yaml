@@ -7,22 +7,26 @@ config:
   resourceGroup: RUNTIME_PARAMETER
   azureServicesAuthConnectionString: RUNTIME_PARAMETER
   applicationInsightsAccountName: RUNTIME_PARAMETER
-  azureOfferDurableId: MS-AZR-0003p
+  azureCloudName: RUNTIME_PARAMETER
   batchAccount:
     accountName: RUNTIME_PARAMETER
   batchNodes:
     subnetId: RUNTIME_PARAMETER
     disablePublicIpAddress: RUNTIME_PARAMETER
     globalStartTask: /configuration/start-task.sh
-    globalManagedIdentity:
   batchScheduling:
-    disable: RUNTIME_PARAMETER
     usePreemptibleVmsOnly: RUNTIME_PARAMETER
     useLegacyAutopools: "False"
     poolRotationForcedDays: "7"
+    taskMaxWallClockTimeDays: "7"
     prefix: RUNTIME_PARAMETER
-  nodeImages:
-    docker: RUNTIME_PARAMETER
+  deployment:
+    organizationName: RUNTIME_PARAMETER
+    organizationUrl: RUNTIME_PARAMETER
+    contactUri: RUNTIME_PARAMETER
+    environment: RUNTIME_PARAMETER
+    created: RUNTIME_PARAMETER
+    updated: RUNTIME_PARAMETER
   batchImageGen2:
     offer: RUNTIME_PARAMETER
     publisher: RUNTIME_PARAMETER
@@ -92,15 +96,25 @@ externalContainers:
 #    resourceGroup: resourceGroup1
 
 externalSasContainers:
+  - accountName: datasettestinputssouthc
+#[SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Public example, not confidential")]
+    sasToken: "si=coa&spr=https&sv=2022-11-02&sr=c&sig=Updk4aRmzWJai%2BhtQaLjNJAVq5jwc5M4frsCBTjIj%2FM%3D"
+    containerName: dataset
   - accountName: datasettestinputs
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Public example, not confidential")]
+#[SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Public example, not confidential")]
     sasToken: "sv=2018-03-28&sr=c&si=coa&sig=nKoK6dxjtk5172JZfDH116N6p3xTs7d%2Bs5EAUE4qqgM%3D"
     containerName: dataset
+# - accountName: storageAccount
+#   sasToken: ""
+#   containerName: test-inputs
+#   isAdlsGen2: true
 
 persistence:
   blobPvcSize: 32Gi
   cromwellTmpSize: 32Gi
   storageAccount: RUNTIME_PARAMETER
+  executionsContainerName: RUNTIME_PARAMETER
+  storageEndpointSuffix: RUNTIME_PARAMETER
 
 identity:
   name: RUNTIME_PARAMETER

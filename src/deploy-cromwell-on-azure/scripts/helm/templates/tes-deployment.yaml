@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   labels:
     io.kompose.service: tes
-    aadpodidbinding: {{ .Values.identity.name }}
   name: tes
 spec:
   replicas: 1
@@ -16,10 +15,11 @@ spec:
     metadata:
       labels:
         io.kompose.service: tes
-        aadpodidbinding: {{ .Values.identity.name }}
+        azure.workload.identity/use: "true"
       annotations:
         container.apparmor.security.beta.kubernetes.io/tes: runtime/default
     spec:
+      serviceAccountName: {{ .Values.identity.name }}-sa
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -28,6 +28,22 @@ spec:
       terminationGracePeriodSeconds: 90
       containers:
         - env:
+            - name: General__AzureCloudName
+              value: {{ .Values.config.azureCloudName }}
+            - name: Deployment__OrganizationName
+              value: {{ .Values.config.deployment.organizationName }}
+            - name: Deployment__OrganizationUrl
+              value: {{ .Values.config.deployment.organizationUrl }}
+            - name: Deployment__ContactUri
+              value: {{ .Values.config.deployment.contactUri }}
+            - name: Deployment__Environment
+              value: {{ .Values.config.deployment.environment }}
+            - name: Deployment__Created
+              value: {{ .Values.config.deployment.created }}
+            - name: Deployment__Updated
+              value: {{ .Values.config.deployment.updated }}
+            - name: Deployment__TesImage
+              value: {{ .Values.images.tes }}
             - name: TesPostgreSql__ServerName
               value: {{ .Values.tesDatabase.serverName }}
             - name: TesPostgreSql__ServerNameSuffix
@@ -46,24 +62,18 @@ spec:
               value: http://0.0.0.0:{{ .Values.service.tesPort }}/
             - name: Storage__DefaultAccountName
               value: {{ .Values.persistence.storageAccount }}
+            - name: Storage__ExecutionsContainerName
+              value: {{ .Values.persistence.executionsContainerName }}
             - name: AzureServicesAuthConnectionString
               value: {{ .Values.config.azureServicesAuthConnectionString }}
             - name: ApplicationInsights__AccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
-            - name: AzureOfferDurableId
-              value: {{ .Values.config.azureOfferDurableId }}
-            - name: BatchScheduling__UseLegacyAutopools
-              value: {{ .Values.config.batchScheduling.useLegacyAutopools | quote }}
             - name: BatchAccount__AccountName
               value: {{ .Values.config.batchAccount.accountName }}
             - name: BatchNodes__SubnetId
               value: {{ .Values.config.batchNodes.subnetId }}
             - name: BatchNodes__DisablePublicIpAddress
               value: {{ .Values.config.batchNodes.disablePublicIpAddress | quote }}
-            - name: BatchScheduling__Disable
-              value: {{ .Values.config.batchScheduling.disable | quote }}
-            - name: NodeImages__Docker
-              value: {{ .Values.config.nodeImages.docker }}
             - name: BatchImageGen2__Offer
               value: {{ .Values.config.batchImageGen2.offer }}
             - name: BatchImageGen2__Publisher
@@ -86,6 +96,8 @@ spec:
               value: {{ .Values.config.batchImageGen1.nodeAgentSkuId }}
             - name: BatchScheduling__PoolRotationForcedDays
               value: {{ .Values.config.batchScheduling.poolRotationForcedDays | quote }}
+            - name: BatchScheduling__TaskMaxWallClockTimeDays
+              value: {{ .Values.config.batchScheduling.taskMaxWallClockTimeDays | quote }}
             - name: BatchScheduling__Prefix
               value: {{ .Values.config.batchScheduling.prefix | quote }}
             - name: Martha__Url
@@ -99,7 +111,7 @@ spec:
             - name: BatchNodes__GlobalStartTask
               value: {{ .Values.config.batchNodes.globalStartTask }}
             - name: BatchNodes__GlobalManagedIdentity
-              value: {{ .Values.config.batchNodes.globalManagedIdentity }}
+              value: {{ .Values.identity.resourceId }}
             - name: Storage__ExternalStorageContainers
 {{- $containers  := list -}}
 {{- range .Values.externalSasContainers }}
