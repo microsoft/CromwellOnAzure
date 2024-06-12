@@ -460,6 +460,9 @@ namespace CromwellOnAzureDeployer
             deployment["created"] = GetValueOrDefault(settings, "DeploymentCreated");
             deployment["updated"] = GetValueOrDefault(settings, "DeploymentUpdated");
 
+            // ensure entries have values
+            _ = batchScheduling.TryAdd("poolRotationForcedDays", "7");
+
             values.Config["batchAccount"] = batchAccount;
             values.Config["batchNodes"] = batchNodes;
             values.Config["batchScheduling"] = batchScheduling;
