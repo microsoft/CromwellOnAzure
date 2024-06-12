@@ -17,6 +17,7 @@ config:
   batchScheduling:
     usePreemptibleVmsOnly: RUNTIME_PARAMETER
     poolRotationForcedDays: "7"
+    taskMaxWallClockTimeDays: "7"
     prefix: RUNTIME_PARAMETER
   deployment:
     organizationName: RUNTIME_PARAMETER
