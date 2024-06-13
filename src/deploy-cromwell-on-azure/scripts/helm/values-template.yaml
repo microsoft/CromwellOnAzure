@@ -70,7 +70,6 @@ images:
 # Mounted as /containername as expected by Cromwell
 cromwellContainers:
   - configuration
-  - cromwell-executions
   - cromwell-workflow-logs
   - outputs
 
