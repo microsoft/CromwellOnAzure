@@ -77,7 +77,7 @@ namespace CromwellOnAzureDeployer
             .Handle<Azure.RequestFailedException>(azureException =>
                 (int)System.Net.HttpStatusCode.Conflict == azureException.Status &&
                 "OperationNotAllowed".Equals(azureException.ErrorCode))
-            .WaitAndRetryAsync(3, retryAttempt => System.TimeSpan.FromSeconds(10));
+            .WaitAndRetryAsync(30, retryAttempt => System.TimeSpan.FromSeconds(10));
 
         private static readonly AsyncRetryPolicy generalRetryPolicy = Policy
             .Handle<Exception>()
