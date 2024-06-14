@@ -337,8 +337,6 @@ namespace TriggerService.Tests
 
         private void VerifyTriggerFileProcessing(ProcessedTriggerInfo processedTriggerInfo, int inputFilesCount)
         {
-            Assert.AreEqual(azureName, processedTriggerInfo.WorkflowSource.Filename, "comparing azureName to workflowSourceFilename");
-            AssertBytesEqual(processedTriggerInfo.WorkflowSource.Data, httpClientData, "workflowSourceData");
             AssertNamesEqual(processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(), inputFilesCount, azureName, "workflowInputsFilenames");
             AssertBytesEqual(processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(), inputFilesCount, httpClientData, "workflowInputsData");
             AssertExtraDataNull(processedTriggerInfo);
@@ -387,8 +385,6 @@ namespace TriggerService.Tests
 
         private static List<CromwellApiClient.CromwellApiClient.FileToPost> RetrievePostFiles(ProcessedTriggerInfo processedTriggerInfo)
             => CromwellApiClient.CromwellApiClient.AccumulatePostFiles(
-                processedTriggerInfo.WorkflowSource.Filename,
-                processedTriggerInfo.WorkflowSource.Data,
                 processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
                 processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
                 processedTriggerInfo.WorkflowOptions.Filename,
@@ -399,12 +395,8 @@ namespace TriggerService.Tests
         private static void VerifyPostFiles(ProcessedTriggerInfo processedTriggerInfo)
         {
             var files = RetrievePostFiles(processedTriggerInfo);
-
-            Assert.AreEqual(processedTriggerInfo.WorkflowInputs.Count + 1, files.Count, "unexpected number of files");
-
-            Assert.AreEqual("workflowSource", files[0].ParameterName, $"unexpected ParameterName for the 0th file");
-            Assert.AreEqual(processedTriggerInfo.WorkflowSource.Filename, files[0].Filename, $"unexpected Filename for the 0th file");
-            AssertBytesEqual(processedTriggerInfo.WorkflowSource.Data, files[0].Data, "files[0].Data");
+         
+            Assert.AreEqual(processedTriggerInfo.WorkflowInputs.Count, files.Count, "unexpected number of files");
 
             for (var i = 0; i < processedTriggerInfo.WorkflowInputs.Count; i++)
             {
@@ -412,15 +404,15 @@ namespace TriggerService.Tests
 
                 if (i == 0)
                 {
-                    Assert.AreEqual("workflowInputs", files[ip1].ParameterName, $"unexpected ParameterName for file #{ip1}");
+                    Assert.AreEqual("workflowInputs", files[i].ParameterName, $"unexpected ParameterName for file #{i}");
                 }
                 else
                 {
-                    Assert.AreEqual("workflowInputs_" + ip1, files[ip1].ParameterName, $"unexpected ParameterName for file #{ip1}");
+                    Assert.AreEqual("workflowInputs_" + ip1, files[i].ParameterName, $"unexpected ParameterName for file #{i}");
                 }
 
-                Assert.AreEqual(processedTriggerInfo.WorkflowInputs[i].Filename, files[ip1].Filename, $"unexpected Filename for file #{ip1}");
-                AssertBytesEqual(processedTriggerInfo.WorkflowInputs[i].Data, files[ip1].Data, $"files[{ip1}].Data");
+                Assert.AreEqual(processedTriggerInfo.WorkflowInputs[i].Filename, files[i].Filename, $"unexpected Filename for file #{i}");
+                AssertBytesEqual(processedTriggerInfo.WorkflowInputs[i].Data, files[i].Data, $"files[{i}].Data");
             }
         }
     }

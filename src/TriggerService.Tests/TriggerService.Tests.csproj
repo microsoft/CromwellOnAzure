@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
+    <ProjectReference Include="..\CromwellApiClient\CromwellApiClient.csproj" />
     <ProjectReference Include="..\ga4gh-tes\src\Tes\Tes.csproj" />
     <ProjectReference Include="..\TriggerService\TriggerService.csproj" />
   </ItemGroup>

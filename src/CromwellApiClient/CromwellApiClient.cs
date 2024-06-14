@@ -56,8 +56,7 @@ namespace CromwellApiClient
             => await PostAsync<PostAbortResponse>($"/{id}/abort", id);
 
         public async Task<PostWorkflowResponse> PostWorkflowAsync(
-            string workflowSourceFilename,
-            byte[] workflowSourceData,
+            string workflowUrl,
             List<string> workflowInputsFilename,
             List<byte[]> workflowInputsData,
             string workflowOptionsFilename = null,
@@ -66,20 +65,20 @@ namespace CromwellApiClient
             byte[] workflowDependenciesData = null)
         {
             var files = AccumulatePostFiles(
-                workflowSourceFilename,
-                workflowSourceData,
                 workflowInputsFilename,
                 workflowInputsData,
                 workflowOptionsFilename,
                 workflowOptionsData,
                 workflowDependenciesFilename,
                 workflowDependenciesData);
-            return await PostAsync<PostWorkflowResponse>(string.Empty, files);
+
+            var parameters = new List<KeyValuePair<string, string>> { 
+                new KeyValuePair<string, string>("workflowUrl", workflowUrl) };
+
+            return await PostAsync<PostWorkflowResponse>(string.Empty, files, parameters);
         }
 
         internal static List<FileToPost> AccumulatePostFiles(
-            string workflowSourceFilename,
-            byte[] workflowSourceData,
             List<string> workflowInputsFilename,
             List<byte[]> workflowInputsData,
             string workflowOptionsFilename = null,
@@ -87,9 +86,7 @@ namespace CromwellApiClient
             string workflowDependenciesFilename = null,
             byte[] workflowDependenciesData = null)
         {
-            var files = new List<FileToPost> {
-                new(workflowSourceFilename, workflowSourceData, "workflowSource", removeTabs: true)
-            };
+            var files = new List<FileToPost>();
 
             for (var i = 0; i < workflowInputsFilename.Count; i++)
             {
@@ -241,7 +238,7 @@ namespace CromwellApiClient
             }
         }
 
-        private async Task<T> PostAsync<T>(string path, IEnumerable<FileToPost> files)
+        private async Task<T> PostAsync<T>(string path, IEnumerable<FileToPost> files, IEnumerable<KeyValuePair<string, string>> parameters = null)
         {
             HttpResponseMessage response = null;
             var url = string.Empty;
@@ -249,15 +246,22 @@ namespace CromwellApiClient
             try
             {
                 url = GetApiUrl(path);
-                var content = new MultipartFormDataContent();
+                using var formContent = new MultipartFormDataContent(Guid.NewGuid().ToString());
+                formContent.Headers.ContentType.MediaType = "multipart/form-data";
+
+                foreach (var parameter in parameters)
+                {
+                    formContent.Add(new StringContent(parameter.Value), parameter.Key);
+                }
 
                 foreach (var file in files)
                 {
-                    var contentPart = new ByteArrayContent(file.Data);
-                    content.Add(contentPart, file.ParameterName, file.Filename);
+                    formContent.Add(new ByteArrayContent(file.Data), file.ParameterName, file.Filename);
                 }
 
-                response = await httpClient.PostAsync(url, content);
+                var req = formContent.ToString();
+
+                response = await httpClient.PostAsync(url, formContent);
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsAsync<T>();
             }

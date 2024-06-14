@@ -129,7 +129,7 @@ namespace TriggerService
                     var processedTriggerInfo = await ProcessBlobTrigger(blobTriggerJson);
 
                     var response = await cromwellApiClient.PostWorkflowAsync(
-                        processedTriggerInfo.WorkflowSource.Filename, processedTriggerInfo.WorkflowSource.Data,
+                        processedTriggerInfo.WorkflowUrl,
                         processedTriggerInfo.WorkflowInputs.Select(a => a.Filename).ToList(),
                         processedTriggerInfo.WorkflowInputs.Select(a => a.Data).ToList(),
                         processedTriggerInfo.WorkflowOptions.Filename, processedTriggerInfo.WorkflowOptions.Data,
@@ -169,7 +169,10 @@ namespace TriggerService
                 throw new ArgumentNullException(nameof(Workflow.WorkflowUrl), "must specify a WorkflowUrl in the Trigger File");
             }
 
-            var workflowSource = await GetBlobFileNameAndData(triggerInfo.WorkflowUrl);
+            if (!Uri.TryCreate(triggerInfo.WorkflowUrl, UriKind.Absolute, out var _))
+            {
+                throw new ArgumentException("The WorkflowUrl was not a valid URI");
+            }
 
             if (triggerInfo.WorkflowInputsUrl is not null)
             {
@@ -187,7 +190,7 @@ namespace TriggerService
             var workflowOptions = await GetBlobFileNameAndData(triggerInfo.WorkflowOptionsUrl);
             var workflowDependencies = await GetBlobFileNameAndData(triggerInfo.WorkflowDependenciesUrl);
 
-            return new ProcessedTriggerInfo(workflowSource, workflowInputs, workflowOptions, workflowDependencies);
+            return new ProcessedTriggerInfo(triggerInfo.WorkflowUrl, workflowInputs, workflowOptions, workflowDependencies);
         }
 
         public async Task UpdateWorkflowStatusesAsync()
