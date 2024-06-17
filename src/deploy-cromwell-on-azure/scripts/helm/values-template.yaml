@@ -14,7 +14,7 @@ config:
     subnetId: RUNTIME_PARAMETER
     disablePublicIpAddress: RUNTIME_PARAMETER
     globalStartTask: /configuration/start-task.sh
-    contentMD5: false
+    contentMD5: "False"
   batchScheduling:
     usePreemptibleVmsOnly: RUNTIME_PARAMETER
     useLegacyAutopools: "False"
