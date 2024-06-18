@@ -74,6 +74,8 @@ spec:
               value: {{ .Values.config.batchNodes.subnetId }}
             - name: BatchNodes__DisablePublicIpAddress
               value: {{ .Values.config.batchNodes.disablePublicIpAddress | quote }}
+            - name: BatchNodes__ContentMD5
+              value: {{ .Values.config.batchNodes.contentMD5 | quote }}
             - name: BatchImageGen2__Offer
               value: {{ .Values.config.batchImageGen2.offer }}
             - name: BatchImageGen2__Publisher

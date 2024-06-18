@@ -73,15 +73,19 @@ namespace CromwellOnAzureDeployer
                 "HashConflictOnDifferentRoleAssignmentIds".Equals(cloudException.Body.Code))
             .RetryAsync();
 
-        private static readonly AsyncRetryPolicy operationNotAllowedConflictRetryPolicy = Policy
+        private static readonly AsyncRetryPolicy updateConflictRetryPolicy = Policy
             .Handle<Azure.RequestFailedException>(azureException =>
-                (int)System.Net.HttpStatusCode.Conflict == azureException.Status &&
-                "OperationNotAllowed".Equals(azureException.ErrorCode))
-            .WaitAndRetryAsync(30, retryAttempt => System.TimeSpan.FromSeconds(10));
+                (int)System.Net.HttpStatusCode.Conflict == azureException.Status && azureException.ErrorCode switch
+                {
+                    "EtagMismatch" => true,
+                    "OperationNotAllowed" => true,
+                    _ => false,
+                })
+            .WaitAndRetryAsync(30, retryAttempt => TimeSpan.FromSeconds(10));
 
         private static readonly AsyncRetryPolicy generalRetryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryAsync(3, retryAttempt => System.TimeSpan.FromSeconds(1));
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(1));
 
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
@@ -325,7 +329,7 @@ namespace CromwellOnAzureDeployer
 
                         if (installedVersion is null || installedVersion < new Version(5, 2, 2))
                         {
-                            await operationNotAllowedConflictRetryPolicy.ExecuteAsync(() => EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup));
+                            await updateConflictRetryPolicy.ExecuteAsync(() => EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup));
                             await kubernetesManager.RemovePodAadChart();
                             await Execute("Waiting 2 minutes for federated crendentials propagation...",
                                 () => Task.Delay(System.TimeSpan.FromMinutes(2), cts.Token));
