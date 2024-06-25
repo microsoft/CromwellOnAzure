@@ -909,9 +909,6 @@ namespace CromwellOnAzureDeployer
                 async () => (await resourceGroup.GetContainerServiceManagedClusters().CreateOrUpdateAsync(Azure.WaitUntil.Completed, configuration.AksClusterName, cluster, cts.Token)).Value);
         }
 
-        private static readonly System.Text.Json.JsonSerializerOptions jsonSerializerWebOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
-        private record struct UserAssignedIdentityJson(Guid PrincipalId, Guid ClientId);
-
         private async Task EnableWorkloadIdentity(ContainerServiceManagedClusterResource aksCluster, IIdentity managedIdentity, IResourceGroup resourceGroup)
         {
             var armCluster = aksCluster.HasData ? aksCluster : (await aksCluster.GetAsync(cancellationToken: cts.Token)).Value;
