@@ -78,12 +78,12 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New))
-                .Returns(Task.FromResult(new[] {
+                .Returns(AsyncEnumerable.Repeat(
                     new TriggerFile {
                         Uri = $"http://tempuri.org/workflows/new/Sample.json",
                         ContainerName = "workflows",
                         Name = $"new/Sample.json",
-                        LastModified = DateTimeOffset.UtcNow } }.AsEnumerable()));
+                        LastModified = DateTimeOffset.UtcNow }, 1));
 
             azureStorage.Setup(x => x.IsAvailableAsync())
                 .Returns(() =>

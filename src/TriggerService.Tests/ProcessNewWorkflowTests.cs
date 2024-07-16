@@ -70,13 +70,17 @@ namespace TriggerService.Tests
                 .Returns(new Mock<ILogger>().Object);
 
             azureStorage
+                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort))
+                .Returns(AsyncEnumerable.Empty<TriggerFile>());
+
+            azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New))
-                .Returns(Task.FromResult(new[] {
+                .Returns(AsyncEnumerable.Repeat(
                     new TriggerFile {
                         Uri = $"http://tempuri.org/workflows/new/Sample.json",
                         ContainerName = "workflows",
                         Name = $"new/Sample.json",
-                        LastModified = DateTimeOffset.UtcNow } }.AsEnumerable()));
+                        LastModified = DateTimeOffset.UtcNow }, 1));
 
             azureStorage
                 .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"new/Sample.json"))
@@ -154,13 +158,17 @@ namespace TriggerService.Tests
                 .Returns(new Mock<ILogger>().Object);
 
             azureStorage
+                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort))
+                .Returns(AsyncEnumerable.Empty<TriggerFile>());
+
+            azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New))
-                .Returns(Task.FromResult(new[] {
+                .Returns(AsyncEnumerable.Repeat(
                     new TriggerFile {
                         Uri = $"http://tempuri.org/workflows/new/Sample.json",
                         ContainerName = "workflows",
                         Name = $"new/Sample.json",
-                        LastModified = DateTimeOffset.UtcNow } }.AsEnumerable()));
+                        LastModified = DateTimeOffset.UtcNow }, 1));
 
             azureStorage
                 .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"new/Sample.json"))

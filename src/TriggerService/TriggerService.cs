@@ -5,18 +5,17 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Azure.Identity;
+using Azure.ResourceManager;
+using Azure.ResourceManager.ApplicationInsights;
+using Azure.ResourceManager.Resources;
 using CommonUtilities.AzureCloud;
 using CromwellApiClient;
-using Microsoft.Azure.Management.ApplicationInsights.Management;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Rest;
 using Tes.Models;
 using Tes.Repository;
-using FluentAzure = Microsoft.Azure.Management.Fluent.Azure;
 
 namespace TriggerService
 {
@@ -101,17 +100,15 @@ namespace TriggerService
             try
             {
                 string applicationInsightsConnectionString;
-                var accessToken = new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) }).GetTokenAsync(new Azure.Core.TokenRequestContext([azureCloudConfig.DefaultTokenScope])).AsTask().GetAwaiter().GetResult().Token;
-                var azureCredentials = new AzureCredentials(new TokenCredentials(accessToken), null, null, azureCloudConfig.AzureEnvironment);
-                var azureManagementClient = FluentAzure.Authenticate(azureCredentials);
-                var subscriptionId = azureManagementClient.Subscriptions.List().Select(s => s.SubscriptionId).First();
+                var tokenCredential = new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) });
+                ArmClient armClient = new(tokenCredential, null, new() { Environment = azureCloudConfig.ArmEnvironment });
+                var subscriptionId = armClient.GetSubscriptions().GetAllAsync().Select(s => s.Id.SubscriptionId).FirstAsync().Result;
                 Console.WriteLine($"Running in subscriptionId: {subscriptionId}");
-                var applicationInsightsManagementClient = new ApplicationInsightsManagementClient(azureCredentials) { SubscriptionId = subscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
-                applicationInsightsConnectionString = applicationInsightsManagementClient
-                    .Components
-                    .List()
-                    .First(c => c.ApplicationId.Equals(triggerServiceOptions.ApplicationInsightsAccountName, StringComparison.OrdinalIgnoreCase))
-                    .ConnectionString;
+                applicationInsightsConnectionString = armClient.GetSubscriptionResource(SubscriptionResource.CreateResourceIdentifier(subscriptionId))
+                    .GetApplicationInsightsComponentsAsync()
+                    .SelectAwait(async c => (await c.GetAsync()).Value)
+                    .FirstAsync(c => c.Data.ApplicationId.Equals(triggerServiceOptions.ApplicationInsightsAccountName, StringComparison.OrdinalIgnoreCase))
+                    .Result.Data.ConnectionString;
 
                 return applicationInsightsConnectionString;
             }
