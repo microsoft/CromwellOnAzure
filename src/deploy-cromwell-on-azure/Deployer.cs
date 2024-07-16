@@ -599,7 +599,8 @@ namespace CromwellOnAzureDeployer
                                 appInsights = await CreateAppInsightsResourceAsync(new(configuration.LogAnalyticsArmId));
                                 await AssignVmAsContributorToAppInsightsAsync(managedIdentity, appInsights);
                             }),
-                            Task.Run(async () => {
+                            Task.Run(async () =>
+                            {
                                 postgreSqlFlexServer ??= await CreatePostgreSqlServerAndDatabaseAsync(vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone);
                             })
                         ]);
