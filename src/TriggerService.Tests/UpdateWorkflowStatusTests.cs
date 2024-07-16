@@ -381,11 +381,13 @@ namespace TriggerService.Tests
             azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.InProgress))
                 .Returns(AsyncEnumerable.Repeat(
-                    new TriggerFile {
+                    new TriggerFile
+                    {
                         Uri = $"http://tempuri.org/workflows/inprogress/inprogress.Sample.{workflowId}.json",
                         ContainerName = "workflows",
                         Name = $"inprogress/inprogress.Sample.{workflowId}.json",
-                        LastModified = DateTimeOffset.UtcNow.AddMinutes(-5) }, 1));
+                        LastModified = DateTimeOffset.UtcNow.AddMinutes(-5)
+                    }, 1));
 
             azureStorage
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))

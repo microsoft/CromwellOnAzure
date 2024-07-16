@@ -66,11 +66,13 @@ namespace TriggerService.Tests
             azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort))
                 .Returns(AsyncEnumerable.Repeat(
-                    new TriggerFile {
+                    new TriggerFile
+                    {
                         Uri = $"http://tempuri.org/workflows/abort/{workflowId}.json",
                         ContainerName = "workflows",
                         Name = $"abort/{workflowId}.json",
-                        LastModified = DateTimeOffset.UtcNow }, 1));
+                        LastModified = DateTimeOffset.UtcNow
+                    }, 1));
 
             azureStorage
                 .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"abort/{workflowId}.json"))

@@ -76,11 +76,13 @@ namespace TriggerService.Tests
             azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New))
                 .Returns(AsyncEnumerable.Repeat(
-                    new TriggerFile {
+                    new TriggerFile
+                    {
                         Uri = $"http://tempuri.org/workflows/new/Sample.json",
                         ContainerName = "workflows",
                         Name = $"new/Sample.json",
-                        LastModified = DateTimeOffset.UtcNow }, 1));
+                        LastModified = DateTimeOffset.UtcNow
+                    }, 1));
 
             azureStorage
                 .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"new/Sample.json"))
@@ -164,11 +166,13 @@ namespace TriggerService.Tests
             azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New))
                 .Returns(AsyncEnumerable.Repeat(
-                    new TriggerFile {
+                    new TriggerFile
+                    {
                         Uri = $"http://tempuri.org/workflows/new/Sample.json",
                         ContainerName = "workflows",
                         Name = $"new/Sample.json",
-                        LastModified = DateTimeOffset.UtcNow }, 1));
+                        LastModified = DateTimeOffset.UtcNow
+                    }, 1));
 
             azureStorage
                 .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"new/Sample.json"))
