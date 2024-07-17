@@ -91,7 +91,7 @@ namespace TriggerService
                 var options = new TriggerServiceOptions();
                 configuration.Bind(TriggerServiceOptions.TriggerServiceOptionsSectionName, options);
                 Console.WriteLine($"TriggerServiceOptions.AzureCloudName: {options.AzureCloudName}");
-                return AzureCloudConfig.CreateAsync(options.AzureCloudName, options.AzureCloudMetadataUrlApiVersion).Result;
+                return AzureCloudConfig.FromKnownCloudNameAsync(cloudName: options.AzureCloudName, azureCloudMetadataUrlApiVersion: options.AzureCloudMetadataUrlApiVersion).Result;
             }
         }
 

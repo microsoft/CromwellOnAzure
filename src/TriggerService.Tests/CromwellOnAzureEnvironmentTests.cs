@@ -159,7 +159,7 @@ namespace TriggerService.Tests
                 ApplicationInsightsAccountName = "fakeappinsights"
             });
 
-            var azureCloudConfig = AzureCloudConfig.CreateAsync().Result;
+            var azureCloudConfig = AzureCloudConfig.FromKnownCloudNameAsync().Result;
             var environment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository, storageUtility.Object, azureCloudConfig);
             return environment;
         }

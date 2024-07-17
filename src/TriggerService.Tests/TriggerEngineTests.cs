@@ -101,7 +101,7 @@ namespace TriggerService.Tests
                 .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
                 .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
 
-            var azureCloudConfig = AzureCloudConfig.CreateAsync().Result;
+            var azureCloudConfig = AzureCloudConfig.FromKnownCloudNameAsync().Result;
             var triggerHostedService = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, tesTaskRepository, storageUtility.Object, azureCloudConfig);
 
             //var engine = new TriggerHostedService(loggerFactory, environment.Object, TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(25));

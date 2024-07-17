@@ -102,7 +102,7 @@ namespace TriggerService.Tests
                 .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
                 .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
 
-            var azureCloudConfig = AzureCloudConfig.CreateAsync().Result;
+            var azureCloudConfig = AzureCloudConfig.FromKnownCloudNameAsync().Result;
             var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository.Object, storageUtility.Object, azureCloudConfig);
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
             return (newTriggerName, newTriggerContent);
