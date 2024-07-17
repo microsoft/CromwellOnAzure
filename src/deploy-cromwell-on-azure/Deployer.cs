@@ -652,7 +652,7 @@ namespace CromwellOnAzureDeployer
                 if (!isBatchPoolQuotaAvailable) insufficientQuotas.Add("pool");
                 if (!isBatchJobQuotaAvailable) insufficientQuotas.Add("job");
 
-                if (0 == insufficientQuotas.Count)
+                if (0 != insufficientQuotas.Count)
                 {
                     if (!configuration.SkipTestWorkflow)
                     {
