@@ -7,11 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="globtest.wdl" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="test-wdls\globtest\globtest.wdl" />
+    <Content Include="test-wdls\**">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

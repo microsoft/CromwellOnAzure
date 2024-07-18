@@ -6,9 +6,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dockerfile_PackagePublishedFiles-TriggerService">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
+    <Content Include="..\Dockerfile-TriggerService">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Azure.ResourceManager.ApplicationInsights" Version="1.0.0" />
     <PackageReference Include="Azure.ResourceManager.Storage" Version="1.2.3" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.20.0" />
+    <PackageReference Include="Microsoft.Azure.Management.ApplicationInsights" Version="0.3.0-preview" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
@@ -25,13 +40,6 @@
     <ProjectReference Include="..\CromwellApiClient\CromwellApiClient.csproj" />
     <ProjectReference Include="..\ga4gh-tes\src\CommonUtilities\CommonUtilities.csproj" />
     <ProjectReference Include="..\ga4gh-tes\src\Tes\Tes.csproj" />
-  </ItemGroup>
-
-
-  <ItemGroup>
-    <None Update="appsettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
 </Project>
