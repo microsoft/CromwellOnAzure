@@ -5,6 +5,7 @@ using System;
 using System.Threading.Tasks;
 using CromwellOnAzureDeployer;
 
+System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
 await InitializeAndDeployAsync(args);
 
 static async Task InitializeAndDeployAsync(string[] args)
