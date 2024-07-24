@@ -45,7 +45,6 @@ using CommonUtilities;
 using CommonUtilities.AzureCloud;
 using k8s;
 using Microsoft.Graph;
-using Microsoft.Rest;
 using Newtonsoft.Json;
 using Polly;
 using Polly.Retry;
@@ -57,13 +56,13 @@ namespace CromwellOnAzureDeployer
     public class Deployer(Configuration configuration)
     {
         private static readonly AsyncRetryPolicy roleAssignmentHashConflictRetryPolicy = Policy
-            .Handle<Microsoft.Rest.Azure.CloudException>(cloudException =>
-                "HashConflictOnDifferentRoleAssignmentIds".Equals(cloudException.Body.Code))
+            .Handle<RequestFailedException>(requestFailedException =>
+                "HashConflictOnDifferentRoleAssignmentIds".Equals(requestFailedException.ErrorCode))
             .RetryAsync();
 
         private static readonly AsyncRetryPolicy updateConflictRetryPolicy = Policy
-            .Handle<Azure.RequestFailedException>(azureException =>
-                (int)System.Net.HttpStatusCode.Conflict == azureException.Status && azureException.ErrorCode switch
+            .Handle<RequestFailedException>(azureException =>
+                (int)HttpStatusCode.Conflict == azureException.Status && azureException.ErrorCode switch
                 {
                     "EtagMismatch" => true,
                     "OperationNotAllowed" => true,
@@ -715,9 +714,9 @@ namespace CromwellOnAzureDeployer
                             ConsoleEx.WriteLine($"WebSocket ErrorCode: {wExc.WebSocketErrorCode}");
                         }
 
-                        if (exc is HttpOperationException hExc)
+                        if (exc is RequestFailedException fExc)
                         {
-                            ConsoleEx.WriteLine($"HTTP Response: {hExc.Response.Content}");
+                            ConsoleEx.WriteLine($"HTTP Response: {fExc.GetRawResponse().Content}");
                         }
                     }
                 }
@@ -1183,7 +1182,7 @@ namespace CromwellOnAzureDeployer
                         }
                     });
             }
-            catch (Microsoft.Rest.Azure.CloudException ex) when (ex.ToCloudErrorType() == CloudErrorType.AuthorizationFailed)
+            catch (RequestFailedException ex) when (ex.ErrorCode.Equals("AuthorizationFailed", StringComparison.OrdinalIgnoreCase))
             {
                 ConsoleEx.WriteLine();
                 ConsoleEx.WriteLine("Unable to programmatically register the required resource providers.", ConsoleColor.Red);
@@ -1264,7 +1263,7 @@ namespace CromwellOnAzureDeployer
                         }
                     });
             }
-            catch (Microsoft.Rest.Azure.CloudException ex) when (ex.ToCloudErrorType() == CloudErrorType.AuthorizationFailed)
+            catch (RequestFailedException ex) when (ex.ErrorCode.Equals("AuthorizationFailed", StringComparison.OrdinalIgnoreCase))
             {
                 ConsoleEx.WriteLine();
                 ConsoleEx.WriteLine("Unable to programmatically register the required features.", ConsoleColor.Red);
@@ -1274,7 +1273,7 @@ namespace CromwellOnAzureDeployer
                 ConsoleEx.WriteLine();
                 ConsoleEx.WriteLine("1. For each of the following, execute 'az feature register --namespace {RESOURCE_PROVIDER_NAME} --name {FEATURE_NAME}'", ConsoleColor.Yellow);
                 ConsoleEx.WriteLine();
-                unregisteredFeatures.ForEach(f => ConsoleEx.WriteLine($"- {f.Data.Name}", ConsoleColor.Yellow));
+                unregisteredFeatures.ForEach(f => ConsoleEx.WriteLine($"- {f.Data.ResourceType.Namespace} - {f.Data.Name}", ConsoleColor.Yellow));
                 ConsoleEx.WriteLine();
                 ConsoleEx.WriteLine("After completion, please re-attempt deployment.");
 
@@ -2395,10 +2394,10 @@ namespace CromwellOnAzureDeployer
                     WriteExecutionTime(line, startTime);
                     return result;
                 }
-                catch (Microsoft.Rest.Azure.CloudException cloudException) when (cloudException.ToCloudErrorType() == CloudErrorType.ExpiredAuthenticationToken)
+                catch (RequestFailedException requestFailedException) when (requestFailedException.ErrorCode.Equals("ExpiredAuthenticationToken", StringComparison.OrdinalIgnoreCase))
                 {
                 }
-                catch (Microsoft.Rest.Azure.CloudException cloudException) when (cloudException.ToCloudErrorType() == CloudErrorType.RoleAssignmentExists)
+                catch (RequestFailedException requestFailedException) when (requestFailedException.ErrorCode.Equals("RoleAssignmentExists", StringComparison.OrdinalIgnoreCase))
                 {
                     line.Write($" skipped. Role assignment already exists.", ConsoleColor.Yellow);
                     return default;
