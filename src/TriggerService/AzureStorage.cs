@@ -8,41 +8,39 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
 
 namespace TriggerService
 {
     public class AzureStorage : IAzureStorage
     {
         private const string WorkflowsContainerName = "workflows";
-        private readonly CloudStorageAccount account;
-        private readonly CloudBlobClient blobClient;
+        private readonly BlobServiceClient blobClient;
         private readonly HttpClient httpClient;
         private readonly HashSet<string> createdContainers = [];
 
-        public AzureStorage(CloudStorageAccount account, HttpClient httpClient)
+        public AzureStorage(BlobServiceClient account, HttpClient httpClient)
         {
             ServicePointManager.DefaultConnectionLimit = Environment.ProcessorCount * 8;
             ServicePointManager.Expect100Continue = false;
 
-            this.account = account;
             this.httpClient = httpClient;
 
-            blobClient = account.CreateCloudBlobClient();
-            var host = account.BlobStorageUri.PrimaryUri.Host;
+            blobClient = account;
+            var host = account.Uri.Host;
             AccountName = host[..host.IndexOf('.')];
         }
 
         public string AccountName { get; }
-        public string AccountAuthority => account.BlobStorageUri.PrimaryUri.Authority;
+        public string AccountAuthority => blobClient.Uri.Authority;
 
         public async Task<bool> IsAvailableAsync()
         {
             try
             {
-                BlobContinuationToken continuationToken = null;
-                await blobClient.ListContainersSegmentedAsync(continuationToken);
+                _ = await blobClient.GetBlobContainersAsync().ToListAsync();
                 return true;
             }
             catch
@@ -52,24 +50,24 @@ namespace TriggerService
         }
 
         /// <inheritdoc />
-        public async Task<IEnumerable<TriggerFile>> GetWorkflowsByStateAsync(WorkflowState state)
+        public IAsyncEnumerable<TriggerFile> GetWorkflowsByStateAsync(WorkflowState state)
         {
-            var containerReference = blobClient.GetContainerReference(WorkflowsContainerName);
+            var containerReference = blobClient.GetBlobContainerClient(WorkflowsContainerName);
             var lowercaseState = state.ToString().ToLowerInvariant();
-            var blobs = await GetBlobsWithPrefixAsync(containerReference, lowercaseState);
+            var blobs = containerReference.GetBlobsAsync(prefix: lowercaseState);
             var readmeBlobName = $"{lowercaseState}/readme.txt";
 
             return blobs
                 .Where(blob => !blob.Name.Equals(lowercaseState, StringComparison.OrdinalIgnoreCase))
                 .Where(blob => !blob.Name.Equals(readmeBlobName, StringComparison.OrdinalIgnoreCase))
                 .Where(blob => blob.Properties.LastModified.HasValue)
-                .Select(blob => new TriggerFile { Uri = blob.Uri.AbsoluteUri, ContainerName = WorkflowsContainerName, Name = blob.Name, LastModified = blob.Properties.LastModified.Value });
+                .Select(blob => new TriggerFile { Uri = containerReference.GetBlobClient(blob.Name).Uri.AbsoluteUri, ContainerName = WorkflowsContainerName, Name = blob.Name, LastModified = blob.Properties.LastModified.Value });
         }
 
         /// <inheritdoc />
         public async Task<string> UploadFileTextAsync(string content, string container, string blobName)
         {
-            var containerReference = blobClient.GetContainerReference(container);
+            var containerReference = blobClient.GetBlobContainerClient(container);
 
             if (!createdContainers.Contains(container.ToLowerInvariant()))
             {
@@ -78,8 +76,12 @@ namespace TriggerService
                 createdContainers.Add(container.ToLowerInvariant());
             }
 
-            var blob = containerReference.GetBlockBlobReference(blobName);
-            await blob.UploadTextAsync(content);
+            var blob = containerReference.GetBlockBlobClient(blobName);
+            using var writer = new StreamWriter(new MemoryStream());
+            writer.Write(content);
+            writer.Flush();
+            writer.BaseStream.Seek(0, SeekOrigin.Begin);
+            await blob.UploadAsync(writer.BaseStream);
             return blob.Uri.AbsoluteUri;
         }
 
@@ -92,17 +94,12 @@ namespace TriggerService
                 blobUrl = blobUrl.TrimStart('/').Replace(this.AccountName, $"https://{this.AccountAuthority}", StringComparison.OrdinalIgnoreCase);
             }
 
-            var blob = new CloudBlockBlob(new Uri(blobUrl), account.Credentials);
+            BlobUriBuilder builder = new(new(blobUrl));
 
-            var options = new BlobRequestOptions()
-            {
-                DisableContentMD5Validation = true,
-            };
-
-            var context = new OperationContext();
+            var blob = blobClient.GetBlobContainerClient(builder.BlobContainerName).GetBlockBlobClient(builder.BlobName);
 
             using var memoryStream = new MemoryStream();
-            await blob.DownloadToStreamAsync(memoryStream, null, options, context);
+            _ = await blob.DownloadToAsync(memoryStream, new BlobDownloadToOptions { TransferValidation = new() { ChecksumAlgorithm = Azure.Storage.StorageChecksumAlgorithm.None } });
             return memoryStream.ToArray();
         }
 
@@ -111,37 +108,18 @@ namespace TriggerService
             => await httpClient.GetByteArrayAsync(url);
 
         /// <inheritdoc />
-        public Task<string> DownloadBlobTextAsync(string container, string blobName)
-            => blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DownloadTextAsync();
+        public async Task<string> DownloadBlobTextAsync(string container, string blobName)
+        {
+            var blob = blobClient.GetBlobContainerClient(container).GetBlockBlobClient(blobName);
+
+            using var reader = new StreamReader(new MemoryStream());
+            _ = await blob.DownloadToAsync(reader.BaseStream);
+            reader.BaseStream.Seek(0, SeekOrigin.Begin);
+            return reader.ReadToEnd();
+        }
 
         /// <inheritdoc />
         public Task DeleteBlobIfExistsAsync(string container, string blobName)
-            => blobClient.GetContainerReference(container).GetBlockBlobReference(blobName).DeleteIfExistsAsync();
-
-        private static async Task<IEnumerable<CloudBlockBlob>> GetBlobsWithPrefixAsync(CloudBlobContainer blobContainer, string prefix)
-        {
-            var blobList = new List<CloudBlockBlob>();
-
-            BlobContinuationToken continuationToken = null;
-
-            do
-            {
-                var partialResult = await blobContainer.ListBlobsSegmentedAsync(
-                    prefix: prefix,
-                    useFlatBlobListing: true,
-                    currentToken: continuationToken,
-                    blobListingDetails: BlobListingDetails.None,
-                    maxResults: null,
-                    options: null,
-                    operationContext: null);
-
-                continuationToken = partialResult.ContinuationToken;
-
-                blobList.AddRange(partialResult.Results.OfType<CloudBlockBlob>());
-            }
-            while (continuationToken is not null);
-
-            return blobList;
-        }
+            => blobClient.GetBlobContainerClient(container).GetBlockBlobClient(blobName).DeleteIfExistsAsync();
     }
 }

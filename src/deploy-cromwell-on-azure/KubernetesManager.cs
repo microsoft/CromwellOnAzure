@@ -10,15 +10,13 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.ResourceManager;
 using Azure.ResourceManager.ContainerService;
+using Azure.ResourceManager.ManagedServiceIdentities;
+using Azure.Storage.Blobs;
 using CommonUtilities.AzureCloud;
 using k8s;
 using k8s.Models;
-using Microsoft.Azure.Management.ContainerService;
-using Microsoft.Azure.Management.Msi.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
-using Microsoft.Azure.Management.Storage.Fluent;
 using Newtonsoft.Json;
 using Polly;
 using Polly.Retry;
@@ -32,11 +30,11 @@ namespace CromwellOnAzureDeployer
     {
         private static readonly AsyncRetryPolicy WorkloadReadyRetryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryAsync(80, retryAttempt => System.TimeSpan.FromSeconds(15));
+            .WaitAndRetryAsync(80, retryAttempt => TimeSpan.FromSeconds(15));
 
         private static readonly AsyncRetryPolicy KubeExecRetryPolicy = Policy
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
-            .WaitAndRetryAsync(200, retryAttempt => System.TimeSpan.FromSeconds(5));
+            .WaitAndRetryAsync(200, retryAttempt => TimeSpan.FromSeconds(5));
 
         private static readonly HashSet<string> testStorageAccounts = new HashSet<string> { "datasettestinputs", "datasettestinputssouthc" };
 
@@ -45,35 +43,35 @@ namespace CromwellOnAzureDeployer
         private const string BlobCsiDriverGithubReleaseVersion = "v1.24.0";
         private const string BlobCsiRepo = $"https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/{BlobCsiDriverGithubReleaseBranch}/charts";
 
-        private Configuration configuration { get; set; }
-        private AzureCredentials azureCredentials { get; set; }
-        private AzureCloudConfig azureCloudConfig { get; set; }
-        private CancellationToken cancellationToken { get; set; }
+        private Configuration configuration { get; }
+        private AzureCloudConfig azureCloudConfig { get; }
+        private CancellationToken cancellationToken { get; }
         private string workingDirectoryTemp { get; set; }
         private string kubeConfigPath { get; set; }
         private string valuesTemplatePath { get; set; }
-        public string helmScriptsRootDirectory { get; set; }
-        public string TempHelmValuesYamlPath { get; set; }
+        public string helmScriptsRootDirectory { get; private set; }
+        public string TempHelmValuesYamlPath { get; private set; }
 
-        public KubernetesManager(Configuration config, AzureCredentials credentials, AzureCloudConfig azureCloudConfig, CancellationToken cancellationToken)
+        public delegate BlobClient GetBlobClient(Azure.ResourceManager.Storage.StorageAccountData storageAccount, string containerName, string blobName);
+        private readonly GetBlobClient getBlobClient;
+
+        public KubernetesManager(Configuration config, AzureCloudConfig azureCloudConfig, GetBlobClient getBlobClient, CancellationToken cancellationToken)
         {
             this.azureCloudConfig = azureCloudConfig;
             this.cancellationToken = cancellationToken;
-            configuration = config;
-            azureCredentials = credentials;
+            this.configuration = config;
+            this.getBlobClient = getBlobClient;
 
             CreateAndInitializeWorkingDirectoriesAsync().Wait(cancellationToken);
         }
 
         public async Task<IKubernetes> GetKubernetesClientAsync(ContainerServiceManagedClusterResource aksCluster)
         {
-            var resourceGroup = aksCluster.Id.ResourceGroupName;
-            var containerServiceClient = new ContainerServiceClient(azureCredentials) { SubscriptionId = configuration.SubscriptionId, BaseUri = new Uri(azureCloudConfig.ResourceManagerUrl) };
+            using MemoryStream kubeconfig = new((await aksCluster.GetClusterAdminCredentialsAsync(cancellationToken: cancellationToken)).Value.Kubeconfigs[0].Value, writable: false);
 
-            // Write kubeconfig in the working directory, because KubernetesClientConfiguration needs to read from a file, TODO figure out how to pass this directly. 
-            var creds = await containerServiceClient.ManagedClusters.ListClusterAdminCredentialsAsync(resourceGroup, configuration.AksClusterName, cancellationToken: cancellationToken);
-            var kubeConfigFile = new FileInfo(kubeConfigPath);
-            await File.WriteAllTextAsync(kubeConfigFile.FullName, Encoding.Default.GetString(creds.Kubeconfigs.First().Value), cancellationToken);
+            // Write kubeconfig in the working directory as helm & kubctl need it.
+            FileInfo kubeConfigFile = new(kubeConfigPath);
+            await File.WriteAllTextAsync(kubeConfigFile.FullName, Encoding.Default.GetString(kubeconfig.ToArray()), cancellationToken);
             kubeConfigFile.Refresh();
 
             if (!OperatingSystem.IsWindows())
@@ -81,8 +79,7 @@ namespace CromwellOnAzureDeployer
                 kubeConfigFile.UnixFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
             }
 
-            var k8sConfiguration = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigFile, false);
-            var k8sClientConfiguration = KubernetesClientConfiguration.BuildConfigFromConfigObject(k8sConfiguration);
+            var k8sClientConfiguration = KubernetesClientConfiguration.BuildConfigFromConfigFile(kubeconfig);
             return new Kubernetes(k8sClientConfiguration);
         }
 
@@ -135,18 +132,18 @@ namespace CromwellOnAzureDeployer
                 workingDirectory: workingDirectoryTemp);
         }
 
-        public async Task UpdateHelmValuesAsync(IStorageAccount storageAccount, string keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, IIdentity managedId, List<MountableContainer> containersToMount)
+        public async Task UpdateHelmValuesAsync(Azure.ResourceManager.Storage.StorageAccountData storageAccount, Uri keyVaultUrl, string resourceGroupName, Dictionary<string, string> settings, UserAssignedIdentityData managedId, List<MountableContainer> containersToMount)
         {
             var values = KubernetesYaml.Deserialize<HelmValues>(await File.ReadAllTextAsync(valuesTemplatePath, cancellationToken));
             UpdateValuesFromSettings(values, settings);
             values.Config["resourceGroup"] = resourceGroupName;
             values.Identity["name"] = managedId.Name;
             values.Identity["resourceId"] = managedId.Id;
-            values.Identity["clientId"] = managedId.ClientId;
+            values.Identity["clientId"] = managedId.ClientId?.ToString("D");
 
             if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
             {
-                values.InternalContainersKeyVaultAuth = new List<Dictionary<string, string>>();
+                values.InternalContainersKeyVaultAuth = [];
 
                 foreach (var container in values.DefaultContainers.Union(values.CromwellContainers, StringComparer.OrdinalIgnoreCase))
                 {
@@ -154,7 +151,7 @@ namespace CromwellOnAzureDeployer
                     {
                         { "accountName",  storageAccount.Name },
                         { "containerName", container },
-                        { "keyVaultURL", keyVaultUrl },
+                        { "keyVaultURL", keyVaultUrl.AbsoluteUri },
                         { "keyVaultSecretName", Deployer.StorageAccountKeySecretName}
                     };
 
@@ -163,7 +160,7 @@ namespace CromwellOnAzureDeployer
             }
             else
             {
-                values.InternalContainersMIAuth = new List<Dictionary<string, string>>();
+                values.InternalContainersMIAuth = [];
 
                 foreach (var container in values.DefaultContainers.Union(values.CromwellContainers, StringComparer.OrdinalIgnoreCase))
                 {
@@ -179,39 +176,42 @@ namespace CromwellOnAzureDeployer
             }
 
             MergeContainers(containersToMount, values);
-            if (azureCloudConfig.AzureEnvironment != AzureEnvironment.AzureGlobalCloud)
+
+            // TODO: Does this make sense? If so, do we need this in TES?
+            if (azureCloudConfig.ArmEnvironment != ArmEnvironment.AzurePublicCloud)
             {
                 values.ExternalSasContainers = null;
             }
 
             var valuesString = KubernetesYaml.Serialize(values);
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString, cancellationToken);
-            await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cancellationToken);
+            await Deployer.UploadTextToStorageAccountAsync(getBlobClient(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml"), valuesString, cancellationToken);
         }
 
-        public async Task UpgradeValuesYamlAsync(IStorageAccount storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount, Version previousVersion)
+        public async Task UpgradeValuesYamlAsync(Azure.ResourceManager.Storage.StorageAccountData storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount, Version previousVersion)
         {
-            var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cancellationToken));
+            var blobClient = getBlobClient(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml");
+            var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(blobClient, cancellationToken));
             UpdateValuesFromSettings(values, settings);
             MergeContainers(containersToMount, values);
             ProcessHelmValuesUpdates(values, previousVersion);
             var valuesString = KubernetesYaml.Serialize(values);
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString, cancellationToken);
-            await Deployer.UploadTextToStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", valuesString, cancellationToken);
+            await Deployer.UploadTextToStorageAccountAsync(blobClient, valuesString, cancellationToken);
         }
 
         private static void ProcessHelmValuesUpdates(HelmValues values, Version previousVersion)
         {
             if (previousVersion < new Version(4, 3))
             {
-                values.CromwellContainers = new List<string>() { Deployer.ConfigurationContainerName, Deployer.ExecutionsContainerName, Deployer.LogsContainerName, Deployer.OutputsContainerName };
-                values.DefaultContainers = new List<string>() { Deployer.InputsContainerName };
+                values.CromwellContainers = [Deployer.ConfigurationContainerName, Deployer.ExecutionsContainerName, Deployer.LogsContainerName, Deployer.OutputsContainerName];
+                values.DefaultContainers = [Deployer.InputsContainerName];
             }
         }
 
-        public async Task<Dictionary<string, string>> GetAKSSettingsAsync(IStorageAccount storageAccount)
+        public async Task<Dictionary<string, string>> GetAKSSettingsAsync(Azure.ResourceManager.Storage.StorageAccountData storageAccount)
         {
-            var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml", cancellationToken));
+            var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(getBlobClient(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml"), cancellationToken));
             return ValuesToSettings(values);
         }
 
@@ -365,15 +365,15 @@ namespace CromwellOnAzureDeployer
             }
         }
 
-        private void MergeContainers(List<MountableContainer> containersToMount, HelmValues values)
+        private static void MergeContainers(List<MountableContainer> containersToMount, HelmValues values)
         {
             if (containersToMount is null)
             {
                 return;
             }
 
-            var internalContainersMIAuth = values.InternalContainersMIAuth.Select(x => new MountableContainer(x)).ToHashSet();
-            var sasContainers = values.ExternalSasContainers.Select(x => new MountableContainer(x)).ToHashSet();
+            var internalContainersMIAuth = values.InternalContainersMIAuth?.Select(x => new MountableContainer(x)).ToHashSet() ?? [];
+            var sasContainers = values.ExternalSasContainers?.Select(x => new MountableContainer(x)).ToHashSet() ?? [];
 
             foreach (var container in containersToMount)
             {
@@ -388,7 +388,6 @@ namespace CromwellOnAzureDeployer
             }
 
             values.InternalContainersMIAuth = internalContainersMIAuth.Select(x => x.ToDictionary()).ToList();
-            values.ExternalSasContainers = new List<Dictionary<string, string>>();
             values.ExternalSasContainers = sasContainers.Select(x => x.ToDictionary()).ToList();
         }
 
