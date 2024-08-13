@@ -3,6 +3,7 @@
 
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Azure.Identity;
 using Azure.ResourceManager;
@@ -28,6 +29,7 @@ namespace TriggerService
 
         public static async Task Main()
         {
+            Console.WriteLine($"TriggerService Build: {Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion}");
             AzureCloudConfig azureCloudConfig = null;
 
             await Host.CreateDefaultBuilder()
