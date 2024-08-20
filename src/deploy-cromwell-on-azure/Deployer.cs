@@ -1278,19 +1278,19 @@ namespace CromwellOnAzureDeployer
 
         private Task AssignManagedIdOperatorToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource)
             => AssignRoleToResourceAsync(managedIdentity, resource, GetSubscriptionRoleDefinition(RoleDefinitions.Identity.ManagedIdentityOperator),
-                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Identity.GetProperty(nameof(RoleDefinitions.Identity.ManagedIdentityOperator)))}' role for the managed id to resource group scope...");
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Identity.ManagedIdentityOperator)}' role for the managed id to resource group scope...");
 
         private Task AssignMIAsNetworkContributorToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource)
             => AssignRoleToResourceAsync(managedIdentity, resource, GetSubscriptionRoleDefinition(RoleDefinitions.Networking.NetworkContributor),
-                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Networking.GetProperty(nameof(RoleDefinitions.Networking.NetworkContributor)))}' role for the managed id to resource group scope...");
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Networking.NetworkContributor)}' role for the managed id to resource group scope...");
 
         private Task AssignMIAsDataOwnerToStorageAccountAsync(UserAssignedIdentityResource managedIdentity, StorageAccountResource storageAccount)
             => AssignRoleToResourceAsync(managedIdentity, storageAccount, GetSubscriptionRoleDefinition(RoleDefinitions.Storage.StorageBlobDataOwner),
-                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Storage.GetProperty(nameof(RoleDefinitions.Storage.StorageBlobDataOwner)))}' role for user-managed identity to Storage Account resource scope...");
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Storage.StorageBlobDataOwner)}' role for user-managed identity to Storage Account resource scope...");
 
         private Task AssignVmAsContributorToStorageAccountAsync(UserAssignedIdentityResource managedIdentity, StorageAccountResource storageAccount)
             => AssignRoleToResourceAsync(managedIdentity, storageAccount, GetSubscriptionRoleDefinition(RoleDefinitions.General.Contributor),
-                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.GetProperty(nameof(RoleDefinitions.General.Contributor)))}' role for user-managed identity to Storage Account resource scope...");
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.Contributor)}' role for user-managed identity to Storage Account resource scope...");
 
         private Task<StorageAccountResource> CreateStorageAccountAsync()
             => Execute(
@@ -1385,7 +1385,7 @@ namespace CromwellOnAzureDeployer
 
         private Task AssignVmAsContributorToBatchAccountAsync(UserAssignedIdentityResource managedIdentity, BatchAccountResource batchAccount)
             => AssignRoleToResourceAsync(managedIdentity, batchAccount, GetSubscriptionRoleDefinition(RoleDefinitions.General.Contributor),
-                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.GetProperty(nameof(RoleDefinitions.General.Contributor)))}' role for user-managed identity to Batch Account resource scope...");
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.Contributor)}' role for user-managed identity to Batch Account resource scope...");
 
         private async Task<PostgreSqlFlexibleServerResource> CreatePostgreSqlServerAndDatabaseAsync(SubnetResource subnet, PrivateDnsZoneResource postgreSqlDnsZone)
         {
@@ -1430,7 +1430,7 @@ namespace CromwellOnAzureDeployer
 
         private Task AssignVmAsContributorToAppInsightsAsync(UserAssignedIdentityResource managedIdentity, ArmResource appInsights)
             => AssignRoleToResourceAsync(managedIdentity, appInsights, GetSubscriptionRoleDefinition(RoleDefinitions.General.Contributor),
-                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.GetProperty(nameof(RoleDefinitions.General.Contributor)))}' role for user-managed identity to App Insights resource scope...");
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.Contributor)}' role for user-managed identity to App Insights resource scope...");
 
         private ResourceIdentifier GetSubscriptionRoleDefinition(Guid roleDefinition)
             => AuthorizationRoleDefinitionResource.CreateResourceIdentifier(SubscriptionResource.CreateResourceIdentifier(configuration.SubscriptionId), new(roleDefinition.ToString("D")));
