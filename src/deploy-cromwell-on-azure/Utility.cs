@@ -2,11 +2,9 @@
 // Licensed under the MIT License.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,6 +13,16 @@ namespace CromwellOnAzureDeployer
 {
     public static class Utility
     {
+        /// <summary>
+        /// Generates a random resource names with the prefix.
+        /// </summary>
+        /// <param name="prefix">the prefix to be used if possible</param>
+        /// <param name="maxLength">the maximum length for the random generated name</param>
+        /// <returns>random name</returns>
+        /// <remarks>Implementation of <c>Microsoft.Azure.Management.ResourceManager.Fluent.SdkContext.RandomResourceName</c></remarks>
+        public static string RandomResourceName(string prefix, int maxLength)
+            => new ResourceNamer(string.Empty).RandomName(prefix, maxLength);
+
         public static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
             => text.Trim().Split(rowDelimiter)
                 .Select(r => r.Trim().Split(fieldDelimiter))
@@ -142,6 +150,50 @@ namespace CromwellOnAzureDeployer
             foreach (var item in values)
             {
                 action(item);
+            }
+        }
+
+        // borrowed from https://github.com/Azure/azure-libraries-for-net/blob/7d85e294e4e7280c3f74b1c41438e2f20bce2052/src/ResourceManagement/ResourceManager/ResourceNamer.cs
+        private class ResourceNamer
+        {
+            private readonly string randName;
+            private static readonly Random random = new();
+
+            public ResourceNamer(string name)
+            {
+                lock (random)
+                {
+                    this.randName = name.ToLower() + Guid.NewGuid().ToString("N")[..3].ToLower();
+                }
+            }
+
+            public string RandomName(string prefix, int maxLen)
+            {
+                lock (random)
+                {
+                    prefix = prefix.ToLower();
+                    var minRandomnessLength = 5;
+                    var minRandomString = random.Next(0, 100000).ToString("D5");
+
+                    if (maxLen < (prefix.Length + randName.Length + minRandomnessLength))
+                    {
+                        var str1 = prefix + minRandomString;
+                        return str1 + RandomString((maxLen - str1.Length) / 2);
+                    }
+
+                    var str = prefix + randName + minRandomString;
+                    return str + RandomString((maxLen - str.Length) / 2);
+                }
+            }
+
+            private static string RandomString(int length)
+            {
+                var str = "";
+                while (str.Length < length)
+                {
+                    str += Guid.NewGuid().ToString("N")[..Math.Min(32, length)].ToLower();
+                }
+                return str;
             }
         }
     }
