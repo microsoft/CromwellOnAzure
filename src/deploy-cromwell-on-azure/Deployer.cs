@@ -463,6 +463,11 @@ namespace CromwellOnAzureDeployer
 
                         ConsoleEx.WriteLine($"Deploying Cromwell on Azure version {targetVersion}...");
 
+                        if (!string.IsNullOrEmpty(configuration.BatchNodesSubnetId))
+                        {
+                            configuration.BatchSubnetName = new ResourceIdentifier(configuration.BatchNodesSubnetId).Name;
+                        }
+
                         var vnetAndSubnet = await ValidateAndGetExistingVirtualNetworkAsync();
 
                         if (string.IsNullOrWhiteSpace(configuration.ResourceGroupName))
@@ -514,11 +519,6 @@ namespace CromwellOnAzureDeployer
                                     configuration.BatchSubnetName = string.IsNullOrEmpty(configuration.BatchSubnetName) ? configuration.DefaultBatchSubnetName : configuration.BatchSubnetName;
                                     configuration.VmSubnetName = string.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
                                     vnetAndSubnet = await CreateVnetAndSubnetsAsync();
-
-                                    if (string.IsNullOrEmpty(this.configuration.BatchNodesSubnetId))
-                                    {
-                                        this.configuration.BatchNodesSubnetId = vnetAndSubnet.Value.batchSubnet.Id;
-                                    }
                                 }
                             }),
                             Task.Run(async () =>
@@ -597,6 +597,11 @@ namespace CromwellOnAzureDeployer
                                 postgreSqlFlexServer ??= await CreatePostgreSqlServerAndDatabaseAsync(vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone);
                             })
                         ]);
+
+                        if (string.IsNullOrEmpty(this.configuration.BatchNodesSubnetId))
+                        {
+                            configuration.BatchNodesSubnetId = vnetAndSubnet.Value.batchSubnet.Id;
+                        }
 
                         var clientId = managedIdentity.Data.ClientId;
                         var settings = ConfigureSettings(clientId?.ToString("D"));
