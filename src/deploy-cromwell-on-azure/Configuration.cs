@@ -31,6 +31,7 @@ namespace CromwellOnAzureDeployer
 
     public abstract class UserAccessibleConfiguration
     {
+        // https://learn.microsoft.com/azure/aks/private-clusters?tabs=azure-portal#configure-a-private-dns-zone CUSTOM_PRIVATE_DNS_ZONE_RESOURCE_ID
         public string AksPrivateDnsZoneResourceId { get; set; }
         public string AksNodeResourceGroupName { get; set; }
         public string IdentityResourceId { get; set; }
@@ -75,6 +76,8 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlSubnetName { get; set; }
         public string BatchSubnetName { get; set; }
         public bool? PrivateNetworking { get; set; } = null;
+        // https://learn.microsoft.com/azure/aks/egress-outboundtype#outbound-type-of-userdefinedrouting
+        // https://learn.microsoft.com/azure/aks/egress-udr
         public bool? UserDefinedRouting { get; set; } = null;
         public string Tags { get; set; } = null;
         public string BatchNodesSubnetId { get; set; } = null;
