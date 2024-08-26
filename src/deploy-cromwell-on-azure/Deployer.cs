@@ -933,7 +933,18 @@ namespace CromwellOnAzureDeployer
                     EnablePrivateClusterPublicFqdn = false
                 };
 
+                if (!string.IsNullOrWhiteSpace(configuration.AksPrivateDnsZoneResourceId))
+                {
+                    cluster.ApiServerAccessProfile.PrivateDnsZone = configuration.AksPrivateDnsZoneResourceId;
+                }
+
                 cluster.PublicNetworkAccess = ContainerServicePublicNetworkAccess.Disabled;
+
+                if (configuration.UserDefinedRouting == true)
+                {
+                    cluster.NetworkProfile ??= new();
+                    cluster.NetworkProfile.OutboundType = ContainerServiceOutboundType.UserDefinedRouting;
+                }
             }
 
             return await Execute(
@@ -2212,6 +2223,8 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.CrossSubscriptionAKSDeployment, nameof(configuration.CrossSubscriptionAKSDeployment));
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
+            ThrowIfProvidedForUpdate(configuration.AksPrivateDnsZoneResourceId, nameof(configuration.AksPrivateDnsZoneResourceId));
+            ThrowIfProvidedForUpdate(configuration.UserDefinedRouting, nameof(configuration.UserDefinedRouting));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
             ThrowIfProvidedForUpdate(configuration.VnetResourceGroupName, nameof(configuration.VnetResourceGroupName));
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
