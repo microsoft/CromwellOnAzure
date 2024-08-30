@@ -1409,7 +1409,7 @@ namespace CromwellOnAzureDeployer
 
             if (!subnet.Data.Delegations.Any())
             {
-                subnet.Data.Delegations.Add(new() { ServiceName = "Microsoft.DBforPostgreSQL/flexibleServers" });
+                subnet.Data.Delegations.Add(NewServiceDelegation("Microsoft.DBforPostgreSQL/flexibleServers"));
                 await subnet.UpdateAsync(WaitUntil.Completed, subnet.Data, cts.Token);
             }
 
@@ -1542,10 +1542,10 @@ namespace CromwellOnAzureDeployer
                         subnets.FirstOrDefault(s => s.Id.Name.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)),
                         subnets.FirstOrDefault(s => s.Id.Name.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)),
                         subnets.FirstOrDefault(s => s.Id.Name.Equals(configuration.BatchSubnetName, StringComparison.OrdinalIgnoreCase)));
-
-                    static ServiceDelegation NewServiceDelegation(string serviceDelegation) =>
-                        new() { Name = serviceDelegation, ServiceName = serviceDelegation };
                 });
+
+        private static ServiceDelegation NewServiceDelegation(string serviceDelegation) =>
+            new() { Name = serviceDelegation, ServiceName = serviceDelegation };
 
         private async Task<NetworkSecurityGroupResource> CreateNetworkSecurityGroupAsync(string networkSecurityGroupName)
         {
