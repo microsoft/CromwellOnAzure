@@ -74,10 +74,11 @@ namespace CromwellOnAzureDeployer
             .Handle<Exception>()
             .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(1));
 
-        /// <summary>
-        /// Grants full access to manage all resources, but does not allow you to assign roles in Azure RBAC, manage assignments in Azure Blueprints, or share image galleries.
-        /// </summary>
-        private static readonly ResourceIdentifier All_Role_Contributor = AuthorizationRoleDefinitionResource.CreateResourceIdentifier(string.Empty, new("b24988ac-6180-42a0-ab88-20f7382dd24c"));
+        private static readonly AsyncRetryPolicy internalServerErrorRetryPolicy = Policy
+            .Handle<RequestFailedException>(azureException =>
+                (int)HttpStatusCode.OK == azureException.Status &&
+                "InternalServerError".Equals(azureException.ErrorCode))
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(15));
 
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
@@ -468,6 +469,11 @@ namespace CromwellOnAzureDeployer
 
                         ConsoleEx.WriteLine($"Deploying Cromwell on Azure version {targetVersion}...");
 
+                        if (!string.IsNullOrEmpty(configuration.BatchNodesSubnetId))
+                        {
+                            configuration.BatchSubnetName = new ResourceIdentifier(configuration.BatchNodesSubnetId).Name;
+                        }
+
                         var vnetAndSubnet = await ValidateAndGetExistingVirtualNetworkAsync();
 
                         if (string.IsNullOrWhiteSpace(configuration.ResourceGroupName))
@@ -519,11 +525,6 @@ namespace CromwellOnAzureDeployer
                                     configuration.BatchSubnetName = string.IsNullOrEmpty(configuration.BatchSubnetName) ? configuration.DefaultBatchSubnetName : configuration.BatchSubnetName;
                                     configuration.VmSubnetName = string.IsNullOrEmpty(configuration.VmSubnetName) ? configuration.DefaultVmSubnetName : configuration.VmSubnetName;
                                     vnetAndSubnet = await CreateVnetAndSubnetsAsync();
-
-                                    if (string.IsNullOrEmpty(this.configuration.BatchNodesSubnetId))
-                                    {
-                                        this.configuration.BatchNodesSubnetId = vnetAndSubnet.Value.batchSubnet.Id;
-                                    }
                                 }
                             }),
                             Task.Run(async () =>
@@ -546,14 +547,14 @@ namespace CromwellOnAzureDeployer
                                 await WritePersonalizedFilesToStorageAccountAsync(storageAccountData);
 
                                 await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
-                                await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount, true);
+                                await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
                                 await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
-                                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup, true);
+                                await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
 
                                 if (aksNodepoolIdentity is not null)
                                 {
                                     await AssignVmAsContributorToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
-                                    await AssignMIAsDataOwnerToStorageAccountAsync(aksNodepoolIdentity, storageAccount, true);
+                                    await AssignMIAsDataOwnerToStorageAccountAsync(aksNodepoolIdentity, storageAccount);
                                     await AssignManagedIdOperatorToResourceAsync(aksNodepoolIdentity, resourceGroup);
                                 }
                             }),
@@ -602,6 +603,11 @@ namespace CromwellOnAzureDeployer
                                 postgreSqlFlexServer ??= await CreatePostgreSqlServerAndDatabaseAsync(vnetAndSubnet.Value.postgreSqlSubnet, postgreSqlDnsZone);
                             })
                         ]);
+
+                        if (string.IsNullOrEmpty(this.configuration.BatchNodesSubnetId))
+                        {
+                            configuration.BatchNodesSubnetId = vnetAndSubnet.Value.batchSubnet.Id;
+                        }
 
                         var clientId = managedIdentity.Data.ClientId;
                         var settings = ConfigureSettings(clientId?.ToString("D"));
@@ -933,7 +939,18 @@ namespace CromwellOnAzureDeployer
                     EnablePrivateClusterPublicFqdn = false
                 };
 
+                if (!string.IsNullOrWhiteSpace(configuration.AksPrivateDnsZoneResourceId))
+                {
+                    cluster.ApiServerAccessProfile.PrivateDnsZone = configuration.AksPrivateDnsZoneResourceId;
+                }
+
                 cluster.PublicNetworkAccess = ContainerServicePublicNetworkAccess.Disabled;
+
+                if (configuration.UserDefinedRouting == true)
+                {
+                    cluster.NetworkProfile ??= new();
+                    cluster.NetworkProfile.OutboundType = ContainerServiceOutboundType.UserDefinedRouting;
+                }
             }
 
             return await Execute(
@@ -1282,62 +1299,20 @@ namespace CromwellOnAzureDeployer
         }
 
         private Task AssignManagedIdOperatorToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource)
-        {
-            // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#managed-identity-operator
+            => AssignRoleToResourceAsync(managedIdentity, resource, GetSubscriptionRoleDefinition(RoleDefinitions.Identity.ManagedIdentityOperator),
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Identity.ManagedIdentityOperator)}' role for the managed id to resource group scope...");
 
-            var roleDefinitionId = AuthorizationRoleDefinitionResource.CreateResourceIdentifier(SubscriptionResource.CreateResourceIdentifier(configuration.SubscriptionId), new("f1a07417-d97a-45cb-824c-7a7467783830"));
-            return Execute(
-                $"Assigning 'Managed ID Operator' role for the managed id to resource group scope...",
-                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                    ct => (Task)resource.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
-                        new(roleDefinitionId, managedIdentity.Data.PrincipalId.Value)
-                        {
-                            PrincipalType = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal
-                        }, ct), cts.Token));
-        }
+        private Task AssignMIAsNetworkContributorToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource)
+            => AssignRoleToResourceAsync(managedIdentity, resource, GetSubscriptionRoleDefinition(RoleDefinitions.Networking.NetworkContributor),
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Networking.NetworkContributor)}' role for the managed id to resource group scope...");
 
-        private Task AssignMIAsNetworkContributorToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource, bool cancelOnException = true)
-        {
-            // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#network-contributor
-            var roleDefinitionId = AuthorizationRoleDefinitionResource.CreateResourceIdentifier(SubscriptionResource.CreateResourceIdentifier(configuration.SubscriptionId), new("4d97b98b-1d4f-4787-a291-c67834d212e7"));
-            return Execute(
-                $"Assigning 'Network Contributor' role for the managed id to resource group scope...",
-                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                    ct => (Task)resource.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
-                        new(roleDefinitionId, managedIdentity.Data.PrincipalId.Value)
-                        {
-                            PrincipalType = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal
-                        }, ct),
-                    cts.Token),
-                cancelOnException: cancelOnException);
-        }
-
-        private Task AssignMIAsDataOwnerToStorageAccountAsync(UserAssignedIdentityResource managedIdentity, StorageAccountResource storageAccount, bool cancelOnException = true)
-        {
-            //https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-owner
-            var roleDefinitionId = AuthorizationRoleDefinitionResource.CreateResourceIdentifier(SubscriptionResource.CreateResourceIdentifier(configuration.SubscriptionId), new("b7e6dc6d-f1e8-4753-8033-0f276bb0955b"));
-
-            return Execute(
-                $"Assigning 'Storage Blob Data Owner' role for user-managed identity to Storage Account resource scope...",
-                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                    ct => (Task)storageAccount.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
-                        new(roleDefinitionId, managedIdentity.Data.PrincipalId.Value)
-                        {
-                            PrincipalType = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal
-                        }, ct),
-                    cts.Token),
-                cancelOnException: cancelOnException);
-        }
+        private Task AssignMIAsDataOwnerToStorageAccountAsync(UserAssignedIdentityResource managedIdentity, StorageAccountResource storageAccount)
+            => AssignRoleToResourceAsync(managedIdentity, storageAccount, GetSubscriptionRoleDefinition(RoleDefinitions.Storage.StorageBlobDataOwner),
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Storage.StorageBlobDataOwner)}' role for user-managed identity to Storage Account resource scope...");
 
         private Task AssignVmAsContributorToStorageAccountAsync(UserAssignedIdentityResource managedIdentity, StorageAccountResource storageAccount)
-            => Execute(
-                $"Assigning 'Contributor' role for user-managed identity to Storage Account resource scope...",
-                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                    ct => (Task)storageAccount.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
-                        new(All_Role_Contributor, managedIdentity.Data.PrincipalId.Value)
-                        {
-                            PrincipalType = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal
-                        }, ct), cts.Token));
+            => AssignRoleToResourceAsync(managedIdentity, storageAccount, GetSubscriptionRoleDefinition(RoleDefinitions.General.Contributor),
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.Contributor)}' role for user-managed identity to Storage Account resource scope...");
 
         private Task<StorageAccountResource> CreateStorageAccountAsync()
             => Execute(
@@ -1431,14 +1406,8 @@ namespace CromwellOnAzureDeployer
                 });
 
         private Task AssignVmAsContributorToBatchAccountAsync(UserAssignedIdentityResource managedIdentity, BatchAccountResource batchAccount)
-            => Execute(
-                $"Assigning 'Contributor' role for user-managed identity to Batch Account resource scope...",
-                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                    ct => (Task)batchAccount.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
-                        new(All_Role_Contributor, managedIdentity.Data.PrincipalId.Value)
-                        {
-                            PrincipalType = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal
-                        }, ct), cts.Token));
+            => AssignRoleToResourceAsync(managedIdentity, batchAccount, GetSubscriptionRoleDefinition(RoleDefinitions.General.Contributor),
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.Contributor)}' role for user-managed identity to Batch Account resource scope...");
 
         private async Task<PostgreSqlFlexibleServerResource> CreatePostgreSqlServerAndDatabaseAsync(SubnetResource subnet, PrivateDnsZoneResource postgreSqlDnsZone)
         {
@@ -1446,7 +1415,7 @@ namespace CromwellOnAzureDeployer
 
             if (!subnet.Data.Delegations.Any())
             {
-                subnet.Data.Delegations.Add(new() { ServiceName = "Microsoft.DBforPostgreSQL/flexibleServers" });
+                subnet.Data.Delegations.Add(NewServiceDelegation("Microsoft.DBforPostgreSQL/flexibleServers"));
                 await subnet.UpdateAsync(WaitUntil.Completed, subnet.Data, cts.Token);
             }
 
@@ -1468,7 +1437,7 @@ namespace CromwellOnAzureDeployer
 
             var server = await Execute(
                 $"Creating Azure Flexible Server for PostgreSQL: {configuration.PostgreSqlServerName}...",
-                async () => (await resourceGroup.GetPostgreSqlFlexibleServers().CreateOrUpdateAsync(WaitUntil.Completed, configuration.PostgreSqlServerName, data, cts.Token)).Value);
+                async () => (await internalServerErrorRetryPolicy.ExecuteAsync(token => resourceGroup.GetPostgreSqlFlexibleServers().CreateOrUpdateAsync(WaitUntil.Completed, configuration.PostgreSqlServerName, data, token), cts.Token)).Value);
 
             await Execute(
                 $"Creating PostgreSQL Cromwell database: {configuration.PostgreSqlCromwellDatabaseName}...",
@@ -1482,14 +1451,60 @@ namespace CromwellOnAzureDeployer
         }
 
         private Task AssignVmAsContributorToAppInsightsAsync(UserAssignedIdentityResource managedIdentity, ArmResource appInsights)
-            => Execute(
-                $"Assigning 'Contributor' role for user-managed identity to App Insights resource scope...",
-                () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(
-                    ct => (Task)appInsights.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
-                        new(All_Role_Contributor, managedIdentity.Data.PrincipalId.Value)
-                        {
-                            PrincipalType = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal
-                        }, ct), cts.Token));
+            => AssignRoleToResourceAsync(managedIdentity, appInsights, GetSubscriptionRoleDefinition(RoleDefinitions.General.Contributor),
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.Contributor)}' role for user-managed identity to App Insights resource scope...");
+
+        private ResourceIdentifier GetSubscriptionRoleDefinition(Guid roleDefinition)
+            => AuthorizationRoleDefinitionResource.CreateResourceIdentifier(SubscriptionResource.CreateResourceIdentifier(configuration.SubscriptionId), new(roleDefinition.ToString("D")));
+
+        private async Task AssignRoleToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
+        {
+            if (await resource.GetRoleAssignments().GetAllAsync(filter: "atScope()", cancellationToken: cts.Token)
+                .SelectAwaitWithCancellation(async (a, ct) => await EnsureResourceDataAsync(a, r => r.HasData, CallGetAsync, ct))
+                .Where(a => a?.HasData ?? false)
+                .Where(a => managedIdentity.Data.PrincipalId.Value.Equals(a.Data.PrincipalId.Value))
+                .Where(a => roleDefinitionId.Equals(a.Data.RoleDefinitionId))
+                .AnyAsync(cts.Token))
+            {
+                return;
+            }
+
+            await Execute(message, () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(token =>
+                (Task)resource.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
+                    new(roleDefinitionId, managedIdentity.Data.PrincipalId.Value)
+                    {
+                        PrincipalType = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal
+                    },
+                    token),
+                cts.Token));
+
+            static Func<CancellationToken, Task<Response<RoleAssignmentResource>>> CallGetAsync(RoleAssignmentResource resource)
+            {
+                return new Func<CancellationToken, Task<Response<RoleAssignmentResource>>>(async cancellationToken =>
+                {
+                    try
+                    {
+                        return await resource.GetAsync(cancellationToken: cancellationToken);
+                    }
+                    catch (RequestFailedException ex) when ("AuthorizationFailed".Equals(ex.ErrorCode))
+                    {
+                        return new NullResponse<RoleAssignmentResource>();
+                    }
+                });
+            }
+        }
+
+        private class NullResponse<T> : Response<T>
+        {
+            public override bool HasValue => false;
+
+            public override T Value => default;
+
+            public override Response GetRawResponse()
+            {
+                throw new NotImplementedException();
+            }
+        }
 
         private Task<(VirtualNetworkResource virtualNetwork, SubnetResource vmSubnet, SubnetResource postgreSqlSubnet, SubnetResource batchSubnet)> CreateVnetAndSubnetsAsync()
           => Execute(
@@ -1533,10 +1548,10 @@ namespace CromwellOnAzureDeployer
                         subnets.FirstOrDefault(s => s.Id.Name.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)),
                         subnets.FirstOrDefault(s => s.Id.Name.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)),
                         subnets.FirstOrDefault(s => s.Id.Name.Equals(configuration.BatchSubnetName, StringComparison.OrdinalIgnoreCase)));
-
-                    static ServiceDelegation NewServiceDelegation(string serviceDelegation) =>
-                        new() { Name = serviceDelegation, ServiceName = serviceDelegation };
                 });
+
+        private static ServiceDelegation NewServiceDelegation(string serviceDelegation) =>
+            new() { Name = serviceDelegation, ServiceName = serviceDelegation };
 
         private async Task<NetworkSecurityGroupResource> CreateNetworkSecurityGroupAsync(string networkSecurityGroupName)
         {
@@ -1876,8 +1891,8 @@ namespace CromwellOnAzureDeployer
 
         private async Task ValidateSubscriptionAndResourceGroupAsync(Configuration configuration)
         {
-            const string ownerRoleId = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635";
-            const string contributorRoleId = "b24988ac-6180-42a0-ab88-20f7382dd24c";
+            var ownerRoleId = RoleDefinitions.General.Owner.ToString("D");
+            var contributorRoleId = RoleDefinitions.General.Contributor.ToString("D");
 
             bool rgExists;
 
@@ -2214,6 +2229,8 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.CrossSubscriptionAKSDeployment, nameof(configuration.CrossSubscriptionAKSDeployment));
             ThrowIfProvidedForUpdate(configuration.ApplicationInsightsAccountName, nameof(configuration.ApplicationInsightsAccountName));
             ThrowIfProvidedForUpdate(configuration.PrivateNetworking, nameof(configuration.PrivateNetworking));
+            ThrowIfProvidedForUpdate(configuration.AksPrivateDnsZoneResourceId, nameof(configuration.AksPrivateDnsZoneResourceId));
+            ThrowIfProvidedForUpdate(configuration.UserDefinedRouting, nameof(configuration.UserDefinedRouting));
             ThrowIfProvidedForUpdate(configuration.VnetName, nameof(configuration.VnetName));
             ThrowIfProvidedForUpdate(configuration.VnetResourceGroupName, nameof(configuration.VnetResourceGroupName));
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
