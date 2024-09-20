@@ -65,6 +65,7 @@ namespace CromwellOnAzureDeployer
         public bool Silent { get; set; }
         public bool DeleteResourceGroupOnFailure { get; set; }
         public string CromwellVersion { get; set; }
+        public string CromwellImageName { get; set; }
         public string TesImageName { get; set; }
         public string TriggerServiceImageName { get; set; }
         public bool SkipTestWorkflow { get; set; } = false;
