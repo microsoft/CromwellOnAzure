@@ -65,6 +65,7 @@ namespace CromwellOnAzureDeployer
         public bool Silent { get; set; }
         public bool DeleteResourceGroupOnFailure { get; set; }
         public string CromwellVersion { get; set; }
+        public string CromwellImageName { get; set; }
         public string TesImageName { get; set; }
         public string TriggerServiceImageName { get; set; }
         public bool SkipTestWorkflow { get; set; } = false;
@@ -94,6 +95,8 @@ namespace CromwellOnAzureDeployer
         public string DeploymentOrganizationUrl { get; set; }
         public string DeploymentContactUri { get; set; }
         public string DeploymentEnvironment { get; set; }
+        public string PrivateTestUbuntuImage { get; set; } = "mcr.microsoft.com/mirror/docker/library/ubuntu:22.04";
+        public string PrivatePSQLUbuntuImage { get; set; } = "mcr.microsoft.com/mirror/docker/library/ubuntu:24.04"; // mcr's docker mirror does not host "latest"
 
         public static Configuration BuildConfiguration(string[] args)
         {

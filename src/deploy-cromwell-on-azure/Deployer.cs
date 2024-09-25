@@ -74,6 +74,12 @@ namespace CromwellOnAzureDeployer
             .Handle<Exception>()
             .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(1));
 
+        private static readonly AsyncRetryPolicy internalServerErrorRetryPolicy = Policy
+            .Handle<RequestFailedException>(azureException =>
+                (int)HttpStatusCode.OK == azureException.Status &&
+                "InternalServerError".Equals(azureException.ErrorCode))
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(15));
+
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
         public const string TesInternalContainerName = "tes-internal";
@@ -619,7 +625,7 @@ namespace CromwellOnAzureDeployer
 
                                 // Deploy an ubuntu pod to run PSQL commands, then delete it
                                 const string deploymentNamespace = "default";
-                                var (deploymentName, ubuntuDeployment) = KubernetesManager.GetUbuntuDeploymentTemplate();
+                                var (deploymentName, ubuntuDeployment) = KubernetesManager.GetUbuntuDeploymentTemplate(configuration.PrivatePSQLUbuntuImage);
                                 await kubernetesClient.AppsV1.CreateNamespacedDeploymentAsync(ubuntuDeployment, deploymentNamespace, cancellationToken: cts.Token);
                                 await ExecuteQueriesOnAzurePostgreSQLDbFromK8(kubernetesClient, deploymentName, deploymentNamespace);
                                 await kubernetesClient.AppsV1.DeleteNamespacedDeploymentAsync(deploymentName, deploymentNamespace, cancellationToken: cts.Token);
@@ -994,9 +1000,12 @@ namespace CromwellOnAzureDeployer
             UpdateSetting(settings, defaults, "DeploymentUpdated", currentTime.ToString("O"), ignoreDefaults: false);
 
             // Process images
-            UpdateSetting(settings, defaults, "CromwellImageName", configuration.CromwellVersion, v => $"broadinstitute/cromwell:{v}",
-                ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "CromwellImageName", configuration.CromwellVersion is null, installedVersion,
-                    tag => GetTag(settings["CromwellImageName"]) <= GetTag(defaults["CromwellImageName"]))); // There's not a good way to detect customization of this property, so default to forced upgrade to the new default.
+            UpdateSetting(settings, defaults, "CromwellImageName",
+                value: string.IsNullOrWhiteSpace(configuration.CromwellImageName) ? (string.IsNullOrWhiteSpace(configuration.CromwellVersion) ? null : configuration.CromwellVersion) : configuration.CromwellImageName,
+                ConvertValue: string.IsNullOrWhiteSpace(configuration.CromwellImageName) ? (v => installedVersion is null ? $"broadinstitute/cromwell:{v}" : $"{GetCromwellImageNameWithoutTag(settings["CromwellImageName"])}:{v}") : null,
+                ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "CromwellImageName", configuration.CromwellVersion is null && configuration.CromwellImageName is null, installedVersion,
+                    tag => GetCromwellImageTag(settings["CromwellImageName"]) <= GetCromwellImageTag(defaults["CromwellImageName"]))); // There's not a good way to detect customization of this property, so default to forced upgrade to the new default.
+
             UpdateSetting(settings, defaults, "TesImageName", configuration.TesImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TesImageName", configuration.TesImageName is null, installedVersion));
             UpdateSetting(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName is null, installedVersion));
 
@@ -1037,7 +1046,10 @@ namespace CromwellOnAzureDeployer
             BackFillSettings(settings, defaults);
             return settings;
 
-            static int GetTag(string imageName)
+            static string GetCromwellImageNameWithoutTag(string imageName)
+                => imageName?[..(imageName.LastIndexOf(':'))] ?? null;
+
+            static int GetCromwellImageTag(string imageName)
                 => int.TryParse(imageName?[(imageName.LastIndexOf(':') + 1)..] ?? string.Empty, System.Globalization.NumberStyles.Integer, System.Globalization.NumberFormatInfo.InvariantInfo, out var tag) ? tag : 0;
         }
 
@@ -1409,7 +1421,7 @@ namespace CromwellOnAzureDeployer
 
             if (!subnet.Data.Delegations.Any())
             {
-                subnet.Data.Delegations.Add(new() { ServiceName = "Microsoft.DBforPostgreSQL/flexibleServers" });
+                subnet.Data.Delegations.Add(NewServiceDelegation("Microsoft.DBforPostgreSQL/flexibleServers"));
                 await subnet.UpdateAsync(WaitUntil.Completed, subnet.Data, cts.Token);
             }
 
@@ -1431,7 +1443,7 @@ namespace CromwellOnAzureDeployer
 
             var server = await Execute(
                 $"Creating Azure Flexible Server for PostgreSQL: {configuration.PostgreSqlServerName}...",
-                async () => (await resourceGroup.GetPostgreSqlFlexibleServers().CreateOrUpdateAsync(WaitUntil.Completed, configuration.PostgreSqlServerName, data, cts.Token)).Value);
+                async () => (await internalServerErrorRetryPolicy.ExecuteAsync(token => resourceGroup.GetPostgreSqlFlexibleServers().CreateOrUpdateAsync(WaitUntil.Completed, configuration.PostgreSqlServerName, data, token), cts.Token)).Value);
 
             await Execute(
                 $"Creating PostgreSQL Cromwell database: {configuration.PostgreSqlCromwellDatabaseName}...",
@@ -1542,10 +1554,10 @@ namespace CromwellOnAzureDeployer
                         subnets.FirstOrDefault(s => s.Id.Name.Equals(configuration.VmSubnetName, StringComparison.OrdinalIgnoreCase)),
                         subnets.FirstOrDefault(s => s.Id.Name.Equals(configuration.PostgreSqlSubnetName, StringComparison.OrdinalIgnoreCase)),
                         subnets.FirstOrDefault(s => s.Id.Name.Equals(configuration.BatchSubnetName, StringComparison.OrdinalIgnoreCase)));
-
-                    static ServiceDelegation NewServiceDelegation(string serviceDelegation) =>
-                        new() { Name = serviceDelegation, ServiceName = serviceDelegation };
                 });
+
+        private static ServiceDelegation NewServiceDelegation(string serviceDelegation) =>
+            new() { Name = serviceDelegation, ServiceName = serviceDelegation };
 
         private async Task<NetworkSecurityGroupResource> CreateNetworkSecurityGroupAsync(string networkSecurityGroupName)
         {
@@ -2209,6 +2221,15 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(configuration.CromwellImageName) && !string.IsNullOrWhiteSpace(configuration.CromwellVersion))
+            {
+                throw new ValidationException($"{nameof(configuration.CromwellImageName)} must not be provided when {nameof(configuration.CromwellVersion)} is provided.");
+            }
+            else if (!string.IsNullOrWhiteSpace(configuration.CromwellImageName) && !int.TryParse(configuration.CromwellImageName[(configuration.CromwellImageName.LastIndexOf(':') + 1)..], System.Globalization.NumberStyles.Integer, System.Globalization.NumberFormatInfo.InvariantInfo, out _))
+            {
+                throw new ValidationException($"{nameof(configuration.CromwellImageName)} must include a tag and that tag must be an integer. It is recommended that the tag be retained from the original.");
+            }
+
             ThrowIfNotProvided(configuration.SubscriptionId, nameof(configuration.SubscriptionId));
 
             ThrowIfNotProvidedForInstall(configuration.RegionName, nameof(configuration.RegionName));
@@ -2331,7 +2352,7 @@ namespace CromwellOnAzureDeployer
             const string inputFileContent = "Hello from inputFile.txt!";
 
             var id = Guid.NewGuid();
-            var wdlFileContent = Utility.GetFileContent(wdlFileName);
+            var wdlFileContent = Utility.GetFileContent(wdlFileName).Replace("{UbuntuImage}", configuration.PrivateTestUbuntuImage);
             var workflowInputsFileContent = Utility.GetFileContent(workflowInputsFileName).Replace("{InputFilePath}", $"/{storageAccount.Name}/{InputsContainerName}/{testDirectoryName}/{inputFileName}");
 
             if (!usePreemptibleVm)
