@@ -78,12 +78,14 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New))
-                .Returns(Task.FromResult(new[] {
-                    new TriggerFile {
+                .Returns(AsyncEnumerable.Repeat(
+                    new TriggerFile
+                    {
                         Uri = $"http://tempuri.org/workflows/new/Sample.json",
                         ContainerName = "workflows",
                         Name = $"new/Sample.json",
-                        LastModified = DateTimeOffset.UtcNow } }.AsEnumerable()));
+                        LastModified = DateTimeOffset.UtcNow
+                    }, 1));
 
             azureStorage.Setup(x => x.IsAvailableAsync())
                 .Returns(() =>
@@ -99,7 +101,7 @@ namespace TriggerService.Tests
                 .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
                 .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
 
-            var azureCloudConfig = AzureCloudConfig.CreateAsync().Result;
+            var azureCloudConfig = AzureCloudConfig.FromKnownCloudNameAsync().Result;
             var triggerHostedService = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, tesTaskRepository, storageUtility.Object, azureCloudConfig);
 
             //var engine = new TriggerHostedService(loggerFactory, environment.Object, TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(25));

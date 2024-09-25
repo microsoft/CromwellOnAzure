@@ -14,7 +14,7 @@ namespace TriggerService
         Task<string> UploadFileTextAsync(string content, string container, string blobName);
         Task<string> DownloadBlobTextAsync(string container, string blobName);
         Task DeleteBlobIfExistsAsync(string container, string blobName);
-        Task<IEnumerable<TriggerFile>> GetWorkflowsByStateAsync(WorkflowState state);
+        IAsyncEnumerable<TriggerFile> GetWorkflowsByStateAsync(WorkflowState state);
         Task<bool> IsAvailableAsync();
         Task<byte[]> DownloadFileUsingHttpClientAsync(string url);
     }

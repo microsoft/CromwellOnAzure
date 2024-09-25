@@ -5,8 +5,10 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{EF518D6D-FA52-4B12-AF47-0C46C0BC434D}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
+		after.CromwellOnAzure.sln.targets = after.CromwellOnAzure.sln.targets
 		CodeCoverage.runsettings = CodeCoverage.runsettings
-		src\CommonAssemblyInfo.cs = src\CommonAssemblyInfo.cs
+		src\CommonAssemblyInfo.props = src\CommonAssemblyInfo.props
+		src\Directory.Build.props = src\Directory.Build.props
 		src\Dockerfile-TriggerService = src\Dockerfile-TriggerService
 	EndProjectSection
 EndProject

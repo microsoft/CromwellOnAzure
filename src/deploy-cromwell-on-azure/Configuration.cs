@@ -31,6 +31,8 @@ namespace CromwellOnAzureDeployer
 
     public abstract class UserAccessibleConfiguration
     {
+        // https://learn.microsoft.com/azure/aks/private-clusters?tabs=azure-portal#configure-a-private-dns-zone CUSTOM_PRIVATE_DNS_ZONE_RESOURCE_ID
+        public string AksPrivateDnsZoneResourceId { get; set; }
         public string AksNodeResourceGroupName { get; set; }
         public string IdentityResourceId { get; set; }
         public string AzureCloudName { get; set; } = AzureCloudConfig.DefaultAzureCloudName;
@@ -44,9 +46,9 @@ namespace CromwellOnAzureDeployer
         public string VmSubnetAddressSpace { get; set; } = "10.1.0.0/24"; // 10.1.0.0 - 10.1.0.255, 256 IPs
         public string PostgreSqlSubnetAddressSpace { get; set; } = "10.1.1.0/24"; // 10.1.1.0 - 10.1.1.255, 256 IPs
         // Address space for kubernetes system services, must not overlap with any subnet.
-        public string KubernetesServiceCidr = "10.1.4.0/22"; // 10.1.4.0 -> 10.1.7.255, 1024 IPs
-        public string KubernetesDnsServiceIP = "10.1.4.10";
-        public string KubernetesDockerBridgeCidr = "172.17.0.1/16"; // 172.17.0.0 - 172.17.255.255, 65536 IPs
+        public string KubernetesServiceCidr { get; set; } = "10.1.4.0/22"; // 10.1.4.0 -> 10.1.7.255, 1024 IPs
+        public string KubernetesDnsServiceIP { get; set; } = "10.1.4.10";
+        public string KubernetesDockerBridgeCidr { get; set; } = "172.17.0.1/16"; // 172.17.0.0 - 172.17.255.255, 65536 IPs
         public string BatchNodesSubnetAddressSpace { get; set; } = "10.1.128.0/17"; // 10.1.128.0 - 10.1.255.255, 32768 IPs
 
         public string ResourceGroupName { get; set; }
@@ -63,6 +65,7 @@ namespace CromwellOnAzureDeployer
         public bool Silent { get; set; }
         public bool DeleteResourceGroupOnFailure { get; set; }
         public string CromwellVersion { get; set; }
+        public string CromwellImageName { get; set; }
         public string TesImageName { get; set; }
         public string TriggerServiceImageName { get; set; }
         public bool SkipTestWorkflow { get; set; } = false;
@@ -74,6 +77,9 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlSubnetName { get; set; }
         public string BatchSubnetName { get; set; }
         public bool? PrivateNetworking { get; set; } = null;
+        // https://learn.microsoft.com/azure/aks/egress-outboundtype#outbound-type-of-userdefinedrouting
+        // https://learn.microsoft.com/azure/aks/egress-udr
+        public bool? UserDefinedRouting { get; set; } = null;
         public string Tags { get; set; } = null;
         public string BatchNodesSubnetId { get; set; } = null;
         public bool? DisableBatchNodesPublicIpAddress { get; set; } = null;
@@ -89,6 +95,8 @@ namespace CromwellOnAzureDeployer
         public string DeploymentOrganizationUrl { get; set; }
         public string DeploymentContactUri { get; set; }
         public string DeploymentEnvironment { get; set; }
+        public string PrivateTestUbuntuImage { get; set; } = "mcr.microsoft.com/mirror/docker/library/ubuntu:22.04";
+        public string PrivatePSQLUbuntuImage { get; set; } = "mcr.microsoft.com/mirror/docker/library/ubuntu:24.04"; // mcr's docker mirror does not host "latest"
 
         public static Configuration BuildConfiguration(string[] args)
         {

@@ -1,0 +1,30 @@
+<Project>
+  <Target Name="PublishSourceFilesProjectOutputGroup" Condition=" '$(PublishDir)' != '' ">
+    <ItemGroup>
+      <_ProjectReference Include="@(ProjectReference)" Condition="'$([System.IO.Path]::GetExtension(%(FullPath)))' != '.metaproj'" />
+      <_ProjectReference Include="@(ProjectReference->'%(RootDir)%(Directory)%(Filename)')" Condition="Exists('%(RootDir)%(Directory)%(Filename)') And '$([System.IO.Path]::GetExtension(%(FullPath)))' == '.metaproj' " />
+    </ItemGroup>
+    <MSBuild
+        BuildInParallel="True"
+        Projects="@(_ProjectReference)"
+        Targets="SourceFilesProjectOutputGroup;ContentFilesProjectOutputGroup"
+        Properties="BuildingSolutionFile=true; CurrentSolutionConfigurationContents=$(CurrentSolutionConfigurationContents); SolutionDir=$(SolutionDir); SolutionExt=$(SolutionExt); SolutionFileName=$(SolutionFileName); SolutionName=$(SolutionName); SolutionPath=$(SolutionPath)">
+      <Output TaskParameter="TargetOutputs" ItemName="CollectedBuildOutput" />
+    </MSBuild>
+    <ItemGroup>
+      <!-- Remove "source" items collected that live outside of the solution directory. -->
+      <CollectedBuildOutput
+          Remove="@(CollectedBuildOutput)"
+          Condition="!Exists('%(FullPath)') Or !$([System.String]::Copy($([MSBuild]::NormalizePath(%(FullPath)))).StartsWith($([MSBuild]::NormalizeDirectory($(SolutionDir))),StringComparison.OrdinalIgnoreCase))" />
+      <CollectedBuildOutput Include="$(SolutionPath)" />
+      <CollectedBuildOutput Include="$([MSBuild]::NormalizeDirectory($(SolutionDir)src\))CommonAssemblyInfo.cs" />
+    </ItemGroup>
+    <Copy
+        SourceFiles="%(CollectedBuildOutput.FullPath)"
+        DestinationFiles="$([MSBuild]::EnsureTrailingSlash($(PublishDir)))$([MSBuild]::MakeRelative($([MSBuild]::NormalizeDirectory($(SolutionDir))),%(CollectedBuildOutput.FullPath)))"
+        SkipUnchangedFiles="true"
+        UseHardlinksIfPossible="true"
+        UseSymbolicLinksIfPossible="true"
+        Retries="$(CopyRetryCount)" />
+  </Target>
+</Project>

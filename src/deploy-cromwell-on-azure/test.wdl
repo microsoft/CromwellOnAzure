@@ -11,7 +11,7 @@ task hello {
     File outfile2 = "outfile2.txt"
   }
   runtime {
-    docker: 'mcr.microsoft.com/mirror/docker/library/ubuntu:22.04'
+    docker: '{UbuntuImage}'
     preemptible: true
   }
 }
