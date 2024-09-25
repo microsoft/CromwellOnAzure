@@ -14,11 +14,20 @@ config:
     subnetId: RUNTIME_PARAMETER
     disablePublicIpAddress: RUNTIME_PARAMETER
     globalStartTask: /configuration/start-task.sh
+    contentMD5: "False"
   batchScheduling:
     usePreemptibleVmsOnly: RUNTIME_PARAMETER
     useLegacyAutopools: "False"
     poolRotationForcedDays: "7"
+    taskMaxWallClockTimeDays: "7"
     prefix: RUNTIME_PARAMETER
+  deployment:
+    organizationName: RUNTIME_PARAMETER
+    organizationUrl: RUNTIME_PARAMETER
+    contactUri: RUNTIME_PARAMETER
+    environment: RUNTIME_PARAMETER
+    created: RUNTIME_PARAMETER
+    updated: RUNTIME_PARAMETER
   batchImageGen2:
     offer: RUNTIME_PARAMETER
     publisher: RUNTIME_PARAMETER

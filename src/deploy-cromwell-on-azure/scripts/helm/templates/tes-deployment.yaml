@@ -30,6 +30,20 @@ spec:
         - env:
             - name: General__AzureCloudName
               value: {{ .Values.config.azureCloudName }}
+            - name: Deployment__OrganizationName
+              value: {{ .Values.config.deployment.organizationName }}
+            - name: Deployment__OrganizationUrl
+              value: {{ .Values.config.deployment.organizationUrl }}
+            - name: Deployment__ContactUri
+              value: {{ .Values.config.deployment.contactUri }}
+            - name: Deployment__Environment
+              value: {{ .Values.config.deployment.environment }}
+            - name: Deployment__Created
+              value: {{ .Values.config.deployment.created }}
+            - name: Deployment__Updated
+              value: {{ .Values.config.deployment.updated }}
+            - name: Deployment__TesImage
+              value: {{ .Values.images.tes }}
             - name: TesPostgreSql__ServerName
               value: {{ .Values.tesDatabase.serverName }}
             - name: TesPostgreSql__ServerNameSuffix
@@ -60,6 +74,8 @@ spec:
               value: {{ .Values.config.batchNodes.subnetId }}
             - name: BatchNodes__DisablePublicIpAddress
               value: {{ .Values.config.batchNodes.disablePublicIpAddress | quote }}
+            - name: BatchNodes__ContentMD5
+              value: {{ .Values.config.batchNodes.contentMD5 | quote }}
             - name: BatchImageGen2__Offer
               value: {{ .Values.config.batchImageGen2.offer }}
             - name: BatchImageGen2__Publisher
@@ -82,6 +98,8 @@ spec:
               value: {{ .Values.config.batchImageGen1.nodeAgentSkuId }}
             - name: BatchScheduling__PoolRotationForcedDays
               value: {{ .Values.config.batchScheduling.poolRotationForcedDays | quote }}
+            - name: BatchScheduling__TaskMaxWallClockTimeDays
+              value: {{ .Values.config.batchScheduling.taskMaxWallClockTimeDays | quote }}
             - name: BatchScheduling__Prefix
               value: {{ .Values.config.batchScheduling.prefix | quote }}
             - name: Martha__Url
