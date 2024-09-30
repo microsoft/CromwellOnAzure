@@ -821,7 +821,7 @@ namespace CromwellOnAzureDeployer
             }
 
             return (await GetExistingAKSClusterAsync(configuration.AksClusterName))
-                ?? throw new ValidationException($"If AKS cluster name is provided, the cluster must already exist in region {configuration.RegionName}, and be accessible to the current user.", displayExample: false);
+                ?? (configuration.CreateMissing.GetValueOrDefault() ? null : throw new ValidationException($"If AKS cluster name is provided, the cluster must already exist in region {configuration.RegionName}, and be accessible to the current user. Set {nameof(configuration.CreateMissing)} to true to create cluster with provided name.", displayExample: false));
         }
 
         private async Task<PostgreSqlFlexibleServerResource> GetExistingPostgresqlService(string serverName)
@@ -2236,8 +2236,12 @@ namespace CromwellOnAzureDeployer
 
             ThrowIfNotProvidedForUpdate(configuration.ResourceGroupName, nameof(configuration.ResourceGroupName));
 
-            ThrowIfProvidedForInstall(configuration.AksClusterName, nameof(configuration.AksClusterName));
+            if (!configuration.CreateMissing.GetValueOrDefault())
+            {
+                ThrowIfProvidedForInstall(configuration.AksClusterName, nameof(configuration.AksClusterName));
+            }
 
+            ThrowIfProvidedForUpdate(configuration.CreateMissing, nameof(configuration.CreateMissing));
             ThrowIfProvidedForUpdate(configuration.BatchPrefix, nameof(configuration.BatchPrefix));
             ThrowIfProvidedForUpdate(configuration.RegionName, nameof(configuration.RegionName));
             ThrowIfProvidedForUpdate(configuration.BatchAccountName, nameof(configuration.BatchAccountName));
