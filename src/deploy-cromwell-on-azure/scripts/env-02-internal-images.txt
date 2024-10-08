@@ -1,2 +1,2 @@
-﻿TesImageName=mcr.microsoft.com/cromwellonazure/tes:5.4.4
-TriggerServiceImageName=mcr.microsoft.com/cromwellonazure/triggerservice:5.4.4
+﻿TesImageName=mcr.microsoft.com/cromwellonazure/tes:5.4.5
+TriggerServiceImageName=mcr.microsoft.com/cromwellonazure/triggerservice:5.4.5
