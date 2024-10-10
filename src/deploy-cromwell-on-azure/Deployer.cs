@@ -1003,8 +1003,8 @@ namespace CromwellOnAzureDeployer
             UpdateSetting(settings, defaults, "CromwellImageName",
                 value: string.IsNullOrWhiteSpace(configuration.CromwellImageName) ? (string.IsNullOrWhiteSpace(configuration.CromwellVersion) ? null : configuration.CromwellVersion) : configuration.CromwellImageName,
                 ConvertValue: string.IsNullOrWhiteSpace(configuration.CromwellImageName) ? (v => installedVersion is null ? $"broadinstitute/cromwell:{v}" : $"{GetCromwellImageNameWithoutTag(settings["CromwellImageName"])}:{v}") : null,
-                ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "CromwellImageName", configuration.CromwellVersion is null && configuration.CromwellImageName is null, installedVersion,
-                    tag => GetCromwellImageTag(settings["CromwellImageName"]) <= GetCromwellImageTag(defaults["CromwellImageName"]))); // There's not a good way to detect customization of this property, so default to forced upgrade to the new default.
+                ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "CromwellImageName", configuration.CromwellVersion is null && configuration.CromwellImageName is null, installedVersion, tagKey: nameof(configuration.CromwellVersion),
+                    IsInstalledNotCustomized: tag => GetCromwellImageTag(settings["CromwellImageName"]) <= GetCromwellImageTag(defaults["CromwellImageName"]))); // There's not a good way to detect customization of this property, so default to forced upgrade to the new default.
 
             UpdateSetting(settings, defaults, "TesImageName", configuration.TesImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TesImageName", configuration.TesImageName is null, installedVersion));
             UpdateSetting(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName is null, installedVersion));
@@ -1050,7 +1050,7 @@ namespace CromwellOnAzureDeployer
                 => imageName?[..(imageName.LastIndexOf(':'))] ?? null;
 
             static int GetCromwellImageTag(string imageName)
-                => int.TryParse(imageName?[(imageName.LastIndexOf(':') + 1)..] ?? string.Empty, System.Globalization.NumberStyles.Integer, System.Globalization.NumberFormatInfo.InvariantInfo, out var tag) ? tag : 0;
+                => int.TryParse(imageName?[(imageName.LastIndexOf(':') + 1)..] ?? string.Empty, System.Globalization.NumberStyles.Integer, System.Globalization.NumberFormatInfo.InvariantInfo, out var tag) ? tag : int.MaxValue;
         }
 
         /// <summary>
@@ -1062,9 +1062,10 @@ namespace CromwellOnAzureDeployer
         /// <param name="valueIsNull">True if configuration value to set is null. See <see cref="UpdateSetting{T}(Dictionary{string, string}, Dictionary{string, string}, string, T, Func{T, string}, string, bool?)"/>'s "value" parameter.</param>
         /// <param name="installedVersion">A <see cref="Version"/> of the current configuration, or null if this is not an update.</param>
         /// <param name="IsInstalledNotCustomized">A <see cref="Predicate{T}"/> where the parameter is the image tag of the currently configured image. Only called if the rest of the image name is identical to the default. Return False if the value is considered customized, otherwise True.</param>
+        /// <param name="tagKey">Configuration key of tag to use in warning if <paramref name="key"/> is not correct.</param>
         /// <returns>false if current setting should be ignored, null otherwise.</returns>
         /// <remarks>This method provides a value for the "ignoreDefaults" parameter to <see cref="UpdateSetting{T}(Dictionary{string, string}, Dictionary{string, string}, string, T, Func{T, string}, string, bool?)"/> for use with container image names.</remarks>
-        private static bool? ImageNameIgnoreDefaults(Dictionary<string, string> settings, Dictionary<string, string> defaults, string key, bool valueIsNull, Version installedVersion, Predicate<string> IsInstalledNotCustomized = default)
+        private static bool? ImageNameIgnoreDefaults(Dictionary<string, string> settings, Dictionary<string, string> defaults, string key, bool valueIsNull, Version installedVersion, Predicate<string> IsInstalledNotCustomized = default, string tagKey = default)
         {
             if (installedVersion is null || !valueIsNull)
             {
@@ -1106,7 +1107,8 @@ namespace CromwellOnAzureDeployer
 
             if (result is null && !sameVersionUpgrade)
             {
-                ConsoleEx.WriteLine($"Warning: CromwellOnAzure is being upgraded, but {key} was customized, and is not being upgraded, which might not be what you want. (To remove the customization of {key}, set it to the empty string.)", ConsoleColor.Yellow);
+                var configKey = installed.StartsWith(defaultPath + ":") ? tagKey ?? key : key;
+                ConsoleEx.WriteLine($"Warning: CromwellOnAzure is being upgraded, but {configKey} was customized, and is not being upgraded, which might not be what you want. (To remove the customization of {configKey}, set it to the empty string.)", ConsoleColor.Yellow);
             }
 
             return result;
@@ -2258,6 +2260,7 @@ namespace CromwellOnAzureDeployer
 
             if (!configuration.ManualHelmDeployment)
             {
+                configuration.HelmBinaryPath = configuration.HelmBinaryPath is null ? null : Environment.ExpandEnvironmentVariables(configuration.HelmBinaryPath);
                 ValidateHelmInstall(configuration.HelmBinaryPath, nameof(configuration.HelmBinaryPath));
             }
 
