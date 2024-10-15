@@ -107,7 +107,7 @@ namespace CromwellOnAzureDeployer
 
             if (System.IO.File.Exists(configFilename))
             {
-                configBuilder.AddJsonFile(configFilename);
+                configBuilder.AddJsonFile(System.IO.Path.GetFullPath(configFilename));
             }
 
             var configurationSource = configBuilder.AddCommandLine(args).Build();

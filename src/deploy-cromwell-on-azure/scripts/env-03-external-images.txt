@@ -1,1 +1,1 @@
-CromwellImageName=broadinstitute/cromwell:86
+CromwellImageName=broadinstitute/cromwell:87
