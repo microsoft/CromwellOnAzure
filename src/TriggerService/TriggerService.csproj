@@ -39,7 +39,7 @@
     <ProjectReference Include="..\Common\Common.csproj" />
     <ProjectReference Include="..\CromwellApiClient\CromwellApiClient.csproj" />
     <ProjectReference Include="..\ga4gh-tes\src\CommonUtilities\CommonUtilities.csproj" />
-    <ProjectReference Include="..\ga4gh-tes\src\Tes\Tes.csproj" />
+    <ProjectReference Include="..\ga4gh-tes\src\Tes.Repository\Tes.Repository.csproj" />
   </ItemGroup>
 
 </Project>
