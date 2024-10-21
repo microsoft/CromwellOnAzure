@@ -349,20 +349,29 @@ namespace CromwellOnAzureDeployer
                             waitForRoleAssignmentPropagation = true;
                         }
 
-                        if (installedVersion is null || installedVersion < new Version(5, 0, 1))
+                        if (installedVersion is null || installedVersion < new Version(5, 4, 7)) // Previous attempt < 5.0.1
                         {
-                            if (!settings.ContainsKey("ExecutionsContainerName"))
+                            if (string.IsNullOrWhiteSpace(settings["ExecutionsContainerName"]))
                             {
                                 settings["ExecutionsContainerName"] = ExecutionsContainerName;
                             }
                         }
 
-                        if (installedVersion is null || installedVersion < new Version(5, 2, 2))
+                        if (installedVersion is null || installedVersion < new Version(5, 4, 7)) // Previous attempt < 5.2.2
                         {
-                            await updateConflictRetryPolicy.ExecuteAsync(() => EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup));
-                            await kubernetesManager.RemovePodAadChart();
-                            await Execute("Waiting 2 minutes for federated credentials propagation...",
-                                () => Task.Delay(System.TimeSpan.FromMinutes(2), cts.Token));
+                            if (!(aksCluster.Data.SecurityProfile.IsWorkloadIdentityEnabled ?? false) ||
+                                !(aksCluster.Data.OidcIssuerProfile.IsEnabled ?? false) ||
+                                (await managedIdentity.GetFederatedIdentityCredentials()
+                                    .SingleOrDefaultAsync(r => "coaFederatedIdentity".Equals(r.Id.Name, StringComparison.OrdinalIgnoreCase), cts.Token)) is null)
+                            {
+                                await Execute("Enabling workload identity...",
+                                    async () =>
+                                    {
+                                        await updateConflictRetryPolicy.ExecuteAsync(() => EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup));
+                                        await Task.Delay(TimeSpan.FromMinutes(2), cts.Token);
+                                    });
+                                await kubernetesManager.RemovePodAadChart();
+                            }
                         }
 
                         if (installedVersion is null || installedVersion < new Version(5, 3, 0))
@@ -378,6 +387,10 @@ namespace CromwellOnAzureDeployer
                             }
                         }
 
+                        //if (installedVersion is null || installedVersion < new Version(5, 4, 7))
+                        //{
+                        //}
+
                         //if (installedVersion is null || installedVersion < new Version(x, y, z))
                         //{
                         //}
@@ -385,7 +398,7 @@ namespace CromwellOnAzureDeployer
                         if (waitForRoleAssignmentPropagation)
                         {
                             await Execute("Waiting 5 minutes for role assignment propagation...",
-                                () => Task.Delay(System.TimeSpan.FromMinutes(5), cts.Token));
+                                () => Task.Delay(TimeSpan.FromMinutes(5), cts.Token));
                         }
 
                         await kubernetesManager.UpgradeValuesYamlAsync(storageAccountData, settings, containersToMount, installedVersion);
@@ -1203,7 +1216,7 @@ namespace CromwellOnAzureDeployer
                                 break;
                             }
 
-                            await Task.Delay(System.TimeSpan.FromSeconds(15), cts.Token);
+                            await Task.Delay(TimeSpan.FromSeconds(15), cts.Token);
                         }
                     });
             }
