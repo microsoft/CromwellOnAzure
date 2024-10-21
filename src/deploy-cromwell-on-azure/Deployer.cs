@@ -2229,8 +2229,9 @@ namespace CromwellOnAzureDeployer
             }
             else
             {
-                var colonIndex = configuration.CromwellImageName?.LastIndexOf('/') ?? -1;
+                var colonIndex = configuration.CromwellImageName?.LastIndexOf(':') ?? -1;
                 var slashIndex = configuration.CromwellImageName?.IndexOf('/') ?? -1;
+
                 if (!string.IsNullOrWhiteSpace(configuration.CromwellImageName) && colonIndex <= slashIndex)
                 {
                     throw new ValidationException($"{nameof(configuration.CromwellImageName)} must include a tag and that tag is always an integer for full releases. It is recommended that the tag be retained from the original.");
