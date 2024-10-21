@@ -2227,9 +2227,15 @@ namespace CromwellOnAzureDeployer
             {
                 throw new ValidationException($"{nameof(configuration.CromwellImageName)} must not be provided when {nameof(configuration.CromwellVersion)} is provided.");
             }
-            else if (!string.IsNullOrWhiteSpace(configuration.CromwellImageName) && !int.TryParse(configuration.CromwellImageName[(configuration.CromwellImageName.LastIndexOf(':') + 1)..], System.Globalization.NumberStyles.Integer, System.Globalization.NumberFormatInfo.InvariantInfo, out _))
+            else
             {
-                throw new ValidationException($"{nameof(configuration.CromwellImageName)} must include a tag and that tag must be an integer. It is recommended that the tag be retained from the original.");
+                var colonIndex = configuration.CromwellImageName?.LastIndexOf(':') ?? -1;
+                var slashIndex = configuration.CromwellImageName?.IndexOf('/') ?? -1;
+
+                if (!string.IsNullOrWhiteSpace(configuration.CromwellImageName) && colonIndex <= slashIndex)
+                {
+                    throw new ValidationException($"{nameof(configuration.CromwellImageName)} must include a tag and that tag is always an integer for full releases. It is recommended that the tag be retained from the original.");
+                }
             }
 
             ThrowIfNotProvided(configuration.SubscriptionId, nameof(configuration.SubscriptionId));
