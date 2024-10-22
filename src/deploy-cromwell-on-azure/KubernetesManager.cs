@@ -217,7 +217,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task RemovePodAadChart()
         {
-            await ExecHelmProcessAsync($"uninstall aad-pod-identity", throwOnNonZeroExitCode: false);
+            await ExecHelmProcessAsync($"uninstall aad-pod-identity --kubeconfig \"{kubeConfigPath}\"", throwOnNonZeroExitCode: false);
         }
 
         public async Task ExecuteCommandsOnPodAsync(IKubernetes client, string podName, IEnumerable<string[]> commands, string aksNamespace)

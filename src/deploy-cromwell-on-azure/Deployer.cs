@@ -326,6 +326,8 @@ namespace CromwellOnAzureDeployer
 
                         var settings = ConfigureSettings(managedIdentity.Data.ClientId?.ToString("D"), aksValues, installedVersion);
                         var waitForRoleAssignmentPropagation = false;
+                        IEnumerable<string> manualPrecommands = null;
+                        Func<IKubernetes, Task> asyncTask = null;
 
                         if (installedVersion is null || installedVersion < new Version(4, 4))
                         {
@@ -364,13 +366,18 @@ namespace CromwellOnAzureDeployer
                                 (await managedIdentity.GetFederatedIdentityCredentials()
                                     .SingleOrDefaultAsync(r => "coaFederatedIdentity".Equals(r.Id.Name, StringComparison.OrdinalIgnoreCase), cts.Token)) is null)
                             {
-                                await Execute("Enabling workload identity...",
-                                    async () =>
-                                    {
-                                        await updateConflictRetryPolicy.ExecuteAsync(() => EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup));
-                                        await Task.Delay(TimeSpan.FromMinutes(2), cts.Token);
-                                    });
-                                await kubernetesManager.RemovePodAadChart();
+                                if (ManagedClusterEnableManagedAad(aksCluster.Data))
+                                {
+                                    await Execute("Enabling workload identity...",
+                                        async () =>
+                                        {
+                                            await updateConflictRetryPolicy.ExecuteAsync(() => EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup));
+                                            await Task.Delay(TimeSpan.FromMinutes(2), cts.Token);
+                                        });
+
+                                    manualPrecommands = (manualPrecommands ?? []).Append("Include the following HELM command: uninstall aad-pod-identity");
+                                    asyncTask = _ => kubernetesManager.RemovePodAadChart();
+                                }
                             }
                         }
 
@@ -402,7 +409,7 @@ namespace CromwellOnAzureDeployer
                         }
 
                         await kubernetesManager.UpgradeValuesYamlAsync(storageAccountData, settings, containersToMount, installedVersion);
-                        kubernetesClient = await PerformHelmDeploymentAsync(aksCluster);
+                        kubernetesClient = await PerformHelmDeploymentAsync(aksCluster, manualPrecommands, asyncTask);
 
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccountData);
                     }
@@ -889,6 +896,23 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private bool ManagedClusterEnableManagedAad(ContainerServiceManagedClusterData managedCluster)
+        {
+            var aadGroupIds = (configuration.AadGroupIds ?? string.Empty).Split(",", StringSplitOptions.RemoveEmptyEntries).Select(Guid.Parse).ToList();
+
+            if (aadGroupIds.Count > 0 && (!(managedCluster.EnableRbac ?? false) || managedCluster.AadProfile is null || aadGroupIds.Any(id => !managedCluster.AadProfile.AdminGroupObjectIds.Contains(id))))
+            {
+                managedCluster.EnableRbac = true;
+                managedCluster.AadProfile ??= new();
+                managedCluster.AadProfile.IsAzureRbacEnabled = false;
+                managedCluster.AadProfile.IsManagedAadEnabled = true;
+                aadGroupIds.Where(id => !managedCluster.AadProfile.AdminGroupObjectIds.Contains(id)).ForEach(managedCluster.AadProfile.AdminGroupObjectIds.Add);
+                return true;
+            }
+
+            return false;
+        }
+
         private async Task<ContainerServiceManagedClusterResource> ProvisionManagedClusterAsync(UserAssignedIdentityResource managedIdentity, OperationalInsightsWorkspaceResource logAnalyticsWorkspace, ResourceIdentifier subnetId, bool privateNetworking, string nodeResourceGroupName)
         {
             var uami = await EnsureResourceDataAsync(managedIdentity, r => r.HasData, r => r.GetAsync, cts.Token);
@@ -910,19 +934,7 @@ namespace CromwellOnAzureDeployer
             ManagedClusterAddonProfile clusterAddonProfile = new(isEnabled: true);
             clusterAddonProfile.Config.Add("logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id);
             cluster.AddonProfiles.Add("omsagent", clusterAddonProfile);
-
-            if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
-            {
-                cluster.EnableRbac = true;
-                cluster.AadProfile = new()
-                {
-                    IsAzureRbacEnabled = false,
-                    IsManagedAadEnabled = true
-                };
-
-                configuration.AadGroupIds.Split(",", StringSplitOptions.RemoveEmptyEntries).Select(Guid.Parse).ForEach(cluster.AadProfile.AdminGroupObjectIds.Add);
-            }
-
+            _ = ManagedClusterEnableManagedAad(cluster);
             Azure.ResourceManager.Models.ManagedServiceIdentity identity = new(Azure.ResourceManager.Models.ManagedServiceIdentityType.UserAssigned);
             identity.UserAssignedIdentities.Add(uami.Id, new());
             cluster.Identity = identity;
@@ -2299,6 +2311,18 @@ namespace CromwellOnAzureDeployer
             if (string.IsNullOrWhiteSpace(configuration.DeploymentOrganizationName) != string.IsNullOrWhiteSpace(configuration.DeploymentOrganizationUrl))
             {
                 throw new ValidationException("Invalid configuration options DeploymentOrganizationName and DeploymentOrganizationUrl must both be provided together.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
+            {
+                try
+                {
+                    _ = configuration.AadGroupIds.Split(",", StringSplitOptions.RemoveEmptyEntries).Select(Guid.Parse).ToArray();
+                }
+                catch (FormatException)
+                {
+                    throw new ValidationException("Invalid configuration option AadGroupIds is not formatted correctly.");
+                }
             }
         }
 
