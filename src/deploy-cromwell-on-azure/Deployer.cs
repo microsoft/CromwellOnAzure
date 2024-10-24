@@ -375,7 +375,7 @@ namespace CromwellOnAzureDeployer
                                             await Task.Delay(TimeSpan.FromMinutes(2), cts.Token);
                                         });
 
-                                    manualPrecommands = (manualPrecommands ?? []).Append("Include the following HELM command: uninstall aad-pod-identity");
+                                    manualPrecommands = (manualPrecommands ?? []).Append("Include the following HELM command: uninstall aad-pod-identity --namespace kube-system");
                                     asyncTask = _ => kubernetesManager.RemovePodAadChart();
                                 }
                             }
@@ -404,8 +404,9 @@ namespace CromwellOnAzureDeployer
 
                         if (waitForRoleAssignmentPropagation)
                         {
-                            await Execute("Waiting 5 minutes for role assignment propagation...",
-                                () => Task.Delay(TimeSpan.FromMinutes(5), cts.Token));
+                            // 10 minutes for propagation https://learn.microsoft.com/azure/role-based-access-control/troubleshooting
+                            await Execute("Waiting 10 minutes for role assignment propagation...",
+                                () => Task.Delay(TimeSpan.FromMinutes(10), cts.Token));
                         }
 
                         await kubernetesManager.UpgradeValuesYamlAsync(storageAccountData, settings, containersToMount, installedVersion);
