@@ -1797,9 +1797,13 @@ namespace CromwellOnAzureDeployer
                     {
                         _me = await client.Me.GetAsync(cancellationToken: cts.Token);
                     }
-                    catch (Microsoft.Graph.Models.ODataErrors.ODataError ex) when ("/me request is only valid with delegated authentication flow.".Equals(ex.Message, StringComparison.Ordinal))
+                    catch (Azure.Identity.AuthenticationFailedException)
                     {
-                        ConsoleEx.WriteLine($"ODataError code: {ex.Error?.Code ?? "<null>"}");
+                        _me = null;
+                    }
+                    catch (Microsoft.Graph.Models.ODataErrors.ODataError ex) when ("BadRequest".Equals(ex.Error?.Code, StringComparison.OrdinalIgnoreCase) && ex.Message.Contains("/me", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // "/me request is only valid with delegated authentication flow."
                         _me = null;
                     }
                 }
