@@ -737,7 +737,7 @@ namespace CromwellOnAzureDeployer
                 if (!(exc is OperationCanceledException && cts.Token.IsCancellationRequested))
                 {
                     ConsoleEx.WriteLine();
-                    ConsoleEx.WriteLine($"{exc.GetType().Name}: {exc.Message}", ConsoleColor.Red);
+                    ConsoleEx.WriteLine($"{exc.GetType().FullName}: {exc.Message}", ConsoleColor.Red);
 
                     if (configuration.DebugLogging)
                     {
@@ -1511,7 +1511,7 @@ namespace CromwellOnAzureDeployer
             => AssignRoleToResourceAsync(managedIdentity.Data.PrincipalId.Value, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal, resource, roleDefinitionId, message);
 
         private Task AssignRoleToResourceAsync(Microsoft.Graph.Models.User user, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
-            => AssignRoleToResourceAsync(new Guid(user.Id), Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User, resource, roleDefinitionId, message);
+            => user is null ? Task.CompletedTask : AssignRoleToResourceAsync(new Guid(user.Id), Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User, resource, roleDefinitionId, message);
 
         private async Task AssignRoleToResourceAsync(Guid principalId, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType principalType, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
         {
@@ -1792,7 +1792,16 @@ namespace CromwellOnAzureDeployer
                 }
                 {
                     using var client = new GraphServiceClient(tokenCredential, baseUrl: baseUrl);
-                    _me = await client.Me.GetAsync(cancellationToken: cts.Token);
+
+                    try
+                    {
+                        _me = await client.Me.GetAsync(cancellationToken: cts.Token);
+                    }
+                    catch (Microsoft.Graph.Models.ODataErrors.ODataError ex) when ("/me request is only valid with delegated authentication flow.".Equals(ex.Message, StringComparison.Ordinal))
+                    {
+                        ConsoleEx.WriteLine($"ODataError code: {ex.Error?.Code ?? "<null>"}");
+                        _me = null;
+                    }
                 }
             }
 
