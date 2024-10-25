@@ -1779,10 +1779,10 @@ namespace CromwellOnAzureDeployer
             {
                 Dictionary<Uri, string> nationalClouds = new(
                 [
-                    new (ArmEnvironment.AzurePublicCloud.Endpoint, GraphClientFactory.Global_Cloud),
-                    new (ArmEnvironment.AzureChina.Endpoint, GraphClientFactory.China_Cloud),
+                    new(ArmEnvironment.AzurePublicCloud.Endpoint, GraphClientFactory.Global_Cloud),
+                    new(ArmEnvironment.AzureChina.Endpoint, GraphClientFactory.China_Cloud),
                     // Note that there are two different values for USGovernment.
-                    new (ArmEnvironment.AzureGovernment.Endpoint, GraphClientFactory.USGOV_Cloud), // TODO: when should we return GraphClientFactory.USGOV_DOD_Cloud?
+                    new(ArmEnvironment.AzureGovernment.Endpoint, GraphClientFactory.USGOV_Cloud), // TODO: when should we return GraphClientFactory.USGOV_DOD_Cloud?
                 ]);
 
                 string baseUrl;
