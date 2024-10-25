@@ -27,6 +27,9 @@ namespace CromwellOnAzureDeployer
                     // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/storage#storage-blob-data-owner
                     new($"{nameof(Storage)}.{nameof(Storage.StorageBlobDataOwner)}", new(new("b7e6dc6d-f1e8-4753-8033-0f276bb0955b"), "Storage Blob Data Owner")),
 
+                    // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/containers#azure-kubernetes-service-rbac-cluster-admin
+                    new($"{nameof(Containers)}.{nameof(Containers.RbacClusterAdmin)}", new(new("b1ff04bb-8a4e-4dc4-8eb5-8693973ce19b"), "Azure Kubernetes Service RBAC Cluster Admin")),
+
                     // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/identity#managed-identity-operator
                     new($"{nameof(Identity)}.{nameof(Identity.ManagedIdentityOperator)}", new(new("f1a07417-d97a-45cb-824c-7a7467783830"), "Managed Identity Operator")),
                 ]);
@@ -61,6 +64,14 @@ namespace CromwellOnAzureDeployer
             /// Provides full access to Azure Storage blob containers and data, including assigning POSIX access control. To learn which actions are required for a given data operation, see [Permissions for calling data operations](https://learn.microsoft.com/rest/api/storageservices/authorize-with-azure-active-directory#permissions-for-calling-data-operations)/>.
             /// </summary>
             internal static Guid StorageBlobDataOwner { get; } = _roleDefinitions[$"{nameof(Storage)}.{nameof(StorageBlobDataOwner)}"].Name;
+        }
+
+        internal static class Containers
+        {
+            /// <summary>
+            /// Azure Kubernetes Fleet Manager RBAC Cluster Admin.
+            /// </summary>
+            internal static Guid RbacClusterAdmin { get; } = _roleDefinitions[$"{nameof(Containers)}.{nameof(RbacClusterAdmin)}"].Name;
         }
 
         internal static class Identity
