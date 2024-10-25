@@ -120,6 +120,12 @@ namespace CromwellOnAzureDeployer
                 await ExecHelmProcessAsync($"repo add blob-csi-driver {BlobCsiRepo}");
             }
 
+            if (helmRepoList.Contains("blob-csi-driver", StringComparison.OrdinalIgnoreCase) && !helmRepoList.Contains(BlobCsiRepo, StringComparison.OrdinalIgnoreCase))
+            {
+                await ExecHelmProcessAsync("repo remove blob-csi-driver", throwOnNonZeroExitCode: false);
+                await ExecHelmProcessAsync($"repo add blob-csi-driver {BlobCsiRepo}");
+            }
+
             await ExecHelmProcessAsync($"repo update");
             await ExecHelmProcessAsync($"upgrade --install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig \"{kubeConfigPath}\"");
         }
