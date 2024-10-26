@@ -3,7 +3,7 @@
 
 using System.Collections.Generic;
 
-namespace CommonUtilities
+namespace Common
 {
     public static class UtilityExtensions
     {
