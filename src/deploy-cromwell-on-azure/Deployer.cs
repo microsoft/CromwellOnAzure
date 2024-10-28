@@ -1362,7 +1362,7 @@ namespace CromwellOnAzureDeployer
 
         private async Task AssignMeAsRbacClusterAdminToManagedClusterAsync(ContainerServiceManagedClusterResource managedCluster)
             => await AssignRoleToResourceAsync(await GetUserObjectAsync(), managedCluster, GetSubscriptionRoleDefinition(RoleDefinitions.Containers.RbacClusterAdmin),
-                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Containers.RbacClusterAdmin)}' role for the deployer to AKS cluster resource scope...");
+                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Containers.RbacClusterAdmin)}' role for {{Admins}} to AKS cluster resource scope...");
 
         private Task<StorageAccountResource> CreateStorageAccountAsync()
             => Execute(
@@ -1508,31 +1508,36 @@ namespace CromwellOnAzureDeployer
             => AuthorizationRoleDefinitionResource.CreateResourceIdentifier(SubscriptionResource.CreateResourceIdentifier(configuration.SubscriptionId), new(roleDefinition.ToString("D")));
 
         private Task AssignRoleToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
-            => AssignRoleToResourceAsync(managedIdentity.Data.PrincipalId.Value, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal, resource, roleDefinitionId, message);
+            => AssignRoleToResourceAsync([managedIdentity.Data.PrincipalId.Value], Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal, resource, roleDefinitionId, message);
 
         private Task AssignRoleToResourceAsync(Microsoft.Graph.Models.User user, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
-            => user is null ? Task.CompletedTask : AssignRoleToResourceAsync(new Guid(user.Id), Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User, resource, roleDefinitionId, message);
+            => string.IsNullOrWhiteSpace(configuration.AadGroupIds)
+                ? user is null ? Task.CompletedTask : AssignRoleToResourceAsync([new Guid(user.Id)], Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User, resource, roleDefinitionId, message.Replace(@"{Admins}", "deployer user"))
+                : AssignRoleToResourceAsync(configuration.AadGroupIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Guid.Parse), Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User, resource, roleDefinitionId, message.Replace(@"{Admins}", "designated group"));
 
-        private async Task AssignRoleToResourceAsync(Guid principalId, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType principalType, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
+        private async Task AssignRoleToResourceAsync(IEnumerable<Guid> principalIds, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType principalType, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
         {
-            if (await resource.GetRoleAssignments().GetAllAsync(filter: "atScope()", cancellationToken: cts.Token)
-                .SelectAwaitWithCancellation(async (a, ct) => await EnsureResourceDataAsync(a, r => r.HasData, CallGetAsync, ct))
-                .Where(a => a?.HasData ?? false)
-                .Where(a => principalId.Equals(a.Data.PrincipalId.Value))
-                .Where(a => roleDefinitionId.Equals(a.Data.RoleDefinitionId))
-                .AnyAsync(cts.Token))
+            foreach (var principalId in principalIds)
             {
-                return;
-            }
+                if (await resource.GetRoleAssignments().GetAllAsync(filter: "atScope()", cancellationToken: cts.Token)
+                    .SelectAwaitWithCancellation(async (a, ct) => await EnsureResourceDataAsync(a, r => r.HasData, CallGetAsync, ct))
+                    .Where(a => a?.HasData ?? false)
+                    .Where(a => principalId.Equals(a.Data.PrincipalId.Value))
+                    .Where(a => roleDefinitionId.Equals(a.Data.RoleDefinitionId))
+                    .AnyAsync(cts.Token))
+                {
+                    return;
+                }
 
-            await Execute(message, () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(token =>
-                (Task)resource.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
-                    new(roleDefinitionId, principalId)
-                    {
-                        PrincipalType = principalType
-                    },
-                    token),
-                cts.Token));
+                await Execute(message, () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(token =>
+                    (Task)resource.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
+                        new(roleDefinitionId, principalId)
+                        {
+                            PrincipalType = principalType
+                        },
+                        token),
+                    cts.Token));
+            }
 
             static Func<CancellationToken, Task<Response<RoleAssignmentResource>>> CallGetAsync(RoleAssignmentResource resource)
             {
@@ -2318,6 +2323,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.VnetResourceGroupName, nameof(configuration.VnetResourceGroupName));
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
+            ThrowIfProvidedForUpdate(configuration.AadGroupIds, nameof(configuration.AadGroupIds));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
 
             if (!configuration.ManualHelmDeployment)
@@ -2342,6 +2348,21 @@ namespace CromwellOnAzureDeployer
             if (string.IsNullOrWhiteSpace(configuration.DeploymentOrganizationName) != string.IsNullOrWhiteSpace(configuration.DeploymentOrganizationUrl))
             {
                 throw new ValidationException("Invalid configuration options DeploymentOrganizationName and DeploymentOrganizationUrl must both be provided together.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
+            {
+                try
+                {
+                    if (!configuration.AadGroupIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Guid.Parse).Any())
+                    {
+                        throw new FormatException();
+                    }
+                }
+                catch (FormatException)
+                {
+                    throw new ValidationException("Invalid configuration option AadGroupIds is not formatted correctly.");
+                }
             }
         }
 

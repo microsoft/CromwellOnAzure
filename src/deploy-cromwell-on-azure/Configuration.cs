@@ -90,7 +90,7 @@ namespace CromwellOnAzureDeployer
         public string PostgreSqlServerSslMode { get; set; } = "VerifyFull";
         public string KeyVaultName { get; set; }
         public string ContainersToMountPath { get; set; }
-        public string AadGroupIds { get; set; } // TODO: remove me
+        public string AadGroupIds { get; set; }
         public string DeploymentOrganizationName { get; set; }
         public string DeploymentOrganizationUrl { get; set; }
         public string DeploymentContactUri { get; set; }
