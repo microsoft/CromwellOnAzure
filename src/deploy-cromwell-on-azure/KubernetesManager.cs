@@ -115,19 +115,33 @@ namespace CromwellOnAzureDeployer
         {
             var helmRepoList = await ExecHelmProcessAsync($"repo list", workingDirectory: null, throwOnNonZeroExitCode: false);
 
-            if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("blob-csi-driver", StringComparison.OrdinalIgnoreCase))
+            foreach (var (helmCmd, throwOnNonZeroExitCode) in EnsureUpdateHelmRepo(helmRepoList, "blob-csi-driver", BlobCsiRepo))
             {
-                await ExecHelmProcessAsync($"repo add blob-csi-driver {BlobCsiRepo}");
-            }
-
-            if (helmRepoList.Contains("blob-csi-driver", StringComparison.OrdinalIgnoreCase) && !helmRepoList.Contains(BlobCsiRepo, StringComparison.OrdinalIgnoreCase))
-            {
-                await ExecHelmProcessAsync("repo remove blob-csi-driver", throwOnNonZeroExitCode: false);
-                await ExecHelmProcessAsync($"repo add blob-csi-driver {BlobCsiRepo}");
+                await ExecHelmProcessAsync(helmCmd, throwOnNonZeroExitCode: throwOnNonZeroExitCode);
             }
 
             await ExecHelmProcessAsync($"repo update");
             await ExecHelmProcessAsync($"upgrade --install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig \"{kubeConfigPath}\"");
+
+            static IEnumerable<(string HelmCmd, bool ThrowOnNonZeroExitCode)> EnsureUpdateHelmRepo(string helmRepoList, string helmRepo, string helmRepoUri)
+            {
+                if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains(helmRepo, StringComparison.OrdinalIgnoreCase))
+                {
+                    return [($"repo add {helmRepo} {helmRepoUri}", true)];
+                }
+                else if (!helmRepoList.Contains(helmRepoUri, StringComparison.OrdinalIgnoreCase))
+                {
+                    return
+                    [
+                        ($"repo remove {helmRepo}", false),
+                        ($"repo add {helmRepo} {helmRepoUri}", true)
+                    ];
+                }
+                else
+                {
+                    return [];
+                }
+            }
         }
 
         public async Task DeployHelmChartToClusterAsync()
