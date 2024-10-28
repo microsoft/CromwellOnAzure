@@ -367,7 +367,7 @@ namespace CromwellOnAzureDeployer
                                 !(aksCluster.Data.OidcIssuerProfile.IsEnabled ?? false) ||
                                 pool?.OSSku == ContainerServiceOSSku.Ubuntu ||
                                 !(pool?.EnableEncryptionAtHost ?? false) ||
-                                !(aksCluster.Data.AadProfile.IsAzureRbacEnabled ?? false) ||
+                                !(aksCluster.Data.AadProfile?.IsAzureRbacEnabled ?? false) ||
                                 (await managedIdentity.GetFederatedIdentityCredentials()
                                     .SingleOrDefaultAsync(r => "coaFederatedIdentity".Equals(r.Id.Name, StringComparison.OrdinalIgnoreCase), cts.Token)) is null)
                             {
@@ -915,6 +915,7 @@ namespace CromwellOnAzureDeployer
             managedCluster.AadProfile ??= new();
             managedCluster.AadProfile.IsAzureRbacEnabled = true;
             managedCluster.AadProfile.IsManagedAadEnabled = true;
+            managedCluster.AadProfile.AdminGroupObjectIds.ToList().ForEach(item => _ = managedCluster.AadProfile.AdminGroupObjectIds.Remove(item));
         }
 
         private async Task<ContainerServiceManagedClusterResource> ProvisionManagedClusterAsync(UserAssignedIdentityResource managedIdentity, OperationalInsightsWorkspaceResource logAnalyticsWorkspace, ResourceIdentifier subnetId, bool privateNetworking, string nodeResourceGroupName)
@@ -1361,8 +1362,36 @@ namespace CromwellOnAzureDeployer
                 $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.Contributor)}' role for user-managed identity to Storage Account resource scope...");
 
         private async Task AssignMeAsRbacClusterAdminToManagedClusterAsync(ContainerServiceManagedClusterResource managedCluster)
-            => await AssignRoleToResourceAsync(await GetUserObjectAsync(), managedCluster, GetSubscriptionRoleDefinition(RoleDefinitions.Containers.RbacClusterAdmin),
-                $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Containers.RbacClusterAdmin)}' role for {{Admins}} to AKS cluster resource scope...");
+        {
+            var message = $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Containers.RbacClusterAdmin)}' role for {{Admins}} to AKS cluster resource scope...";
+            var roleDefinitionId = GetSubscriptionRoleDefinition(RoleDefinitions.Containers.RbacClusterAdmin);
+
+            var adminGroupObjectIds = managedCluster.Data.AadProfile?.AdminGroupObjectIds ?? (string.IsNullOrWhiteSpace(configuration.AadGroupIds) ? [] : configuration.AadGroupIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Guid.Parse).ToList());
+
+            if (adminGroupObjectIds.Count == 0)
+            {
+                var user = await GetUserObjectAsync();
+
+                if (user is not null)
+                {
+                    await AssignRoleToResourceAsync(
+                        [new Guid(user.Id)],
+                        Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User,
+                        managedCluster,
+                        roleDefinitionId,
+                        message.Replace(@"{Admins}", "deployer user"));
+                }
+            }
+            else
+            {
+                await AssignRoleToResourceAsync(
+                    configuration.AadGroupIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Guid.Parse),
+                    Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.Group,
+                    managedCluster,
+                    roleDefinitionId,
+                    message.Replace(@"{Admins}", "designated group"));
+            }
+        }
 
         private Task<StorageAccountResource> CreateStorageAccountAsync()
             => Execute(
@@ -1509,11 +1538,6 @@ namespace CromwellOnAzureDeployer
 
         private Task AssignRoleToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
             => AssignRoleToResourceAsync([managedIdentity.Data.PrincipalId.Value], Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal, resource, roleDefinitionId, message);
-
-        private Task AssignRoleToResourceAsync(Microsoft.Graph.Models.User user, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
-            => string.IsNullOrWhiteSpace(configuration.AadGroupIds)
-                ? user is null ? Task.CompletedTask : AssignRoleToResourceAsync([new Guid(user.Id)], Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User, resource, roleDefinitionId, message.Replace(@"{Admins}", "deployer user"))
-                : AssignRoleToResourceAsync(configuration.AadGroupIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Guid.Parse), Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User, resource, roleDefinitionId, message.Replace(@"{Admins}", "designated group"));
 
         private async Task AssignRoleToResourceAsync(IEnumerable<Guid> principalIds, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType principalType, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
         {
