@@ -1526,7 +1526,7 @@ namespace CromwellOnAzureDeployer
                     .Where(a => roleDefinitionId.Equals(a.Data.RoleDefinitionId))
                     .AnyAsync(cts.Token))
                 {
-                    return;
+                    continue;
                 }
 
                 await Execute(message, () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(token =>
