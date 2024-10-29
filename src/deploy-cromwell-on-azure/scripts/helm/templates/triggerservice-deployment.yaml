@@ -44,8 +44,6 @@ spec:
               value: {{ .Values.persistence.storageAccount }}
             - name: AzureServicesAuthConnectionString
               value: {{ .Values.config.azureServicesAuthConnectionString }}
-            - name: AZURE_ADDITIONALLY_ALLOWED_TENANTS
-              value: "*"
             - name: TriggerService__ApplicationInsightsAccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
             - name: TriggerService__AzureCloudName
