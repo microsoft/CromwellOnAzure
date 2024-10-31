@@ -326,6 +326,8 @@ namespace CromwellOnAzureDeployer
 
                         var settings = ConfigureSettings(managedIdentity.Data.ClientId?.ToString("D"), aksValues, installedVersion);
                         var waitForRoleAssignmentPropagation = false;
+                        IEnumerable<string> manualPrecommands = null;
+                        Func<IKubernetes, Task> asyncTask = null;
 
                         if (installedVersion is null || installedVersion < new Version(4, 4))
                         {
@@ -349,20 +351,51 @@ namespace CromwellOnAzureDeployer
                             waitForRoleAssignmentPropagation = true;
                         }
 
-                        if (installedVersion is null || installedVersion < new Version(5, 0, 1))
+                        if (installedVersion is null || installedVersion < new Version(5, 4, 7)) // Previous attempt < 5.0.1
                         {
-                            if (!settings.ContainsKey("ExecutionsContainerName"))
+                            if (string.IsNullOrWhiteSpace(settings["ExecutionsContainerName"]))
                             {
                                 settings["ExecutionsContainerName"] = ExecutionsContainerName;
                             }
                         }
 
-                        if (installedVersion is null || installedVersion < new Version(5, 2, 2))
+                        if (installedVersion is null || installedVersion < new Version(5, 4, 7)) // Previous attempt < 5.2.2
                         {
-                            await updateConflictRetryPolicy.ExecuteAsync(() => EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup));
-                            await kubernetesManager.RemovePodAadChart();
-                            await Execute("Waiting 2 minutes for federated credentials propagation...",
-                                () => Task.Delay(System.TimeSpan.FromMinutes(2), cts.Token));
+                            var connectionString = settings["AzureServicesAuthConnectionString"];
+                            if (connectionString.Contains("RunAs=App"))
+                            {
+                                settings["AzureServicesAuthConnectionString"] = connectionString.Replace("RunAs=App", "RunAs=Workload");
+                            }
+
+                            var pool = aksCluster.Data.AgentPoolProfiles.FirstOrDefault(pool => "nodepool1".Equals(pool.Name, StringComparison.OrdinalIgnoreCase));
+
+                            if (!(aksCluster.Data.SecurityProfile.IsWorkloadIdentityEnabled ?? false) ||
+                                !(aksCluster.Data.OidcIssuerProfile.IsEnabled ?? false) ||
+                                pool?.OSSku == ContainerServiceOSSku.Ubuntu ||
+                                !(pool?.EnableEncryptionAtHost ?? false) ||
+                                !(aksCluster.Data.AadProfile?.IsAzureRbacEnabled ?? false) ||
+                                (await managedIdentity.GetFederatedIdentityCredentials()
+                                    .SingleOrDefaultAsync(r => "coaFederatedIdentity".Equals(r.Id.Name, StringComparison.OrdinalIgnoreCase), cts.Token)) is null)
+                            {
+                                await AssignMeAsRbacClusterAdminToManagedClusterAsync(aksCluster);
+                                waitForRoleAssignmentPropagation = true;
+                                ManagedClusterEnableManagedAad(aksCluster.Data);
+
+                                if (pool?.OSSku == ContainerServiceOSSku.Ubuntu || !(pool?.EnableEncryptionAtHost ?? false))
+                                {
+                                    pool.EnableEncryptionAtHost = true;
+                                    pool.OSSku = ContainerServiceOSSku.AzureLinux;
+                                }
+
+                                aksCluster = await EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup);
+                                await Task.Delay(TimeSpan.FromMinutes(2), cts.Token);
+
+                                if (installedVersion is null || installedVersion < new Version(5, 2, 3))
+                                {
+                                    manualPrecommands = (manualPrecommands ?? []).Append("Include the following HELM command: uninstall aad-pod-identity --namespace kube-system");
+                                    asyncTask = _ => kubernetesManager.RemovePodAadChart();
+                                }
+                            }
                         }
 
                         if (installedVersion is null || installedVersion < new Version(5, 3, 0))
@@ -384,12 +417,13 @@ namespace CromwellOnAzureDeployer
 
                         if (waitForRoleAssignmentPropagation)
                         {
-                            await Execute("Waiting 5 minutes for role assignment propagation...",
-                                () => Task.Delay(System.TimeSpan.FromMinutes(5), cts.Token));
+                            // 10 minutes for propagation https://learn.microsoft.com/azure/role-based-access-control/troubleshooting
+                            await Execute("Waiting 10 minutes for role assignment propagation...",
+                                () => Task.Delay(TimeSpan.FromMinutes(10), cts.Token));
                         }
 
                         await kubernetesManager.UpgradeValuesYamlAsync(storageAccountData, settings, containersToMount, installedVersion);
-                        kubernetesClient = await PerformHelmDeploymentAsync(aksCluster);
+                        kubernetesClient = await PerformHelmDeploymentAsync(aksCluster, manualPrecommands, asyncTask);
 
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccountData);
                     }
@@ -585,7 +619,8 @@ namespace CromwellOnAzureDeployer
                                 if (aksCluster is null && !configuration.ManualHelmDeployment)
                                 {
                                     aksCluster = await ProvisionManagedClusterAsync(managedIdentity, logAnalyticsWorkspace, vnetAndSubnet?.vmSubnet.Id, configuration.PrivateNetworking.GetValueOrDefault(), configuration.AksNodeResourceGroupName);
-                                    await EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup);
+                                    await AssignMeAsRbacClusterAdminToManagedClusterAsync(aksCluster);
+                                    aksCluster = await EnableWorkloadIdentity(aksCluster, managedIdentity, resourceGroup);
                                 }
                             }),
                             Task.Run(async () =>
@@ -704,7 +739,7 @@ namespace CromwellOnAzureDeployer
                 if (!(exc is OperationCanceledException && cts.Token.IsCancellationRequested))
                 {
                     ConsoleEx.WriteLine();
-                    ConsoleEx.WriteLine($"{exc.GetType().Name}: {exc.Message}", ConsoleColor.Red);
+                    ConsoleEx.WriteLine($"{exc.GetType().FullName}: {exc.Message}", ConsoleColor.Red);
 
                     if (configuration.DebugLogging)
                     {
@@ -876,6 +911,15 @@ namespace CromwellOnAzureDeployer
             }
         }
 
+        private static void ManagedClusterEnableManagedAad(ContainerServiceManagedClusterData managedCluster)
+        {
+            managedCluster.EnableRbac = true;
+            managedCluster.AadProfile ??= new();
+            managedCluster.AadProfile.IsAzureRbacEnabled = true;
+            managedCluster.AadProfile.IsManagedAadEnabled = true;
+            managedCluster.AadProfile.AdminGroupObjectIds.ToList().ForEach(item => _ = managedCluster.AadProfile.AdminGroupObjectIds.Remove(item));
+        }
+
         private async Task<ContainerServiceManagedClusterResource> ProvisionManagedClusterAsync(UserAssignedIdentityResource managedIdentity, OperationalInsightsWorkspaceResource logAnalyticsWorkspace, ResourceIdentifier subnetId, bool privateNetworking, string nodeResourceGroupName)
         {
             var uami = await EnsureResourceDataAsync(managedIdentity, r => r.HasData, r => r.GetAsync, cts.Token);
@@ -897,19 +941,7 @@ namespace CromwellOnAzureDeployer
             ManagedClusterAddonProfile clusterAddonProfile = new(isEnabled: true);
             clusterAddonProfile.Config.Add("logAnalyticsWorkspaceResourceID", logAnalyticsWorkspace.Id);
             cluster.AddonProfiles.Add("omsagent", clusterAddonProfile);
-
-            if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
-            {
-                cluster.EnableRbac = true;
-                cluster.AadProfile = new()
-                {
-                    IsAzureRbacEnabled = false,
-                    IsManagedAadEnabled = true
-                };
-
-                configuration.AadGroupIds.Split(",", StringSplitOptions.RemoveEmptyEntries).Select(Guid.Parse).ForEach(cluster.AadProfile.AdminGroupObjectIds.Add);
-            }
-
+            ManagedClusterEnableManagedAad(cluster);
             Azure.ResourceManager.Models.ManagedServiceIdentity identity = new(Azure.ResourceManager.Models.ManagedServiceIdentityType.UserAssigned);
             identity.UserAssignedIdentities.Add(uami.Id, new());
             cluster.Identity = identity;
@@ -958,23 +990,32 @@ namespace CromwellOnAzureDeployer
                 async () => (await resourceGroup.GetContainerServiceManagedClusters().CreateOrUpdateAsync(Azure.WaitUntil.Completed, configuration.AksClusterName, cluster, cts.Token)).Value);
         }
 
-        private async Task EnableWorkloadIdentity(ContainerServiceManagedClusterResource aksCluster, UserAssignedIdentityResource managedIdentity, ResourceGroupResource resourceGroup)
+        private async Task<ContainerServiceManagedClusterResource> EnableWorkloadIdentity(ContainerServiceManagedClusterResource aksCluster, UserAssignedIdentityResource managedIdentity, ResourceGroupResource resourceGroup)
         {
             aksCluster.Data.SecurityProfile.IsWorkloadIdentityEnabled = true;
             aksCluster.Data.OidcIssuerProfile.IsEnabled = true;
             var aksClusterCollection = resourceGroup.GetContainerServiceManagedClusters();
-            var cluster = await aksClusterCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, aksCluster.Data.Name, aksCluster.Data, cts.Token);
+
+            var cluster = await Execute("Updating AKS cluster...",
+                async () => await updateConflictRetryPolicy.ExecuteAsync(() => aksClusterCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, aksCluster.Data.Name, aksCluster.Data, cts.Token)));
+
             var aksOidcIssuer = cluster.Value.Data.OidcIssuerProfile.IssuerUriInfo;
-
             var federatedCredentialsCollection = managedIdentity.GetFederatedIdentityCredentials();
-            var data = new FederatedIdentityCredentialData()
-            {
-                IssuerUri = new Uri(aksOidcIssuer),
-                Subject = $"system:serviceaccount:{configuration.AksCoANamespace}:{managedIdentity.Id.Name}-sa"
-            };
-            data.Audiences.Add("api://AzureADTokenExchange");
 
-            await federatedCredentialsCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, "coaFederatedIdentity", data, cts.Token);
+            if ((await federatedCredentialsCollection.SingleOrDefaultAsync(r => "coaFederatedIdentity".Equals(r.Id.Name, StringComparison.OrdinalIgnoreCase), cts.Token)) is null)
+            {
+                var data = new FederatedIdentityCredentialData()
+                {
+                    IssuerUri = new Uri(aksOidcIssuer),
+                    Subject = $"system:serviceaccount:{configuration.AksCoANamespace}:{managedIdentity.Id.Name}-sa"
+                };
+                data.Audiences.Add("api://AzureADTokenExchange");
+
+                await Execute("Enabling workload identity...",
+                    async () => _ = await updateConflictRetryPolicy.ExecuteAsync(() => federatedCredentialsCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, "coaFederatedIdentity", data, cts.Token)));
+            }
+
+            return cluster.Value;
         }
 
         private static Dictionary<string, string> GetDefaultValues(string[] files)
@@ -1026,7 +1067,7 @@ namespace CromwellOnAzureDeployer
                 UpdateSetting(settings, defaults, "ApplicationInsightsAccountName", configuration.ApplicationInsightsAccountName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "AzureCloudName", configuration.AzureCloudName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "ManagedIdentityClientId", managedIdentityClientId, ignoreDefaults: true);
-                UpdateSetting(settings, defaults, "AzureServicesAuthConnectionString", managedIdentityClientId, s => $"RunAs=App;AppId={s}", ignoreDefaults: true);
+                UpdateSetting(settings, defaults, "AzureServicesAuthConnectionString", managedIdentityClientId, s => $"RunAs=Workload;AppId={s}", ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "KeyVaultName", configuration.KeyVaultName, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "AksCoANamespace", configuration.AksCoANamespace, ignoreDefaults: true);
                 UpdateSetting(settings, defaults, "CrossSubscriptionAKSDeployment", configuration.CrossSubscriptionAKSDeployment);
@@ -1203,7 +1244,7 @@ namespace CromwellOnAzureDeployer
                                 break;
                             }
 
-                            await Task.Delay(System.TimeSpan.FromSeconds(15), cts.Token);
+                            await Task.Delay(TimeSpan.FromSeconds(15), cts.Token);
                         }
                     });
             }
@@ -1321,6 +1362,39 @@ namespace CromwellOnAzureDeployer
         private Task AssignVmAsContributorToStorageAccountAsync(UserAssignedIdentityResource managedIdentity, StorageAccountResource storageAccount)
             => AssignRoleToResourceAsync(managedIdentity, storageAccount, GetSubscriptionRoleDefinition(RoleDefinitions.General.Contributor),
                 $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.General.Contributor)}' role for user-managed identity to Storage Account resource scope...");
+
+        private async Task AssignMeAsRbacClusterAdminToManagedClusterAsync(ContainerServiceManagedClusterResource managedCluster)
+        {
+            var message = $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Containers.RbacClusterAdmin)}' role for {{Admins}} to AKS cluster resource scope...";
+            var roleDefinitionId = GetSubscriptionRoleDefinition(RoleDefinitions.Containers.RbacClusterAdmin);
+
+            var adminGroupObjectIds = managedCluster.Data.AadProfile?.AdminGroupObjectIds ?? [];
+            adminGroupObjectIds = adminGroupObjectIds.Count != 0 ? adminGroupObjectIds : (string.IsNullOrWhiteSpace(configuration.AadGroupIds) ? [] : configuration.AadGroupIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Guid.Parse).ToList());
+
+            if (adminGroupObjectIds.Count == 0)
+            {
+                var user = await GetUserObjectAsync();
+
+                if (user is not null)
+                {
+                    await AssignRoleToResourceAsync(
+                        [new Guid(user.Id)],
+                        Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User,
+                        managedCluster,
+                        roleDefinitionId,
+                        message.Replace(@"{Admins}", "deployer user"));
+                }
+            }
+            else
+            {
+                await AssignRoleToResourceAsync(
+                    adminGroupObjectIds,
+                    Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.Group,
+                    managedCluster,
+                    roleDefinitionId,
+                    message.Replace(@"{Admins}", "designated group"));
+            }
+        }
 
         private Task<StorageAccountResource> CreateStorageAccountAsync()
             => Execute(
@@ -1465,26 +1539,32 @@ namespace CromwellOnAzureDeployer
         private ResourceIdentifier GetSubscriptionRoleDefinition(Guid roleDefinition)
             => AuthorizationRoleDefinitionResource.CreateResourceIdentifier(SubscriptionResource.CreateResourceIdentifier(configuration.SubscriptionId), new(roleDefinition.ToString("D")));
 
-        private async Task AssignRoleToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
-        {
-            if (await resource.GetRoleAssignments().GetAllAsync(filter: "atScope()", cancellationToken: cts.Token)
-                .SelectAwaitWithCancellation(async (a, ct) => await EnsureResourceDataAsync(a, r => r.HasData, CallGetAsync, ct))
-                .Where(a => a?.HasData ?? false)
-                .Where(a => managedIdentity.Data.PrincipalId.Value.Equals(a.Data.PrincipalId.Value))
-                .Where(a => roleDefinitionId.Equals(a.Data.RoleDefinitionId))
-                .AnyAsync(cts.Token))
-            {
-                return;
-            }
+        private Task AssignRoleToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
+            => AssignRoleToResourceAsync([managedIdentity.Data.PrincipalId.Value], Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal, resource, roleDefinitionId, message);
 
-            await Execute(message, () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(token =>
-                (Task)resource.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
-                    new(roleDefinitionId, managedIdentity.Data.PrincipalId.Value)
-                    {
-                        PrincipalType = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal
-                    },
-                    token),
-                cts.Token));
+        private async Task AssignRoleToResourceAsync(IEnumerable<Guid> principalIds, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType principalType, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
+        {
+            foreach (var principalId in principalIds)
+            {
+                if (await resource.GetRoleAssignments().GetAllAsync(filter: "atScope()", cancellationToken: cts.Token)
+                    .SelectAwaitWithCancellation(async (a, ct) => await EnsureResourceDataAsync(a, r => r.HasData, CallGetAsync, ct))
+                    .Where(a => a?.HasData ?? false)
+                    .Where(a => principalId.Equals(a.Data.PrincipalId.Value))
+                    .Where(a => roleDefinitionId.Equals(a.Data.RoleDefinitionId))
+                    .AnyAsync(cts.Token))
+                {
+                    continue;
+                }
+
+                await Execute(message, () => roleAssignmentHashConflictRetryPolicy.ExecuteAsync(token =>
+                    (Task)resource.GetRoleAssignments().CreateOrUpdateAsync(WaitUntil.Completed, Guid.NewGuid().ToString(),
+                        new(roleDefinitionId, principalId)
+                        {
+                            PrincipalType = principalType
+                        },
+                        token),
+                    cts.Token));
+            }
 
             static Func<CancellationToken, Task<Response<RoleAssignmentResource>>> CallGetAsync(RoleAssignmentResource resource)
             {
@@ -1678,7 +1758,7 @@ namespace CromwellOnAzureDeployer
 
                     properties.AccessPolicies.AddRange(
                     [
-                        new(tenantId.Value, await GetUserObjectId(), permissions),
+                        new(tenantId.Value, (await GetUserObjectAsync()).Id, permissions),
                         new(tenantId.Value, managedIdentity.Data.PrincipalId.Value.ToString("D"), permissions),
                     ]);
 
@@ -1720,41 +1800,49 @@ namespace CromwellOnAzureDeployer
                     }
 
                     return vault;
-
-                    async ValueTask<string> GetUserObjectId()
-                    {
-                        string baseUrl;
-                        {
-                            using var client = GraphClientFactory.Create(nationalCloud: NationalCloud());
-                            baseUrl = client.BaseAddress.AbsoluteUri;
-                        }
-                        {
-                            using var client = new GraphServiceClient(tokenCredential, baseUrl: baseUrl);
-                            return (await client.Me.GetAsync(cancellationToken: cts.Token)).Id;
-                        }
-                    }
-
-                    // Note that there are two different values for USGovernment.
-                    string NationalCloud()
-                    {
-                        if (cloudEnvironment.ArmEnvironment.Endpoint == ArmEnvironment.AzurePublicCloud.Endpoint)
-                        {
-                            return GraphClientFactory.Global_Cloud;
-                        }
-
-                        if (cloudEnvironment.ArmEnvironment.Endpoint == ArmEnvironment.AzureChina.Endpoint)
-                        {
-                            return GraphClientFactory.China_Cloud;
-                        }
-
-                        if (cloudEnvironment.ArmEnvironment.Endpoint == ArmEnvironment.AzureGovernment.Endpoint)
-                        {
-                            return GraphClientFactory.USGOV_Cloud; // TODO: when should we return GraphClientFactory.USGOV_DOD_Cloud?
-                        }
-
-                        return GraphClientFactory.Global_Cloud;
-                    }
                 });
+
+
+        private Microsoft.Graph.Models.User _me = null;
+
+        private async Task<Microsoft.Graph.Models.User> GetUserObjectAsync()
+        {
+            if (_me is null)
+            {
+                Dictionary<Uri, string> nationalClouds = new(
+                [
+                    new(ArmEnvironment.AzurePublicCloud.Endpoint, GraphClientFactory.Global_Cloud),
+                    new(ArmEnvironment.AzureChina.Endpoint, GraphClientFactory.China_Cloud),
+                    // Note that there are two different values for USGovernment.
+                    new(ArmEnvironment.AzureGovernment.Endpoint, GraphClientFactory.USGOV_Cloud), // TODO: when should we return GraphClientFactory.USGOV_DOD_Cloud?
+                ]);
+
+                string baseUrl;
+                {
+                    using var client = GraphClientFactory.Create(nationalCloud: nationalClouds.TryGetValue(cloudEnvironment.ArmEnvironment.Endpoint, out var value) ? value : GraphClientFactory.Global_Cloud);
+                    baseUrl = client.BaseAddress.AbsoluteUri;
+                }
+                {
+                    using var client = new GraphServiceClient(tokenCredential, baseUrl: baseUrl);
+
+                    try
+                    {
+                        _me = await client.Me.GetAsync(cancellationToken: cts.Token);
+                    }
+                    catch (Azure.Identity.AuthenticationFailedException)
+                    {
+                        _me = null;
+                    }
+                    catch (Microsoft.Graph.Models.ODataErrors.ODataError ex) when ("BadRequest".Equals(ex.Error?.Code, StringComparison.OrdinalIgnoreCase) && ex.Message.Contains("/me", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // "/me request is only valid with delegated authentication flow."
+                        _me = null;
+                    }
+                }
+            }
+
+            return _me;
+        }
 
         private async Task<OperationalInsightsWorkspaceResource> GetLogAnalyticsWorkspaceAsync(string resourceId)
         {
@@ -2227,9 +2315,15 @@ namespace CromwellOnAzureDeployer
             {
                 throw new ValidationException($"{nameof(configuration.CromwellImageName)} must not be provided when {nameof(configuration.CromwellVersion)} is provided.");
             }
-            else if (!string.IsNullOrWhiteSpace(configuration.CromwellImageName) && !int.TryParse(configuration.CromwellImageName[(configuration.CromwellImageName.LastIndexOf(':') + 1)..], System.Globalization.NumberStyles.Integer, System.Globalization.NumberFormatInfo.InvariantInfo, out _))
+            else
             {
-                throw new ValidationException($"{nameof(configuration.CromwellImageName)} must include a tag and that tag must be an integer. It is recommended that the tag be retained from the original.");
+                var colonIndex = configuration.CromwellImageName?.LastIndexOf(':') ?? -1;
+                var slashIndex = configuration.CromwellImageName?.IndexOf('/') ?? -1;
+
+                if (!string.IsNullOrWhiteSpace(configuration.CromwellImageName) && colonIndex <= slashIndex)
+                {
+                    throw new ValidationException($"{nameof(configuration.CromwellImageName)} must include a tag and that tag is always an integer for full releases. It is recommended that the tag be retained from the original.");
+                }
             }
 
             ThrowIfNotProvided(configuration.SubscriptionId, nameof(configuration.SubscriptionId));
@@ -2256,6 +2350,7 @@ namespace CromwellOnAzureDeployer
             ThrowIfProvidedForUpdate(configuration.VnetResourceGroupName, nameof(configuration.VnetResourceGroupName));
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
+            ThrowIfProvidedForUpdate(configuration.AadGroupIds, nameof(configuration.AadGroupIds));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
 
             if (!configuration.ManualHelmDeployment)
@@ -2280,6 +2375,21 @@ namespace CromwellOnAzureDeployer
             if (string.IsNullOrWhiteSpace(configuration.DeploymentOrganizationName) != string.IsNullOrWhiteSpace(configuration.DeploymentOrganizationUrl))
             {
                 throw new ValidationException("Invalid configuration options DeploymentOrganizationName and DeploymentOrganizationUrl must both be provided together.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuration.AadGroupIds))
+            {
+                try
+                {
+                    if (!configuration.AadGroupIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Guid.Parse).Any())
+                    {
+                        throw new FormatException();
+                    }
+                }
+                catch (FormatException)
+                {
+                    throw new ValidationException("Invalid configuration option AadGroupIds is not formatted correctly.");
+                }
             }
         }
 
