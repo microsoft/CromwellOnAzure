@@ -78,7 +78,7 @@ namespace TriggerService
                 {
                     serviceCollection.Configure<CromwellApiClientOptions>(hostBuilderContext.Configuration.GetSection(CromwellApiClientOptions.CromwellApiClientOptionsSectionName));
                     serviceCollection.Configure<TriggerServiceOptions>(hostBuilderContext.Configuration.GetSection(TriggerServiceOptions.TriggerServiceOptionsSectionName));
-                    serviceCollection.Configure<PostgreSqlOptions>(hostBuilderContext.Configuration.GetSection(PostgreSqlOptions.GetConfigurationSectionName("Tes")));
+                    serviceCollection.Configure<Tes.Repository.Models.PostgreSqlOptions>(hostBuilderContext.Configuration.GetSection(Tes.Repository.Models.PostgreSqlOptions.GetConfigurationSectionName("Tes")));
                     serviceCollection.AddSingleton(azureCloudConfig);
                     serviceCollection.AddSingleton<ICromwellApiClient, CromwellApiClient.CromwellApiClient>();
                     serviceCollection.AddSingleton<IRepository<TesTask>, TesTaskPostgreSqlRepository>();

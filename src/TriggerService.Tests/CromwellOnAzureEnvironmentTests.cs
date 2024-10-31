@@ -142,7 +142,7 @@ namespace TriggerService.Tests
             }
 
             var logger = new Mock<ILogger<TriggerHostedService>>().Object;
-            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
+            var postgreSqlOptions = new Mock<IOptions<Tes.Repository.Models.PostgreSqlOptions>>().Object;
             var cromwellApiClient = new Mock<ICromwellApiClient>().Object;
             var repository = new Mock<IRepository<TesTask>>().Object;
             var storageUtility = new Mock<IAzureStorageUtility>();

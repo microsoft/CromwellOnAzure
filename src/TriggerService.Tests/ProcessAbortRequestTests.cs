@@ -95,7 +95,7 @@ namespace TriggerService.Tests
                 ApplicationInsightsAccountName = "fakeappinsights"
             });
 
-            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
+            var postgreSqlOptions = new Mock<IOptions<Tes.Repository.Models.PostgreSqlOptions>>().Object;
             var storageUtility = new Mock<IAzureStorageUtility>();
 
             storageUtility

@@ -71,7 +71,7 @@ namespace TriggerService.Tests
                 MainRunIntervalMilliseconds = 25
             });
 
-            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
+            var postgreSqlOptions = new Mock<IOptions<Tes.Repository.Models.PostgreSqlOptions>>().Object;
             var cromwellApiClient = new Mock<ICromwellApiClient>().Object;
             var tesTaskRepository = new Mock<IRepository<TesTask>>().Object;
             var azureStorage = new Mock<IAzureStorage>();
