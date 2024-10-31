@@ -66,6 +66,8 @@ spec:
               value: {{ .Values.persistence.executionsContainerName }}
             - name: AzureServicesAuthConnectionString
               value: {{ .Values.config.azureServicesAuthConnectionString }}
+            - name: AZURE_ADDITIONALLY_ALLOWED_TENANTS
+              value: "*"
             - name: ApplicationInsights__AccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
             - name: BatchAccount__AccountName
