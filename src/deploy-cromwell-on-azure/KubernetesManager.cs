@@ -36,8 +36,6 @@ namespace CromwellOnAzureDeployer
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
             .WaitAndRetryAsync(200, retryAttempt => TimeSpan.FromSeconds(5));
 
-        private static readonly HashSet<string> testStorageAccounts = new HashSet<string> { "datasettestinputs", "datasettestinputssouthc" };
-
         // "master" is used despite not being a best practice: https://github.com/kubernetes-sigs/blob-csi-driver/issues/783
         private const string BlobCsiDriverGithubReleaseBranch = "master";
         private const string BlobCsiDriverGithubReleaseVersion = "v1.24.0";
@@ -222,10 +220,20 @@ namespace CromwellOnAzureDeployer
 
         private static void ProcessHelmValuesUpdates(HelmValues values, Version previousVersion)
         {
-            if (previousVersion < new Version(4, 3))
+            if (previousVersion is null || previousVersion < new Version(4, 3))
             {
                 values.CromwellContainers = [Deployer.ConfigurationContainerName, Deployer.ExecutionsContainerName, Deployer.LogsContainerName, Deployer.OutputsContainerName];
                 values.DefaultContainers = [Deployer.InputsContainerName];
+            }
+
+            if (previousVersion is null || previousVersion < new Version(5, 5, 0))
+            {
+                var datasettestinputs = values.ExternalSasContainers.SingleOrDefault(container => container.TryGetValue("accountName", out var name) && "datasettestinputs".Equals(name, StringComparison.OrdinalIgnoreCase));
+
+                if (datasettestinputs is not null)
+                {
+                    _ = datasettestinputs.Remove("sasToken");
+                }
             }
         }
 
