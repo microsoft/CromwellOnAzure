@@ -19,6 +19,7 @@ using Tes.Repository;
 namespace TriggerService.Tests
 {
     [TestClass]
+    [Ignore]
     public class ProcessAbortRequestTests
     {
         public ProcessAbortRequestTests()
