@@ -118,9 +118,9 @@ backend {
 }
 
 database {
-  db.url = ""jdbc:postgresql://bmcoa-9ce05612.postgres.database.azure.com/cromwell_db?sslmode=require""
+  db.url = ""jdbc:postgresql://db.postgres.database.azure.com/cromwell_db?sslmode=require""
   db.user = ""cromwell""
-  db.password = ""ML9tKd1Citk9IBn7""
+  db.password = ""password""
   db.driver = ""org.postgresql.Driver""
   profile = ""slick.jdbc.PostgresProfile$""
   db.connectionTimeout = 15000
@@ -216,9 +216,9 @@ backend : {
 } 
 
 database {
-  db.url = ""jdbc:postgresql://bmcoa-9ce05612.postgres.database.azure.com/cromwell_db?sslmode=require""
+  db.url = ""jdbc:postgresql://db.postgres.database.azure.com/cromwell_db?sslmode=require""
   db.user = ""cromwell""
-  db.password = ""ML9tKd1Citk9IBn7""
+  db.password = ""password""
   db.driver = ""org.postgresql.Driver""
   profile = ""slick.jdbc.PostgresProfile$""
   db.connectionTimeout = 15000
