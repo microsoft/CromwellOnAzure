@@ -227,6 +227,11 @@ namespace CromwellOnAzureDeployer
                 values.CromwellContainers = [Deployer.ConfigurationContainerName, Deployer.ExecutionsContainerName, Deployer.LogsContainerName, Deployer.OutputsContainerName];
                 values.DefaultContainers = [Deployer.InputsContainerName];
             }
+
+            if (previousVersion < new Version(5, 5, 0))
+            {
+                _ = values.CromwellContainers.Remove(Deployer.ExecutionsContainerName);
+            }
         }
 
         public async Task<Dictionary<string, string>> GetAKSSettingsAsync(Azure.ResourceManager.Storage.StorageAccountData storageAccount)
