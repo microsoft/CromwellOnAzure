@@ -4,3 +4,4 @@ metadata:
   annotations:
     azure.workload.identity/client-id: {{ .Values.identity.clientId }}
   name: {{ .Values.identity.name }}-sa
+  namespace: {{ .Values.config.coaNamespace }}

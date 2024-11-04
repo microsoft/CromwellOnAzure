@@ -97,6 +97,7 @@ namespace CromwellOnAzureDeployer
         public string DeploymentEnvironment { get; set; }
         public string PrivateTestUbuntuImage { get; set; } = "mcr.microsoft.com/mirror/docker/library/ubuntu:22.04";
         public string PrivatePSQLUbuntuImage { get; set; } = "mcr.microsoft.com/mirror/docker/library/ubuntu:24.04"; // mcr's docker mirror does not host "latest"
+        public bool? CreateMissing { get; set; } = null;
 
         public static Configuration BuildConfiguration(string[] args)
         {
@@ -106,7 +107,7 @@ namespace CromwellOnAzureDeployer
 
             if (System.IO.File.Exists(configFilename))
             {
-                configBuilder.AddJsonFile(configFilename);
+                configBuilder.AddJsonFile(System.IO.Path.GetFullPath(configFilename));
             }
 
             var configurationSource = configBuilder.AddCommandLine(args).Build();
