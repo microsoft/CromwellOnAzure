@@ -232,7 +232,7 @@ namespace CromwellOnAzureDeployer
 
                 if (datasettestinputs is not null)
                 {
-                    _ = datasettestinputs.Remove("sasToken");
+                    _ = values.ExternalSasContainers.Remove(datasettestinputs);
                 }
             }
         }
