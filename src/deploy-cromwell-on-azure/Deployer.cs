@@ -411,7 +411,7 @@ namespace CromwellOnAzureDeployer
                             }
                         }
 
-                        if (installedVersion is null || installedVersion < new Version(5, 5, 0))
+                        if (installedVersion is null || installedVersion < new Version(5, 5, 1))
                         {
                             var cromwellConfig = GetBlobClient(storageAccountData, ConfigurationContainerName, CromwellConfigurationFileName);
                             var configContent = await DownloadTextFromStorageAccountAsync(cromwellConfig, cts.Token);
