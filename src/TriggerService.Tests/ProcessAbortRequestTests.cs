@@ -19,7 +19,6 @@ using Tes.Repository;
 namespace TriggerService.Tests
 {
     [TestClass]
-    [Ignore]
     public class ProcessAbortRequestTests
     {
         public ProcessAbortRequestTests()
@@ -103,8 +102,7 @@ namespace TriggerService.Tests
                 .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
                 .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
 
-            var azureCloudConfig = AzureCloudConfig.FromKnownCloudNameAsync().Result;
-            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository.Object, storageUtility.Object, azureCloudConfig);
+            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository.Object, storageUtility.Object, AzureCloudConfig.ForUnitTesting());
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
             return (newTriggerName, newTriggerContent);
         }

@@ -19,7 +19,6 @@ using Tes.Repository;
 namespace TriggerService.Tests
 {
     [TestClass]
-    [Ignore]
     public class CromwellOnAzureEnvironmentTests
     {
         private const string azureName = "test";
@@ -160,8 +159,7 @@ namespace TriggerService.Tests
                 ApplicationInsightsAccountName = "fakeappinsights"
             });
 
-            var azureCloudConfig = AzureCloudConfig.FromKnownCloudNameAsync().Result;
-            var environment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository, storageUtility.Object, azureCloudConfig);
+            var environment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository, storageUtility.Object, AzureCloudConfig.ForUnitTesting());
             return environment;
         }
 
