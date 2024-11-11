@@ -36,8 +36,6 @@ namespace CromwellOnAzureDeployer
             .Handle<WebSocketException>(ex => ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
             .WaitAndRetryAsync(200, retryAttempt => TimeSpan.FromSeconds(5));
 
-        private static readonly HashSet<string> testStorageAccounts = new HashSet<string> { "datasettestinputs", "datasettestinputssouthc" };
-
         // "master" is used despite not being a best practice: https://github.com/kubernetes-sigs/blob-csi-driver/issues/783
         private const string BlobCsiDriverGithubReleaseBranch = "master";
         private const string BlobCsiDriverGithubReleaseVersion = "v1.24.0";
@@ -115,13 +113,33 @@ namespace CromwellOnAzureDeployer
         {
             var helmRepoList = await ExecHelmProcessAsync($"repo list", workingDirectory: null, throwOnNonZeroExitCode: false);
 
-            if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains("blob-csi-driver", StringComparison.OrdinalIgnoreCase))
+            foreach (var (helmCmd, throwOnNonZeroExitCode) in EnsureUpdateHelmRepo(helmRepoList, "blob-csi-driver", BlobCsiRepo))
             {
-                await ExecHelmProcessAsync($"repo add blob-csi-driver {BlobCsiRepo}");
+                await ExecHelmProcessAsync(helmCmd, throwOnNonZeroExitCode: throwOnNonZeroExitCode);
             }
 
             await ExecHelmProcessAsync($"repo update");
             await ExecHelmProcessAsync($"upgrade --install blob-csi-driver blob-csi-driver/blob-csi-driver --set node.enableBlobfuseProxy=true --namespace kube-system --version {BlobCsiDriverGithubReleaseVersion} --kubeconfig \"{kubeConfigPath}\"");
+
+            static IEnumerable<(string HelmCmd, bool ThrowOnNonZeroExitCode)> EnsureUpdateHelmRepo(string helmRepoList, string helmRepo, string helmRepoUri)
+            {
+                if (string.IsNullOrWhiteSpace(helmRepoList) || !helmRepoList.Contains(helmRepo, StringComparison.OrdinalIgnoreCase))
+                {
+                    return [($"repo add {helmRepo} {helmRepoUri}", true)];
+                }
+                else if (!helmRepoList.Contains(helmRepoUri, StringComparison.OrdinalIgnoreCase))
+                {
+                    return
+                    [
+                        ($"repo remove {helmRepo}", false),
+                        ($"repo add {helmRepo} {helmRepoUri}", true)
+                    ];
+                }
+                else
+                {
+                    return [];
+                }
+            }
         }
 
         public async Task DeployHelmChartToClusterAsync()
@@ -202,10 +220,25 @@ namespace CromwellOnAzureDeployer
 
         private static void ProcessHelmValuesUpdates(HelmValues values, Version previousVersion)
         {
-            if (previousVersion < new Version(4, 3))
+            if (previousVersion is null || previousVersion < new Version(4, 3))
             {
                 values.CromwellContainers = [Deployer.ConfigurationContainerName, Deployer.ExecutionsContainerName, Deployer.LogsContainerName, Deployer.OutputsContainerName];
                 values.DefaultContainers = [Deployer.InputsContainerName];
+            }
+
+            if (previousVersion is null || previousVersion < new Version(5, 5, 0))
+            {
+                var datasettestinputs = values.ExternalSasContainers.SingleOrDefault(container => container.TryGetValue("accountName", out var name) && "datasettestinputs".Equals(name, StringComparison.OrdinalIgnoreCase));
+
+                if (datasettestinputs is not null)
+                {
+                    _ = values.ExternalSasContainers.Remove(datasettestinputs);
+                }
+            }
+
+            if (previousVersion < new Version(5, 5, 1))
+            {
+                _ = values.CromwellContainers.Remove(Deployer.ExecutionsContainerName);
             }
         }
 
@@ -217,7 +250,7 @@ namespace CromwellOnAzureDeployer
 
         public async Task RemovePodAadChart()
         {
-            await ExecHelmProcessAsync($"uninstall aad-pod-identity", throwOnNonZeroExitCode: false);
+            await ExecHelmProcessAsync($"uninstall aad-pod-identity --namespace kube-system --kubeconfig \"{kubeConfigPath}\"", throwOnNonZeroExitCode: false);
         }
 
         public async Task ExecuteCommandsOnPodAsync(IKubernetes client, string podName, IEnumerable<string[]> commands, string aksNamespace)
