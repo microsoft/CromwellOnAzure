@@ -19,7 +19,6 @@ using Tes.Repository;
 namespace TriggerService.Tests
 {
     [TestClass]
-    [Ignore]
     public class CromwellOnAzureEnvironmentTests
     {
         private const string azureName = "test";

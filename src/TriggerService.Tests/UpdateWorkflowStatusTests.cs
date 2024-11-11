@@ -21,7 +21,6 @@ using Tes.TaskSubmitters;
 namespace TriggerService.Tests
 {
     [TestClass]
-    [Ignore]
     public class UpdateWorkflowStatusTests
     {
         public UpdateWorkflowStatusTests()
