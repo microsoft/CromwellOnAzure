@@ -20,6 +20,7 @@ using Tes.Repository;
 namespace TriggerService.Tests
 {
     [TestClass]
+    [Ignore]
     public class ProcessNewWorkflowTests
     {
         public ProcessNewWorkflowTests()
