@@ -413,6 +413,18 @@ namespace CromwellOnAzureDeployer
 
                         if (installedVersion is null || installedVersion < new Version(5, 5, 1))
                         {
+                            var pool = aksCluster.Data.AgentPoolProfiles.FirstOrDefault(pool => "nodepool1".Equals(pool.Name, StringComparison.OrdinalIgnoreCase));
+
+                            if (pool.Count == 2 && pool.Count != configuration.AksPoolSize)
+                            {
+                                pool.Count = configuration.AksPoolSize;
+
+                                aksCluster = (await Execute("Updating AKS cluster...", async () =>
+                                    (await updateConflictRetryPolicy.ExecuteAsync(() =>
+                                        resourceGroup.GetContainerServiceManagedClusters().CreateOrUpdateAsync(
+                                            WaitUntil.Completed, aksCluster.Data.Name, aksCluster.Data, cts.Token))))).Value;
+                            }
+
                             var cromwellConfig = GetBlobClient(storageAccountData, ConfigurationContainerName, CromwellConfigurationFileName);
                             var configContent = await DownloadTextFromStorageAccountAsync(cromwellConfig, cts.Token);
 
