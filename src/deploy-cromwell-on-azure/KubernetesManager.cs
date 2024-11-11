@@ -235,6 +235,11 @@ namespace CromwellOnAzureDeployer
                     _ = values.ExternalSasContainers.Remove(datasettestinputs);
                 }
             }
+
+            if (previousVersion < new Version(5, 5, 1))
+            {
+                _ = values.CromwellContainers.Remove(Deployer.ExecutionsContainerName);
+            }
         }
 
         public async Task<Dictionary<string, string>> GetAKSSettingsAsync(Azure.ResourceManager.Storage.StorageAccountData storageAccount)

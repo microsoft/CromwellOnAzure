@@ -411,6 +411,41 @@ namespace CromwellOnAzureDeployer
                             }
                         }
 
+                        if (installedVersion is null || installedVersion < new Version(5, 5, 1))
+                        {
+                            var cromwellConfig = GetBlobClient(storageAccountData, ConfigurationContainerName, CromwellConfigurationFileName);
+                            var configContent = await DownloadTextFromStorageAccountAsync(cromwellConfig, cts.Token);
+
+                            if (!configContent.Contains(".blob.", StringComparison.Ordinal))
+                            {
+                                using HoconUtil hocon = new(configContent);
+                                var conf = hocon.Parse();
+
+                                var changes = Hocon.HoconParser.Parse($@"
+filesystems.blob {{
+  class = ""cromwell.filesystems.blob.BlobPathBuilderFactory""
+  global {{
+    class = ""cromwell.filesystems.blob.BlobFileSystemManager""
+    config.subscription = ""{configuration.SubscriptionId}""
+  }}
+}}
+
+engine.filesystems.blob.enabled: true
+
+backend.providers.TES.config {{
+  filesystems {{
+    http.enabled: true
+    local.enabled: true
+    blob.enabled: true
+  }}
+  root = ""https://{storageAccountData.Name}.blob.{azureCloudConfig.Suffixes.StorageSuffix}/{ExecutionsContainerName}/""
+}}").Value.GetObject();
+
+                                conf.Value.GetObject().Merge(changes);
+                                await UploadTextToStorageAccountAsync(cromwellConfig, hocon.ToString(conf).ReplaceLineEndings("\r\n"), cts.Token);
+                            }
+                        }
+
                         //if (installedVersion is null || installedVersion < new Version(x, y, z))
                         //{
                         //}
@@ -1482,6 +1517,9 @@ namespace CromwellOnAzureDeployer
                         new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),
                         new Utility.ConfigReplaceTextItem("{DatabaseDriver}", $"\"org.postgresql.Driver\""),
                         new Utility.ConfigReplaceTextItem("{DatabaseProfile}", "\"slick.jdbc.PostgresProfile$\""),
+                        new Utility.ConfigReplaceTextItem("{StorageAccount}", configuration.StorageAccountName),
+                        new Utility.ConfigReplaceTextItem("{Subscription}", configuration.SubscriptionId),
+                        new Utility.ConfigReplaceTextItem("{StorageSuffix}", azureCloudConfig.Suffixes.StorageSuffix),
                     ], "scripts", CromwellConfigurationFileName), cts.Token);
 
                     await UploadTextToStorageAccountAsync(GetBlobClient(storageAccount, TesInternalContainerName, $"{ConfigurationContainerName}/{AllowedVmSizesFileName}"), Utility.GetFileContent("scripts", AllowedVmSizesFileName), cts.Token);
