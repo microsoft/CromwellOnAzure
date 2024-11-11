@@ -1,6 +1,4 @@
 ﻿UsePreemptibleVmsOnly=false
-DisableBatchScheduling=false
-AzureOfferDurableId=MS-AZR-0003p
 UseLegacyBatchImplementationWithAutopools=false
 Gen2BatchImageOffer=ubuntu-hpc
 Gen2BatchImagePublisher=microsoft-dsvm

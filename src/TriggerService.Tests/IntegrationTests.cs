@@ -49,7 +49,7 @@ namespace TriggerService.Tests
                 ("https://raw.githubusercontent.com/microsoft/gatk4-data-processing-azure/main-azure/processing-for-variant-discovery-gatk4.hg38.trigger.json", "preprocessing-hg38"),
                 ("https://raw.githubusercontent.com/microsoft/gatk4-genome-processing-pipeline-azure/main-azure/WholeGenomeGermlineSingleSample.trigger.json", "germline"),
                 ("https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json", "mutect2"),
-                ("https://raw.githubusercontent.com/microsoft/gatk4-rnaseq-germline-snps-indels-azure/jsaun/gatk4-rna-germline-variant-calling.trigger.json", "rna-germline"),
+                ("https://raw.githubusercontent.com/microsoft/gatk4-rnaseq-germline-snps-indels-azure/main-azure/gatk4-rna-germline-variant-calling.trigger.json", "rna-germline"),
                 ("https://raw.githubusercontent.com/microsoft/gatk4-cnn-variant-filter-azure/main-azure/cram2filtered.trigger.json", "cram-to-filtered"),
                 ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/interleaved-fastq-to-paired-fastq.trigger.json", "fastq-to-paired"),
                 ("https://raw.githubusercontent.com/microsoft/seq-format-conversion-azure/main-azure/paired-fastq-to-unmapped-bam.trigger.json", "paired-fastq-to-unmapped-bam"),
@@ -104,7 +104,7 @@ namespace TriggerService.Tests
         public async Task RunScaleTestWithMutect2Async()
         {
             const int countOfWorkflowsToRun = 100;
-            const string triggerFile = "https://raw.githubusercontent.com/microsoft/gatk4-somatic-snvs-indels-azure/main-azure/mutect2.trigger.json";
+            const string triggerFile = "https://raw.githubusercontent.com/microsoft/CromwellOnAzure/main/src/TriggerService.Tests/test-wdls/mutect2/mutect2.trigger.json";
             const string workflowFriendlyName = $"mutect2";
             var triggerFiles = new List<(string triggerFileBlobUrl, string workflowFriendlyName)> { (triggerFile, workflowFriendlyName) };
             await StartWorkflowsAsync(countOfWorkflowsToRun, triggerFiles, testStorageAccountName);
@@ -175,6 +175,7 @@ namespace TriggerService.Tests
                     && pool.TargetDedicatedComputeNodes == 0)
                 {
                     Console.WriteLine($"Deleting Batch pool {pool.Id}...");
+                    await batchClient.JobOperations.DeleteJobAsync(pool.Id);
                     await batchClient.PoolOperations.DeletePoolAsync(pool.Id);
                     count++;
                 }

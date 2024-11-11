@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   labels:
     io.kompose.service: triggerservice
-    aadpodidbinding: {{ .Values.identity.name }}
   name: triggerservice
 spec:
   replicas: 1
@@ -15,10 +14,11 @@ spec:
     metadata:
       labels:
         io.kompose.service: triggerservice
-        aadpodidbinding: {{ .Values.identity.name }}
+        azure.workload.identity/use: "true"
       annotations:
         container.apparmor.security.beta.kubernetes.io/triggerservice: runtime/default
     spec:
+      serviceAccountName: {{ .Values.identity.name }}-sa
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -44,8 +44,12 @@ spec:
               value: {{ .Values.persistence.storageAccount }}
             - name: AzureServicesAuthConnectionString
               value: {{ .Values.config.azureServicesAuthConnectionString }}
+            - name: AZURE_ADDITIONALLY_ALLOWED_TENANTS
+              value: "*"
             - name: TriggerService__ApplicationInsightsAccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
+            - name: TriggerService__AzureCloudName
+              value: {{ .Values.config.azureCloudName }}
           image: {{ .Values.images.triggerservice }}
           name: triggerservice
           resources:
