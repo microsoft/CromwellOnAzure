@@ -585,8 +585,19 @@ backend.providers.TES.config {{
 
                         if (!string.IsNullOrWhiteSpace(configuration.IdentityResourceId))
                         {
-                            ConsoleEx.WriteLine($"Using existing user-assigned managed identity: {configuration.IdentityResourceId}");
-                            managedIdentity = await GetUserManagedIdentityAsync(configuration.IdentityResourceId);
+                            var identityResourceId = ResourceIdentifier.Parse(configuration.IdentityResourceId);
+
+                            if (!UserAssignedIdentityResource.CreateResourceIdentifier(identityResourceId.SubscriptionId, identityResourceId.ResourceGroupName, identityResourceId.Name).Equals(identityResourceId)
+                                // https://learn.microsoft.com/azure/azure-resource-manager/management/resource-name-rules#microsoftmanagedidentity + rule that names used with VirtualMachineSets should not be longer than 24
+                                || identityResourceId.Name.Length < 3 || identityResourceId.Name.Length > 24
+                                || !char.IsAsciiLetterOrDigit(identityResourceId.Name[0])
+                                || !identityResourceId.Name.Skip(1).All(@char => char.IsAsciiLetterOrDigit(@char) || '-' == @char || '_' == @char))
+                            {
+                                throw new ValidationException($"{nameof(configuration.IdentityResourceId)} is invalid. It must be a user assigned managed identity with a valid name that isn't longer than 24 characters.", false);
+                            }
+
+                            ConsoleEx.WriteLine($"Using existing user-assigned managed identity: {identityResourceId}");
+                            managedIdentity = await GetUserManagedIdentityAsync(identityResourceId);
                         }
                         else
                         {
@@ -2040,10 +2051,12 @@ backend.providers.TES.config {{
                 });
         }
 
-        private async Task<UserAssignedIdentityResource> GetUserManagedIdentityAsync(string resourceId)
+        private async Task<UserAssignedIdentityResource> GetUserManagedIdentityAsync(ResourceIdentifier resourceId)
         {
+            ArgumentNullException.ThrowIfNull(resourceId);
+
             return await armSubscription.GetUserAssignedIdentitiesAsync(cts.Token)
-                .SingleOrDefaultAsync(id => string.Equals(id.Id.ToString(), resourceId, StringComparison.OrdinalIgnoreCase), cts.Token);
+                .SingleAsync(id => resourceId.Equals(id.Id), cts.Token);
         }
 
         private async Task DeleteResourceGroupAsync(CancellationToken cancellationToken)
