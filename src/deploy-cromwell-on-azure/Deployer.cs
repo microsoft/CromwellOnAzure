@@ -588,7 +588,8 @@ backend.providers.TES.config {{
                             var identityResourceId = ResourceIdentifier.Parse(configuration.IdentityResourceId);
 
                             if (!UserAssignedIdentityResource.CreateResourceIdentifier(identityResourceId.SubscriptionId, identityResourceId.ResourceGroupName, identityResourceId.Name).Equals(identityResourceId)
-                                // https://learn.microsoft.com/azure/azure-resource-manager/management/resource-name-rules#microsoftmanagedidentity + rule that names used with VirtualMachineSets should not be longer than 24
+                                // https://learn.microsoft.com/azure/azure-resource-manager/management/resource-name-rules#microsoftmanagedidentity
+                                // https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/how-manage-user-assigned-managed-identities?pivots=identity-mi-methods-azp#create-a-user-assigned-managed-identity
                                 || identityResourceId.Name.Length < 3 || identityResourceId.Name.Length > 24
                                 || !char.IsAsciiLetterOrDigit(identityResourceId.Name[0])
                                 || !identityResourceId.Name.Skip(1).All(@char => char.IsAsciiLetterOrDigit(@char) || '-' == @char || '_' == @char))
