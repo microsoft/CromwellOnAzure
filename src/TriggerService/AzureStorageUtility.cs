@@ -6,12 +6,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Storage;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using CommonUtilities.AzureCloud;
+using Microsoft.Extensions.Configuration;
 
 
 namespace TriggerService
@@ -21,9 +21,10 @@ namespace TriggerService
         Task<(List<IAzureStorage>, IAzureStorage)> GetStorageAccountsUsingMsiAsync(string accountName);
     }
 
-    public class AzureStorageUtility(AzureCloudConfig azureCloudConfig) : IAzureStorageUtility
+    public class AzureStorageUtility(AzureCloudConfig azureCloudConfig, IConfiguration configuration) : IAzureStorageUtility
     {
         private readonly AzureCloudConfig azureCloudConfig = azureCloudConfig;
+        private readonly IConfiguration configuration = configuration;
 
         public async Task<(List<IAzureStorage>, IAzureStorage)> GetStorageAccountsUsingMsiAsync(string accountName)
         {
@@ -76,7 +77,7 @@ namespace TriggerService
                     .SelectMany(a => a);
         }
 
-        private async Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
+        private static async Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
         {
             return (await storageAccountInfo.StorageAccount.GetKeysAsync().FirstOrDefaultAsync()).Value;
         }
@@ -86,7 +87,7 @@ namespace TriggerService
         /// </summary>
         /// <returns>An authenticated Azure Client instance</returns>
         private ArmClient GetAzureManagementClient()
-            => new(new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) }),
+            => new(new CommonUtilities.AzureServicesConnectionStringCredential(new(configuration, azureCloudConfig)),
                 default,
                 new() { Environment = azureCloudConfig.ArmEnvironment });
     }
