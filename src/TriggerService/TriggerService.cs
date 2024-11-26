@@ -5,7 +5,6 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
-using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.ApplicationInsights;
 using Azure.ResourceManager.Resources;
@@ -25,36 +24,36 @@ namespace TriggerService
         public TriggerService()
             => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
-        internal static string applicationInsightsConnectionString = "";
-
         public static async Task Main()
         {
             Console.WriteLine($"TriggerService Build: {Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion}");
             AzureCloudConfig azureCloudConfig = null;
+            var applicationInsightsConnectionString = string.Empty;
+            IConfiguration configuration = null;
 
             await Host.CreateDefaultBuilder()
                 .ConfigureAppConfiguration((hostBuilderContext, configurationBuilder) =>
                 {
                     configurationBuilder.AddJsonFile("appsettings.json");
                     configurationBuilder.AddEnvironmentVariables();
-                    var config = configurationBuilder.Build();
-                    azureCloudConfig = GetAzureCloudConfig(config);
+                    configuration = configurationBuilder.Build();
+                    azureCloudConfig = GetAzureCloudConfig(configuration);
                     var triggerServiceOptions = new TriggerServiceOptions();
-                    config.Bind(TriggerServiceOptions.TriggerServiceOptionsSectionName, triggerServiceOptions);
+                    configuration.Bind(TriggerServiceOptions.TriggerServiceOptionsSectionName, triggerServiceOptions);
                     const string legacyApplicationInsightsConnectionStringKey = "APPLICATIONINSIGHTS_CONNECTION_STRING";
 
-                    if (!string.IsNullOrWhiteSpace(config[legacyApplicationInsightsConnectionStringKey]))
+                    if (!string.IsNullOrWhiteSpace(configuration[legacyApplicationInsightsConnectionStringKey]))
                     {
                         // Legacy CoA setting
                         Console.WriteLine($"Using {legacyApplicationInsightsConnectionStringKey}");
-                        applicationInsightsConnectionString = config[legacyApplicationInsightsConnectionStringKey];
+                        applicationInsightsConnectionString = configuration[legacyApplicationInsightsConnectionStringKey];
                     }
                     else if (!string.IsNullOrWhiteSpace(triggerServiceOptions.ApplicationInsightsAccountName))
                     {
                         Console.WriteLine($"Getting Azure subscriptions and Application Insights Connection string");
 
                         // name was specified, get the subscription, then the connection string from the account
-                        applicationInsightsConnectionString = GetApplicationInsightsConnectionString(azureCloudConfig, triggerServiceOptions);
+                        applicationInsightsConnectionString = GetApplicationInsightsConnectionStringAsync(configuration, azureCloudConfig, triggerServiceOptions).GetAwaiter().GetResult();
 
                         Console.WriteLine($"Successfully retrieved applicationInsightsConnectionString: {!string.IsNullOrWhiteSpace(applicationInsightsConnectionString)}");
                     }
@@ -69,7 +68,14 @@ namespace TriggerService
                         loggingBuilder.AddApplicationInsights(
                             configuration =>
                             {
-                                configuration.ConnectionString = applicationInsightsConnectionString;
+                                if (string.IsNullOrWhiteSpace(applicationInsightsConnectionString))
+                                {
+                                    configuration.DisableTelemetry = true;
+                                }
+                                else
+                                {
+                                    configuration.ConnectionString = applicationInsightsConnectionString;
+                                }
                             },
                             options => { });
 
@@ -82,7 +88,7 @@ namespace TriggerService
                     serviceCollection.AddSingleton(azureCloudConfig);
                     serviceCollection.AddSingleton<ICromwellApiClient, CromwellApiClient.CromwellApiClient>();
                     serviceCollection.AddSingleton<IRepository<TesTask>, TesTaskPostgreSqlRepository>();
-                    serviceCollection.AddSingleton<IAzureStorageUtility, AzureStorageUtility>();
+                    serviceCollection.AddSingleton<IAzureStorageUtility, AzureStorageUtility>(sp => ActivatorUtilities.CreateInstance<AzureStorageUtility>(sp, configuration));
                     serviceCollection.AddHostedService<TriggerHostedService>();
                 })
                 .Build()
@@ -97,26 +103,26 @@ namespace TriggerService
             }
         }
 
-        private static string GetApplicationInsightsConnectionString(AzureCloudConfig azureCloudConfig, TriggerServiceOptions triggerServiceOptions)
+        private static async Task<string> GetApplicationInsightsConnectionStringAsync(IConfiguration config, AzureCloudConfig azureCloudConfig, TriggerServiceOptions triggerServiceOptions)
         {
             try
             {
                 string applicationInsightsConnectionString;
-                var tokenCredential = new DefaultAzureCredential(new DefaultAzureCredentialOptions { AuthorityHost = new Uri(azureCloudConfig.Authentication.LoginEndpointUrl) });
+                var tokenCredential = new CommonUtilities.AzureServicesConnectionStringCredential(new(config, azureCloudConfig));
                 ArmClient armClient = new(tokenCredential, null, new() { Environment = azureCloudConfig.ArmEnvironment });
-                var subscriptionId = armClient.GetSubscriptions().GetAllAsync().Select(s => s.Id.SubscriptionId).FirstAsync().Result;
+                var subscriptionId = await armClient.GetSubscriptions().GetAllAsync().Select(s => s.Id.SubscriptionId).FirstAsync();
                 Console.WriteLine($"Running in subscriptionId: {subscriptionId}");
-                applicationInsightsConnectionString = armClient.GetSubscriptionResource(SubscriptionResource.CreateResourceIdentifier(subscriptionId))
-                    .GetApplicationInsightsComponentsAsync()
-                    .SelectAwait(async c => (await c.GetAsync()).Value)
-                    .FirstAsync(c => c.Data.ApplicationId.Equals(triggerServiceOptions.ApplicationInsightsAccountName, StringComparison.OrdinalIgnoreCase))
-                    .Result.Data.ConnectionString;
+                applicationInsightsConnectionString = (await armClient.GetSubscriptionResource(SubscriptionResource.CreateResourceIdentifier(subscriptionId))
+                        .GetApplicationInsightsComponentsAsync()
+                        .SelectAwait(async c => (await c.GetAsync()).Value)
+                        .FirstAsync(c => c.Data.ApplicationId.Equals(triggerServiceOptions.ApplicationInsightsAccountName, StringComparison.OrdinalIgnoreCase)))
+                    .Data.ConnectionString;
 
                 return applicationInsightsConnectionString;
             }
             catch (Exception exc)
             {
-                Console.WriteLine($"Exception in {nameof(GetApplicationInsightsConnectionString)}: {exc.Message} {exc}");
+                Console.WriteLine($"Exception in {nameof(GetApplicationInsightsConnectionStringAsync)}: {exc.Message} {exc}");
                 throw;
             }
         }

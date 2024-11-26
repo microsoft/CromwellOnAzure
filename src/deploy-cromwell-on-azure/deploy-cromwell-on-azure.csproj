@@ -48,6 +48,8 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.1.2" />
     <!--Mitigate reported security issues-->
     <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    <!--Mitigate reported security issues-->
+    <PackageReference Include="System.Private.Uri" Version="4.3.2" />
   </ItemGroup>
 
   <ItemGroup>
