@@ -161,7 +161,7 @@ namespace CromwellOnAzureDeployer
 
             if (!Deployer.IsStorageInPublicCloud)
             {
-                values.DefaultContainers.Add(Deployer.ExecutionsContainerName);
+                values.CromwellContainers.Add(Deployer.ExecutionsContainerName);
             }
 
             if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
