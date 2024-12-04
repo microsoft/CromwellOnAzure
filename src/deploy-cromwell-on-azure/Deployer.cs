@@ -126,6 +126,7 @@ namespace CromwellOnAzureDeployer
         private KubernetesManager kubernetesManager { get; set; }
         internal static AzureCloudConfig azureCloudConfig { get; private set; }
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<ResourceIdentifier, Azure.Storage.StorageSharedKeyCredential> storageKeys = [];
+        internal static bool IsStorageInPublicCloud { get; private set; }
 
         private static async Task<T> EnsureResourceDataAsync<T>(T resource, Predicate<T> HasData, Func<T, Func<CancellationToken, Task<Response<T>>>> GetAsync, CancellationToken cancellationToken, Action<T> OnAcquisition = null) where T : ArmResource
         {
@@ -183,6 +184,8 @@ namespace CromwellOnAzureDeployer
                     azureCloudConfig = await AzureCloudConfig.FromKnownCloudNameAsync(cloudName: configuration.AzureCloudName, retryPolicyOptions: Microsoft.Extensions.Options.Options.Create<CommonUtilities.Options.RetryPolicyOptions>(new()));
                     cloudEnvironment = new(azureCloudConfig.ArmEnvironment.Value, azureCloudConfig.AuthorityHost);
                 });
+
+                IsStorageInPublicCloud = "core.windows.net".Equals(azureCloudConfig.Suffixes.StorageSuffix, StringComparison.OrdinalIgnoreCase);
 
                 await Execute("Validating command line arguments...", () =>
                 {
@@ -411,7 +414,7 @@ namespace CromwellOnAzureDeployer
                             }
                         }
 
-                        if (installedVersion is null || installedVersion < new Version(5, 5, 1))
+                        if (IsStorageInPublicCloud && (installedVersion is null || installedVersion < new Version(5, 5, 1)))
                         {
                             var cromwellConfig = GetBlobClient(storageAccountData, ConfigurationContainerName, CromwellConfigurationFileName);
                             var configContent = await DownloadTextFromStorageAccountAsync(cromwellConfig, cts.Token);
@@ -441,6 +444,27 @@ backend.providers.TES.config {{
   root = ""https://{storageAccountData.Name}.blob.{azureCloudConfig.Suffixes.StorageSuffix}/{ExecutionsContainerName}/""
 }}").Value.GetObject();
 
+                                conf.Value.GetObject().Merge(changes);
+                                await UploadTextToStorageAccountAsync(cromwellConfig, hocon.ToString(conf).ReplaceLineEndings("\r\n"), cts.Token);
+                            }
+                        }
+
+                        if (!IsStorageInPublicCloud && installedVersion == new Version(5, 5, 1)) // special case: revert 5.5.1 changes
+                        {
+                            var cromwellConfig = GetBlobClient(storageAccountData, ConfigurationContainerName, CromwellConfigurationFileName);
+                            var configContent = await DownloadTextFromStorageAccountAsync(cromwellConfig, cts.Token);
+
+                            if (configContent.Contains(".blob.", StringComparison.Ordinal))
+                            {
+                                using HoconUtil hocon = new(configContent);
+                                var conf = hocon.Parse();
+
+                                var changes = Hocon.HoconParser.Parse($@"
+backend.providers.TES.config.root = ""/{ExecutionsContainerName}""
+filesystems.blob.enabled: false
+engine.filesystems.blob.enabled: false
+backend.providers.TES.config.filesystems.blob.enabled: false
+").Value.GetObject();
                                 conf.Value.GetObject().Merge(changes);
                                 await UploadTextToStorageAccountAsync(cromwellConfig, hocon.ToString(conf).ReplaceLineEndings("\r\n"), cts.Token);
                             }
@@ -1512,6 +1536,7 @@ backend.providers.TES.config {{
                     // Configure Cromwell config file for PostgreSQL on Azure.
                     await UploadTextToStorageAccountAsync(GetBlobClient(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName), Utility.PersonalizeContent(
                     [
+                        new Utility.ConfigNamedConditional("AzurePublic", IsStorageInPublicCloud),
                         new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}/{configuration.PostgreSqlCromwellDatabaseName}?sslmode=require\""),
                         new Utility.ConfigReplaceTextItem("{DatabaseUser}", $"\"{configuration.PostgreSqlCromwellUserLogin}\""),
                         new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),

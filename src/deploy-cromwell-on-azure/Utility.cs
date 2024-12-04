@@ -46,52 +46,83 @@ namespace CromwellOnAzureDeployer
             public abstract string Replace(string input);
 
             public bool Skip { get; set; }
+
+            protected static string ValidateIsNotNullOrEmpty(string value, string name)
+            {
+                ArgumentException.ThrowIfNullOrEmpty(value, name);
+                return value;
+            }
         }
 
-        public sealed class ConfigReplaceTextItem : ConfigReplaceTextItemBase
+        public sealed class ConfigReplaceTextItem(string match, string replacement) : ConfigReplaceTextItemBase
         {
-            private readonly string _match;
-            private readonly string _replacement;
-
-            public ConfigReplaceTextItem(string match, string replacement)
-            {
-                _match = match ?? throw new ArgumentNullException(nameof(match));
-                _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
-            }
+            private readonly string _match = ValidateIsNotNullOrEmpty(match, nameof(match));
+            private readonly string _replacement = ValidateIsNotNullOrEmpty(replacement, nameof(replacement));
 
             public override string Replace(string input) => Skip ? input : input.Replace(_match, _replacement);
         }
 
-        public sealed class ConfigReplaceRegExItemText : ConfigReplaceTextItemBase
+        public sealed class ConfigReplaceRegExItemText(string match, string replacement, RegexOptions options) : ConfigReplaceTextItemBase
         {
-            private readonly string _match;
-            private readonly string _replacement;
-            private readonly RegexOptions _options;
-
-            public ConfigReplaceRegExItemText(string match, string replacement, RegexOptions options)
-            {
-                _match = match ?? throw new ArgumentNullException(nameof(match));
-                _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
-                _options = options;
-            }
+            private readonly string _match = ValidateIsNotNullOrEmpty(match, nameof(match));
+            private readonly string _replacement = ValidateIsNotNullOrEmpty(replacement, nameof(replacement));
+            private readonly RegexOptions _options = options;
 
             public override string Replace(string input) => Skip ? input : Regex.Replace(input, _match, _replacement, _options);
         }
 
-        public sealed class ConfigReplaceRegExItemEvaluator : ConfigReplaceTextItemBase
+        public sealed class ConfigReplaceRegExItemEvaluator(string match, MatchEvaluator replacement, RegexOptions options) : ConfigReplaceTextItemBase
         {
-            private readonly string _match;
-            private readonly MatchEvaluator _replacement;
-            private readonly RegexOptions _options;
-
-            public ConfigReplaceRegExItemEvaluator(string match, MatchEvaluator replacement, RegexOptions options)
-            {
-                _match = match ?? throw new ArgumentNullException(nameof(match));
-                _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
-                _options = options;
-            }
+            private readonly string _match = ValidateIsNotNullOrEmpty(match, nameof(match));
+            private readonly MatchEvaluator _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
+            private readonly RegexOptions _options = options;
 
             public override string Replace(string input) => Skip ? input : Regex.Replace(input, _match, _replacement, _options);
+        }
+
+        public sealed class ConfigNamedConditional(string name, bool condition, string lineSeparator = "\n") : ConfigReplaceTextItemBase
+        {
+            private readonly string _name = ValidateIsNotNullOrEmpty(name, nameof(name));
+            private readonly bool _condition = condition;
+            private readonly string _lineSeparator = lineSeparator;
+
+            public override string Replace(string input) => Skip ? input : PerformReplace(input);
+
+            private string PerformReplace(string input)
+            {
+                IList<string> lines = [];
+                var include = true;
+
+                foreach (var line in input.Split(_lineSeparator))
+                {
+                    if (LineIs(line, $"!if({_name})"))
+                    {
+                        include = _condition;
+                        continue;
+                    }
+
+                    if (LineIs(line, $"!else({_name})"))
+                    {
+                        include = !_condition;
+                        continue;
+                    }
+
+                    if (LineIs(line, $"!endif({_name})"))
+                    {
+                        include = true;
+                        continue;
+                    }
+
+                    if (include)
+                    {
+                        lines.Add(line);
+                    }
+                }
+
+                return string.Join(_lineSeparator, lines);
+
+                static bool LineIs(string line, string match) => line.TrimStart().StartsWith(match) && string.IsNullOrWhiteSpace(line.TrimStart()[match.Length..]);
+            }
         }
 
         public static string DictionaryToDelimitedText(Dictionary<string, string> dictionary, string fieldDelimiter = "=", string rowDelimiter = "\n")

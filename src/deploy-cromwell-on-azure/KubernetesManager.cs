@@ -159,6 +159,11 @@ namespace CromwellOnAzureDeployer
             values.Identity["resourceId"] = managedId.Id;
             values.Identity["clientId"] = managedId.ClientId?.ToString("D");
 
+            if (!Deployer.IsStorageInPublicCloud)
+            {
+                values.DefaultContainers.Add(Deployer.ExecutionsContainerName);
+            }
+
             if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
             {
                 values.InternalContainersKeyVaultAuth = [];
@@ -236,9 +241,27 @@ namespace CromwellOnAzureDeployer
                 }
             }
 
-            if (previousVersion < new Version(5, 5, 1))
+            if (Deployer.IsStorageInPublicCloud && previousVersion < new Version(5, 5, 1))
             {
                 _ = values.CromwellContainers.Remove(Deployer.ExecutionsContainerName);
+            }
+
+            if (!Deployer.IsStorageInPublicCloud && previousVersion == new Version(5, 5, 1)) // special case: revert 5.5.1 changes
+            {
+                values.CromwellContainers.Add(Deployer.ExecutionsContainerName);
+            }
+
+            if (Deployer.IsStorageInPublicCloud && previousVersion < new Version(5, 5, 2))
+            {
+                if (values.InternalContainersMIAuth.Any(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName))
+                {
+                    values.InternalContainersMIAuth.Remove(values.InternalContainersMIAuth.First(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName));
+                }
+
+                if (values.InternalContainersKeyVaultAuth.Any(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName))
+                {
+                    values.InternalContainersKeyVaultAuth.Remove(values.InternalContainersMIAuth.First(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName));
+                }
             }
         }
 
