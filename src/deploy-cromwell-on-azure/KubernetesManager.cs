@@ -253,12 +253,12 @@ namespace CromwellOnAzureDeployer
 
             if (Deployer.IsStorageInPublicCloud && previousVersion < new Version(5, 5, 2))
             {
-                if (values.InternalContainersMIAuth.Any(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName))
+                if (values.InternalContainersMIAuth?.Any(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName) ?? false)
                 {
                     values.InternalContainersMIAuth.Remove(values.InternalContainersMIAuth.First(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName));
                 }
 
-                if (values.InternalContainersKeyVaultAuth.Any(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName))
+                if (values.InternalContainersKeyVaultAuth?.Any(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName) ?? false)
                 {
                     values.InternalContainersKeyVaultAuth.Remove(values.InternalContainersMIAuth.First(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName));
                 }
