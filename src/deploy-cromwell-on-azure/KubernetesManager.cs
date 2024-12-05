@@ -251,7 +251,7 @@ namespace CromwellOnAzureDeployer
                 _ = values.CromwellContainers.Remove(Deployer.ExecutionsContainerName);
             }
 
-            if (!Deployer.IsStorageInPublicCloud && previousVersion == new Version(5, 5, 1)) // special case: revert 5.5.1 changes
+            if (!Deployer.IsStorageInPublicCloud && (previousVersion.Major == 5 && previousVersion.Minor == 5 && previousVersion.Build == 1)) // special case: revert 5.5.1 changes
             {
                 values.CromwellContainers.Add(Deployer.ExecutionsContainerName);
             }

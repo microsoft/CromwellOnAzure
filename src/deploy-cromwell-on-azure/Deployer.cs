@@ -449,7 +449,7 @@ backend.providers.TES.config {{
                             }
                         }
 
-                        if (!IsStorageInPublicCloud && installedVersion == new Version(5, 5, 1)) // special case: revert 5.5.1 changes
+                        if (!IsStorageInPublicCloud && (installedVersion.Major == 5 && installedVersion.Minor == 5 && installedVersion.Build == 1)) // special case: revert 5.5.1 changes
                         {
                             var cromwellConfig = GetBlobClient(storageAccountData, ConfigurationContainerName, CromwellConfigurationFileName);
                             var configContent = await DownloadTextFromStorageAccountAsync(cromwellConfig, cts.Token);
