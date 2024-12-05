@@ -459,13 +459,12 @@ backend.providers.TES.config {{
                                 using HoconUtil hocon = new(configContent);
                                 var conf = hocon.Parse();
 
-                                var changes = Hocon.HoconParser.Parse($@"
-backend.providers.TES.config.root = ""/{ExecutionsContainerName}""
-filesystems.blob.enabled: false
-engine.filesystems.blob.enabled: false
-backend.providers.TES.config.filesystems.blob.enabled: false
-").Value.GetObject();
+                                var changes = Hocon.HoconParser.Parse($@"backend.providers.TES.config.root = ""/{ExecutionsContainerName}""").Value.GetObject();
                                 conf.Value.GetObject().Merge(changes);
+                                _ = hocon.Remove(conf, "filesystems.blob");
+                                _ = hocon.Remove(conf, "engine.filesystems.blob");
+                                _ = hocon.Remove(conf, "backend.providers.TES.config.filesystems.blob");
+
                                 await UploadTextToStorageAccountAsync(cromwellConfig, hocon.ToString(conf).ReplaceLineEndings("\r\n"), cts.Token);
                             }
                         }
