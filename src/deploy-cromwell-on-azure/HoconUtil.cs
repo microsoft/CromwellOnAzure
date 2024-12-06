@@ -114,6 +114,8 @@ namespace CromwellOnAzureDeployer
         }
 
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Maintain API")]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:Remove unnecessary suppression", Justification = "CA1822 suppression is appropriate in this use case.")]
         public bool Remove(HoconRoot config, string path)
         {
             var value = config.Value.GetObject();
@@ -212,7 +214,7 @@ namespace CromwellOnAzureDeployer
                     return false;
                 }
 
-                for (int i = 0; i < parentPath.Count; i++)
+                for (var i = 0; i < parentPath.Count; ++i)
                 {
                     if (path[i] != parentPath[i])
                     {
