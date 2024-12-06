@@ -113,6 +113,27 @@ namespace CromwellOnAzureDeployer
             return result;
         }
 
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Maintain API")]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:Remove unnecessary suppression", Justification = "CA1822 suppression is appropriate in this use case.")]
+        public bool Remove(HoconRoot config, string path)
+        {
+            var value = config.Value.GetObject();
+            var pathParts = path.Split('.');
+
+            foreach (var part in pathParts.Take(pathParts.Length - 1))
+            {
+                if (!value.TryGetValue(part, out var nextValue))
+                {
+                    return false;
+                }
+
+                value = nextValue.GetObject();
+            }
+
+            return value.Remove(pathParts.Last());
+        }
+
         /// <summary>
         /// Converts <paramref name="config"/> into a more stable configuration
         /// </summary>
@@ -134,10 +155,10 @@ namespace CromwellOnAzureDeployer
                     // If the element was not removed
                     if (config.TryGetValue(section.Field.Value.Field.Path, out var result))
                     {
-                        // Determine if element was changed. Note that formatting is normalized in that case.
+                        // Determine if element was changed. Note that formatting is normalized if the element was modified.
                         sb.Append(section.Field.Value.Field.Value.Equals(result)
                             ? section.Text.ReplaceLineEndings()
-                            : $"{section.Field.Value.Field.Path} : {result.ToString(withBraces ? 3 : 1, 2)} {Environment.NewLine}{Environment.NewLine}");
+                            : $"{section.Field.Value.Field.Path} : {result.ToString(withBraces ? 3 : 1, 2)}{Environment.NewLine}{Environment.NewLine}");
                     }
                 }
             }
@@ -193,7 +214,7 @@ namespace CromwellOnAzureDeployer
                     return false;
                 }
 
-                for (int i = 0; i < parentPath.Count; i++)
+                for (var i = 0; i < parentPath.Count; ++i)
                 {
                     if (path[i] != parentPath[i])
                     {

@@ -174,7 +174,7 @@ engine.filesystems : {
   blob : {
     enabled : true
   }
-} 
+}
 
 workflow-options {
   workflow-log-dir: ""/cromwell-workflow-logs""
@@ -213,7 +213,7 @@ backend : {
       }
     }
   }
-} 
+}
 
 database {
   db.url = ""jdbc:postgresql://db.postgres.database.azure.com/cromwell_db?sslmode=require""
@@ -234,6 +234,171 @@ filesystems : {
       }
     }
   }
+}".ReplaceLineEndings(), hocon.ToString(conf).ReplaceLineEndings());
+        }
+
+        [TestMethod]
+        public void TestRemove()
+        {
+            using HoconUtil hocon = new(@"include required(classpath(""application""))
+
+akka.http.host-connection-pool.max-open-requests = 16384
+akka.http.host-connection-pool.max-connections = 2000
+
+call-caching {
+  enabled = false
+}
+
+system {
+  input-read-limits {
+    lines = 1000000
+  }
+}
+
+filesystems : {
+  blob : {
+    class : ""cromwell.filesystems.blob.BlobPathBuilderFactory"",
+    global : {
+      class : ""cromwell.filesystems.blob.BlobFileSystemManager"",
+      config : {
+        subscription : ""subscription""
+      }
+    }
+  }
+}
+
+engine.filesystems : {
+  local : {
+    enabled : true
+  },
+  http : {
+    enabled : true
+  },
+  blob : {
+    enabled : true
+  }
+}
+
+workflow-options {
+  workflow-log-dir: ""/cromwell-workflow-logs""
+  workflow-log-temporary: false
+}
+
+backend : {
+  default : ""TES"",
+  providers : {
+    TES : {
+      actor-factory : ""cromwell.backend.impl.tes.TesBackendLifecycleActorFactory"",
+      config : {
+        filesystems : {
+          http : {
+            enabled : true
+          },
+          local : {
+            enabled : true
+          },
+          blob : {
+            enabled : true
+          }
+        },
+        root : ""https://storageAccount.blob.storageSuffix/cromwell-executions/"",
+        dockerRoot : ""/cromwell-executions"",
+        endpoint : ""http://tes/v1/tasks"",
+        use_tes_11_preview_backend_parameters : true,
+        default-runtime-attributes : {
+          cpu : 1,
+          failOnStderr : false,
+          continueOnReturnCode : 0,
+          memory : ""2 GB"",
+          disk : ""10 GB"",
+          preemptible : true
+        }
+      }
+    }
+  }
+}
+
+database {
+  db.url = ""jdbc:postgresql://db.postgres.database.azure.com/cromwell_db?sslmode=require""
+  db.user = ""cromwell""
+  db.password = ""password""
+  db.driver = ""org.postgresql.Driver""
+  profile = ""slick.jdbc.PostgresProfile$""
+  db.connectionTimeout = 15000
+}");
+            var conf = hocon.Parse();
+
+            _ = hocon.Remove(conf, "filesystems.blob");
+            _ = hocon.Remove(conf, "engine.filesystems.blob");
+            _ = hocon.Remove(conf, "backend.providers.TES.config.filesystems.blob");
+
+            Assert.AreEqual(@"include required(classpath(""application""))
+
+akka.http.host-connection-pool.max-open-requests = 16384
+akka.http.host-connection-pool.max-connections = 2000
+
+call-caching {
+  enabled = false
+}
+
+system {
+  input-read-limits {
+    lines = 1000000
+  }
+}
+
+engine.filesystems : {
+  local : {
+    enabled : true
+  },
+  http : {
+    enabled : true
+  }
+}
+
+workflow-options {
+  workflow-log-dir: ""/cromwell-workflow-logs""
+  workflow-log-temporary: false
+}
+
+backend : {
+  default : ""TES"",
+  providers : {
+    TES : {
+      actor-factory : ""cromwell.backend.impl.tes.TesBackendLifecycleActorFactory"",
+      config : {
+        filesystems : {
+          http : {
+            enabled : true
+          },
+          local : {
+            enabled : true
+          }
+        },
+        root : ""https://storageAccount.blob.storageSuffix/cromwell-executions/"",
+        dockerRoot : ""/cromwell-executions"",
+        endpoint : ""http://tes/v1/tasks"",
+        use_tes_11_preview_backend_parameters : true,
+        default-runtime-attributes : {
+          cpu : 1,
+          failOnStderr : false,
+          continueOnReturnCode : 0,
+          memory : ""2 GB"",
+          disk : ""10 GB"",
+          preemptible : true
+        }
+      }
+    }
+  }
+}
+
+database {
+  db.url = ""jdbc:postgresql://db.postgres.database.azure.com/cromwell_db?sslmode=require""
+  db.user = ""cromwell""
+  db.password = ""password""
+  db.driver = ""org.postgresql.Driver""
+  profile = ""slick.jdbc.PostgresProfile$""
+  db.connectionTimeout = 15000
 }".ReplaceLineEndings(), hocon.ToString(conf).ReplaceLineEndings());
         }
     }
