@@ -40,11 +40,11 @@ spec:
             - containerPort: {{ .Values.service.cromwellPort }}
           resources:
             requests:
-              cpu: "1.0"
-              memory: "1024Mi"
+              cpu: "1"
+              memory: "1.5Gi"
             limits:
-              cpu: "8.0"
-              memory: "4096Mi"
+              cpu: "2"
+              memory: "3Gi"
           securityContext:
             allowPrivilegeEscalation: false
           volumeMounts:
