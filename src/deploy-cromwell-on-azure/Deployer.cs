@@ -116,6 +116,7 @@ namespace CromwellOnAzureDeployer
 
         private Configuration configuration { get; } = configuration;
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance", Justification = "We are using the base type everywhere.")]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:Remove unnecessary suppression", Justification = "CA1859 suppression seems appropriate in this use case.")]
         private TokenCredential tokenCredential { get; set; }
         private SubscriptionResource armSubscription { get; set; }
         private ArmClient armClient { get; set; }
@@ -126,6 +127,7 @@ namespace CromwellOnAzureDeployer
         private KubernetesManager kubernetesManager { get; set; }
         internal static AzureCloudConfig azureCloudConfig { get; private set; }
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<ResourceIdentifier, Azure.Storage.StorageSharedKeyCredential> storageKeys = [];
+        internal static bool IsStorageInPublicCloud { get; private set; }
 
         private static async Task<T> EnsureResourceDataAsync<T>(T resource, Predicate<T> HasData, Func<T, Func<CancellationToken, Task<Response<T>>>> GetAsync, CancellationToken cancellationToken, Action<T> OnAcquisition = null) where T : ArmResource
         {
@@ -183,6 +185,8 @@ namespace CromwellOnAzureDeployer
                     azureCloudConfig = await AzureCloudConfig.FromKnownCloudNameAsync(cloudName: configuration.AzureCloudName, retryPolicyOptions: Microsoft.Extensions.Options.Options.Create<CommonUtilities.Options.RetryPolicyOptions>(new()));
                     cloudEnvironment = new(azureCloudConfig.ArmEnvironment.Value, azureCloudConfig.AuthorityHost);
                 });
+
+                IsStorageInPublicCloud = "core.windows.net".Equals(azureCloudConfig.Suffixes.StorageSuffix, StringComparison.OrdinalIgnoreCase);
 
                 await Execute("Validating command line arguments...", () =>
                 {
@@ -411,7 +415,7 @@ namespace CromwellOnAzureDeployer
                             }
                         }
 
-                        if (installedVersion is null || installedVersion < new Version(5, 5, 1))
+                        if (IsStorageInPublicCloud && (installedVersion is null || installedVersion < new Version(5, 5, 1)))
                         {
                             var cromwellConfig = GetBlobClient(storageAccountData, ConfigurationContainerName, CromwellConfigurationFileName);
                             var configContent = await DownloadTextFromStorageAccountAsync(cromwellConfig, cts.Token);
@@ -442,6 +446,26 @@ backend.providers.TES.config {{
 }}").Value.GetObject();
 
                                 conf.Value.GetObject().Merge(changes);
+                                await UploadTextToStorageAccountAsync(cromwellConfig, hocon.ToString(conf).ReplaceLineEndings("\r\n"), cts.Token);
+                            }
+                        }
+
+                        if (!IsStorageInPublicCloud && (installedVersion.Major == 5 && installedVersion.Minor == 5 && installedVersion.Build == 1)) // special case: revert 5.5.1 changes
+                        {
+                            var cromwellConfig = GetBlobClient(storageAccountData, ConfigurationContainerName, CromwellConfigurationFileName);
+                            var configContent = await DownloadTextFromStorageAccountAsync(cromwellConfig, cts.Token);
+
+                            if (configContent.Contains(".blob.", StringComparison.Ordinal))
+                            {
+                                using HoconUtil hocon = new(configContent);
+                                var conf = hocon.Parse();
+
+                                var changes = Hocon.HoconParser.Parse($@"backend.providers.TES.config.root = ""/{ExecutionsContainerName}""").Value.GetObject();
+                                conf.Value.GetObject().Merge(changes);
+                                _ = hocon.Remove(conf, "filesystems.blob");
+                                _ = hocon.Remove(conf, "engine.filesystems.blob");
+                                _ = hocon.Remove(conf, "backend.providers.TES.config.filesystems.blob");
+
                                 await UploadTextToStorageAccountAsync(cromwellConfig, hocon.ToString(conf).ReplaceLineEndings("\r\n"), cts.Token);
                             }
                         }
@@ -1512,6 +1536,7 @@ backend.providers.TES.config {{
                     // Configure Cromwell config file for PostgreSQL on Azure.
                     await UploadTextToStorageAccountAsync(GetBlobClient(storageAccount, ConfigurationContainerName, CromwellConfigurationFileName), Utility.PersonalizeContent(
                     [
+                        new Utility.ConfigNamedConditional("AzurePublic", IsStorageInPublicCloud),
                         new Utility.ConfigReplaceTextItem("{DatabaseUrl}", $"\"jdbc:postgresql://{configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}/{configuration.PostgreSqlCromwellDatabaseName}?sslmode=require\""),
                         new Utility.ConfigReplaceTextItem("{DatabaseUser}", $"\"{configuration.PostgreSqlCromwellUserLogin}\""),
                         new Utility.ConfigReplaceTextItem("{DatabasePassword}", $"\"{configuration.PostgreSqlCromwellUserPassword}\""),
@@ -1729,6 +1754,8 @@ backend.providers.TES.config {{
                     return dnsZone;
                 });
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1861:Avoid constant arrays as arguments", Justification = "Only called once per process invocation.")]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:Remove unnecessary suppression", Justification = "CA1861 suppression is appropriate in this use case.")]
         private Task ExecuteQueriesOnAzurePostgreSQLDbFromK8(IKubernetes kubernetesClient, string podName, string aksNamespace)
             => Execute(
                 $"Executing script to create users in tes_db and cromwell_db...",
@@ -1740,13 +1767,13 @@ backend.providers.TES.config {{
                     var adminUser = configuration.PostgreSqlAdministratorLogin;
 
                     var commands = new List<string[]> {
-                        new string[] { "apt", "-qq", "update" },
-                        new string[] { "apt", "-qq", "install", "-y", "postgresql-client" },
-                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlCromwellDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" },
-                        new string[] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlTesDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} >> ~/.pgpass" },
-                        new string[] { "bash", "-lic", "chmod 0600 ~/.pgpass" },
-                        new string[] { "/usr/bin/psql", "-h", serverPath, "-U", adminUser, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", cromwellScript },
-                        new string[] { "/usr/bin/psql", "-h", serverPath, "-U", adminUser, "-d", configuration.PostgreSqlTesDatabaseName, "-c", tesScript }
+                        new [] { "apt", "-qq", "update" },
+                        new [] { "apt", "-qq", "install", "-y", "postgresql-client" },
+                        new [] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlCromwellDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} > ~/.pgpass" },
+                        new [] { "bash", "-lic", $"echo {configuration.PostgreSqlServerName}.{azureCloudConfig.Suffixes.PostgresqlServerEndpointSuffix}:{configuration.PostgreSqlServerPort}:{configuration.PostgreSqlTesDatabaseName}:{adminUser}:{configuration.PostgreSqlAdministratorPassword} >> ~/.pgpass" },
+                        new [] { "bash", "-lic", "chmod 0600 ~/.pgpass" },
+                        new [] { "/usr/bin/psql", "-h", serverPath, "-U", adminUser, "-d", configuration.PostgreSqlCromwellDatabaseName, "-c", cromwellScript },
+                        new [] { "/usr/bin/psql", "-h", serverPath, "-U", adminUser, "-d", configuration.PostgreSqlTesDatabaseName, "-c", tesScript }
                     };
 
                     await kubernetesManager.ExecuteCommandsOnPodAsync(kubernetesClient, podName, commands, aksNamespace);

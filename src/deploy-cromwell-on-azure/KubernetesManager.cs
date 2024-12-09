@@ -51,14 +51,14 @@ namespace CromwellOnAzureDeployer
         public string TempHelmValuesYamlPath { get; private set; }
 
         public delegate BlobClient GetBlobClient(Azure.ResourceManager.Storage.StorageAccountData storageAccount, string containerName, string blobName);
-        private readonly GetBlobClient getBlobClient;
+        private readonly GetBlobClient _GetBlobClient;
 
         public KubernetesManager(Configuration config, AzureCloudConfig azureCloudConfig, GetBlobClient getBlobClient, CancellationToken cancellationToken)
         {
             this.azureCloudConfig = azureCloudConfig;
             this.cancellationToken = cancellationToken;
             this.configuration = config;
-            this.getBlobClient = getBlobClient;
+            this._GetBlobClient = getBlobClient;
 
             CreateAndInitializeWorkingDirectoriesAsync().Wait(cancellationToken);
         }
@@ -159,6 +159,11 @@ namespace CromwellOnAzureDeployer
             values.Identity["resourceId"] = managedId.Id;
             values.Identity["clientId"] = managedId.ClientId?.ToString("D");
 
+            if (!Deployer.IsStorageInPublicCloud)
+            {
+                values.CromwellContainers.Add(Deployer.ExecutionsContainerName);
+            }
+
             if (configuration.CrossSubscriptionAKSDeployment.GetValueOrDefault())
             {
                 values.InternalContainersKeyVaultAuth = [];
@@ -203,12 +208,12 @@ namespace CromwellOnAzureDeployer
 
             var valuesString = KubernetesYaml.Serialize(values);
             await File.WriteAllTextAsync(TempHelmValuesYamlPath, valuesString, cancellationToken);
-            await Deployer.UploadTextToStorageAccountAsync(getBlobClient(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml"), valuesString, cancellationToken);
+            await Deployer.UploadTextToStorageAccountAsync(_GetBlobClient(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml"), valuesString, cancellationToken);
         }
 
         public async Task UpgradeValuesYamlAsync(Azure.ResourceManager.Storage.StorageAccountData storageAccount, Dictionary<string, string> settings, List<MountableContainer> containersToMount, Version previousVersion)
         {
-            var blobClient = getBlobClient(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml");
+            var blobClient = _GetBlobClient(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml");
             var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(blobClient, cancellationToken));
             UpdateValuesFromSettings(values, settings);
             MergeContainers(containersToMount, values);
@@ -222,29 +227,52 @@ namespace CromwellOnAzureDeployer
         {
             if (previousVersion is null || previousVersion < new Version(4, 3))
             {
-                values.CromwellContainers = [Deployer.ConfigurationContainerName, Deployer.ExecutionsContainerName, Deployer.LogsContainerName, Deployer.OutputsContainerName];
+                values.CromwellContainers = [Deployer.ConfigurationContainerName, Deployer.LogsContainerName, Deployer.OutputsContainerName];
                 values.DefaultContainers = [Deployer.InputsContainerName];
             }
 
             if (previousVersion is null || previousVersion < new Version(5, 5, 0))
             {
-                var datasettestinputs = values.ExternalSasContainers.SingleOrDefault(container => container.TryGetValue("accountName", out var name) && "datasettestinputs".Equals(name, StringComparison.OrdinalIgnoreCase));
+                var datasettestinputs = values.ExternalSasContainers?.SingleOrDefault(container => container.TryGetValue("accountName", out var name) && "datasettestinputs".Equals(name, StringComparison.OrdinalIgnoreCase));
 
                 if (datasettestinputs is not null)
                 {
                     _ = values.ExternalSasContainers.Remove(datasettestinputs);
+
+                    if (values.ExternalSasContainers.Count == 0)
+                    {
+                        values.ExternalSasContainers = null;
+                    }
                 }
             }
 
-            if (previousVersion < new Version(5, 5, 1))
+            if (Deployer.IsStorageInPublicCloud && previousVersion < new Version(5, 5, 1))
             {
                 _ = values.CromwellContainers.Remove(Deployer.ExecutionsContainerName);
+            }
+
+            if (!Deployer.IsStorageInPublicCloud && (previousVersion.Major == 5 && previousVersion.Minor == 5 && previousVersion.Build == 1)) // special case: revert 5.5.1 changes
+            {
+                values.CromwellContainers.Add(Deployer.ExecutionsContainerName);
+            }
+
+            if (Deployer.IsStorageInPublicCloud && previousVersion < new Version(5, 5, 2))
+            {
+                if (values.InternalContainersMIAuth?.Any(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName) ?? false)
+                {
+                    values.InternalContainersMIAuth.Remove(values.InternalContainersMIAuth.First(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName));
+                }
+
+                if (values.InternalContainersKeyVaultAuth?.Any(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName) ?? false)
+                {
+                    values.InternalContainersKeyVaultAuth.Remove(values.InternalContainersMIAuth.First(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName));
+                }
             }
         }
 
         public async Task<Dictionary<string, string>> GetAKSSettingsAsync(Azure.ResourceManager.Storage.StorageAccountData storageAccount)
         {
-            var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(getBlobClient(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml"), cancellationToken));
+            var values = KubernetesYaml.Deserialize<HelmValues>(await Deployer.DownloadTextFromStorageAccountAsync(_GetBlobClient(storageAccount, Deployer.ConfigurationContainerName, "aksValues.yaml"), cancellationToken));
             return ValuesToSettings(values);
         }
 
