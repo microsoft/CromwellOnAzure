@@ -1,4 +1,4 @@
 name: cromwell-on-azure
 description: A cromwell deployment designed to run on Azure.
-version: 5.5.0
+version: 5.5.2
 apiVersion: v1
