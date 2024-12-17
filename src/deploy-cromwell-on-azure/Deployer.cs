@@ -1442,7 +1442,7 @@ backend.providers.TES.config {{
                         {
                             if (e is RequestFailedException ex && ex.Status == 403 && "AuthorizationFailed".Equals(ex.ErrorCode, StringComparison.OrdinalIgnoreCase))
                             {
-                                return new System.ComponentModel.WarningException("Role assignment not authorized. Skipping role assignment to AKS cluster.", e);
+                                return new System.ComponentModel.WarningException("Insufficient authorization for role assignment. Skipping role assignment to AKS cluster resource scope.", e);
                             }
 
                             return e;
