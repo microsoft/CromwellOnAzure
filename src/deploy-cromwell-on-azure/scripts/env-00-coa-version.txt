@@ -1,1 +1,1 @@
-﻿CromwellOnAzureVersion=5.5.2
+﻿CromwellOnAzureVersion=5.5.3
