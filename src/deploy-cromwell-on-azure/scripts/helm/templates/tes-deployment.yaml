@@ -128,11 +128,11 @@ spec:
             - containerPort: {{ .Values.service.tesPort }}
           resources:
             requests:
-              cpu: "1.5"
-              memory: "3072Mi"
+              cpu: "0.5"
+              memory: "1Gi"
             limits:
-              cpu: "8.0"
-              memory: "8192Mi"
+              cpu: "1"
+              memory: "2Gi"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

@@ -55,10 +55,10 @@ spec:
           resources:
             requests:
               cpu: "0.5"
-              memory: "256Mi"
+              memory: "0.5Gi"
             limits:
-              cpu: "2.0"
-              memory: "1024Mi"
+              cpu: "1"
+              memory: "1Gi"
           securityContext:
             allowPrivilegeEscalation: false
       restartPolicy: Always
