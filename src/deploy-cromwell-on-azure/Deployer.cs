@@ -1215,7 +1215,7 @@ backend.providers.TES.config {{
 
             // We always overwrite the CoA version
             UpdateSetting(settings, defaults, "CromwellOnAzureVersion", default(string), ignoreDefaults: false);
-            settings["SameVersionUpgrade"] = (installedVersion?.ToString() ?? string.Empty).Equals(new(defaults["TesOnAzureVersion"])).ToString();
+            settings["SameVersionUpgrade"] = (installedVersion?.ToString() ?? string.Empty).Equals(new(defaults["CromwellOnAzureVersion"])).ToString();
             UpdateSetting(settings, defaults, "DeploymentUpdated", currentTime.ToString("O"), ignoreDefaults: false);
 
             // Process images
