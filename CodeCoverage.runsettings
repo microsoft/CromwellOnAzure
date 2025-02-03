@@ -15,7 +15,6 @@
                 <Function>^TesApi.Attributes\..*</Function>
                 <Function>^TesApi.Filters\..*</Function>
                 <Function>^TesApi.Models\..*</Function>
-                <Function>^TesApi.Web\.CosmosDbRepository.*</Function>
                 <Function>^TesApi.Web\.AzureProxy\..*</Function>
                 <Function>^TesApi.Web\.Program\..*</Function>
                 <Function>^TesApi.Web\.Startup\..*</Function>

@@ -7,13 +7,16 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Common;
+using CommonUtilities.AzureCloud;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
 using Tes.Models;
 using Tes.Repository;
+using Tes.TaskSubmitters;
 
 namespace TriggerService.Tests
 {
@@ -59,8 +62,8 @@ namespace TriggerService.Tests
             Assert.AreEqual("FailureExitCode", failedTask?.FailureReason);
             Assert.AreEqual(1, failedTask?.SystemLogs?.Count);
             Assert.AreEqual("The task process exited with an unexpected exit code", failedTask?.SystemLogs.First());
-            Assert.AreEqual("execution/__batch/stdout.txt", failedTask.StdOut);
-            Assert.AreEqual("execution/__batch/stderr.txt", failedTask.StdErr);
+            Assert.AreEqual($"/tes-internal/{tesTasks.First().Id}/stdout.txt", failedTask.StdOut);
+            Assert.AreEqual($"/tes-internal/{tesTasks.First().Id}/stderr.txt", failedTask.StdErr);
         }
 
         [TestMethod]
@@ -284,45 +287,60 @@ namespace TriggerService.Tests
         }
 
         private static TesTask GetTesTask(string workflowId, int shard, int attempt, params TesTaskLog[] tesTaskLogs)
-            => new()
+        {
+            TesTask task = new()
             {
-                WorkflowId = $"{workflowId}",
-                Description = $"BackendJobDescriptorKey_CommandCallNode_BamToUnmappedBams.SortSam:{shard}:{attempt}",
-                Executors = new List<TesExecutor> { new TesExecutor { Stdout = "execution/stdout", Stderr = "execution/stderr" } },
-                Logs = tesTaskLogs.ToList()
+                Description = $"{workflowId}:BackendJobDescriptorKey_CommandCallNode_BamToUnmappedBams.SortSam:{shard}:{attempt}",
+                Executors = [new() { Stdout = "execution/stdout", Stderr = "execution/stderr" }],
+                Inputs = [new() { Name = "commandScript", Description = "workflow1.Task1.commandScript", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/script", Type = TesFileType.FILE }],
+                Outputs =
+                [
+                    new() { Name = "commandScript", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/script" },
+                    new() { Name = "stderr", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/stderr" },
+                    new() { Name = "stdout", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/stdout" },
+                    new() { Name = "rc", Path = $"/cromwell-executions/test/{workflowId}/call-hello/{ShardString(shard)}execution/rc" },
+                ],
+                Logs = [.. tesTaskLogs]
             };
+
+            task.TaskSubmitter = TaskSubmitter.Parse(task);
+            return task;
+
+            static string ShardString(int shard) =>
+                shard == -1 ? string.Empty : $"shard-{shard}/";
+        }
 
         private static TesTaskLog TesTaskLogForBatchTaskFailure => new()
         {
-            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 1 } },
-            SystemLogs = new List<string> { "FailureExitCode", "The task process exited with an unexpected exit code" },
+            Logs = [new() { ExitCode = 1 }],
+            SystemLogs = ["FailureExitCode", "The task process exited with an unexpected exit code"],
             FailureReason = "FailureExitCode"
         };
 
         private static TesTaskLog TesTaskLogForBatchNodeAllocationFailure => new()
         {
-            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = null } },
+            Logs = [new() { ExitCode = null }],
             FailureReason = "NodeAllocationFailed"
         };
 
         private static TesTaskLog TesTaskLogForCromwellScriptFailure => new()
         {
-            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
+            Logs = [new() { ExitCode = 0 }],
             FailureReason = null,
             CromwellResultCode = 1
         };
 
         private static TesTaskLog TesTaskLogForSuccessfulTask => new()
         {
-            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
+            Logs = [new() { ExitCode = 0 }],
             FailureReason = null,
             CromwellResultCode = 0
         };
 
         private static TesTaskLog TesTaskLogForSuccessfulTaskWithWarning => new()
         {
-            Logs = new List<TesExecutorLog> { new TesExecutorLog { ExitCode = 0 } },
-            SystemLogs = new List<string> { "Warning1", "Warning1Details" },
+            Logs = [new() { ExitCode = 0 }],
+            SystemLogs = ["Warning1", "Warning1Details"],
             Warning = "Warning1"
         };
 
@@ -362,12 +380,14 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.InProgress))
-                .Returns(Task.FromResult(new[] {
-                    new TriggerFile {
+                .Returns(AsyncEnumerable.Repeat(
+                    new TriggerFile
+                    {
                         Uri = $"http://tempuri.org/workflows/inprogress/inprogress.Sample.{workflowId}.json",
                         ContainerName = "workflows",
                         Name = $"inprogress/inprogress.Sample.{workflowId}.json",
-                        LastModified = DateTimeOffset.UtcNow.AddMinutes(-5) } }.AsEnumerable()));
+                        LastModified = DateTimeOffset.UtcNow.AddMinutes(-5)
+                    }, 1));
 
             azureStorage
                 .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
@@ -392,10 +412,25 @@ namespace TriggerService.Tests
                 .Returns(Task.FromResult(new GetTimingResponse()));
 
             repository
-                .Setup(r => r.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>()))
+                .Setup(r => r.GetItemsAsync(It.IsAny<Expression<Func<TesTask, bool>>>(), It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(Task.FromResult(tesTasks));
 
-            var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient.Object, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            var logger = new Mock<ILogger<TriggerHostedService>>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>();
+
+            triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
+            {
+                DefaultStorageAccountName = "fakestorage",
+                ApplicationInsightsAccountName = "fakeappinsights"
+            });
+            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
+            var storageUtility = new Mock<IAzureStorageUtility>();
+
+            storageUtility
+                .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
+
+            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient.Object, repository.Object, storageUtility.Object, AzureCloudConfig.ForUnitTesting());
 
             await cromwellOnAzureEnvironment.UpdateWorkflowStatusesAsync();
 

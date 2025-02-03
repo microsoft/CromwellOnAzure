@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   labels:
     io.kompose.service: triggerservice
-    aadpodidbinding: {{ .Values.identity.name }}
   name: triggerservice
 spec:
   replicas: 1
@@ -15,10 +14,11 @@ spec:
     metadata:
       labels:
         io.kompose.service: triggerservice
-        aadpodidbinding: {{ .Values.identity.name }}
+        azure.workload.identity/use: "true"
       annotations:
         container.apparmor.security.beta.kubernetes.io/triggerservice: runtime/default
     spec:
+      serviceAccountName: {{ .Values.identity.name }}-sa
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -26,14 +26,30 @@ spec:
         supplementalGroups: [1000]
       containers:
         - env:
-            - name: DefaultStorageAccountName
+            - name: TesPostgreSql__ServerName
+              value: {{ .Values.tesDatabase.serverName }}
+            - name: TesPostgreSql__ServerNameSuffix
+              value: {{ .Values.tesDatabase.serverNameSuffix }}
+            - name: TesPostgreSql__ServerSslMode
+              value: {{ .Values.tesDatabase.serverSslMode }}
+            - name: TesPostgreSql__ServerPort
+              value: {{ .Values.tesDatabase.serverPort | quote }}
+            - name: TesPostgreSql__DatabaseName
+              value: {{ .Values.tesDatabase.databaseName }}
+            - name: TesPostgreSql__DatabaseUserLogin
+              value: {{ .Values.tesDatabase.databaseUserLogin }}
+            - name: TesPostgreSql__DatabaseUserPassword
+              value: {{ .Values.tesDatabase.databaseUserPassword }}
+            - name: TriggerService__DefaultStorageAccountName
               value: {{ .Values.persistence.storageAccount }}
             - name: AzureServicesAuthConnectionString
               value: {{ .Values.config.azureServicesAuthConnectionString }}
-            - name: ApplicationInsightsAccountName
+            - name: AZURE_ADDITIONALLY_ALLOWED_TENANTS
+              value: "*"
+            - name: TriggerService__ApplicationInsightsAccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
-            - name: CosmosDbAccountName
-              value: {{ .Values.config.cosmosDbAccountName }}
+            - name: TriggerService__AzureCloudName
+              value: {{ .Values.config.azureCloudName }}
           image: {{ .Values.images.triggerservice }}
           name: triggerservice
           resources:

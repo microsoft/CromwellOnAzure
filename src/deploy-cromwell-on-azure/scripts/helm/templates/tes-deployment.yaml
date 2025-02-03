@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   labels:
     io.kompose.service: tes
-    aadpodidbinding: {{ .Values.identity.name }}
   name: tes
 spec:
   replicas: 1
@@ -16,64 +15,108 @@ spec:
     metadata:
       labels:
         io.kompose.service: tes
-        aadpodidbinding: {{ .Values.identity.name }}
+        azure.workload.identity/use: "true"
       annotations:
         container.apparmor.security.beta.kubernetes.io/tes: runtime/default
     spec:
+      serviceAccountName: {{ .Values.identity.name }}-sa
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
         supplementalGroups: [1000]
+      terminationGracePeriodSeconds: 90
       containers:
         - env:
+            - name: General__AzureCloudName
+              value: {{ .Values.config.azureCloudName }}
+            - name: Deployment__OrganizationName
+              value: {{ .Values.config.deployment.organizationName }}
+            - name: Deployment__OrganizationUrl
+              value: {{ .Values.config.deployment.organizationUrl }}
+            - name: Deployment__ContactUri
+              value: {{ .Values.config.deployment.contactUri }}
+            - name: Deployment__Environment
+              value: {{ .Values.config.deployment.environment }}
+            - name: Deployment__Created
+              value: {{ .Values.config.deployment.created }}
+            - name: Deployment__Updated
+              value: {{ .Values.config.deployment.updated }}
+            - name: Deployment__TesImage
+              value: {{ .Values.images.tes }}
+            - name: TesPostgreSql__ServerName
+              value: {{ .Values.tesDatabase.serverName }}
+            - name: TesPostgreSql__ServerNameSuffix
+              value: {{ .Values.tesDatabase.serverNameSuffix }}
+            - name: TesPostgreSql__ServerSslMode
+              value: {{ .Values.tesDatabase.serverSslMode }}
+            - name: TesPostgreSql__ServerPort
+              value: {{ .Values.tesDatabase.serverPort | quote }}
+            - name: TesPostgreSql__DatabaseName
+              value: {{ .Values.tesDatabase.databaseName }}
+            - name: TesPostgreSql__DatabaseUserLogin
+              value: {{ .Values.tesDatabase.databaseUserLogin }}
+            - name: TesPostgreSql__DatabaseUserPassword
+              value: {{ .Values.tesDatabase.databaseUserPassword }}
             - name: ASPNETCORE_URLS
               value: http://0.0.0.0:{{ .Values.service.tesPort }}/
-            - name: DefaultStorageAccountName
+            - name: Storage__DefaultAccountName
               value: {{ .Values.persistence.storageAccount }}
+            - name: Storage__ExecutionsContainerName
+              value: {{ .Values.persistence.executionsContainerName }}
             - name: AzureServicesAuthConnectionString
               value: {{ .Values.config.azureServicesAuthConnectionString }}
-            - name: ApplicationInsightsAccountName
+            - name: AZURE_ADDITIONALLY_ALLOWED_TENANTS
+              value: "*"
+            - name: ApplicationInsights__AccountName
               value: {{ .Values.config.applicationInsightsAccountName }}
-            - name: CosmosDbAccountName
-              value: {{ .Values.config.cosmosDbAccountName }}
-            - name: AzureOfferDurableId
-              value: {{ .Values.config.azureOfferDurableId }}
-            - name: BatchAccountName
-              value: {{ .Values.config.batchAccountName }}
-            - name: BatchNodesSubnetId
-              value: {{ .Values.config.batchNodesSubnetId }}
-            - name: BlobxferImageName
-              value: {{ .Values.config.blobxferImageName }}
-            - name: DisableBatchNodesPublicIpAddress
-              value: {{ .Values.config.disableBatchNodesPublicIpAddress | quote }}
-            - name: DisableBatchScheduling
-              value: {{ .Values.config.disableBatchScheduling | quote }}
-            - name: DockerInDockerImageName
-              value: {{ .Values.config.dockerInDockerImageName }}
-            - name: BatchImageOffer
-              value: {{ .Values.config.batchImageOffer }}
-            - name: BatchImagePublisher
-              value: {{ .Values.config.batchImagePublisher }}
-            - name: BatchImageSku
-              value: {{ .Values.config.batchImageSku | quote }}
-            - name: BatchImageVersion
-              value: {{ .Values.config.batchImageVersion }}
-            - name: BatchNodeAgentSkuId
-              value: {{ .Values.config.batchNodeAgentSkuId }}
-            - name: MarthaUrl
-              value: {{ .Values.config.marthaUrl }}
-            - name: MarthaKeyVaultName
-              value: {{ .Values.config.marthaKeyVaultName }}
-            - name: MarthaSecretName
-              value: {{ .Values.config.marthaSecretName }}
-            - name: UsePreemptibleVmsOnly
-              value: {{ .Values.config.usePreemptibleVmsOnly | quote}}
-            - name: GlobalStartTaskPath
-              value: {{ .Values.config.globalStartTaskPath }}
-            - name: GlobalManagedIdentity
-              value: {{ .Values.config.batchManagedIdentity }}
-            - name: ExternalStorageContainers
+            - name: BatchAccount__AccountName
+              value: {{ .Values.config.batchAccount.accountName }}
+            - name: BatchNodes__SubnetId
+              value: {{ .Values.config.batchNodes.subnetId }}
+            - name: BatchNodes__DisablePublicIpAddress
+              value: {{ .Values.config.batchNodes.disablePublicIpAddress | quote }}
+            - name: BatchNodes__ContentMD5
+              value: {{ .Values.config.batchNodes.contentMD5 | quote }}
+            - name: BatchImageGen2__Offer
+              value: {{ .Values.config.batchImageGen2.offer }}
+            - name: BatchImageGen2__Publisher
+              value: {{ .Values.config.batchImageGen2.publisher }}
+            - name: BatchImageGen2__Sku
+              value: {{ .Values.config.batchImageGen2.sku | quote }}
+            - name: BatchImageGen2__Version
+              value: {{ .Values.config.batchImageGen2.version }}
+            - name: BatchImageGen2__NodeAgentSkuId
+              value: {{ .Values.config.batchImageGen2.nodeAgentSkuId }}
+            - name: BatchImageGen1__Offer
+              value: {{ .Values.config.batchImageGen1.offer }}
+            - name: BatchImageGen1__Publisher
+              value: {{ .Values.config.batchImageGen1.publisher }}
+            - name: BatchImageGen1__Sku
+              value: {{ .Values.config.batchImageGen1.sku | quote }}
+            - name: BatchImageGen1__Version
+              value: {{ .Values.config.batchImageGen1.version }}
+            - name: BatchImageGen1__NodeAgentSkuId
+              value: {{ .Values.config.batchImageGen1.nodeAgentSkuId }}
+            - name: BatchScheduling__PoolRotationForcedDays
+              value: {{ .Values.config.batchScheduling.poolRotationForcedDays | quote }}
+            - name: BatchScheduling__TaskMaxWallClockTimeDays
+              value: {{ .Values.config.batchScheduling.taskMaxWallClockTimeDays | quote }}
+            - name: BatchScheduling__Prefix
+              value: {{ .Values.config.batchScheduling.prefix | quote }}
+            - name: Martha__Url
+              value: {{ .Values.config.martha.url }}
+            - name: Martha__KeyVaultName
+              value: {{ .Values.config.martha.keyVaultName }}
+            - name: Martha__SecretName
+              value: {{ .Values.config.martha.secretName }}
+            - name: BatchScheduling__UsePreemptibleVmsOnly
+              value: {{ .Values.config.batchScheduling.usePreemptibleVmsOnly | quote}}
+            - name: BatchNodes__GlobalStartTask
+              value: {{ .Values.config.batchNodes.globalStartTask }}
+            - name: BatchNodes__GlobalManagedIdentity
+              value: {{ .Values.identity.resourceId }}
+            - name: Storage__ExternalStorageContainers
 {{- $containers  := list -}}
 {{- range .Values.externalSasContainers }}
 {{- $containers = append $containers (printf "https://%s.blob.core.windows.net/%s?%s" .accountName .containerName .sasToken) -}}

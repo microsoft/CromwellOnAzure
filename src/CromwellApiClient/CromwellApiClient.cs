@@ -4,10 +4,11 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using TriggerService;
 
 [assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace CromwellApiClient
@@ -19,16 +20,18 @@ namespace CromwellApiClient
         private static readonly HttpClient httpClient = new();
         private readonly string url;
 
-        public CromwellApiClient(string baseUrl)
+        public CromwellApiClient(IOptions<CromwellApiClientOptions> cromwellApiClientOptions)
         {
+            ArgumentException.ThrowIfNullOrEmpty(cromwellApiClientOptions.Value.BaseUrl, nameof(cromwellApiClientOptions.Value.BaseUrl));
+
             Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
-            if (string.IsNullOrWhiteSpace(baseUrl))
+            if (string.IsNullOrWhiteSpace(cromwellApiClientOptions.Value.BaseUrl))
             {
-                throw new ArgumentException(null, nameof(baseUrl));
+                throw new ArgumentException(null, nameof(cromwellApiClientOptions.Value.BaseUrl));
             }
 
-            url = $"{baseUrl.TrimEnd('/')}{basePath}";
+            url = $"{cromwellApiClientOptions.Value.BaseUrl.TrimEnd('/')}{basePath}";
         }
 
         public string GetUrl()

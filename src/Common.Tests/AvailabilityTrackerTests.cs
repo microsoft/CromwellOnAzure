@@ -39,7 +39,8 @@ namespace Common.Tests
                 return false;
             }
 
-            await availabilityTracker.WaitForAsync(availableAfter3Tries, TimeSpan.FromMilliseconds(1), "Test", msg => stdOut.Add(msg));
+            await availabilityTracker.WaitForAsync(availableAfter3Tries, TimeSpan.FromMilliseconds(1), "Test", msg => stdOut.Add(msg),
+                new System.Threading.CancellationToken());
 
             Assert.IsTrue(stdOut.Count == attempts);
         }
@@ -65,11 +66,11 @@ namespace Common.Tests
             Task<bool> cromwellIsAvailable()
                 => Task.FromResult(true);
 
-            await availabilityTracker.WaitForAsync(availableAfter3Tries, TimeSpan.FromMilliseconds(1), "Test", msg => stdOut.Add(msg));
+            await availabilityTracker.WaitForAsync(availableAfter3Tries, TimeSpan.FromMilliseconds(1), "Test", msg => stdOut.Add(msg), new System.Threading.CancellationToken());
 
             Assert.IsTrue(stdOut.Count == attempts);
 
-            await availabilityTracker.WaitForAsync(cromwellIsAvailable, TimeSpan.FromMilliseconds(1), "Test", msg => stdOut.Add(msg));
+            await availabilityTracker.WaitForAsync(cromwellIsAvailable, TimeSpan.FromMilliseconds(1), "Test", msg => stdOut.Add(msg), new System.Threading.CancellationToken());
 
             // Verify it did not log since it was already available
             Assert.IsTrue(stdOut.Count == attempts);

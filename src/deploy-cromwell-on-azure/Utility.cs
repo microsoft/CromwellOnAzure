@@ -5,14 +5,24 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CromwellOnAzureDeployer
 {
     public static class Utility
     {
+        /// <summary>
+        /// Generates a random resource names with the prefix.
+        /// </summary>
+        /// <param name="prefix">the prefix to be used if possible</param>
+        /// <param name="maxLength">the maximum length for the random generated name</param>
+        /// <returns>random name</returns>
+        /// <remarks>Implementation of <c>Microsoft.Azure.Management.ResourceManager.Fluent.SdkContext.RandomResourceName</c></remarks>
+        public static string RandomResourceName(string prefix, int maxLength)
+            => new ResourceNamer(string.Empty).RandomName(prefix, maxLength);
+
         public static Dictionary<string, string> DelimitedTextToDictionary(string text, string fieldDelimiter = "=", string rowDelimiter = "\n")
             => text.Trim().Split(rowDelimiter)
                 .Select(r => r.Trim().Split(fieldDelimiter))
@@ -36,52 +46,83 @@ namespace CromwellOnAzureDeployer
             public abstract string Replace(string input);
 
             public bool Skip { get; set; }
+
+            protected static string ValidateIsNotNullOrEmpty(string value, string name)
+            {
+                ArgumentException.ThrowIfNullOrEmpty(value, name);
+                return value;
+            }
         }
 
-        public sealed class ConfigReplaceTextItem : ConfigReplaceTextItemBase
+        public sealed class ConfigReplaceTextItem(string match, string replacement) : ConfigReplaceTextItemBase
         {
-            private readonly string _match;
-            private readonly string _replacement;
-
-            public ConfigReplaceTextItem(string match, string replacement)
-            {
-                _match = match ?? throw new ArgumentNullException(nameof(match));
-                _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
-            }
+            private readonly string _match = ValidateIsNotNullOrEmpty(match, nameof(match));
+            private readonly string _replacement = ValidateIsNotNullOrEmpty(replacement, nameof(replacement));
 
             public override string Replace(string input) => Skip ? input : input.Replace(_match, _replacement);
         }
 
-        public sealed class ConfigReplaceRegExItemText : ConfigReplaceTextItemBase
+        public sealed class ConfigReplaceRegExItemText(string match, string replacement, RegexOptions options) : ConfigReplaceTextItemBase
         {
-            private readonly string _match;
-            private readonly string _replacement;
-            private readonly RegexOptions _options;
-
-            public ConfigReplaceRegExItemText(string match, string replacement, RegexOptions options)
-            {
-                _match = match ?? throw new ArgumentNullException(nameof(match));
-                _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
-                _options = options;
-            }
+            private readonly string _match = ValidateIsNotNullOrEmpty(match, nameof(match));
+            private readonly string _replacement = ValidateIsNotNullOrEmpty(replacement, nameof(replacement));
+            private readonly RegexOptions _options = options;
 
             public override string Replace(string input) => Skip ? input : Regex.Replace(input, _match, _replacement, _options);
         }
 
-        public sealed class ConfigReplaceRegExItemEvaluator : ConfigReplaceTextItemBase
+        public sealed class ConfigReplaceRegExItemEvaluator(string match, MatchEvaluator replacement, RegexOptions options) : ConfigReplaceTextItemBase
         {
-            private readonly string _match;
-            private readonly MatchEvaluator _replacement;
-            private readonly RegexOptions _options;
-
-            public ConfigReplaceRegExItemEvaluator(string match, MatchEvaluator replacement, RegexOptions options)
-            {
-                _match = match ?? throw new ArgumentNullException(nameof(match));
-                _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
-                _options = options;
-            }
+            private readonly string _match = ValidateIsNotNullOrEmpty(match, nameof(match));
+            private readonly MatchEvaluator _replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
+            private readonly RegexOptions _options = options;
 
             public override string Replace(string input) => Skip ? input : Regex.Replace(input, _match, _replacement, _options);
+        }
+
+        public sealed class ConfigNamedConditional(string name, bool condition, string lineSeparator = "\n") : ConfigReplaceTextItemBase
+        {
+            private readonly string _name = ValidateIsNotNullOrEmpty(name, nameof(name));
+            private readonly bool _condition = condition;
+            private readonly string _lineSeparator = lineSeparator;
+
+            public override string Replace(string input) => Skip ? input : PerformReplace(input);
+
+            private string PerformReplace(string input)
+            {
+                IList<string> lines = [];
+                var include = true;
+
+                foreach (var line in input.Split(_lineSeparator))
+                {
+                    if (LineIs(line, $"!if({_name})"))
+                    {
+                        include = _condition;
+                        continue;
+                    }
+
+                    if (LineIs(line, $"!else({_name})"))
+                    {
+                        include = !_condition;
+                        continue;
+                    }
+
+                    if (LineIs(line, $"!endif({_name})"))
+                    {
+                        include = true;
+                        continue;
+                    }
+
+                    if (include)
+                    {
+                        lines.Add(line);
+                    }
+                }
+
+                return string.Join(_lineSeparator, lines);
+
+                static bool LineIs(string line, string match) => line.TrimStart().StartsWith(match) && string.IsNullOrWhiteSpace(line.TrimStart()[match.Length..]);
+            }
         }
 
         public static string DictionaryToDelimitedText(Dictionary<string, string> dictionary, string fieldDelimiter = "=", string rowDelimiter = "\n")
@@ -92,9 +133,10 @@ namespace CromwellOnAzureDeployer
         /// and creates subdirectories
         /// </summary>
         /// <param name="outputBasePath">The base path to create the subdirectories and write the files</param>
+        /// <param name="cancellationToken"></param>
         /// <param name="pathComponentsRelativeToAppBase">The path components relative to the app base to write</param>
         /// <returns></returns>
-        public static async Task WriteEmbeddedFilesAsync(string outputBasePath, params string[] pathComponentsRelativeToAppBase)
+        public static async Task WriteEmbeddedFilesAsync(string outputBasePath, CancellationToken cancellationToken, params string[] pathComponentsRelativeToAppBase)
         {
             var assembly = typeof(Deployer).Assembly;
             var resourceNames = assembly.GetManifestResourceNames();
@@ -106,7 +148,7 @@ namespace CromwellOnAzureDeployer
 
             foreach (var file in resourceNames.Where(r => r.StartsWith(componentSubstring)))
             {
-                var content = (await new StreamReader(assembly.GetManifestResourceStream(file)).ReadToEndAsync()).Replace("\r\n", "\n");
+                var content = (await new StreamReader(assembly.GetManifestResourceStream(file)).ReadToEndAsync(cancellationToken)).Replace("\r\n", "\n");
                 var pathSeparatedByPeriods = file.Replace(componentSubstring, "").TrimStart('.');
                 var outputPath = Path.Join(outputBasePath, pathSeparatedByPeriods);
                 var lastPeriodBeforeFilename = pathSeparatedByPeriods.LastIndexOf('.', pathSeparatedByPeriods.LastIndexOf('.') - 1);
@@ -120,7 +162,7 @@ namespace CromwellOnAzureDeployer
                 }
 
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
-                await File.WriteAllTextAsync(outputPath, content);
+                await File.WriteAllTextAsync(outputPath, content, cancellationToken);
             }
         }
 
@@ -134,29 +176,55 @@ namespace CromwellOnAzureDeployer
         private static Stream GetBinaryFileContent(params string[] pathComponentsRelativeToAppBase)
             => typeof(Deployer).Assembly.GetManifestResourceStream($"deploy-cromwell-on-azure.{string.Join(".", pathComponentsRelativeToAppBase)}");
 
-        /// <summary>
-        /// Generates a secure password with one lowercase letter, one uppercase letter, and one number
-        /// </summary>
-        /// <param name="length">Length of the password</param>
-        /// <returns>The password</returns>
-        public static string GeneratePassword(int length = 16)
+        public static void ForEach<T>(this IEnumerable<T> values, Action<T> action)
         {
-            // one lower, one upper, one number, min length
-            var regex = new Regex(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{" + length.ToString() + ",}$");
-
-            while (true)
+            foreach (var item in values)
             {
-                var buffer = RandomNumberGenerator.GetBytes(length);
+                action(item);
+            }
+        }
 
-                var password = Convert.ToBase64String(buffer)
-                    .Replace("+", "-")
-                    .Replace("/", "_")
-                    .Substring(0, length);
+        // borrowed from https://github.com/Azure/azure-libraries-for-net/blob/7d85e294e4e7280c3f74b1c41438e2f20bce2052/src/ResourceManagement/ResourceManager/ResourceNamer.cs
+        private class ResourceNamer
+        {
+            private readonly string randName;
+            private static readonly Random random = new();
 
-                if (regex.IsMatch(password))
+            public ResourceNamer(string name)
+            {
+                lock (random)
                 {
-                    return password;
+                    this.randName = name.ToLower() + Guid.NewGuid().ToString("N")[..3].ToLower();
                 }
+            }
+
+            public string RandomName(string prefix, int maxLen)
+            {
+                lock (random)
+                {
+                    prefix = prefix.ToLower();
+                    var minRandomnessLength = 5;
+                    var minRandomString = random.Next(0, 100000).ToString("D5");
+
+                    if (maxLen < (prefix.Length + randName.Length + minRandomnessLength))
+                    {
+                        var str1 = prefix + minRandomString;
+                        return str1 + RandomString((maxLen - str1.Length) / 2);
+                    }
+
+                    var str = prefix + randName + minRandomString;
+                    return str + RandomString((maxLen - str.Length) / 2);
+                }
+            }
+
+            private static string RandomString(int length)
+            {
+                var str = "";
+                while (str.Length < length)
+                {
+                    str += Guid.NewGuid().ToString("N")[..Math.Min(32, length)].ToLower();
+                }
+                return str;
             }
         }
     }

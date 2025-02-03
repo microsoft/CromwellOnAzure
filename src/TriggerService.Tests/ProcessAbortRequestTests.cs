@@ -2,11 +2,14 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Common;
+using CommonUtilities.AzureCloud;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json;
@@ -40,9 +43,7 @@ namespace TriggerService.Tests
             var workflowId = Guid.NewGuid();
             var cromwellApiClient = new Mock<ICromwellApiClient>();
             cromwellApiClient.Setup(ac => ac.PostAbortAsync(It.IsAny<Guid>())).Throws(new Exception("Workflow not found"));
-
             var (newTriggerName, newTriggerContent) = await ProcessAbortRequestAsync(workflowId, cromwellApiClient.Object);
-
             Assert.IsTrue(newTriggerName.StartsWith("failed/"));
             Assert.AreEqual("ErrorOccuredWhileAbortingWorkflow", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReason);
             Assert.AreEqual("Workflow not found", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReasonDetail);
@@ -64,12 +65,14 @@ namespace TriggerService.Tests
 
             azureStorage
                 .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort))
-                .Returns(Task.FromResult(new[] {
-                    new TriggerFile {
+                .Returns(AsyncEnumerable.Repeat(
+                    new TriggerFile
+                    {
                         Uri = $"http://tempuri.org/workflows/abort/{workflowId}.json",
                         ContainerName = "workflows",
                         Name = $"abort/{workflowId}.json",
-                        LastModified = DateTimeOffset.UtcNow } }.AsEnumerable()));
+                        LastModified = DateTimeOffset.UtcNow
+                    }, 1));
 
             azureStorage
                 .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"abort/{workflowId}.json"))
@@ -83,10 +86,24 @@ namespace TriggerService.Tests
                     newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
                 });
 
-            var cromwellOnAzureEnvironment = new CromwellOnAzureEnvironment(loggerFactory.Object, azureStorage.Object, cromwellApiClient, repository.Object, Enumerable.Repeat(azureStorage.Object, 1));
+            var logger = new Mock<ILogger<TriggerHostedService>>().Object;
+            var triggerServiceOptions = new Mock<IOptions<TriggerServiceOptions>>();
 
+            triggerServiceOptions.Setup(o => o.Value).Returns(new TriggerServiceOptions()
+            {
+                DefaultStorageAccountName = "fakestorage",
+                ApplicationInsightsAccountName = "fakeappinsights"
+            });
+
+            var postgreSqlOptions = new Mock<IOptions<PostgreSqlOptions>>().Object;
+            var storageUtility = new Mock<IAzureStorageUtility>();
+
+            storageUtility
+                .Setup(x => x.GetStorageAccountsUsingMsiAsync(It.IsAny<string>()))
+                .Returns(Task.FromResult((new List<IAzureStorage>(), azureStorage.Object)));
+
+            var cromwellOnAzureEnvironment = new TriggerHostedService(logger, triggerServiceOptions.Object, cromwellApiClient, repository.Object, storageUtility.Object, AzureCloudConfig.ForUnitTesting());
             await cromwellOnAzureEnvironment.ProcessAndAbortWorkflowsAsync();
-
             return (newTriggerName, newTriggerContent);
         }
     }
