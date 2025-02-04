@@ -8,7 +8,6 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Storage;
-using Azure.Storage;
 using Azure.Storage.Blobs;
 using CommonUtilities.AzureCloud;
 using Microsoft.Extensions.Configuration;
@@ -47,12 +46,11 @@ namespace TriggerService
         {
             BlobServiceClient defaultAccount = default;
             var accounts = GetAccessibleStorageAccountsAsync();
-            return (await accounts.SelectAwait(GetCloudAccountFromStorageAccountInfo).ToListAsync(), defaultAccount ?? throw new Exception($"Azure Storage account with name: {accountName} not found in list of {await accounts.CountAsync()} storage accounts."));
+            return (await accounts.Select(GetCloudAccountFromStorageAccountInfo).ToListAsync(), defaultAccount ?? throw new Exception($"Azure Storage account with name: {accountName} not found in list of {await accounts.CountAsync()} storage accounts."));
 
-            async ValueTask<BlobServiceClient> GetCloudAccountFromStorageAccountInfo(StorageAccountInfo account)
+            BlobServiceClient GetCloudAccountFromStorageAccountInfo(StorageAccountInfo account)
             {
-                var key = await GetStorageAccountKeyAsync(account);
-                StorageSharedKeyCredential storageCredentials = new(account.Name, key);
+                CommonUtilities.AzureServicesConnectionStringCredential storageCredentials = new(new(configuration, azureCloudConfig));
                 BlobServiceClient storageAccount = new(account.BlobEndpoint, storageCredentials);
 
                 if (account.Name == accountName)
@@ -75,11 +73,6 @@ namespace TriggerService
                     subId.GetStorageAccountsAsync()
                         .Select(a => new StorageAccountInfo { StorageAccount = a, Name = a.Id.Name, Subscription = subId, BlobEndpoint = a.Data.PrimaryEndpoints.BlobUri }))
                     .SelectMany(a => a);
-        }
-
-        private static async Task<string> GetStorageAccountKeyAsync(StorageAccountInfo storageAccountInfo)
-        {
-            return (await storageAccountInfo.StorageAccount.GetKeysAsync().FirstOrDefaultAsync()).Value;
         }
 
         /// <summary>
