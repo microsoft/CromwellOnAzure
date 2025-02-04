@@ -14,7 +14,8 @@ namespace CromwellApiClient
             string workflowSourceFilename, byte[] workflowSourceData,
             List<string> workflowInputsFilename, List<byte[]> workflowInputsData,
             string workflowOptionsFilename = null, byte[] workflowOptionsData = null,
-            string workflowDependenciesFilename = null, byte[] workflowDependenciesData = null);
+            string workflowDependenciesFilename = null, byte[] workflowDependenciesData = null,
+            string workflowLabelsFilename = null, byte[] workflowLabelsData = null);
         Task<GetStatusResponse> GetStatusAsync(Guid id);
         Task<GetOutputsResponse> GetOutputsAsync(Guid id);
         Task<GetMetadataResponse> GetMetadataAsync(Guid id);

@@ -192,8 +192,9 @@ namespace TriggerService
 
             var workflowOptions = await GetBlobFileNameAndData(triggerInfo.WorkflowOptionsUrl);
             var workflowDependencies = await GetBlobFileNameAndData(triggerInfo.WorkflowDependenciesUrl);
+            var workflowLabels = await GetBlobFileNameAndData(triggerInfo.WorkflowLabelsUrl);
 
-            return new(workflowSource, workflowInputs, workflowOptions, workflowDependencies);
+            return new(workflowSource, workflowInputs, workflowOptions, workflowDependencies, workflowLabels);
         }
 
         public async Task UpdateWorkflowStatusesAsync()
@@ -329,7 +330,7 @@ namespace TriggerService
 
             if (string.IsNullOrEmpty(blobName))
             {
-                throw new ArgumentException($"url object submitted ({url}) is not valid URL");
+                throw new ArgumentException($"Invalid URL: {url}");
             }
 
             byte[] data;
