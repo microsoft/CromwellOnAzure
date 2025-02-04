@@ -11,14 +11,16 @@ namespace CromwellApiClient
         public List<ProcessedWorkflowItem> WorkflowInputs { get; private set; }
         public ProcessedWorkflowItem WorkflowOptions { get; private set; }
         public ProcessedWorkflowItem WorkflowDependencies { get; private set; }
+        public ProcessedWorkflowItem WorkflowLabels { get; private set; }
 
         public ProcessedTriggerInfo(ProcessedWorkflowItem workflowSource, List<ProcessedWorkflowItem> workflowInputs,
-            ProcessedWorkflowItem workflowOptions, ProcessedWorkflowItem workflowDependencies)
+            ProcessedWorkflowItem workflowOptions, ProcessedWorkflowItem workflowDependencies, ProcessedWorkflowItem workflowLabels)
         {
             this.WorkflowSource = workflowSource;
             this.WorkflowInputs = workflowInputs;
             this.WorkflowOptions = workflowOptions;
             this.WorkflowDependencies = workflowDependencies;
+            this.WorkflowLabels = workflowLabels;
         }
     }
 
