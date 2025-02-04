@@ -9,7 +9,9 @@ Cromwell on Azure configures all Azure resources needed to run workflows with Cr
  * https://github.com/microsoft/CromwellOnAzure/releases
 
 ### Documentation
-All documentation has been moved to our [wiki](https://github.com/microsoft/CromwellOnAzure/wiki)! 
+All documentation has been moved to our [wiki](https://github.com/microsoft/CromwellOnAzure/wiki)!
+
+
 
 [Getting Started?](https://github.com/microsoft/CromwellOnAzure/wiki/Getting-Started)
 

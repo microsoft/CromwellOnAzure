@@ -63,7 +63,9 @@ namespace CromwellApiClient
             string workflowOptionsFilename = null,
             byte[] workflowOptionsData = null,
             string workflowDependenciesFilename = null,
-            byte[] workflowDependenciesData = null)
+            byte[] workflowDependenciesData = null,
+            string workflowLabelsFilename = null,
+            byte[] workflowLabelsData = null)
         {
             var files = AccumulatePostFiles(
                 workflowSourceFilename,
@@ -73,7 +75,9 @@ namespace CromwellApiClient
                 workflowOptionsFilename,
                 workflowOptionsData,
                 workflowDependenciesFilename,
-                workflowDependenciesData);
+                workflowDependenciesData,
+                workflowLabelsFilename,
+                workflowLabelsData);
             return await PostAsync<PostWorkflowResponse>(string.Empty, files);
         }
 
@@ -85,7 +89,9 @@ namespace CromwellApiClient
             string workflowOptionsFilename = null,
             byte[] workflowOptionsData = null,
             string workflowDependenciesFilename = null,
-            byte[] workflowDependenciesData = null)
+            byte[] workflowDependenciesData = null,
+            string workflowLabelsFilename = null,
+            byte[] workflowLabelsData = null)
         {
             var files = new List<FileToPost> {
                 new(workflowSourceFilename, workflowSourceData, "workflowSource", removeTabs: true)
@@ -105,6 +111,11 @@ namespace CromwellApiClient
             if (workflowDependenciesFilename is not null && workflowDependenciesData is not null)
             {
                 files.Add(new(workflowDependenciesFilename, workflowDependenciesData, "workflowDependencies"));
+            }
+
+            if (workflowLabelsFilename is not null && workflowLabelsData is not null)
+            {
+                files.Add(new FileToPost(workflowLabelsFilename, workflowLabelsData, "workflowLabels"));
             }
 
             return files;
