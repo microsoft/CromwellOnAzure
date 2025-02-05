@@ -246,7 +246,7 @@ namespace CromwellOnAzureDeployer
 
                         if (!await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
                         {
-                            ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployer user to the storage account. If the deployment fails as a result, assign the deploying user the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
+                            ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, assign the deploying user the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
                         }
 
                         var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccountData);
@@ -646,7 +646,7 @@ backend.providers.TES.config {{
 
                                 if (!await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
                                 {
-                                    ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployer user to the storage account. If the deployment fails as a result, the storage account must be precreated and the deploying user must have the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
+                                    ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, the storage account must be precreated and the deploying user must have the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
                                 }
 
                                 await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccountData);
@@ -1440,7 +1440,7 @@ backend.providers.TES.config {{
                         type,
                         storageAccount,
                         GetSubscriptionRoleDefinition(RoleDefinitions.Storage.StorageBlobDataContributor),
-                        $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Storage.StorageBlobDataContributor)}' role for the deployer user to Storage Account resource scope...");
+                        $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Storage.StorageBlobDataContributor)}' role for the deployment identity to Storage Account resource scope...");
 
             return true;
         }
@@ -1901,7 +1901,7 @@ backend.providers.TES.config {{
 
                     properties.AccessPolicies.AddRange(
                     [
-                        new(tenantId.Value, (await GetUserObjectAsync()).Id, permissions),
+                        new(tenantId.Value, string.IsNullOrWhiteSpace(configuration.ServicePrincipalId) ? (await GetUserObjectAsync()).Id : configuration.ServicePrincipalId, permissions),
                         new(tenantId.Value, managedIdentity.Data.PrincipalId.Value.ToString("D"), permissions),
                     ]);
 
