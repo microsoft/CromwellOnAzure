@@ -1419,11 +1419,6 @@ backend.providers.TES.config {{
 
             if (string.IsNullOrWhiteSpace(configuration.ServicePrincipalId))
             {
-                id = configuration.ServicePrincipalId;
-                type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal;
-            }
-            else
-            {
                 var user = await GetUserObjectAsync();
 
                 if (user is null)
@@ -1433,6 +1428,11 @@ backend.providers.TES.config {{
 
                 id = user.Id;
                 type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User;
+            }
+            else
+            {
+                id = configuration.ServicePrincipalId;
+                type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal;
             }
 
             await AssignRoleToResourceAsync(
