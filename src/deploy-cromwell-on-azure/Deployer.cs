@@ -1116,23 +1116,48 @@ backend.providers.TES.config {{
                 defaultRegistries.Add(acr.Data.LoginServer);
             }
 
-            // No build needed if the image is not in the registries this deployer manages or if the same version is being upgraded with no explicit source code provided.
-            if ((((string[])[configuration.AcrId, configuration.GitHubCommit, configuration.SolutionDir]).All(string.IsNullOrWhiteSpace) && bool.Parse(settings["SameVersionUpgrade"]))
-                || !defaultRegistries.Select(s => s + "/").Any(settings["TesImageName"].StartsWith))
-            {
-                if (defaultRegistries.Count > 1 && settings["TesImageName"].StartsWith(defaultRegistries[0]))
-                {
-                    var path = settings["TesImageName"][defaultRegistries[0].Length..];
+            var suppressBuild = false;
 
-                    if (path[path.IndexOf(':')..].Count(c => c == '.') == 3)
+            // No build needed if the image is not in the registries this deployer manages or if the same version is being upgraded with no explicit source code provided.
+            {
+                var sameVersionUpgrade = ((string[])[configuration.AcrId, configuration.GitHubCommit, configuration.SolutionDir]).All(string.IsNullOrWhiteSpace) && bool.Parse(settings["SameVersionUpgrade"]);
+                var tesUpgradable = defaultRegistries.Select(s => s + "/").Any(settings["TesImageName"].StartsWith);
+                var triggerServiceUpgradable = defaultRegistries.Select(s => s + "/").Any(settings["TriggerServiceImageName"].StartsWith);
+                var cromwellUpgradable = defaultRegistries.Skip(1).Prepend("broadinstitute").Select(s => s + "/").Any(settings["CromwellImageName"].StartsWith);
+
+                var canReturnEarly = false;
+
+                if (sameVersionUpgrade || (!tesUpgradable && !triggerServiceUpgradable))
+                {
+                    UpdateImageName("TesImageName");
+                    UpdateImageName("TriggerServiceImageName");
+
+                    void UpdateImageName(string key)
                     {
-                        path = path[..path.LastIndexOf('.')];
+                        if (defaultRegistries.Count > 1 && settings[key].StartsWith(defaultRegistries[0]))
+                        {
+                            var path = settings[key][defaultRegistries[0].Length..];
+                            if (path[path.IndexOf(':')..].Count(c => c == '.') == 3)
+                            {
+                                path = path[..path.LastIndexOf('.')];
+                            }
+                            settings[key] = defaultRegistries[1] + path;
+                        }
                     }
 
-                    settings["TesImageName"] = defaultRegistries[1] + path;
+                    canReturnEarly = true;
                 }
 
-                return; // No ACR build needed
+                if (canReturnEarly && cromwellUpgradable)
+                {
+                    suppressBuild = true;
+                    canReturnEarly = false;
+                }
+
+                if (canReturnEarly)
+                {
+                    return; // No ACR build needed
+                }
             }
 
             if (acr is null)
@@ -1154,8 +1179,10 @@ backend.providers.TES.config {{
                 }
             }
 
-            var build = await Execute($"Building TES and TriggerService images on {acr.Id.Name}...",
-                async () =>
+            if (!suppressBuild)
+            {
+                var build = await Execute($"Building TES and TriggerService images on {acr.Id.Name}...",
+                () => generalRetryPolicy.ExecuteAsync(async () =>
                 {
                     AcrBuild build;
                     {
@@ -1202,9 +1229,24 @@ backend.providers.TES.config {{
                     }
 
                     return build;
-                });
+                }));
 
-            settings["TesImageName"] = $"{acr.Data.LoginServer}/ga4gh/tes:{build.Tag}";
+                settings["TesImageName"] = $"{acr.Data.LoginServer}/cromwellonazure/tes:{build.Tag}";
+                settings["TriggerServiceImageName"] = $"{acr.Data.LoginServer}/cromwellonazure/triggerservice:{build.Tag}";
+            }
+
+            var cromwellImage = settings["CromwellImageName"];
+
+            if (((string[])["broadinstitute", acr.Data.LoginServer]).Select(s => s + "/").Any(cromwellImage.StartsWith))
+            {
+                var targetTag = cromwellImage[cromwellImage.IndexOf('/')..];
+                Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistryImportImageContent import = new(new(cromwellImage));
+                import.TargetTags.Add(targetTag);
+                _ = await Execute(
+                    $"Importing Cromwell into {acr.Id.Name}",
+                    () => generalRetryPolicy.ExecuteAsync(token => acr.ImportImageAsync(WaitUntil.Completed, import, token), cts.Token));
+                settings["CromwellImageName"] = $"{acr.Data.LoginServer}/{targetTag}";
+            }
         }
 
         private static Dictionary<string, string> GetDefaultValues(string[] files)
