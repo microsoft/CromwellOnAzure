@@ -1237,10 +1237,10 @@ backend.providers.TES.config {{
 
             var cromwellImage = settings["CromwellImageName"];
 
-            if (((string[])["broadinstitute", acr.Data.LoginServer]).Select(s => s + "/").Any(cromwellImage.StartsWith))
+            if (cromwellImage.StartsWith("broadinstitute/"))
             {
                 var targetTag = cromwellImage[cromwellImage.IndexOf('/')..];
-                Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistryImportImageContent import = new(new(cromwellImage));
+                Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistryImportImageContent import = new(new("docker.io/" + cromwellImage));
                 import.TargetTags.Add(targetTag);
                 _ = await Execute(
                     $"Importing Cromwell into {acr.Id.Name}",
