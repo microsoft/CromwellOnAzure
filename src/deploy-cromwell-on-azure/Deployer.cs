@@ -1414,16 +1414,30 @@ backend.providers.TES.config {{
 
         private async Task<bool> AssignRoleForDeployerToStorageAccountAsync(StorageAccountResource storageAccount)
         {
-            var user = await GetUserObjectAsync();
+            Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType type;
+            string id;
 
-            if (user is null)
+            if (string.IsNullOrWhiteSpace(configuration.ServicePrincipalId))
             {
-                return false;
+                id = configuration.ServicePrincipalId;
+                type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal;
+            }
+            else
+            {
+                var user = await GetUserObjectAsync();
+
+                if (user is null)
+                {
+                    return false;
+                }
+
+                id = user.Id;
+                type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User;
             }
 
             await AssignRoleToResourceAsync(
-                        [new Guid(user.Id)],
-                        Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User,
+                        [new Guid(id)],
+                        type,
                         storageAccount,
                         GetSubscriptionRoleDefinition(RoleDefinitions.Storage.StorageBlobDataContributor),
                         $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Storage.StorageBlobDataContributor)}' role for the deployer user to Storage Account resource scope...");
