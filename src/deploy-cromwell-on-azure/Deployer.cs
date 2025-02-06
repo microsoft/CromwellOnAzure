@@ -1239,11 +1239,11 @@ backend.providers.TES.config {{
 
             if (cromwellImage.StartsWith("broadinstitute/"))
             {
-                var targetTag = cromwellImage[cromwellImage.IndexOf('/')..];
+                var targetTag = cromwellImage[(cromwellImage.IndexOf('/') + 1)..];
                 Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistryImportImageContent import = new(
                     new(cromwellImage)
                     {
-                        RegistryAddress = "docker.io"
+                        RegistryAddress = "docker.io" // "registry-1.docker.io" // "registry.hub.docker.com"
                     })
                 {
                     Mode = Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistryImportMode.Force
