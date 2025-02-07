@@ -149,30 +149,17 @@ namespace CromwellOnAzureDeployer
             return result;
         }
 
-        private Azure.Storage.StorageSharedKeyCredential GetStorageSharedKeyCredential(StorageAccountData storageAccount)
-        {
-            return storageKeys.GetOrAdd(storageAccount.Id, id =>
-            {
-                var key = armClient
-                    .GetStorageAccountResource(storageAccount.Id)
-                    .GetKeysAsync(cancellationToken: cts.Token)
-                    .FirstOrDefaultAsync(cts.Token)
-                    .AsTask().GetAwaiter().GetResult();
-                return new(storageAccount.Name, key.Value);
-            });
-        }
-
         private BlobClient GetBlobClient(StorageAccountData storageAccount, string containerName, string blobName)
         {
             return new(new BlobUriBuilder(storageAccount.PrimaryEndpoints.BlobUri) { BlobContainerName = containerName, BlobName = blobName }.ToUri(),
-                GetStorageSharedKeyCredential(storageAccount),
+                tokenCredential,
                 new() { Audience = storageAccount.PrimaryEndpoints.BlobUri.AbsoluteUri });
         }
 
         private BlobContainerClient GetBlobContainerClient(StorageAccountData storageAccount, string containerName)
         {
             return new(new BlobUriBuilder(storageAccount.PrimaryEndpoints.BlobUri) { BlobContainerName = containerName }.ToUri(),
-                GetStorageSharedKeyCredential(storageAccount),
+                tokenCredential,
                 new() { Audience = storageAccount.PrimaryEndpoints.BlobUri.AbsoluteUri });
         }
 
@@ -256,6 +243,11 @@ namespace CromwellOnAzureDeployer
                         }
 
                         storageAccountData = (await FetchResourceDataAsync(ct => storageAccount.GetAsync(cancellationToken: ct), cts.Token, account => storageAccount = account)).Data;
+
+                        if (!await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
+                        {
+                            ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, assign the deploying user the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
+                        }
 
                         var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccountData);
 
@@ -651,6 +643,12 @@ backend.providers.TES.config {{
                                 storageAccount = await EnsureResourceDataAsync(storageAccount ?? await CreateStorageAccountAsync(), r => r.HasData, r => ct => r.GetAsync(cancellationToken: ct), cts.Token);
                                 await CreateDefaultStorageContainersAsync(storageAccount);
                                 storageAccountData = storageAccount.Data;
+
+                                if (!await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
+                                {
+                                    ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, the storage account must be precreated and the deploying user must have the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
+                                }
+
                                 await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccountData);
                                 await WritePersonalizedFilesToStorageAccountAsync(storageAccountData);
 
@@ -1414,6 +1412,39 @@ backend.providers.TES.config {{
             }
         }
 
+        private async Task<bool> AssignRoleForDeployerToStorageAccountAsync(StorageAccountResource storageAccount)
+        {
+            Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType type;
+            string id;
+
+            if (string.IsNullOrWhiteSpace(configuration.ServicePrincipalId))
+            {
+                var user = await GetUserObjectAsync();
+
+                if (user is null)
+                {
+                    return false;
+                }
+
+                id = user.Id;
+                type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User;
+            }
+            else
+            {
+                id = configuration.ServicePrincipalId;
+                type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal;
+            }
+
+            await AssignRoleToResourceAsync(
+                        [new Guid(id)],
+                        type,
+                        storageAccount,
+                        GetSubscriptionRoleDefinition(RoleDefinitions.Storage.StorageBlobDataContributor),
+                        $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Storage.StorageBlobDataContributor)}' role for the deployment identity to Storage Account resource scope...");
+
+            return true;
+        }
+
         private Task AssignManagedIdOperatorToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource)
             => AssignRoleToResourceAsync(managedIdentity, resource, GetSubscriptionRoleDefinition(RoleDefinitions.Identity.ManagedIdentityOperator),
                 $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Identity.ManagedIdentityOperator)}' role for the managed id to resource group scope...");
@@ -1481,7 +1512,10 @@ backend.providers.TES.config {{
                         new(Storage.StorageSkuName.StandardLrs),
                         Storage.StorageKind.StorageV2,
                         new(configuration.RegionName))
-                    { EnableHttpsTrafficOnly = true },
+                    {
+                        AllowSharedKeyAccess = false,
+                        EnableHttpsTrafficOnly = true
+                    },
                     cts.Token)).Value);
 
         private async Task<StorageAccountResource> GetExistingStorageAccountAsync(string storageAccountName)
@@ -1867,7 +1901,7 @@ backend.providers.TES.config {{
 
                     properties.AccessPolicies.AddRange(
                     [
-                        new(tenantId.Value, (await GetUserObjectAsync()).Id, permissions),
+                        new(tenantId.Value, string.IsNullOrWhiteSpace(configuration.ServicePrincipalId) ? (await GetUserObjectAsync()).Id : configuration.ServicePrincipalId, permissions),
                         new(tenantId.Value, managedIdentity.Data.PrincipalId.Value.ToString("D"), permissions),
                     ]);
 
