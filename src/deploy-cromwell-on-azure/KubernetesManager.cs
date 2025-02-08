@@ -462,6 +462,7 @@ namespace CromwellOnAzureDeployer
             var martha = GetObjectFromConfig(values, "martha") ?? new Dictionary<string, string>();
             var deployment = GetObjectFromConfig(values, "deployment") ?? new Dictionary<string, string>();
 
+            values.Config["acrId"] = GetValueOrDefault(settings, "AcrId");
             values.Config["cromwellOnAzureVersion"] = GetValueOrDefault(settings, "CromwellOnAzureVersion");
             values.Config["azureServicesAuthConnectionString"] = GetValueOrDefault(settings, "AzureServicesAuthConnectionString");
             values.Config["applicationInsightsAccountName"] = GetValueOrDefault(settings, "ApplicationInsightsAccountName");
@@ -552,6 +553,7 @@ namespace CromwellOnAzureDeployer
 
             return new()
             {
+                ["AcrId"] = GetValueOrDefault(values.Config, "acrId") as string,
                 ["CromwellOnAzureVersion"] = GetValueOrDefault(values.Config, "cromwellOnAzureVersion") as string,
                 ["AzureServicesAuthConnectionString"] = GetValueOrDefault(values.Config, "azureServicesAuthConnectionString") as string,
                 ["ApplicationInsightsAccountName"] = GetValueOrDefault(values.Config, "applicationInsightsAccountName") as string,
