@@ -24,6 +24,9 @@ namespace CromwellOnAzureDeployer
                     // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/networking#network-contributor
                     new($"{nameof(Networking)}.{nameof(Networking.NetworkContributor)}", new(new("4d97b98b-1d4f-4787-a291-c67834d212e7"), "Network Contributor")),
 
+                    // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/storage#storage-blob-data-contributor
+                    new($"{nameof(Storage)}.{nameof(Storage.StorageBlobDataContributor)}", new(new("ba92f5b4-2d11-453d-a403-e96b0029c9fe"), "Storage Blob Data Contributor")),
+
                     // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/storage#storage-blob-data-owner
                     new($"{nameof(Storage)}.{nameof(Storage.StorageBlobDataOwner)}", new(new("b7e6dc6d-f1e8-4753-8033-0f276bb0955b"), "Storage Blob Data Owner")),
 
@@ -63,6 +66,11 @@ namespace CromwellOnAzureDeployer
 
         internal static class Storage
         {
+            /// <summary>
+            /// Read, write, and delete Azure Storage containers and blobs. To learn which actions are required for a given data operation, see [Permissions for calling data operations](https://learn.microsoft.com/rest/api/storageservices/authorize-with-azure-active-directory#permissions-for-calling-data-operations)/>.
+            /// </summary>
+            internal static Guid StorageBlobDataContributor { get; } = _roleDefinitions[$"{nameof(Storage)}.{nameof(StorageBlobDataContributor)}"].Name;
+
             /// <summary>
             /// Provides full access to Azure Storage blob containers and data, including assigning POSIX access control. To learn which actions are required for a given data operation, see [Permissions for calling data operations](https://learn.microsoft.com/rest/api/storageservices/authorize-with-azure-active-directory#permissions-for-calling-data-operations)/>.
             /// </summary>

@@ -101,6 +101,7 @@ namespace CromwellOnAzureDeployer
         public string PrivateTestUbuntuImage { get; set; } = "mcr.microsoft.com/mirror/docker/library/ubuntu:22.04";
         public string PrivatePSQLUbuntuImage { get; set; } = "mcr.microsoft.com/mirror/docker/library/ubuntu:24.04"; // mcr's docker mirror does not host "latest"
         public bool? CreateMissing { get; set; } = null;
+        public string ServicePrincipalId { get; set; }
 
         public static Configuration BuildConfiguration(string[] args)
         {
