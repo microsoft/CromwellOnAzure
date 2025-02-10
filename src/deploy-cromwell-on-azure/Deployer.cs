@@ -132,7 +132,6 @@ namespace CromwellOnAzureDeployer
         private bool isResourceGroupCreated { get; set; }
         private KubernetesManager kubernetesManager { get; set; }
         internal static AzureCloudConfig azureCloudConfig { get; private set; }
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<ResourceIdentifier, Azure.Storage.StorageSharedKeyCredential> storageKeys = [];
         internal static bool IsStorageInPublicCloud { get; private set; }
 
         private static async Task<T> EnsureResourceDataAsync<T>(T resource, Predicate<T> HasData, Func<T, Func<CancellationToken, Task<Response<T>>>> GetAsync, CancellationToken cancellationToken, Action<T> OnAcquisition = null) where T : ArmResource
@@ -336,7 +335,7 @@ namespace CromwellOnAzureDeployer
                         IEnumerable<string> manualPrecommands = null;
                         Func<IKubernetes, Task> asyncTask = null;
 
-                        if (!string.IsNullOrWhiteSpace(configuration.AcrId) && settings.ContainsKey("AcrId"))
+                        if (!string.IsNullOrWhiteSpace(configuration.AcrId) && settings.TryGetValue("AcrId", out var acrId) && !string.IsNullOrEmpty(acrId))
                         {
                             throw new ValidationException("AcrId must not be set if previously configured.", displayExample: false);
                         }
@@ -1108,7 +1107,7 @@ backend.providers.TES.config {{
         {
             ContainerRegistryResource acr = default;
 
-            if (settings.TryGetValue("AcrId", out var acrId))
+            if (settings.TryGetValue("AcrId", out var acrId) && !string.IsNullOrEmpty(acrId))
             {
                 acr = await EnsureResourceDataAsync(armClient.GetContainerRegistryResource(new(acrId)), r => r.HasData, r => r.GetAsync, cts.Token);
             }
@@ -1360,7 +1359,7 @@ backend.providers.TES.config {{
             _ = settings.TryGetValue(key, out var installed);
             _ = defaults.TryGetValue(key, out var @default);
 
-            if (settings.TryGetValue("AcrId", out var acrId))
+            if (settings.TryGetValue("AcrId", out var acrId) && !string.IsNullOrEmpty(acrId))
             {
                 var id = ResourceIdentifier.Parse(acrId);
 
