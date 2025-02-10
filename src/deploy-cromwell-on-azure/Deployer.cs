@@ -155,14 +155,14 @@ namespace CromwellOnAzureDeployer
         {
             return new(new BlobUriBuilder(storageAccount.PrimaryEndpoints.BlobUri) { BlobContainerName = containerName, BlobName = blobName }.ToUri(),
                 tokenCredential,
-                new() { Audience = storageAccount.PrimaryEndpoints.BlobUri.AbsoluteUri });
+                new() { Audience = Azure.Storage.Blobs.Models.BlobAudience.DefaultAudience }); // https://github.com/Azure/azure-cli/issues/28708#issuecomment-2047256166
         }
 
         private BlobContainerClient GetBlobContainerClient(StorageAccountData storageAccount, string containerName)
         {
             return new(new BlobUriBuilder(storageAccount.PrimaryEndpoints.BlobUri) { BlobContainerName = containerName }.ToUri(),
                 tokenCredential,
-                new() { Audience = storageAccount.PrimaryEndpoints.BlobUri.AbsoluteUri });
+                new() { Audience = Azure.Storage.Blobs.Models.BlobAudience.DefaultAudience }); // https://github.com/Azure/azure-cli/issues/28708#issuecomment-2047256166
         }
 
         public async Task<int> DeployAsync()
@@ -246,13 +246,7 @@ namespace CromwellOnAzureDeployer
 
                         storageAccountData = (await FetchResourceDataAsync(ct => storageAccount.GetAsync(cancellationToken: ct), cts.Token, account => storageAccount = account)).Data;
 
-                        if (await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
-                        {
-                            // 10 minutes for propagation https://learn.microsoft.com/azure/role-based-access-control/troubleshooting
-                            await Execute("Waiting 5 minutes for role assignment propagation...",
-                                () => Task.Delay(TimeSpan.FromMinutes(5), cts.Token));
-                        }
-                        else
+                        if (!await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
                         {
                             ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, assign the deploying user the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
                         }
