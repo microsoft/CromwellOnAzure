@@ -245,15 +245,17 @@ namespace CromwellOnAzureDeployer
 
                         storageAccountData = (await FetchResourceDataAsync(ct => storageAccount.GetAsync(cancellationToken: ct), cts.Token, account => storageAccount = account)).Data;
 
-                        if (await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
+                        switch (await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
                         {
-                            // 10 minutes for propagation https://learn.microsoft.com/azure/role-based-access-control/troubleshooting
-                            await Execute("Waiting 5 minutes for role assignment propagation...",
-                                () => Task.Delay(TimeSpan.FromMinutes(5), cts.Token));
-                        }
-                        else
-                        {
-                            ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, assign the deploying user the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
+                            case true:
+                                // 10 minutes for propagation https://learn.microsoft.com/azure/role-based-access-control/troubleshooting
+                                await Execute("Waiting 5 minutes for role assignment propagation...",
+                                    () => Task.Delay(TimeSpan.FromMinutes(5), cts.Token));
+                                break;
+
+                            case null:
+                                ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, assign the deploying user the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
+                                break;
                         }
 
                         var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccountData);
@@ -663,7 +665,7 @@ backend.providers.TES.config {{
                                 await CreateDefaultStorageContainersAsync(storageAccount);
                                 storageAccountData = storageAccount.Data;
 
-                                if (!await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
+                                if (await AssignRoleForDeployerToStorageAccountAsync(storageAccount) is null)
                                 {
                                     ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, the storage account must be precreated and the deploying user must have the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
                                 }
@@ -1612,7 +1614,7 @@ backend.providers.TES.config {{
             }
         }
 
-        private async Task<bool> AssignRoleForDeployerToStorageAccountAsync(StorageAccountResource storageAccount)
+        private async Task<bool?> AssignRoleForDeployerToStorageAccountAsync(StorageAccountResource storageAccount)
         {
             Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType type;
             string id;
@@ -1623,7 +1625,7 @@ backend.providers.TES.config {{
 
                 if (user is null)
                 {
-                    return false;
+                    return null;
                 }
 
                 id = user.Id;
@@ -1635,14 +1637,12 @@ backend.providers.TES.config {{
                 type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal;
             }
 
-            await AssignRoleToResourceAsync(
+            return await AssignRoleToResourceAsync(
                         [new Guid(id)],
                         type,
                         storageAccount,
                         GetSubscriptionRoleDefinition(RoleDefinitions.Storage.StorageBlobDataContributor),
                         $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Storage.StorageBlobDataContributor)}' role for the deployment identity to Storage Account resource scope...");
-
-            return true;
         }
 
         private Task AssignManagedIdAcrPullToResourceAsync(UserAssignedIdentityResource managedIdentity, ContainerRegistryResource resource)
@@ -1860,7 +1860,7 @@ backend.providers.TES.config {{
         private Task AssignRoleToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
             => AssignRoleToResourceAsync([managedIdentity.Data.PrincipalId.Value], Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal, resource, roleDefinitionId, message);
 
-        private async Task AssignRoleToResourceAsync(IEnumerable<Guid> principalIds, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType principalType, ArmResource resource, ResourceIdentifier roleDefinitionId, string message, Func<Exception, Exception> transformException = default)
+        private async Task<bool> AssignRoleToResourceAsync(IEnumerable<Guid> principalIds, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType principalType, ArmResource resource, ResourceIdentifier roleDefinitionId, string message, Func<Exception, Exception> transformException = default)
         {
             foreach (var principalId in principalIds)
             {
@@ -1874,7 +1874,7 @@ backend.providers.TES.config {{
                     continue;
                 }
 
-                await Execute(message, async () =>
+                return await Execute(message, async () =>
                 {
                     try
                     {
@@ -1886,6 +1886,8 @@ backend.providers.TES.config {{
                                 },
                                 token),
                             cts.Token);
+
+                        return true;
                     }
                     catch (Exception ex)
                     {
@@ -1897,7 +1899,7 @@ backend.providers.TES.config {{
 
                             if (e is null)
                             {
-                                return;
+                                return false;
                             }
                         }
                         else
@@ -1910,6 +1912,8 @@ backend.providers.TES.config {{
                     }
                 });
             }
+
+            return false;
 
             static Func<CancellationToken, Task<Response<RoleAssignmentResource>>> CallGetAsync(RoleAssignmentResource resource)
             {
