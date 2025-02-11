@@ -1862,6 +1862,8 @@ backend.providers.TES.config {{
 
         private async Task<bool> AssignRoleToResourceAsync(IEnumerable<Guid> principalIds, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType principalType, ArmResource resource, ResourceIdentifier roleDefinitionId, string message, Func<Exception, Exception> transformException = default)
         {
+            var changed = false;
+
             foreach (var principalId in principalIds)
             {
                 if (await resource.GetRoleAssignments().GetAllAsync(filter: "atScope()", cancellationToken: cts.Token)
@@ -1874,7 +1876,7 @@ backend.providers.TES.config {{
                     continue;
                 }
 
-                return await Execute(message, async () =>
+                changed |= await Execute(message, async () =>
                 {
                     try
                     {
@@ -1913,7 +1915,7 @@ backend.providers.TES.config {{
                 });
             }
 
-            return false;
+            return changed;
 
             static Func<CancellationToken, Task<Response<RoleAssignmentResource>>> CallGetAsync(RoleAssignmentResource resource)
             {
