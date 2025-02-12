@@ -1719,7 +1719,7 @@ backend.providers.TES.config {{
                         Storage.StorageKind.StorageV2,
                         new(configuration.RegionName))
                     {
-                        AllowSharedKeyAccess = false,
+                        AllowSharedKeyAccess = true, // Cromwell requires shared key access
                         EnableHttpsTrafficOnly = true
                     },
                     cts.Token)).Value);
