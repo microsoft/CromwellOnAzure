@@ -499,6 +499,7 @@ backend.providers.TES.config {{
 
                         await kubernetesManager.UpgradeValuesYamlAsync(storageAccountData, settings, containersToMount, installedVersion);
                         kubernetesClient = await PerformHelmDeploymentAsync(aksCluster, manualPrecommands, asyncTask);
+                        await kubernetesManager.ProcessClusterUpdatesAsync(kubernetesClient, installedVersion);
 
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccountData);
                     }

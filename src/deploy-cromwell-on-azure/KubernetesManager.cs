@@ -200,7 +200,6 @@ namespace CromwellOnAzureDeployer
 
             MergeContainers(containersToMount, values);
 
-            // TODO: Does this make sense? If so, do we need this in TES?
             if (azureCloudConfig.ArmEnvironment != ArmEnvironment.AzurePublicCloud)
             {
                 values.ExternalSasContainers = null;
@@ -266,6 +265,20 @@ namespace CromwellOnAzureDeployer
                 if (values.InternalContainersKeyVaultAuth?.Any(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName) ?? false)
                 {
                     values.InternalContainersKeyVaultAuth.Remove(values.InternalContainersMIAuth.First(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName));
+                }
+            }
+        }
+
+        public async Task ProcessClusterUpdatesAsync(IKubernetes kubernetes, Version previousVersion)
+        {
+            if (Deployer.IsStorageInPublicCloud && (previousVersion > new Version(5, 5, 0) && previousVersion < new Version(5, 5, 3)))
+            {
+                foreach (var volume in (await kubernetes.CoreV1.ListPersistentVolumeWithHttpMessagesAsync(cancellationToken: cancellationToken)).Body)
+                {
+                    if ("coa-blob-cromwell-executions".Equals(volume.Spec.StorageClassName))
+                    {
+                        _ = await kubernetes.CoreV1.DeletePersistentVolumeAsync(volume.Name(), orphanDependents: true, cancellationToken: cancellationToken);
+                    }
                 }
             }
         }
