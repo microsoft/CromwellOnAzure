@@ -1244,11 +1244,13 @@ backend.providers.TES.config {{
 
             if (cromwellImage.StartsWith("broadinstitute/"))
             {
+                var dockerhubCredientials = configuration.DockerHubUserInfo?.Split(':', 2, StringSplitOptions.None);
                 var targetTag = cromwellImage[(cromwellImage.IndexOf('/') + 1)..];
                 Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistryImportImageContent import = new(
                     new(cromwellImage)
                     {
-                        RegistryAddress = "docker.io" // "registry-1.docker.io" // "registry.hub.docker.com"
+                        RegistryAddress = "docker.io", // "registry-1.docker.io" // "registry.hub.docker.com"
+                        Credentials = dockerhubCredientials is null ? default : new(dockerhubCredientials[1]) { Username = dockerhubCredientials[0] }
                     })
                 {
                     Mode = Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistryImportMode.Force

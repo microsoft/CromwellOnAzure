@@ -66,6 +66,7 @@ namespace CromwellOnAzureDeployer
         public bool DeleteResourceGroupOnFailure { get; set; }
         public string CromwellVersion { get; set; }
         public string CromwellImageName { get; set; }
+        public string DockerHubUserInfo { get; set; }
         public string AcrId { get; set; }
         public string GitHubCommit { get; set; }
         public string SolutionDir { get; set; }
