@@ -17,7 +17,6 @@ config:
     contentMD5: "False"
   batchScheduling:
     usePreemptibleVmsOnly: RUNTIME_PARAMETER
-    useLegacyAutopools: "False"
     poolRotationForcedDays: "7"
     taskMaxWallClockTimeDays: "7"
     prefix: RUNTIME_PARAMETER

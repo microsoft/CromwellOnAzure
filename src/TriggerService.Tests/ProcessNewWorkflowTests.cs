@@ -16,6 +16,7 @@ using Moq;
 using Newtonsoft.Json;
 using Tes.Models;
 using Tes.Repository;
+using Tes.Repository.Models;
 
 namespace TriggerService.Tests
 {
