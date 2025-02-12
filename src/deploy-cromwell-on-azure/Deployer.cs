@@ -132,7 +132,6 @@ namespace CromwellOnAzureDeployer
         private bool isResourceGroupCreated { get; set; }
         private KubernetesManager kubernetesManager { get; set; }
         internal static AzureCloudConfig azureCloudConfig { get; private set; }
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<ResourceIdentifier, Azure.Storage.StorageSharedKeyCredential> storageKeys = [];
         internal static bool IsStorageInPublicCloud { get; private set; }
 
         private static async Task<T> EnsureResourceDataAsync<T>(T resource, Predicate<T> HasData, Func<T, Func<CancellationToken, Task<Response<T>>>> GetAsync, CancellationToken cancellationToken, Action<T> OnAcquisition = null) where T : ArmResource
@@ -155,14 +154,14 @@ namespace CromwellOnAzureDeployer
         {
             return new(new BlobUriBuilder(storageAccount.PrimaryEndpoints.BlobUri) { BlobContainerName = containerName, BlobName = blobName }.ToUri(),
                 tokenCredential,
-                new() { Audience = storageAccount.PrimaryEndpoints.BlobUri.AbsoluteUri });
+                new() { Audience = Azure.Storage.Blobs.Models.BlobAudience.DefaultAudience }); // https://github.com/Azure/azure-cli/issues/28708#issuecomment-2047256166
         }
 
         private BlobContainerClient GetBlobContainerClient(StorageAccountData storageAccount, string containerName)
         {
             return new(new BlobUriBuilder(storageAccount.PrimaryEndpoints.BlobUri) { BlobContainerName = containerName }.ToUri(),
                 tokenCredential,
-                new() { Audience = storageAccount.PrimaryEndpoints.BlobUri.AbsoluteUri });
+                new() { Audience = Azure.Storage.Blobs.Models.BlobAudience.DefaultAudience }); // https://github.com/Azure/azure-cli/issues/28708#issuecomment-2047256166
         }
 
         public async Task<int> DeployAsync()
@@ -246,9 +245,17 @@ namespace CromwellOnAzureDeployer
 
                         storageAccountData = (await FetchResourceDataAsync(ct => storageAccount.GetAsync(cancellationToken: ct), cts.Token, account => storageAccount = account)).Data;
 
-                        if (!await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
+                        switch (await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
                         {
-                            ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, assign the deploying user the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
+                            case true:
+                                // 10 minutes for propagation https://learn.microsoft.com/azure/role-based-access-control/troubleshooting
+                                await Execute("Waiting 5 minutes for role assignment propagation...",
+                                    () => Task.Delay(TimeSpan.FromMinutes(5), cts.Token));
+                                break;
+
+                            case null:
+                                ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, assign the deploying user the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
+                                break;
                         }
 
                         var aksValues = await kubernetesManager.GetAKSSettingsAsync(storageAccountData);
@@ -330,7 +337,7 @@ namespace CromwellOnAzureDeployer
                         IEnumerable<string> manualPrecommands = null;
                         Func<IKubernetes, Task> asyncTask = null;
 
-                        if (!string.IsNullOrWhiteSpace(configuration.AcrId) && settings.ContainsKey("AcrId"))
+                        if (!string.IsNullOrWhiteSpace(configuration.AcrId) && settings.TryGetValue("AcrId", out var acrId) && !string.IsNullOrEmpty(acrId))
                         {
                             throw new ValidationException("AcrId must not be set if previously configured.", displayExample: false);
                         }
@@ -658,7 +665,7 @@ backend.providers.TES.config {{
                                 await CreateDefaultStorageContainersAsync(storageAccount);
                                 storageAccountData = storageAccount.Data;
 
-                                if (!await AssignRoleForDeployerToStorageAccountAsync(storageAccount))
+                                if (await AssignRoleForDeployerToStorageAccountAsync(storageAccount) is null)
                                 {
                                     ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, the storage account must be precreated and the deploying user must have the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
                                 }
@@ -1102,7 +1109,7 @@ backend.providers.TES.config {{
         {
             ContainerRegistryResource acr = default;
 
-            if (settings.TryGetValue("AcrId", out var acrId))
+            if (settings.TryGetValue("AcrId", out var acrId) && !string.IsNullOrEmpty(acrId))
             {
                 acr = await EnsureResourceDataAsync(armClient.GetContainerRegistryResource(new(acrId)), r => r.HasData, r => r.GetAsync, cts.Token);
             }
@@ -1237,11 +1244,13 @@ backend.providers.TES.config {{
 
             if (cromwellImage.StartsWith("broadinstitute/"))
             {
+                var dockerhubCredientials = configuration.DockerHubUserInfo?.Split(':', 2, StringSplitOptions.None);
                 var targetTag = cromwellImage[(cromwellImage.IndexOf('/') + 1)..];
                 Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistryImportImageContent import = new(
                     new(cromwellImage)
                     {
-                        RegistryAddress = "docker.io" // "registry-1.docker.io" // "registry.hub.docker.com"
+                        RegistryAddress = "docker.io", // "registry-1.docker.io" // "registry.hub.docker.com"
+                        Credentials = dockerhubCredientials is null ? default : new(dockerhubCredientials[1]) { Username = dockerhubCredientials[0] }
                     })
                 {
                     Mode = Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistryImportMode.Force
@@ -1354,7 +1363,7 @@ backend.providers.TES.config {{
             _ = settings.TryGetValue(key, out var installed);
             _ = defaults.TryGetValue(key, out var @default);
 
-            if (settings.TryGetValue("AcrId", out var acrId))
+            if (settings.TryGetValue("AcrId", out var acrId) && !string.IsNullOrEmpty(acrId))
             {
                 var id = ResourceIdentifier.Parse(acrId);
 
@@ -1607,7 +1616,7 @@ backend.providers.TES.config {{
             }
         }
 
-        private async Task<bool> AssignRoleForDeployerToStorageAccountAsync(StorageAccountResource storageAccount)
+        private async Task<bool?> AssignRoleForDeployerToStorageAccountAsync(StorageAccountResource storageAccount)
         {
             Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType type;
             string id;
@@ -1618,7 +1627,7 @@ backend.providers.TES.config {{
 
                 if (user is null)
                 {
-                    return false;
+                    return null;
                 }
 
                 id = user.Id;
@@ -1630,14 +1639,12 @@ backend.providers.TES.config {{
                 type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal;
             }
 
-            await AssignRoleToResourceAsync(
+            return await AssignRoleToResourceAsync(
                         [new Guid(id)],
                         type,
                         storageAccount,
                         GetSubscriptionRoleDefinition(RoleDefinitions.Storage.StorageBlobDataContributor),
                         $"Assigning '{RoleDefinitions.GetDisplayName(RoleDefinitions.Storage.StorageBlobDataContributor)}' role for the deployment identity to Storage Account resource scope...");
-
-            return true;
         }
 
         private Task AssignManagedIdAcrPullToResourceAsync(UserAssignedIdentityResource managedIdentity, ContainerRegistryResource resource)
@@ -1712,7 +1719,7 @@ backend.providers.TES.config {{
                         Storage.StorageKind.StorageV2,
                         new(configuration.RegionName))
                     {
-                        AllowSharedKeyAccess = false,
+                        AllowSharedKeyAccess = true, // Cromwell requires shared key access
                         EnableHttpsTrafficOnly = true
                     },
                     cts.Token)).Value);
@@ -1855,8 +1862,10 @@ backend.providers.TES.config {{
         private Task AssignRoleToResourceAsync(UserAssignedIdentityResource managedIdentity, ArmResource resource, ResourceIdentifier roleDefinitionId, string message)
             => AssignRoleToResourceAsync([managedIdentity.Data.PrincipalId.Value], Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal, resource, roleDefinitionId, message);
 
-        private async Task AssignRoleToResourceAsync(IEnumerable<Guid> principalIds, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType principalType, ArmResource resource, ResourceIdentifier roleDefinitionId, string message, Func<Exception, Exception> transformException = default)
+        private async Task<bool> AssignRoleToResourceAsync(IEnumerable<Guid> principalIds, Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType principalType, ArmResource resource, ResourceIdentifier roleDefinitionId, string message, Func<Exception, Exception> transformException = default)
         {
+            var changed = false;
+
             foreach (var principalId in principalIds)
             {
                 if (await resource.GetRoleAssignments().GetAllAsync(filter: "atScope()", cancellationToken: cts.Token)
@@ -1869,7 +1878,7 @@ backend.providers.TES.config {{
                     continue;
                 }
 
-                await Execute(message, async () =>
+                changed |= await Execute(message, async () =>
                 {
                     try
                     {
@@ -1881,6 +1890,8 @@ backend.providers.TES.config {{
                                 },
                                 token),
                             cts.Token);
+
+                        return true;
                     }
                     catch (Exception ex)
                     {
@@ -1892,7 +1903,7 @@ backend.providers.TES.config {{
 
                             if (e is null)
                             {
-                                return;
+                                return false;
                             }
                         }
                         else
@@ -1905,6 +1916,8 @@ backend.providers.TES.config {{
                     }
                 });
             }
+
+            return changed;
 
             static Func<CancellationToken, Task<Response<RoleAssignmentResource>>> CallGetAsync(RoleAssignmentResource resource)
             {
