@@ -8,7 +8,7 @@ RUN apt update && apt full-upgrade -y && apt autoremove -y
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS publish
 WORKDIR /src
 COPY . .
-RUN dotnet publish "TriggerService/TriggerService.csproj" -c Release -o /app/publish
+RUN dotnet publish "TriggerService/TriggerService.csproj" -c Release -r linux-x64 /p:DebugType=none -o /app/publish
 
 FROM base AS final
 WORKDIR /app
