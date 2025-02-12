@@ -24,8 +24,14 @@ namespace CromwellOnAzureDeployer
                     // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/networking#network-contributor
                     new($"{nameof(Networking)}.{nameof(Networking.NetworkContributor)}", new(new("4d97b98b-1d4f-4787-a291-c67834d212e7"), "Network Contributor")),
 
+                    // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/storage#storage-blob-data-contributor
+                    new($"{nameof(Storage)}.{nameof(Storage.StorageBlobDataContributor)}", new(new("ba92f5b4-2d11-453d-a403-e96b0029c9fe"), "Storage Blob Data Contributor")),
+
                     // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/storage#storage-blob-data-owner
                     new($"{nameof(Storage)}.{nameof(Storage.StorageBlobDataOwner)}", new(new("b7e6dc6d-f1e8-4753-8033-0f276bb0955b"), "Storage Blob Data Owner")),
+
+                    // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/containers#acrpull
+                    new($"{nameof(Containers)}.{nameof(Containers.AcrPull)}", new(new("7f951dda-4ed3-4680-a7ca-43fe172d538d"), "Pull artifacts from a container registry")),
 
                     // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/containers#azure-kubernetes-service-rbac-cluster-admin
                     new($"{nameof(Containers)}.{nameof(Containers.RbacClusterAdmin)}", new(new("b1ff04bb-8a4e-4dc4-8eb5-8693973ce19b"), "Azure Kubernetes Service RBAC Cluster Admin")),
@@ -61,6 +67,11 @@ namespace CromwellOnAzureDeployer
         internal static class Storage
         {
             /// <summary>
+            /// Read, write, and delete Azure Storage containers and blobs. To learn which actions are required for a given data operation, see [Permissions for calling data operations](https://learn.microsoft.com/rest/api/storageservices/authorize-with-azure-active-directory#permissions-for-calling-data-operations)/>.
+            /// </summary>
+            internal static Guid StorageBlobDataContributor { get; } = _roleDefinitions[$"{nameof(Storage)}.{nameof(StorageBlobDataContributor)}"].Name;
+
+            /// <summary>
             /// Provides full access to Azure Storage blob containers and data, including assigning POSIX access control. To learn which actions are required for a given data operation, see [Permissions for calling data operations](https://learn.microsoft.com/rest/api/storageservices/authorize-with-azure-active-directory#permissions-for-calling-data-operations)/>.
             /// </summary>
             internal static Guid StorageBlobDataOwner { get; } = _roleDefinitions[$"{nameof(Storage)}.{nameof(StorageBlobDataOwner)}"].Name;
@@ -68,6 +79,11 @@ namespace CromwellOnAzureDeployer
 
         internal static class Containers
         {
+            /// <summary>
+            /// Pull artifacts from a container registry.
+            /// </summary>
+            internal static Guid AcrPull { get; } = _roleDefinitions[$"{nameof(Containers)}.{nameof(AcrPull)}"].Name;
+
             /// <summary>
             /// Azure Kubernetes Fleet Manager RBAC Cluster Admin.
             /// </summary>
