@@ -17,8 +17,6 @@ spec:
       labels:
         io.kompose.service: cromwell
         azure.workload.identity/use: "true"
-      annotations:
-        container.apparmor.security.beta.kubernetes.io/cromwell: runtime/default
     spec:
       serviceAccountName: {{ .Values.identity.name }}-sa
       securityContext:
@@ -26,6 +24,8 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
         supplementalGroups: [1000]
+        appArmorProfile:
+          type: RuntimeDefault
       containers:
         - args:
             -  java -Djava.io.tmpdir=/cromwell-tmp/ -Dconfig.file=/configuration/cromwell-application.conf -jar /app/cromwell.jar server
