@@ -15,8 +15,6 @@ spec:
       labels:
         io.kompose.service: triggerservice
         azure.workload.identity/use: "true"
-      annotations:
-        container.apparmor.security.beta.kubernetes.io/triggerservice: runtime/default
     spec:
       serviceAccountName: {{ .Values.identity.name }}-sa
       securityContext:
@@ -24,6 +22,8 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
         supplementalGroups: [1000]
+        appArmorProfile:
+          type: RuntimeDefault
       containers:
         - env:
             - name: TesPostgreSql__ServerName
