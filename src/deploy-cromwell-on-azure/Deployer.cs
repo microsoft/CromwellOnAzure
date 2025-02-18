@@ -1205,7 +1205,7 @@ backend.providers.TES.config {{
 
                             if (string.IsNullOrWhiteSpace(configuration.SolutionDir))
                             {
-                                tar = AcrBuild.GetGitHubArchive(BuildType.CoA, string.IsNullOrWhiteSpace(configuration.GitHubCommit) ? new Version(targetVersion).ToString(3) : configuration.GitHubCommit);
+                                tar = AcrBuild.GetGitHubArchive(BuildType.CoA, string.IsNullOrWhiteSpace(configuration.GitHubCommit) ? new Version(targetVersion).ToString(3) : configuration.GitHubCommit, GitHubArchive.GetAccessTokenProvider());
                                 tarDisposable = tar as IAsyncDisposable;
                             }
                             else
