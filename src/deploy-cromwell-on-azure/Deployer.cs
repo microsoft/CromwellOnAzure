@@ -265,6 +265,11 @@ namespace CromwellOnAzureDeployer
                             throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.", displayExample: false);
                         }
 
+                        if (aksValues.TryGetValue("AksCoANamespace", out var aksCoANamespace))
+                        {
+                            configuration.AksCoANamespace = aksCoANamespace;
+                        }
+
                         if (!aksValues.TryGetValue("BatchAccountName", out var batchAccountName))
                         {
                             throw new ValidationException($"Could not retrieve the Batch account name", displayExample: false);
@@ -2719,6 +2724,8 @@ backend.providers.TES.config {{
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
             ThrowIfProvidedForUpdate(configuration.AadGroupIds, nameof(configuration.AadGroupIds));
+            // This must match default in Configuration.cs
+            ThrowIfProvidedForUpdate("coa".Equals(configuration.AksCoANamespace, StringComparison.Ordinal) ? default : configuration.AksCoANamespace, nameof(configuration.AksCoANamespace));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
 
             if (!configuration.ManualHelmDeployment)

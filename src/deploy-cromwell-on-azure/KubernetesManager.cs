@@ -280,7 +280,7 @@ namespace CromwellOnAzureDeployer
 
                 foreach (var volume in (await kubernetes.CoreV1.ListPersistentVolumeWithHttpMessagesAsync(cancellationToken: cancellationToken)).Body)
                 {
-                    if ("coa-blob-cromwell-executions".Equals(volume.Spec.StorageClassName))
+                    if ($"{configuration.AksCoANamespace}-blob-cromwell-executions".Equals(volume.Spec.StorageClassName))
                     {
                         _ = await kubernetes.CoreV1.DeletePersistentVolumeAsync(volume.Name(), orphanDependents: true, cancellationToken: cancellationToken);
                         restartCluster = true; // Needed because new pod exists but the old volume incorrectly persists. Entire cluster reset is more effective at getting back to a good configuration.
