@@ -6,9 +6,9 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using TriggerService;
 
 [assembly: InternalsVisibleTo("TriggerService.Tests")]
 namespace CromwellApiClient
@@ -26,46 +26,50 @@ namespace CromwellApiClient
 
             Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
 
-            if (string.IsNullOrWhiteSpace(cromwellApiClientOptions.Value.BaseUrl))
-            {
-                throw new ArgumentException(null, nameof(cromwellApiClientOptions.Value.BaseUrl));
-            }
-
             url = $"{cromwellApiClientOptions.Value.BaseUrl.TrimEnd('/')}{basePath}";
         }
 
+        /// <inheritdoc/>
         public string GetUrl()
             => url;
 
-        public async Task<GetLogsResponse> GetLogsAsync(Guid id)
-            => await GetAsync<GetLogsResponse>($"/{id}/logs");
+        /// <inheritdoc/>
+        public async Task<GetLogsResponse> GetLogsAsync(Guid id, CancellationToken cancellationToken)
+            => await GetAsync<GetLogsResponse>($"/{id}/logs", cancellationToken);
 
-        public async Task<GetOutputsResponse> GetOutputsAsync(Guid id)
-            => new() { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json") };
+        /// <inheritdoc/>
+        public async Task<GetOutputsResponse> GetOutputsAsync(Guid id, CancellationToken cancellationToken)
+            => new() { Id = id, Json = await GetAsyncWithMediaType($"/{id}/outputs", "application/json", cancellationToken) };
 
-        public async Task<GetMetadataResponse> GetMetadataAsync(Guid id)
-            => new() { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json") };
+        /// <inheritdoc/>
+        public async Task<GetMetadataResponse> GetMetadataAsync(Guid id, CancellationToken cancellationToken)
+            => new() { Id = id, Json = await GetAsyncWithMediaType($"/{id}/metadata?expandSubWorkflows=true", "application/json", cancellationToken) };
 
-        public async Task<GetStatusResponse> GetStatusAsync(Guid id)
-            => await GetAsync<GetStatusResponse>($"/{id}/status");
+        /// <inheritdoc/>
+        /// <inheritdoc/>
+        public async Task<GetStatusResponse> GetStatusAsync(Guid id, CancellationToken cancellationToken)
+            => await GetAsync<GetStatusResponse>($"/{id}/status", cancellationToken);
 
-        public async Task<GetTimingResponse> GetTimingAsync(Guid id)
-            => new() { Id = id, Html = await GetAsyncWithMediaType($"/{id}/timing", "text/html") };
+        /// <inheritdoc/>
+        public async Task<GetTimingResponse> GetTimingAsync(Guid id, CancellationToken cancellationToken)
+            => new() { Id = id, Html = await GetAsyncWithMediaType($"/{id}/timing", "text/html", cancellationToken) };
 
-        public async Task<PostAbortResponse> PostAbortAsync(Guid id)
-            => await PostAsync<PostAbortResponse>($"/{id}/abort", id);
+        /// <inheritdoc/>
+        public async Task<PostAbortResponse> PostAbortAsync(Guid id, CancellationToken cancellationToken)
+            => await PostAsync<PostAbortResponse>($"/{id}/abort", id, cancellationToken);
 
+        /// <inheritdoc/>
         public async Task<PostWorkflowResponse> PostWorkflowAsync(
             string workflowSourceFilename,
             byte[] workflowSourceData,
             List<string> workflowInputsFilename,
             List<byte[]> workflowInputsData,
+            CancellationToken cancellationToken,
             string workflowOptionsFilename = null,
             byte[] workflowOptionsData = null,
             string workflowDependenciesFilename = null,
             byte[] workflowDependenciesData = null,
-            string workflowLabelsFilename = null,
-            byte[] workflowLabelsData = null)
+            string workflowLabelsFilename = null, byte[] workflowLabelsData = null)
         {
             var files = AccumulatePostFiles(
                 workflowSourceFilename,
@@ -78,7 +82,7 @@ namespace CromwellApiClient
                 workflowDependenciesData,
                 workflowLabelsFilename,
                 workflowLabelsData);
-            return await PostAsync<PostWorkflowResponse>(string.Empty, files);
+            return await PostAsync<PostWorkflowResponse>(string.Empty, files, cancellationToken);
         }
 
         internal static List<FileToPost> AccumulatePostFiles(
@@ -121,13 +125,14 @@ namespace CromwellApiClient
             return files;
         }
 
-        public async Task<PostQueryResponse> PostQueryAsync(string queryJson)
-            => await PostAsync<PostQueryResponse>("/query", queryJson);
+        /// <inheritdoc/>
+        public async Task<PostQueryResponse> PostQueryAsync(string queryJson, CancellationToken cancellationToken)
+            => await PostAsync<PostQueryResponse>("/query", queryJson, cancellationToken);
 
         private string GetApiUrl(string path)
             => $"{url}{path}";
 
-        private async Task<T> GetAsync<T>(string path)
+        private async Task<T> GetAsync<T>(string path, CancellationToken cancellationToken)
         {
             HttpResponseMessage response = null;
             var url = string.Empty;
@@ -135,20 +140,13 @@ namespace CromwellApiClient
             try
             {
                 url = GetApiUrl(path);
-                response = await httpClient.GetAsync(url);
+                response = await httpClient.GetAsync(url, cancellationToken);
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsAsync<T>();
+                return await response.Content.ReadAsAsync<T>(cancellationToken);
             }
             catch (HttpRequestException httpRequestException)
             {
-                var messageBuilder = new StringBuilder();
-                messageBuilder.AppendLine($"URL: {url}");
-                messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
-                messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
-
-                await AppendResponseBodyAsync(response, messageBuilder);
-
-                throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
+                throw await WrapHttpRequestExceptionAsync(httpRequestException, url, response, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -156,7 +154,7 @@ namespace CromwellApiClient
             }
         }
 
-        private async Task<string> GetAsyncWithMediaType(string path, string mediaType)
+        private async Task<string> GetAsyncWithMediaType(string path, string mediaType, CancellationToken cancellationToken)
         {
             HttpResponseMessage response = null;
             var url = string.Empty;
@@ -172,20 +170,13 @@ namespace CromwellApiClient
                 };
 
                 request.Headers.Accept.Add(new(mediaType));
-                response = await httpClient.SendAsync(request);
+                response = await httpClient.SendAsync(request, cancellationToken);
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsStringAsync();
+                return await response.Content.ReadAsStringAsync(cancellationToken);
             }
             catch (HttpRequestException httpRequestException)
             {
-                var messageBuilder = new StringBuilder();
-                messageBuilder.AppendLine($"URL: {url}");
-                messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
-                messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
-
-                await AppendResponseBodyAsync(response, messageBuilder);
-
-                throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
+                throw await WrapHttpRequestExceptionAsync(httpRequestException, url, response, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -193,7 +184,7 @@ namespace CromwellApiClient
             }
         }
 
-        private async Task<T> PostAsync<T>(string path, Guid id)
+        private async Task<T> PostAsync<T>(string path, Guid id, CancellationToken cancellationToken)
         {
             HttpResponseMessage response = null;
             var url = string.Empty;
@@ -201,21 +192,14 @@ namespace CromwellApiClient
             try
             {
                 url = GetApiUrl(path);
-                var content = new FormUrlEncodedContent(new KeyValuePair<string, string>[] { new("id", id.ToString()) });
-                response = await httpClient.PostAsync(url, content);
+                var content = new FormUrlEncodedContent([new("id", id.ToString())]);
+                response = await httpClient.PostAsync(url, content, cancellationToken);
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsAsync<T>();
+                return await response.Content.ReadAsAsync<T>(cancellationToken);
             }
             catch (HttpRequestException httpRequestException)
             {
-                var messageBuilder = new StringBuilder();
-                messageBuilder.AppendLine($"URL: {url}");
-                messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
-                messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
-
-                await AppendResponseBodyAsync(response, messageBuilder);
-
-                throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
+                throw await WrapHttpRequestExceptionAsync(httpRequestException, url, response, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -223,7 +207,7 @@ namespace CromwellApiClient
             }
         }
 
-        private async Task<T> PostAsync<T>(string path, string body)
+        private async Task<T> PostAsync<T>(string path, string body, CancellationToken cancellationToken)
         {
             HttpResponseMessage response = null;
             var url = string.Empty;
@@ -231,20 +215,13 @@ namespace CromwellApiClient
             try
             {
                 url = GetApiUrl(path);
-                response = await httpClient.PostAsync(url, new StringContent(body, Encoding.UTF8, "application/json"));
+                response = await httpClient.PostAsync(url, new StringContent(body, Encoding.UTF8, "application/json"), cancellationToken);
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsAsync<T>();
+                return await response.Content.ReadAsAsync<T>(cancellationToken);
             }
             catch (HttpRequestException httpRequestException)
             {
-                var messageBuilder = new StringBuilder();
-                messageBuilder.AppendLine($"URL: {url}");
-                messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
-                messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
-
-                await AppendResponseBodyAsync(response, messageBuilder);
-
-                throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
+                throw await WrapHttpRequestExceptionAsync(httpRequestException, url, response, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -252,7 +229,7 @@ namespace CromwellApiClient
             }
         }
 
-        private async Task<T> PostAsync<T>(string path, IEnumerable<FileToPost> files)
+        private async Task<T> PostAsync<T>(string path, IEnumerable<FileToPost> files, CancellationToken cancellationToken)
         {
             HttpResponseMessage response = null;
             var url = string.Empty;
@@ -268,20 +245,13 @@ namespace CromwellApiClient
                     content.Add(contentPart, file.ParameterName, file.Filename);
                 }
 
-                response = await httpClient.PostAsync(url, content);
+                response = await httpClient.PostAsync(url, content, cancellationToken);
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsAsync<T>();
+                return await response.Content.ReadAsAsync<T>(cancellationToken);
             }
             catch (HttpRequestException httpRequestException)
             {
-                var messageBuilder = new StringBuilder();
-                messageBuilder.AppendLine($"URL: {url}");
-                messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
-                messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
-
-                await AppendResponseBodyAsync(response, messageBuilder);
-
-                throw new CromwellApiException(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
+                throw await WrapHttpRequestExceptionAsync(httpRequestException, url, response, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -289,12 +259,24 @@ namespace CromwellApiClient
             }
         }
 
-        private static async Task AppendResponseBodyAsync(HttpResponseMessage response, StringBuilder messageBuilder)
+        private static async ValueTask<CromwellApiException> WrapHttpRequestExceptionAsync(HttpRequestException httpRequestException, string url, HttpResponseMessage response, CancellationToken cancellationToken)
+        {
+            var messageBuilder = new StringBuilder();
+            messageBuilder.AppendLine($"URL: {url}");
+            messageBuilder.AppendLine($"StatusCode: {response?.StatusCode}");
+            messageBuilder.AppendLine($"Exception message: {httpRequestException.Message}");
+
+            await AppendResponseBodyAsync(response, messageBuilder, cancellationToken);
+
+            return new (messageBuilder.ToString(), httpRequestException, response?.StatusCode);
+        }
+
+        private static async Task AppendResponseBodyAsync(HttpResponseMessage response, StringBuilder messageBuilder, CancellationToken cancellationToken)
         {
             try
             {
                 // Attempt to append the response body for additional error info
-                var contents = await response.Content.ReadAsStringAsync();
+                var contents = await response.Content.ReadAsStringAsync(cancellationToken);
                 messageBuilder.AppendLine(contents);
             }
             catch
@@ -326,7 +308,7 @@ namespace CromwellApiClient
             /// <returns>A new byte array of the file</returns>
             private static byte[] EncodeToUtf8AndRemoveTabsAndDecode(byte[] data)
             {
-                if (data?.Length == 0)
+                if ((data?.Length ?? 0) == 0)
                 {
                     return data;
                 }
