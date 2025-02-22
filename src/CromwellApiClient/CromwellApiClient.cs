@@ -268,7 +268,7 @@ namespace CromwellApiClient
 
             await AppendResponseBodyAsync(response, messageBuilder, cancellationToken);
 
-            return new (messageBuilder.ToString(), httpRequestException, response?.StatusCode);
+            return new(messageBuilder.ToString(), httpRequestException, response?.StatusCode);
         }
 
         private static async Task AppendResponseBodyAsync(HttpResponseMessage response, StringBuilder messageBuilder, CancellationToken cancellationToken)
