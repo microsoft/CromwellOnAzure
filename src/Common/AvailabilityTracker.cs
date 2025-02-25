@@ -23,7 +23,9 @@ namespace Common
 
             try
             {
-                while (!await availabilityCondition.Invoke() && !cancellationToken.IsCancellationRequested)
+                for (cancellationToken.ThrowIfCancellationRequested();
+                    !await availabilityCondition.Invoke();
+                    cancellationToken.ThrowIfCancellationRequested())
                 {
                     hasBeenAvailable = false;
                     informationLogger.Invoke($"Waiting {waitTime.TotalSeconds:n0}s for {systemName} to become available...");
