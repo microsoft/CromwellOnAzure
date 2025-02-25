@@ -5,7 +5,7 @@ using System;
 
 namespace CromwellApiClient
 {
-    public class CromwellResponse
+    public abstract class CromwellResponse
     {
         public Guid Id { get; set; }
     }

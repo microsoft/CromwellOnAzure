@@ -5,14 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Common;
 using CommonUtilities.AzureCloud;
 using CromwellApiClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using Newtonsoft.Json;
 using Tes.Models;
 using Tes.Repository;
 
@@ -77,7 +75,7 @@ namespace TriggerService.Tests
             var azureStorage = new Mock<IAzureStorage>();
 
             azureStorage
-                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New))
+                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New, It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(AsyncEnumerable.Repeat(
                     new TriggerFile
                     {
@@ -87,7 +85,7 @@ namespace TriggerService.Tests
                         LastModified = DateTimeOffset.UtcNow
                     }, 1));
 
-            azureStorage.Setup(x => x.IsAvailableAsync())
+            azureStorage.Setup(x => x.IsAvailableAsync(It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(() =>
                 {
                     logger.LogInformation("IsAzureStorageAvailableAsync");

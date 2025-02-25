@@ -7,9 +7,9 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 
 namespace TriggerService
@@ -33,14 +33,18 @@ namespace TriggerService
             AccountName = host[..host.IndexOf('.')];
         }
 
+        /// <inheritdoc />
         public string AccountName { get; }
+
+        /// <inheritdoc />
         public string AccountAuthority => blobClient.Uri.Authority;
 
-        public async Task<bool> IsAvailableAsync()
+        /// <inheritdoc />
+        public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken)
         {
             try
             {
-                _ = await blobClient.GetBlobContainersAsync().ToListAsync();
+                _ = await blobClient.GetBlobContainersAsync(cancellationToken: cancellationToken).ToListAsync(cancellationToken);
                 return true;
             }
             catch
@@ -50,11 +54,11 @@ namespace TriggerService
         }
 
         /// <inheritdoc />
-        public IAsyncEnumerable<TriggerFile> GetWorkflowsByStateAsync(WorkflowState state)
+        public IAsyncEnumerable<TriggerFile> GetWorkflowsByStateAsync(WorkflowState state, CancellationToken cancellationToken)
         {
             var containerReference = blobClient.GetBlobContainerClient(WorkflowsContainerName);
             var lowercaseState = state.ToString().ToLowerInvariant();
-            var blobs = containerReference.GetBlobsAsync(prefix: lowercaseState);
+            var blobs = containerReference.GetBlobsAsync(prefix: lowercaseState, cancellationToken: cancellationToken);
             var readmeBlobName = $"{lowercaseState}/readme.txt";
 
             return blobs
@@ -65,28 +69,28 @@ namespace TriggerService
         }
 
         /// <inheritdoc />
-        public async Task<string> UploadFileTextAsync(string content, string container, string blobName)
+        public async Task<string> UploadFileTextAsync(string content, string container, string blobName, CancellationToken cancellationToken)
         {
             var containerReference = blobClient.GetBlobContainerClient(container);
 
             if (!createdContainers.Contains(container.ToLowerInvariant()))
             {
                 // Only attempt to create the container once per lifetime of the process
-                await containerReference.CreateIfNotExistsAsync();
+                _ = await containerReference.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
                 createdContainers.Add(container.ToLowerInvariant());
             }
 
             var blob = containerReference.GetBlockBlobClient(blobName);
-            using var writer = new StreamWriter(new MemoryStream());
+            using StreamWriter writer = new(new MemoryStream());
             writer.Write(content);
             writer.Flush();
             writer.BaseStream.Seek(0, SeekOrigin.Begin);
-            await blob.UploadAsync(writer.BaseStream);
+            await blob.UploadAsync(writer.BaseStream, cancellationToken: cancellationToken);
             return blob.Uri.AbsoluteUri;
         }
 
         /// <inheritdoc />
-        public async Task<byte[]> DownloadBlockBlobAsync(string blobUrl)
+        public async Task<byte[]> DownloadBlockBlobAsync(string blobUrl, CancellationToken cancellationToken)
         {
             // Supporting "http://account.blob.core.windows.net/container/blob", "/account/container/blob" and "account/container/blob" URLs
             if (!blobUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) && blobUrl.TrimStart('/').StartsWith(this.AccountName + "/", StringComparison.OrdinalIgnoreCase))
@@ -98,28 +102,28 @@ namespace TriggerService
 
             var blob = blobClient.GetBlobContainerClient(builder.BlobContainerName).GetBlockBlobClient(builder.BlobName);
 
-            using var memoryStream = new MemoryStream();
-            _ = await blob.DownloadToAsync(memoryStream, new BlobDownloadToOptions { TransferValidation = new() { ChecksumAlgorithm = Azure.Storage.StorageChecksumAlgorithm.None } });
+            using MemoryStream memoryStream = new();
+            _ = await blob.DownloadToAsync(memoryStream, new() { TransferValidation = new() { ChecksumAlgorithm = Azure.Storage.StorageChecksumAlgorithm.None } }, cancellationToken);
             return memoryStream.ToArray();
         }
 
         /// <inheritdoc />
-        public async Task<byte[]> DownloadFileUsingHttpClientAsync(string url)
-            => await httpClient.GetByteArrayAsync(url);
+        public async Task<byte[]> DownloadFileUsingHttpClientAsync(string url, CancellationToken cancellationToken)
+            => await httpClient.GetByteArrayAsync(url, cancellationToken);
 
         /// <inheritdoc />
-        public async Task<string> DownloadBlobTextAsync(string container, string blobName)
+        public async Task<string> DownloadBlobTextAsync(string container, string blobName, CancellationToken cancellationToken)
         {
             var blob = blobClient.GetBlobContainerClient(container).GetBlockBlobClient(blobName);
 
-            using var reader = new StreamReader(new MemoryStream());
-            _ = await blob.DownloadToAsync(reader.BaseStream);
+            using StreamReader reader = new(new MemoryStream());
+            _ = await blob.DownloadToAsync(reader.BaseStream, cancellationToken);
             reader.BaseStream.Seek(0, SeekOrigin.Begin);
             return reader.ReadToEnd();
         }
 
         /// <inheritdoc />
-        public Task DeleteBlobIfExistsAsync(string container, string blobName)
-            => blobClient.GetBlobContainerClient(container).GetBlockBlobClient(blobName).DeleteIfExistsAsync();
+        public Task DeleteBlobIfExistsAsync(string container, string blobName, CancellationToken cancellationToken)
+            => blobClient.GetBlobContainerClient(container).GetBlockBlobClient(blobName).DeleteIfExistsAsync(cancellationToken: cancellationToken);
     }
 }
