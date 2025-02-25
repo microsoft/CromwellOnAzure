@@ -1,3 +1,5 @@
+### Announcement: Deployment [changes](https://github.com/microsoft/CromwellOnAzure/wiki/6.0.0-Migration-Guide) in v6.0.0
+
 # Welcome to Cromwell on Azure
 ![Logo](/docs/screenshots/logo.png)
 
