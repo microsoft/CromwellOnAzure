@@ -675,14 +675,18 @@ backend.providers.TES.config {{
                                 {
                                     ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, the storage account must be precreated and the deploying user must have the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
                                 }
-
-                                await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccountData);
-                                await WritePersonalizedFilesToStorageAccountAsync(storageAccountData);
+                                else
+                                {
+                                    await Task.Delay(TimeSpan.FromMinutes(5), cts.Token);
+                                }
 
                                 await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
                                 await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
                                 await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                                 await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+
+                                await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccountData);
+                                await WritePersonalizedFilesToStorageAccountAsync(storageAccountData);
                             }),
                         ]);
 
