@@ -33,7 +33,7 @@ namespace TriggerService.Tests
             var cromwellApiClient = new Mock<ICromwellApiClient>();
 
             cromwellApiClient
-                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
+                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<System.Threading.CancellationToken>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
                 .Returns(Task.FromResult(new PostWorkflowResponse { Id = workflowId }));
 
             var (newTriggerName, newTriggerContent) = await ProcessNewWorkflowAsync(cromwellApiClient.Object);
@@ -48,7 +48,7 @@ namespace TriggerService.Tests
             var exceptionMessage = "Error submitting new workflow";
 
             cromwellApiClient
-                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
+                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<System.Threading.CancellationToken>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
                 .Throws(new Exception(exceptionMessage));
 
             var (newTriggerName, newTriggerContent) = await ProcessNewWorkflowAsync(cromwellApiClient.Object);
@@ -71,11 +71,11 @@ namespace TriggerService.Tests
                 .Returns(new Mock<ILogger>().Object);
 
             azureStorage
-                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort))
+                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort, It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(AsyncEnumerable.Empty<TriggerFile>());
 
             azureStorage
-                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New))
+                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New, It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(AsyncEnumerable.Repeat(
                     new TriggerFile
                     {
@@ -86,12 +86,12 @@ namespace TriggerService.Tests
                     }, 1));
 
             azureStorage
-                .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"new/Sample.json"))
+                .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"new/Sample.json", It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(Task.FromResult(@"{'WorkflowUrl': 'https://tempuri.org/inputs/bam-to-unmapped-bams.wdl','WorkflowInputsUrl': 'https://tempuri.org/inputs/bam-to-unmapped-bams.inputs.json'}"));
 
             azureStorage
-                .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) =>
+                .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>(), It.IsAny<System.Threading.CancellationToken>()))
+                .Callback((string content, string container, string blobName, System.Threading.CancellationToken token) =>
                 {
                     newTriggerName = blobName;
                     newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
@@ -144,7 +144,7 @@ namespace TriggerService.Tests
 
             var triesToPost = false;
             cromwellApiClient
-                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
+                .Setup(ac => ac.PostWorkflowAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<List<string>>(), It.IsAny<List<byte[]>>(), It.IsAny<System.Threading.CancellationToken>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<byte[]>()))
                 .Callback(() => triesToPost = true)
                 .Throws(new Exception("Should never get here."));
 
@@ -160,11 +160,11 @@ namespace TriggerService.Tests
                 .Returns(new Mock<ILogger>().Object);
 
             azureStorage
-                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort))
+                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort, It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(AsyncEnumerable.Empty<TriggerFile>());
 
             azureStorage
-                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New))
+                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.New, It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(AsyncEnumerable.Repeat(
                     new TriggerFile
                     {
@@ -175,12 +175,12 @@ namespace TriggerService.Tests
                     }, 1));
 
             azureStorage
-                .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"new/Sample.json"))
+                .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"new/Sample.json", It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(Task.FromResult(badJason));
 
             azureStorage
-                .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) =>
+                .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>(), It.IsAny<System.Threading.CancellationToken>()))
+                .Callback((string content, string container, string blobName, System.Threading.CancellationToken token) =>
                 {
                     newTriggerName = blobName;
                     newTriggerContent = content;
@@ -188,7 +188,7 @@ namespace TriggerService.Tests
 
             var deleted = false;
             azureStorage
-                .Setup(az => az.DeleteBlobIfExistsAsync(It.IsAny<string>(), $"new/Sample.json"))
+                .Setup(az => az.DeleteBlobIfExistsAsync(It.IsAny<string>(), $"new/Sample.json", It.IsAny<System.Threading.CancellationToken>()))
                 .Callback(() => deleted = true);
 
             var logger = new Mock<ILogger<TriggerHostedService>>().Object;

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommonUtilities.AzureCloud;
 using CromwellApiClient;
@@ -22,15 +23,16 @@ namespace TriggerService.Tests
     public class CromwellOnAzureEnvironmentTests
     {
         private const string azureName = "test";
-        private readonly byte[] blobData = new byte[3] { 1, 2, 3 };
-        private readonly byte[] httpClientData = new byte[4] { 4, 3, 2, 1 };
+        private readonly byte[] blobData = [1, 2, 3];
+        private readonly byte[] httpClientData = [4, 3, 2, 1];
         private readonly string fakeAzureWdl = $"https://fake.azure.storage.account/{azureName}/test.wdl";
         private readonly string fakeAzureInput = $"https://fake.azure.storage.account/{azureName}/test.input.json";
-        private readonly List<string> fakeAzureInputs = new() {
+        private readonly List<string> fakeAzureInputs =
+        [
             $"https://fake.azure.storage.account/{azureName}/test.input1.json",
             $"https://fake.azure.storage.account/{azureName}/test.input_2.json"
-        };
-        private readonly string fakeAzureWdlWithSas = @"https://fake.azure.storage.account/{azureName}/test.wdl?sp=r&st=2019-12-18T18:55:41Z&se=2019-12-19T02:55:41Z&spr=https&sv=2019-02-02&sr=b&sig=EMJyBMOxdG2NvBqiwUsg71ZdYqwqMWda9242KU43%2F5Y%3D";
+        ];
+        private readonly string fakeAzureWdlWithSas = $"https://fake.azure.storage.account/{azureName}/test.wdl?sp=r&st=2019-12-18T18:55:41Z&se=2019-12-19T02:55:41Z&spr=https&sv=2019-02-02&sr=b&sig=EMJyBMOxdG2NvBqiwUsg71ZdYqwqMWda9242KU43%2F5Y%3D";
 
         public CromwellOnAzureEnvironmentTests()
             => Common.NewtonsoftJsonSafeInit.SetDefaultSettings();
@@ -107,11 +109,11 @@ namespace TriggerService.Tests
             var azStorageMock = new Mock<IAzureStorage>();
 
             azStorageMock.Setup(az => az
-                .DownloadBlockBlobAsync(It.IsAny<string>()))
+                .DownloadBlockBlobAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.FromResult(blobData));
 
             azStorageMock.Setup(az => az
-                .DownloadFileUsingHttpClientAsync(It.IsAny<string>()))
+                .DownloadFileUsingHttpClientAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.FromResult(httpClientData));
 
             azStorageMock.SetupGet(az => az.AccountAuthority).Returns(accountAuthority);

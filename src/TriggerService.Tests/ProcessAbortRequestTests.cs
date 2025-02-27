@@ -34,7 +34,7 @@ namespace TriggerService.Tests
 
             Assert.IsTrue(newTriggerName.StartsWith("failed/"));
             Assert.AreEqual("AbortRequested", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReason);
-            cromwellApiClient.Verify(mock => mock.PostAbortAsync(workflowId), Times.Once());
+            cromwellApiClient.Verify(mock => mock.PostAbortAsync(workflowId, It.IsAny<System.Threading.CancellationToken>()), Times.Once());
         }
 
         [TestMethod]
@@ -42,12 +42,12 @@ namespace TriggerService.Tests
         {
             var workflowId = Guid.NewGuid();
             var cromwellApiClient = new Mock<ICromwellApiClient>();
-            cromwellApiClient.Setup(ac => ac.PostAbortAsync(It.IsAny<Guid>())).Throws(new Exception("Workflow not found"));
+            cromwellApiClient.Setup(ac => ac.PostAbortAsync(It.IsAny<Guid>(), It.IsAny<System.Threading.CancellationToken>())).Throws(new Exception("Workflow not found"));
             var (newTriggerName, newTriggerContent) = await ProcessAbortRequestAsync(workflowId, cromwellApiClient.Object);
             Assert.IsTrue(newTriggerName.StartsWith("failed/"));
             Assert.AreEqual("ErrorOccuredWhileAbortingWorkflow", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReason);
             Assert.AreEqual("Workflow not found", newTriggerContent?.WorkflowFailureInfo?.WorkflowFailureReasonDetail);
-            cromwellApiClient.Verify(mock => mock.PostAbortAsync(workflowId), Times.Once());
+            cromwellApiClient.Verify(mock => mock.PostAbortAsync(workflowId, It.IsAny<System.Threading.CancellationToken>()), Times.Once());
         }
 
         private static async Task<(string newTriggerName, Workflow newTriggerContent)> ProcessAbortRequestAsync(Guid workflowId, ICromwellApiClient cromwellApiClient)
@@ -64,7 +64,7 @@ namespace TriggerService.Tests
                 .Returns(new Mock<ILogger>().Object);
 
             azureStorage
-                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort))
+                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.Abort, It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(AsyncEnumerable.Repeat(
                     new TriggerFile
                     {
@@ -75,12 +75,12 @@ namespace TriggerService.Tests
                     }, 1));
 
             azureStorage
-                .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"abort/{workflowId}.json"))
+                .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"abort/{workflowId}.json", It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(Task.FromResult(string.Empty));
 
             azureStorage
-                .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) =>
+                .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>(), It.IsAny<System.Threading.CancellationToken>()))
+                .Callback((string content, string container, string blobName, System.Threading.CancellationToken token) =>
                 {
                     newTriggerName = blobName;
                     newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;

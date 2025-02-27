@@ -6,10 +6,8 @@ using System.Net;
 
 namespace CromwellApiClient
 {
-    public class CromwellApiException : Exception
+    public class CromwellApiException(string message, Exception exc, HttpStatusCode? httpStatusCode) : Exception(message, exc)
     {
-        public HttpStatusCode? HttpStatusCode { get; set; }
-        public CromwellApiException(string message, Exception exc, HttpStatusCode? httpStatusCode) : base(message, exc)
-            => HttpStatusCode = httpStatusCode;
+        public HttpStatusCode? HttpStatusCode { get; set; } = httpStatusCode;
     }
 }

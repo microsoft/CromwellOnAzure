@@ -85,4 +85,19 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <!-- Not needed in NET SDK 9 -->
+  <Target Name="RemoveSingleFileHostsFromDependencies" BeforeTargets="_ComputeCopyToPublishDirectoryItems">
+    <PropertyGroup>
+      <SingleFileHostIntermediatePath Condition=" '$(SingleFileHostIntermediatePath)' == '' ">$(AppHostIntermediatePath)</SingleFileHostIntermediatePath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <__ItemsToRemove Remove="@(__ItemsToRemove)" />
+      <__ItemsToRemove Condition=" '%(Filename)' == '$(_DotNetSingleFileHostExecutableNameWithoutExtension)' And '%(FullPath)' != '$(SingleFileHostIntermediatePath)' "
+                       Include="@(_SourceItemsToCopyToPublishDirectoryAlways)" />
+      <_SourceItemsToCopyToPublishDirectoryAlways Remove="@(__ItemsToRemove)" />
+      <__ItemsToRemove Remove="@(__ItemsToRemove)" />
+    </ItemGroup>
+  </Target>
+
 </Project>

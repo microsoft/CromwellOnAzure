@@ -16,8 +16,6 @@ spec:
       labels:
         io.kompose.service: tes
         azure.workload.identity/use: "true"
-      annotations:
-        container.apparmor.security.beta.kubernetes.io/tes: runtime/default
     spec:
       serviceAccountName: {{ .Values.identity.name }}-sa
       securityContext:
@@ -25,6 +23,8 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
         supplementalGroups: [1000]
+        appArmorProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 90
       containers:
         - env:

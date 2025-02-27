@@ -57,6 +57,7 @@ namespace CromwellOnAzureDeployer
         public string LogAnalyticsArmId { get; set; }
         public string ApplicationInsightsAccountName { get; set; }
         public string AksClusterName { get; set; }
+        // This must match validation in Deployer.cs's ValidateInitialCommandLineArgs()
         public string AksCoANamespace { get; set; } = "coa";
         public bool ManualHelmDeployment { get; set; }
         public string HelmBinaryPath { get; set; } = OperatingSystem.IsWindows() ? @"C:\ProgramData\chocolatey\bin\helm.exe" : "/usr/local/bin/helm";
@@ -66,6 +67,8 @@ namespace CromwellOnAzureDeployer
         public bool DeleteResourceGroupOnFailure { get; set; }
         public string CromwellVersion { get; set; }
         public string CromwellImageName { get; set; }
+        public string CromwellMemoryRequest { get; set; }
+        public string CromwellMemoryLimit { get; set; }
         public string DockerHubUserInfo { get; set; }
         public string AcrId { get; set; }
         public string GitHubCommit { get; set; }

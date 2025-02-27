@@ -200,7 +200,6 @@ namespace CromwellOnAzureDeployer
 
             MergeContainers(containersToMount, values);
 
-            // TODO: Does this make sense? If so, do we need this in TES?
             if (azureCloudConfig.ArmEnvironment != ArmEnvironment.AzurePublicCloud)
             {
                 values.ExternalSasContainers = null;
@@ -267,6 +266,37 @@ namespace CromwellOnAzureDeployer
                 {
                     values.InternalContainersKeyVaultAuth.Remove(values.InternalContainersMIAuth.First(values => values.ContainsKey("containerName") && values["containerName"] == Deployer.ExecutionsContainerName));
                 }
+            }
+        }
+
+        public async Task ProcessClusterUpdatesAsync(IKubernetes kubernetes, ContainerServiceManagedClusterResource aksCluster, Version previousVersion, Func<string, Func<Task>, bool, Task> execute)
+        {
+            var restartCluster = false;
+
+            if (Deployer.IsStorageInPublicCloud && (previousVersion > new Version(5, 5, 0) && previousVersion < new Version(5, 5, 3)))
+            {
+                // AKS is supposed to remove all unused storage classes, persistent volues, and persistent volume claims.
+                // For some reason, this persisent volume remains (even though its storage class is removed) and breaks Cromwell (not during startup but during workflow execution)
+
+                foreach (var volume in (await kubernetes.CoreV1.ListPersistentVolumeWithHttpMessagesAsync(cancellationToken: cancellationToken)).Body)
+                {
+                    if ($"{configuration.AksCoANamespace}-blob-cromwell-executions".Equals(volume.Spec.StorageClassName))
+                    {
+                        _ = await kubernetes.CoreV1.DeletePersistentVolumeAsync(volume.Name(), orphanDependents: true, cancellationToken: cancellationToken);
+                        restartCluster = true; // Needed because new pod exists but the old volume incorrectly persists. Entire cluster reset is more effective at getting back to a good configuration.
+                    }
+                }
+            }
+
+            if (restartCluster)
+            {
+                await execute("Restarting AKS cluster...", async () =>
+                {
+                    _ = await aksCluster.StopAsync(Azure.WaitUntil.Completed, cancellationToken);
+                    await Task.Delay(TimeSpan.FromSeconds(15));
+                    _ = await aksCluster.StartAsync(Azure.WaitUntil.Completed, cancellationToken);
+                },
+                /* cancelOnException */ true);
             }
         }
 
@@ -526,6 +556,10 @@ namespace CromwellOnAzureDeployer
             _ = batchScheduling.TryAdd("poolRotationForcedDays", "7");
             _ = batchScheduling.TryAdd("taskMaxWallClockTimeDays", "7");
 
+            // Override previous value if present
+            ReplaceHelmSectionWithValueIfPresent("cromwellMemoryRequest", "CromwellMemoryRequest", values.Service, settings);
+            ReplaceHelmSectionWithValueIfPresent("cromwellMemoryLimit", "CromwellMemoryLimit", values.Service, settings);
+
             values.Config["batchAccount"] = batchAccount;
             values.Config["batchNodes"] = batchNodes;
             values.Config["batchScheduling"] = batchScheduling;
@@ -533,6 +567,14 @@ namespace CromwellOnAzureDeployer
             values.Config["batchImageGen1"] = batchImageGen1;
             values.Config["martha"] = martha;
             values.Config["deployment"] = deployment;
+        }
+
+        private static void ReplaceHelmSectionWithValueIfPresent(string helmKey, string settingsKey, Dictionary<string, string> helmSection, Dictionary<string, string> settings)
+        {
+            if (settings.TryGetValue(settingsKey, out var value))
+            {
+                helmSection[helmKey] = value;
+            }
         }
 
         private static IDictionary<string, string> GetObjectFromConfig(HelmValues values, string key)

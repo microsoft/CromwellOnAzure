@@ -265,6 +265,11 @@ namespace CromwellOnAzureDeployer
                             throw new ValidationException("Upgrading pre-4.0 versions of CromwellOnAzure is not supported. Please see https://github.com/microsoft/CromwellOnAzure/wiki/4.0-Migration-Guide.", displayExample: false);
                         }
 
+                        if (aksValues.TryGetValue("AksCoANamespace", out var aksCoANamespace))
+                        {
+                            configuration.AksCoANamespace = aksCoANamespace;
+                        }
+
                         if (!aksValues.TryGetValue("BatchAccountName", out var batchAccountName))
                         {
                             throw new ValidationException($"Could not retrieve the Batch account name", displayExample: false);
@@ -499,6 +504,7 @@ backend.providers.TES.config {{
 
                         await kubernetesManager.UpgradeValuesYamlAsync(storageAccountData, settings, containersToMount, installedVersion);
                         kubernetesClient = await PerformHelmDeploymentAsync(aksCluster, manualPrecommands, asyncTask);
+                        await kubernetesManager.ProcessClusterUpdatesAsync(kubernetesClient, aksCluster, installedVersion, Execute);
 
                         await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccountData);
                     }
@@ -669,14 +675,18 @@ backend.providers.TES.config {{
                                 {
                                     ConsoleEx.WriteLine("Unable to assign 'Storage Blob Data Contributor' for deployment identity to the storage account. If the deployment fails as a result, the storage account must be precreated and the deploying user must have the 'Storage Blob Data Contributor' role for the storage account.", ConsoleColor.Yellow);
                                 }
-
-                                await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccountData);
-                                await WritePersonalizedFilesToStorageAccountAsync(storageAccountData);
+                                else
+                                {
+                                    await Task.Delay(TimeSpan.FromMinutes(5), cts.Token);
+                                }
 
                                 await AssignVmAsContributorToStorageAccountAsync(managedIdentity, storageAccount);
                                 await AssignMIAsDataOwnerToStorageAccountAsync(managedIdentity, storageAccount);
                                 await AssignManagedIdOperatorToResourceAsync(managedIdentity, resourceGroup);
                                 await AssignMIAsNetworkContributorToResourceAsync(managedIdentity, resourceGroup);
+
+                                await WriteNonPersonalizedFilesToStorageAccountAsync(storageAccountData);
+                                await WritePersonalizedFilesToStorageAccountAsync(storageAccountData);
                             }),
                         ]);
 
@@ -1199,7 +1209,7 @@ backend.providers.TES.config {{
 
                             if (string.IsNullOrWhiteSpace(configuration.SolutionDir))
                             {
-                                tar = AcrBuild.GetGitHubArchive(BuildType.CoA, string.IsNullOrWhiteSpace(configuration.GitHubCommit) ? new Version(targetVersion).ToString(3) : configuration.GitHubCommit);
+                                tar = AcrBuild.GetGitHubArchive(BuildType.CoA, string.IsNullOrWhiteSpace(configuration.GitHubCommit) ? new Version(targetVersion).ToString(3) : configuration.GitHubCommit, GitHubArchive.GetAccessTokenProvider());
                                 tarDisposable = tar as IAsyncDisposable;
                             }
                             else
@@ -1303,6 +1313,9 @@ backend.providers.TES.config {{
             UpdateSetting(settings, defaults, "DeploymentOrganizationUrl", configuration.DeploymentOrganizationUrl);
             UpdateSetting(settings, defaults, "DeploymentContactUri", configuration.DeploymentContactUri);
             UpdateSetting(settings, defaults, "DeploymentEnvironment", configuration.DeploymentEnvironment);
+
+            UpdateSetting(settings, defaults, "CromwellMemoryRequest", configuration.CromwellMemoryRequest, defaultValue: null, ignoreDefaults: true);
+            UpdateSetting(settings, defaults, "CromwellMemoryLimit", configuration.CromwellMemoryLimit, defaultValue: null, ignoreDefaults: true);
 
             if (installedVersion is null)
             {
@@ -2718,6 +2731,8 @@ backend.providers.TES.config {{
             ThrowIfProvidedForUpdate(configuration.SubnetName, nameof(configuration.SubnetName));
             ThrowIfProvidedForUpdate(configuration.Tags, nameof(configuration.Tags));
             ThrowIfProvidedForUpdate(configuration.AadGroupIds, nameof(configuration.AadGroupIds));
+            // This must match default in Configuration.cs
+            ThrowIfProvidedForUpdate("coa".Equals(configuration.AksCoANamespace, StringComparison.Ordinal) ? default : configuration.AksCoANamespace, nameof(configuration.AksCoANamespace));
             ThrowIfTagsFormatIsUnacceptable(configuration.Tags, nameof(configuration.Tags));
 
             if (!configuration.ManualHelmDeployment)

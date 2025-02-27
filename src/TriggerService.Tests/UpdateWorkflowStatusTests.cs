@@ -349,7 +349,7 @@ namespace TriggerService.Tests
                 workflowId,
                 tesTasks,
                 cromwellApiClient => cromwellApiClient
-                    .Setup(ac => ac.GetStatusAsync(It.IsAny<Guid>()))
+                    .Setup(ac => ac.GetStatusAsync(It.IsAny<Guid>(), It.IsAny<System.Threading.CancellationToken>()))
                     .Returns(Task.FromResult(new GetStatusResponse { Id = Guid.Parse(workflowId), Status = cromwellWorkflowStatus })));
 
         private static Task<(string newTriggerName, Workflow newTriggerContent)> UpdateWorkflowStatusAsync(string workflowId, IEnumerable<TesTask> tesTasks, Exception cromwellWorkflowStatusException)
@@ -357,7 +357,7 @@ namespace TriggerService.Tests
                 workflowId,
                 tesTasks,
                 cromwellApiClient => cromwellApiClient
-                    .Setup(ac => ac.GetStatusAsync(It.IsAny<Guid>()))
+                    .Setup(ac => ac.GetStatusAsync(It.IsAny<Guid>(), It.IsAny<System.Threading.CancellationToken>()))
                     .Throws(cromwellWorkflowStatusException));
 
         private static async Task<(string newTriggerName, Workflow newTriggerContent)> UpdateWorkflowStatusAsync(string workflowId, IEnumerable<TesTask> tesTasks, Action<Mock<ICromwellApiClient>> cromwellApiClientSetup)
@@ -375,11 +375,11 @@ namespace TriggerService.Tests
                 .Returns(new Mock<ILogger>().Object);
 
             azureStorage
-                .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"inprogress/inprogress.Sample.{workflowId}.json"))
+                .Setup(az => az.DownloadBlobTextAsync(It.IsAny<string>(), $"inprogress/inprogress.Sample.{workflowId}.json", It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(Task.FromResult(@"{'WorkflowUrl': 'https://bam-to-unmapped-bams.wdl','WorkflowInputsUrl': 'https://bam-to-unmapped-bams.inputs.json'}"));
 
             azureStorage
-                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.InProgress))
+                .Setup(az => az.GetWorkflowsByStateAsync(WorkflowState.InProgress, It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(AsyncEnumerable.Repeat(
                     new TriggerFile
                     {
@@ -390,8 +390,8 @@ namespace TriggerService.Tests
                     }, 1));
 
             azureStorage
-                .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>()))
-                .Callback((string content, string container, string blobName) =>
+                .Setup(az => az.UploadFileTextAsync(It.IsAny<string>(), "workflows", It.IsAny<string>(), It.IsAny<System.Threading.CancellationToken>()))
+                .Callback((string content, string container, string blobName, System.Threading.CancellationToken token) =>
                 {
                     newTriggerName = blobName;
                     newTriggerContent = content is not null ? JsonConvert.DeserializeObject<Workflow>(content) : null;
@@ -400,15 +400,15 @@ namespace TriggerService.Tests
             cromwellApiClientSetup(cromwellApiClient);
 
             cromwellApiClient
-                .Setup(ac => ac.GetOutputsAsync(It.IsAny<Guid>()))
+                .Setup(ac => ac.GetOutputsAsync(It.IsAny<Guid>(), It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(Task.FromResult(new GetOutputsResponse()));
 
             cromwellApiClient
-                .Setup(ac => ac.GetMetadataAsync(It.IsAny<Guid>()))
+                .Setup(ac => ac.GetMetadataAsync(It.IsAny<Guid>(), It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(Task.FromResult(new GetMetadataResponse()));
 
             cromwellApiClient
-                .Setup(ac => ac.GetTimingAsync(It.IsAny<Guid>()))
+                .Setup(ac => ac.GetTimingAsync(It.IsAny<Guid>(), It.IsAny<System.Threading.CancellationToken>()))
                 .Returns(Task.FromResult(new GetTimingResponse()));
 
             repository
