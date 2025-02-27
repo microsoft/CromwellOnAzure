@@ -1314,6 +1314,9 @@ backend.providers.TES.config {{
             UpdateSetting(settings, defaults, "DeploymentContactUri", configuration.DeploymentContactUri);
             UpdateSetting(settings, defaults, "DeploymentEnvironment", configuration.DeploymentEnvironment);
 
+            UpdateSetting(settings, defaults, "CromwellMemoryRequest", configuration.CromwellMemoryRequest, defaultValue: null, ignoreDefaults: true);
+            UpdateSetting(settings, defaults, "CromwellMemoryLimit", configuration.CromwellMemoryLimit, defaultValue: null, ignoreDefaults: true);
+
             if (installedVersion is null)
             {
                 UpdateSetting(settings, defaults, "BatchPrefix", configuration.BatchPrefix, ignoreDefaults: true);

@@ -1,6 +1,8 @@
 ﻿service:
   tesPort: 80
   cromwellPort: 8000
+  cromwellMemoryRequest: "1024Mi"
+  cromwellMemoryLimit: "4096Mi"
 
 config:
   coaNamespace: RUNTIME_PARAMETER
