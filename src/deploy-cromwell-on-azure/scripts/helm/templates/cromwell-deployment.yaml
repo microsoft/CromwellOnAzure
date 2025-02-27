@@ -41,10 +41,10 @@ spec:
           resources:
             requests:
               cpu: "1.0"
-              memory: "1024Mi"
+              memory: {{ .Values.service.cromwellMemoryRequest }}
             limits:
               cpu: "8.0"
-              memory: "4096Mi"
+              memory: {{ .Values.service.cromwellMemoryLimit }}
           securityContext:
             allowPrivilegeEscalation: false
           volumeMounts:

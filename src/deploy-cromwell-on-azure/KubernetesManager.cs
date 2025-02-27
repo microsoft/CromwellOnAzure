@@ -556,6 +556,10 @@ namespace CromwellOnAzureDeployer
             _ = batchScheduling.TryAdd("poolRotationForcedDays", "7");
             _ = batchScheduling.TryAdd("taskMaxWallClockTimeDays", "7");
 
+            // Override previous value if present
+            ReplaceHelmSectionWithValueIfPresent("cromwellMemoryRequest", "CromwellMemoryRequest", values.Service, settings);
+            ReplaceHelmSectionWithValueIfPresent("cromwellMemoryLimit", "CromwellMemoryLimit", values.Service, settings);
+
             values.Config["batchAccount"] = batchAccount;
             values.Config["batchNodes"] = batchNodes;
             values.Config["batchScheduling"] = batchScheduling;
@@ -563,6 +567,14 @@ namespace CromwellOnAzureDeployer
             values.Config["batchImageGen1"] = batchImageGen1;
             values.Config["martha"] = martha;
             values.Config["deployment"] = deployment;
+        }
+
+        private static void ReplaceHelmSectionWithValueIfPresent(string helmKey, string settingsKey, Dictionary<string, string> helmSection, Dictionary<string, string> settings)
+        {
+            if (settings.TryGetValue(settingsKey, out var value))
+            {
+                helmSection[helmKey] = value;
+            }
         }
 
         private static IDictionary<string, string> GetObjectFromConfig(HelmValues values, string key)

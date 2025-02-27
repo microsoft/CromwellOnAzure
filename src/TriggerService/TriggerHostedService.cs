@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -26,6 +27,7 @@ namespace TriggerService
     public partial class TriggerHostedService : ITriggerHostedService, IHostedService
     {
         private const string OutputsContainerName = "outputs";
+        private const int RetryLimit = 3;
         private readonly CancellationTokenSource hostCancellationTokenSource = new();
         private static readonly TimeSpan inProgressWorkflowInvisibilityPeriod = TimeSpan.FromMinutes(1);
 
@@ -40,6 +42,7 @@ namespace TriggerService
         private IAzureStorage storage { get; set; }
         internal ICromwellApiClient cromwellApiClient { get; set; }
         private readonly List<IAzureStorage> storageAccounts;
+        private readonly ConcurrentDictionary<Guid, int> workflowRetries = [];
         private readonly ILogger<TriggerHostedService> logger;
         private readonly IRepository<TesTask> tesTaskRepository;
         private readonly AzureCloudConfig azureCloudConfig;
@@ -294,6 +297,33 @@ namespace TriggerService
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
                     logger.LogError(exception, "Exception in UpdateWorkflowStatusesAsync for {BlobTrigger}.  Id: {Workflow}", blobTrigger.Uri, id);
+
+                    if (RetryLimit <= workflowRetries.AddOrUpdate(id, 1, (_, retries) => retries + 1))
+                    {
+                        logger.LogError("Exceeded retry count  UpdateWorkflowStatusesAsync for {BlobTrigger}.  Id: {Workflow}  Cromwell reported workflow as NotFound (404).  Mutating state to Failed.", blobTrigger.Uri, id);
+
+                        await MutateStateAsync(
+                            blobTrigger.ContainerName,
+                            blobTrigger.Name,
+                            WorkflowState.Failed,
+                            wf => wf.WorkflowFailureInfo = new() { WorkflowFailureReason = "CromwellApiExceededRetryCount" });
+                    }
+                    else
+                    {
+                        return; // Keep retryable error count
+                    }
+                }
+
+                // Remove retryable error count if one exists
+                if (workflowRetries.TryGetValue(id, out var retries))
+                {
+                    while (!workflowRetries.TryRemove(new(id, retries)))
+                    {
+                        if (!workflowRetries.TryGetValue(id, out retries))
+                        {
+                            return;
+                        }
+                    }
                 }
             }
         }
