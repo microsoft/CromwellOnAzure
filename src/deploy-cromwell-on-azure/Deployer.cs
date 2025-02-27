@@ -76,6 +76,27 @@ namespace CromwellOnAzureDeployer
                 })
             .WaitAndRetryAsync(30, retryAttempt => TimeSpan.FromSeconds(10));
 
+        private static readonly AsyncRetryPolicy buildPushAcrRetryPolicy = Policy
+            .Handle<Exception>(AsyncRetryExceptionPolicy)
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(1));
+
+        private static bool AsyncRetryExceptionPolicy(Exception ex)
+        {
+            var dontRetry = ex is InvalidOperationException
+                || (ex is GitHub.Models.ValidationError ve && (int)HttpStatusCode.UnprocessableContent == ve.ResponseStatusCode)
+                || (ex is GitHub.Models.BasicError be &&
+                    ((int)HttpStatusCode.Forbidden == be.ResponseStatusCode
+                    || (int)HttpStatusCode.NotFound == be.ResponseStatusCode
+                    || (int)HttpStatusCode.Conflict == be.ResponseStatusCode));
+
+            if (!dontRetry)
+            {
+                Console.WriteLine($"Retrying ACR image build because ({ex.GetType().FullName}): {ex.Message}");
+            }
+
+            return !dontRetry;
+        }
+
         private static readonly AsyncRetryPolicy generalRetryPolicy = Policy
             .Handle<Exception>()
             .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(1));
@@ -1197,7 +1218,7 @@ backend.providers.TES.config {{
             if (!suppressBuild)
             {
                 var build = await Execute($"Building TES and TriggerService images on {acr.Id.Name}...",
-                () => generalRetryPolicy.ExecuteAsync(async () =>
+                () => buildPushAcrRetryPolicy.ExecuteAsync(async () =>
                 {
                     AcrBuild build;
                     {
