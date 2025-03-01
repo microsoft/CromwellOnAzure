@@ -107,6 +107,9 @@ namespace CromwellOnAzureDeployer
                 "InternalServerError".Equals(azureException.ErrorCode, StringComparison.OrdinalIgnoreCase))
             .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(15));
 
+        internal static Azure.Core.Pipeline.RetryPolicy GetRetryPolicy(CommonUtilities.Options.RetryPolicyOptions retryPolicy)
+            => new(retryPolicy.MaxRetryCount, DelayStrategy.CreateExponentialDelayStrategy(TimeSpan.FromSeconds(retryPolicy.ExponentialBackOffExponent)));
+
         public const string WorkflowsContainerName = "workflows";
         public const string ConfigurationContainerName = "configuration";
         public const string TesInternalContainerName = "tes-internal";
@@ -175,14 +178,22 @@ namespace CromwellOnAzureDeployer
         {
             return new(new BlobUriBuilder(storageAccount.PrimaryEndpoints.BlobUri) { BlobContainerName = containerName, BlobName = blobName }.ToUri(),
                 tokenCredential,
-                new() { Audience = Azure.Storage.Blobs.Models.BlobAudience.DefaultAudience }); // https://github.com/Azure/azure-cli/issues/28708#issuecomment-2047256166
+                new()
+                {
+                    Audience = Azure.Storage.Blobs.Models.BlobAudience.DefaultAudience, // https://github.com/Azure/azure-cli/issues/28708#issuecomment-2047256166
+                    RetryPolicy = GetRetryPolicy(new())
+                });
         }
 
         private BlobContainerClient GetBlobContainerClient(StorageAccountData storageAccount, string containerName)
         {
             return new(new BlobUriBuilder(storageAccount.PrimaryEndpoints.BlobUri) { BlobContainerName = containerName }.ToUri(),
                 tokenCredential,
-                new() { Audience = Azure.Storage.Blobs.Models.BlobAudience.DefaultAudience }); // https://github.com/Azure/azure-cli/issues/28708#issuecomment-2047256166
+                new()
+                {
+                    Audience = Azure.Storage.Blobs.Models.BlobAudience.DefaultAudience, // https://github.com/Azure/azure-cli/issues/28708#issuecomment-2047256166
+                    RetryPolicy = GetRetryPolicy(new())
+                });
         }
 
         public async Task<int> DeployAsync()
@@ -211,8 +222,8 @@ namespace CromwellOnAzureDeployer
 
                 await Execute("Connecting to Azure Services...", async () =>
                 {
-                    tokenCredential = new AzureCliCredential(new() { AuthorityHost = cloudEnvironment.AzureAuthorityHost });
-                    armClient = new ArmClient(tokenCredential, configuration.SubscriptionId, new() { Environment = cloudEnvironment.ArmEnvironment });
+                    tokenCredential = new AzureCliCredential(new() { AuthorityHost = cloudEnvironment.AzureAuthorityHost, RetryPolicy = GetRetryPolicy(new()) });
+                    armClient = new ArmClient(tokenCredential, configuration.SubscriptionId, new() { Environment = cloudEnvironment.ArmEnvironment, RetryPolicy = GetRetryPolicy(new()) });
                     armSubscription = armClient.GetSubscriptionResource(SubscriptionResource.CreateResourceIdentifier(configuration.SubscriptionId));
                     subscriptionIds = await armClient.GetSubscriptions().GetAllAsync(cts.Token).ToListAsync(cts.Token);
                 });
@@ -1139,55 +1150,47 @@ backend.providers.TES.config {{
         private async Task BuildPushAcrAsync(Dictionary<string, string> settings, string targetVersion, UserAssignedIdentityResource managedIdentity)
         {
             ContainerRegistryResource acr = default;
+            Azure.Containers.ContainerRegistry.ContainerRegistryClient client = default;
 
             if (settings.TryGetValue("AcrId", out var acrId) && !string.IsNullOrEmpty(acrId))
             {
                 acr = await EnsureResourceDataAsync(armClient.GetContainerRegistryResource(new(acrId)), r => r.HasData, r => r.GetAsync, cts.Token);
             }
 
-            List<string> defaultRegistries = ["mcr.microsoft.com"]; // Upgrade tag changes reset to MCR even though it is no longer used.
-
-            if (acr is not null)
-            {
-                defaultRegistries.Add(acr.Data.LoginServer);
-            }
-
             var suppressBuild = false;
+            var cromwellUpgraded = false;
 
             // No build needed if the image is not in the registries this deployer manages or if the same version is being upgraded with no explicit source code provided.
             {
-                var sameVersionUpgrade = ((string[])[configuration.AcrId, configuration.GitHubCommit, configuration.SolutionDir]).All(string.IsNullOrWhiteSpace) && bool.Parse(settings["SameVersionUpgrade"]);
-                var tesUpgradable = defaultRegistries.Select(s => s + "/").Any(settings["TesImageName"].StartsWith);
-                var triggerServiceUpgradable = defaultRegistries.Select(s => s + "/").Any(settings["TriggerServiceImageName"].StartsWith);
-                var cromwellUpgradable = defaultRegistries.Skip(1).Prepend("broadinstitute").Select(s => s + "/").Any(settings["CromwellImageName"].StartsWith);
+                var acrRequested = !((string[])[configuration.AcrId, configuration.GitHubCommit, configuration.SolutionDir]).All(string.IsNullOrWhiteSpace);
+                var sameVersionUpgrade = bool.Parse(settings["SameVersionUpgrade"]);
+                var tesUpgraded = !settings["TesImageName"].Equals(settings["PreviousTesImageName"]);
+                var triggerServiceUpgraded = !settings["TriggerServiceImageName"].Equals(settings["PreviousTriggerServiceImageName"]);
+                cromwellUpgraded = !settings["CromwellImageName"].Equals(settings["PreviousCromwellImageName"]);
+                var canReturnEarly = sameVersionUpgrade;
 
-                var canReturnEarly = false;
-
-                if (sameVersionUpgrade || (!tesUpgradable && !triggerServiceUpgradable))
+                if (acr is null && !acrRequested &&
+                    ((string[])[settings["TesImageName"], settings["TriggerServiceImageName"]]).All(name => !name.StartsWith("mcr.microsoft.com/")))
                 {
-                    UpdateImageName("TesImageName");
-                    UpdateImageName("TriggerServiceImageName");
-
-                    void UpdateImageName(string key)
-                    {
-                        if (defaultRegistries.Count > 1 && settings[key].StartsWith(defaultRegistries[0]))
-                        {
-                            var path = settings[key][defaultRegistries[0].Length..];
-                            if (path[path.IndexOf(':')..].Count(c => c == '.') == 3)
-                            {
-                                path = path[..path.LastIndexOf('.')];
-                            }
-                            settings[key] = defaultRegistries[1] + path;
-                        }
-                    }
-
-                    canReturnEarly = true;
+                    settings["ActualTesImageName"] = settings["TesImageName"];
+                    settings["ActualTriggerServiceImageName"] = settings["TriggerServiceImageName"];
+                }
+                else
+                {
+                    canReturnEarly = sameVersionUpgrade && !tesUpgraded && !triggerServiceUpgraded && !string.IsNullOrEmpty(settings["ActualTesImageName"]) && !string.IsNullOrEmpty(settings["ActualTriggerServiceImageName"]);
                 }
 
-                if (canReturnEarly && cromwellUpgradable)
+                if (cromwellUpgraded || string.IsNullOrEmpty(settings["ActualCromwellImageName"]))
                 {
-                    suppressBuild = true;
-                    canReturnEarly = false;
+                    if (acr is null && !acrRequested && sameVersionUpgrade)
+                    {
+                        settings["ActualCromwellImageName"] = settings["CromwellImageName"];
+                    }
+                    else
+                    {
+                        suppressBuild = canReturnEarly;
+                        canReturnEarly = false;
+                    }
                 }
 
                 if (canReturnEarly)
@@ -1198,18 +1201,18 @@ backend.providers.TES.config {{
 
             if (acr is null)
             {
-                if (!string.IsNullOrWhiteSpace(configuration.AcrId))
+                if (string.IsNullOrWhiteSpace(configuration.AcrId))
                 {
-                    acr = await EnsureResourceDataAsync(armClient.GetContainerRegistryResource(new(configuration.AcrId)), r => r.HasData, r => r.GetAsync, cts.Token);
-                    ConsoleEx.WriteLine($"Using existing Container Registry {acr.Id.Name}");
+                    var name = Utility.RandomResourceName(configuration.MainIdentifierPrefix, 25);
+                    acr = await Execute($"Creating Container Registry: {name}...",
+                        async () => (await resourceGroup.GetContainerRegistries().CreateOrUpdateAsync(WaitUntil.Completed, name, new(new(configuration.RegionName), new(Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistrySkuName.Standard)), cts.Token)).Value);
                     await AssignManagedIdAcrPullToResourceAsync(managedIdentity, acr);
                     settings["AcrId"] = acr.Id;
                 }
                 else
                 {
-                    var name = Utility.RandomResourceName(configuration.MainIdentifierPrefix, 25);
-                    acr = await Execute($"Creating Container Registry: {name}...",
-                        async () => (await resourceGroup.GetContainerRegistries().CreateOrUpdateAsync(WaitUntil.Completed, name, new(new(configuration.RegionName), new(Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistrySkuName.Standard)), cts.Token)).Value);
+                    acr = await EnsureResourceDataAsync(armClient.GetContainerRegistryResource(new(configuration.AcrId)), r => r.HasData, r => r.GetAsync, cts.Token);
+                    ConsoleEx.WriteLine($"Using existing Container Registry {acr.Id.Name}");
                     await AssignManagedIdAcrPullToResourceAsync(managedIdentity, acr);
                     settings["AcrId"] = acr.Id;
                 }
@@ -1267,20 +1270,26 @@ backend.providers.TES.config {{
                     return build;
                 }));
 
-                settings["TesImageName"] = $"{acr.Data.LoginServer}/cromwellonazure/tes:{build.Tag}";
-                settings["TriggerServiceImageName"] = $"{acr.Data.LoginServer}/cromwellonazure/triggerservice:{build.Tag}";
+                var tesDigest = (await (client ??= GetClient()).GetArtifact("cromwellonazure/tes", build.Tag.ToString()).GetManifestPropertiesAsync(cts.Token)).Value.Digest;
+                settings["ActualTesImageName"] = $"{acr.Data.LoginServer}/cromwellonazure/tes@{tesDigest}";
+                var triggerserviceDigest = (await (client ??= GetClient()).GetArtifact("cromwellonazure/triggerservice", build.Tag.ToString()).GetManifestPropertiesAsync(cts.Token)).Value.Digest;
+                settings["ActualTriggerServiceImageName"] = $"{acr.Data.LoginServer}/cromwellonazure/triggerservice@{triggerserviceDigest}";
             }
 
-            var cromwellImage = settings["CromwellImageName"];
-
-            if (cromwellImage.StartsWith("broadinstitute/"))
+            if (cromwellUpgraded || string.IsNullOrEmpty(settings["ActualCromwellImageName"]))
             {
+                var cromwellImage = settings["CromwellImageName"];
                 var dockerhubCredientials = configuration.DockerHubUserInfo?.Split(':', 2, StringSplitOptions.None);
-                var targetTag = cromwellImage[(cromwellImage.IndexOf('/') + 1)..];
+                var cromwellOnDocker = cromwellImage.StartsWith("broadinstitute/");
+                // "docker.io", "registry-1.docker.io", "registry.hub.docker.com"
+                var registryAddress = cromwellOnDocker ? "docker.io" : cromwellImage[(cromwellImage.IndexOf('/') + 1)..];
+                var sourceImage = cromwellOnDocker ? cromwellImage : cromwellImage[(registryAddress.Length + 1)..];
+                var targetTag = "cromwell" + sourceImage[(sourceImage.IndexOf(':'))..];
+
                 Azure.ResourceManager.ContainerRegistry.Models.ContainerRegistryImportImageContent import = new(
-                    new(cromwellImage)
+                    new(sourceImage)
                     {
-                        RegistryAddress = "docker.io", // "registry-1.docker.io" // "registry.hub.docker.com"
+                        RegistryAddress = registryAddress,
                         Credentials = dockerhubCredientials is null ? default : new(dockerhubCredientials[1]) { Username = dockerhubCredientials[0] }
                     })
                 {
@@ -1288,10 +1297,17 @@ backend.providers.TES.config {{
                 };
                 import.TargetTags.Add(targetTag);
                 _ = await Execute(
-                    $"Importing Cromwell into {acr.Id.Name}",
+                    $"Importing Cromwell into {acr.Id.Name}...",
                     () => generalRetryPolicy.ExecuteAsync(token => acr.ImportImageAsync(WaitUntil.Completed, import, token), cts.Token));
-                settings["CromwellImageName"] = $"{acr.Data.LoginServer}/{targetTag}";
+
+                var name = targetTag[..targetTag.IndexOf(':')];
+                var tag = targetTag[(targetTag.IndexOf(':') + 1)..];
+                var digest = (await (client ??= GetClient()).GetArtifact(name, tag).GetManifestPropertiesAsync(cts.Token)).Value.Digest;
+                settings["ActualCromwellImageName"] = $"{acr.Data.LoginServer}/{name}@{digest}";
             }
+
+            Azure.Containers.ContainerRegistry.ContainerRegistryClient GetClient()
+                => new(new UriBuilder() { Scheme = Uri.UriSchemeHttps, Host = acr.Data.LoginServer }.Uri, tokenCredential, new() { Audience = cloudEnvironment.ArmEnvironment.Audience, RetryPolicy = GetRetryPolicy(new()) });
         }
 
         private static Dictionary<string, string> GetDefaultValues(string[] files)
@@ -1318,13 +1334,16 @@ backend.providers.TES.config {{
             UpdateSetting(settings, defaults, "DeploymentUpdated", currentTime.ToString("O"), ignoreDefaults: false);
 
             // Process images
+            CopySetting("CromwellImageName", "PreviousCromwellImageName");
             UpdateSetting(settings, defaults, "CromwellImageName",
                 value: string.IsNullOrWhiteSpace(configuration.CromwellImageName) ? (string.IsNullOrWhiteSpace(configuration.CromwellVersion) ? null : configuration.CromwellVersion) : configuration.CromwellImageName,
                 ConvertValue: string.IsNullOrWhiteSpace(configuration.CromwellImageName) ? (v => installedVersion is null ? $"broadinstitute/cromwell:{v}" : $"{GetCromwellImageNameWithoutTag(settings["CromwellImageName"])}:{v}") : null,
                 ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "CromwellImageName", configuration.CromwellVersion is null && configuration.CromwellImageName is null, installedVersion, tagKey: nameof(configuration.CromwellVersion),
                     IsInstalledNotCustomized: tag => GetCromwellImageTag(settings["CromwellImageName"]) <= GetCromwellImageTag(defaults["CromwellImageName"]))); // There's not a good way to detect customization of this property, so default to forced upgrade to the new default.
 
+            CopySetting("TesImageName", "PreviousTesImageName");
             UpdateSetting(settings, defaults, "TesImageName", configuration.TesImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TesImageName", configuration.TesImageName is null, installedVersion));
+            CopySetting("TriggerServiceImageName", "PreviousTriggerServiceImageName");
             UpdateSetting(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName, ignoreDefaults: ImageNameIgnoreDefaults(settings, defaults, "TriggerServiceImageName", configuration.TriggerServiceImageName is null, installedVersion));
 
             // Additional non-personalized settings
@@ -1372,6 +1391,9 @@ backend.providers.TES.config {{
 
             static int GetCromwellImageTag(string imageName)
                 => int.TryParse(imageName?[(imageName.LastIndexOf(':') + 1)..] ?? string.Empty, System.Globalization.NumberStyles.Integer, System.Globalization.NumberFormatInfo.InvariantInfo, out var tag) ? tag : int.MaxValue;
+
+            void CopySetting(string key, string newKey, string @default = null)
+                => settings[newKey] = settings.TryGetValue(key, out var value) ? value : @default;
         }
 
         /// <summary>
@@ -1397,28 +1419,6 @@ backend.providers.TES.config {{
             _ = settings.TryGetValue(key, out var installed);
             _ = defaults.TryGetValue(key, out var @default);
 
-            if (settings.TryGetValue("AcrId", out var acrId) && !string.IsNullOrEmpty(acrId))
-            {
-                var id = ResourceIdentifier.Parse(acrId);
-
-                if (installed.StartsWith($"{id.Name}."))
-                {
-                    @default = $"{installed.Split('/', 2)[0]}/{@default.Split('/', 2)[1]}";
-                }
-            }
-
-            var fieldCount = installedVersion switch
-            {
-                var v when v.Revision != -1 => 4,
-                var v when v.Build != -1 => 3,
-                _ => 2,
-            };
-
-            if (acrId is not null)
-            {
-                fieldCount = Math.Min(fieldCount, 3);
-            }
-
             var defaultPath = @default?[..@default.LastIndexOf(':')];
             var installedTag = installed?[(installed.LastIndexOf(':') + 1)..];
             bool? result;
@@ -1429,7 +1429,7 @@ backend.providers.TES.config {{
                 // Attempt to parse the tag as a version (ignoring any decorations)
                 return Version.TryParse(tag, out var version) &&
                        // Check if the parsed version matches the installed version
-                       version.ToString(fieldCount).Equals(installedVersion.ToString(fieldCount));
+                       version.Equals(installedVersion);
             });
 
             try
@@ -2105,7 +2105,7 @@ backend.providers.TES.config {{
 
         private async Task SetStorageKeySecret(Uri vaultUrl, string secretName, string secretValue)
         {
-            var client = new SecretClient(vaultUrl, tokenCredential);
+            var client = new SecretClient(vaultUrl, tokenCredential, new() { RetryPolicy = GetRetryPolicy(new()) });
             await client.SetSecretAsync(secretName, secretValue, cts.Token);
         }
 
