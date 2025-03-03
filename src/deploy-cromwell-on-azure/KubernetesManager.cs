@@ -493,6 +493,9 @@ namespace CromwellOnAzureDeployer
             var deployment = GetObjectFromConfig(values, "deployment") ?? new Dictionary<string, string>();
 
             values.Config["acrId"] = GetValueOrDefault(settings, "AcrId");
+            values.Config["tesImage"] = GetValueOrDefault(settings, "TesImageName");
+            values.Config["triggerserviceImage"] = GetValueOrDefault(settings, "TriggerServiceImageName");
+            values.Config["cromwellImage"] = GetValueOrDefault(settings, "CromwellImageName");
             values.Config["cromwellOnAzureVersion"] = GetValueOrDefault(settings, "CromwellOnAzureVersion");
             values.Config["azureServicesAuthConnectionString"] = GetValueOrDefault(settings, "AzureServicesAuthConnectionString");
             values.Config["applicationInsightsAccountName"] = GetValueOrDefault(settings, "ApplicationInsightsAccountName");
@@ -519,9 +522,9 @@ namespace CromwellOnAzureDeployer
             values.Config["crossSubscriptionAKSDeployment"] = GetValueOrDefault(settings, "CrossSubscriptionAKSDeployment");
             values.Config["usePostgreSqlSingleServer"] = GetValueOrDefault(settings, "UsePostgreSqlSingleServer");
 
-            values.Images["tes"] = GetValueOrDefault(settings, "TesImageName");
-            values.Images["triggerservice"] = GetValueOrDefault(settings, "TriggerServiceImageName");
-            values.Images["cromwell"] = GetValueOrDefault(settings, "CromwellImageName");
+            values.Images["tes"] = GetValueOrDefault(settings, "ActualTesImageName");
+            values.Images["triggerservice"] = GetValueOrDefault(settings, "ActualTriggerServiceImageName");
+            values.Images["cromwell"] = GetValueOrDefault(settings, "ActualCromwellImageName");
 
             values.Persistence["storageAccount"] = GetValueOrDefault(settings, "DefaultStorageAccountName");
             values.Persistence["executionsContainerName"] = GetValueOrDefault(settings, "ExecutionsContainerName");
@@ -557,8 +560,8 @@ namespace CromwellOnAzureDeployer
             _ = batchScheduling.TryAdd("taskMaxWallClockTimeDays", "7");
 
             // Override previous value if present
-            ReplaceHelmSectionWithValueIfPresent("cromwellMemoryRequest", "CromwellMemoryRequest", values.Service, settings);
-            ReplaceHelmSectionWithValueIfPresent("cromwellMemoryLimit", "CromwellMemoryLimit", values.Service, settings);
+            ReplaceHelmSectionWithSettingIfPresent("cromwellMemoryRequest", "CromwellMemoryRequest", values.Service, settings);
+            ReplaceHelmSectionWithSettingIfPresent("cromwellMemoryLimit", "CromwellMemoryLimit", values.Service, settings);
 
             values.Config["batchAccount"] = batchAccount;
             values.Config["batchNodes"] = batchNodes;
@@ -569,9 +572,9 @@ namespace CromwellOnAzureDeployer
             values.Config["deployment"] = deployment;
         }
 
-        private static void ReplaceHelmSectionWithValueIfPresent(string helmKey, string settingsKey, Dictionary<string, string> helmSection, Dictionary<string, string> settings)
+        private static void ReplaceHelmSectionWithSettingIfPresent(string helmKey, string settingsKey, Dictionary<string, string> helmSection, Dictionary<string, string> settings)
         {
-            if (settings.TryGetValue(settingsKey, out var value))
+            if (settings.TryGetValue(settingsKey, out var value) && value is not null)
             {
                 helmSection[helmKey] = value;
             }
@@ -596,6 +599,9 @@ namespace CromwellOnAzureDeployer
             return new()
             {
                 ["AcrId"] = GetValueOrDefault(values.Config, "acrId") as string,
+                ["TesImageName"] = GetValueOrDefault(values.Config, "tesImage") as string ?? GetValueOrDefault(values.Images, "tes"),
+                ["TriggerServiceImageName"] = GetValueOrDefault(values.Config, "triggerserviceImage") as string ?? GetValueOrDefault(values.Images, "triggerservice"),
+                ["CromwellImageName"] = GetValueOrDefault(values.Config, "cromwellImage") as string ?? GetValueOrDefault(values.Images, "cromwell"),
                 ["CromwellOnAzureVersion"] = GetValueOrDefault(values.Config, "cromwellOnAzureVersion") as string,
                 ["AzureServicesAuthConnectionString"] = GetValueOrDefault(values.Config, "azureServicesAuthConnectionString") as string,
                 ["ApplicationInsightsAccountName"] = GetValueOrDefault(values.Config, "applicationInsightsAccountName") as string,
@@ -622,9 +628,9 @@ namespace CromwellOnAzureDeployer
                 ["CrossSubscriptionAKSDeployment"] = GetValueOrDefault(values.Config, "crossSubscriptionAKSDeployment") as string,
                 ["UsePostgreSqlSingleServer"] = GetValueOrDefault(values.Config, "usePostgreSqlSingleServer") as string,
                 ["ManagedIdentityClientId"] = GetValueOrDefault(values.Identity, "clientId"),
-                ["TesImageName"] = GetValueOrDefault(values.Images, "tes"),
-                ["TriggerServiceImageName"] = GetValueOrDefault(values.Images, "triggerservice"),
-                ["CromwellImageName"] = GetValueOrDefault(values.Images, "cromwell"),
+                ["ActualTesImageName"] = string.IsNullOrEmpty(GetValueOrDefault(values.Config, "tesImage") as string) ? null : GetValueOrDefault(values.Images, "tes"),
+                ["ActualTriggerServiceImageName"] = string.IsNullOrEmpty(GetValueOrDefault(values.Config, "triggerserviceImage") as string) ? null : GetValueOrDefault(values.Images, "triggerservice"),
+                ["ActualCromwellImageName"] = string.IsNullOrEmpty(GetValueOrDefault(values.Config, "cromwellImage") as string) ? null : GetValueOrDefault(values.Images, "cromwell"),
                 ["DefaultStorageAccountName"] = GetValueOrDefault(values.Persistence, "storageAccount"),
                 ["ExecutionsContainerName"] = GetValueOrDefault(values.Persistence, "executionsContainerName"),
                 ["StorageEndpointSuffix"] = GetValueOrDefault(values.Persistence, "storageEndpointSuffix"),
