@@ -97,6 +97,10 @@ namespace CromwellOnAzureDeployer
             return !dontRetry;
         }
 
+        private static readonly AsyncRetryPolicy acrGetDigestRetryPolicy = Policy
+            .Handle<RequestFailedException>(azureException => (int)HttpStatusCode.NotFound == azureException.Status)
+            .WaitAndRetryAsync(30, retryAttempt => TimeSpan.FromSeconds(10));
+
         private static readonly AsyncRetryPolicy generalRetryPolicy = Policy
             .Handle<Exception>()
             .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(1));
@@ -1270,9 +1274,9 @@ backend.providers.TES.config {{
                     return build;
                 }));
 
-                var tesDigest = (await (client ??= GetClient()).GetArtifact("cromwellonazure/tes", build.Tag.ToString()).GetManifestPropertiesAsync(cts.Token)).Value.Digest;
+                var tesDigest = (await acrGetDigestRetryPolicy.ExecuteAsync(token => (client ??= GetClient()).GetArtifact("cromwellonazure/tes", build.Tag.ToString()).GetManifestPropertiesAsync(token), cts.Token)).Value.Digest;
                 settings["ActualTesImageName"] = $"{acr.Data.LoginServer}/cromwellonazure/tes@{tesDigest}";
-                var triggerserviceDigest = (await (client ??= GetClient()).GetArtifact("cromwellonazure/triggerservice", build.Tag.ToString()).GetManifestPropertiesAsync(cts.Token)).Value.Digest;
+                var triggerserviceDigest = (await acrGetDigestRetryPolicy.ExecuteAsync(token => (client ??= GetClient()).GetArtifact("cromwellonazure/triggerservice", build.Tag.ToString()).GetManifestPropertiesAsync(token), cts.Token)).Value.Digest;
                 settings["ActualTriggerServiceImageName"] = $"{acr.Data.LoginServer}/cromwellonazure/triggerservice@{triggerserviceDigest}";
             }
 
@@ -1302,7 +1306,7 @@ backend.providers.TES.config {{
 
                 var name = targetTag[..targetTag.IndexOf(':')];
                 var tag = targetTag[(targetTag.IndexOf(':') + 1)..];
-                var digest = (await (client ??= GetClient()).GetArtifact(name, tag).GetManifestPropertiesAsync(cts.Token)).Value.Digest;
+                var digest = (await acrGetDigestRetryPolicy.ExecuteAsync(token => (client ??= GetClient()).GetArtifact(name, tag).GetManifestPropertiesAsync(token), cts.Token)).Value.Digest;
                 settings["ActualCromwellImageName"] = $"{acr.Data.LoginServer}/{name}@{digest}";
             }
 
