@@ -1223,30 +1223,47 @@ backend.providers.TES.config {{
                 var build = await Execute($"Building TES and TriggerService images on {acr.Id.Name}...",
                 () => buildPushAcrRetryPolicy.ExecuteAsync(async () =>
                 {
-                    AcrBuild build;
+                    AcrBuild build = default;
                     {
-                        IAsyncDisposable tarDisposable = default;
+                        var loadSuccess = false;
 
-                        try
+                        for (var i = 2; i > 0 && !loadSuccess; --i, await Task.Delay(TimeSpan.FromSeconds(1), cts.Token))
                         {
-                            IArchive tar;
+                            IAsyncDisposable tarDisposable = default;
 
-                            if (string.IsNullOrWhiteSpace(configuration.SolutionDir))
+                            try
                             {
-                                tar = AcrBuild.GetGitHubArchive(BuildType.CoA, string.IsNullOrWhiteSpace(configuration.GitHubCommit) ? new Version(targetVersion).ToString(3) : configuration.GitHubCommit, GitHubArchive.GetAccessTokenProvider());
-                                tarDisposable = tar as IAsyncDisposable;
-                            }
-                            else
-                            {
-                                tar = AcrBuild.GetLocalGitArchiveAsync(new(configuration.SolutionDir));
-                            }
+                                IArchive tar;
 
-                            build = new(BuildType.CoA, await tar.GetTagAsync(cts.Token), acr.Id, tokenCredential, new Azure.Containers.ContainerRegistry.ContainerRegistryAudience(azureCloudConfig.ArmEnvironment.Value.Endpoint.AbsoluteUri));
-                            await build.LoadAsync(tar, azureCloudConfig.ArmEnvironment.Value, cts.Token);
-                        }
-                        finally
-                        {
-                            await (tarDisposable?.DisposeAsync() ?? ValueTask.CompletedTask);
+                                if (string.IsNullOrWhiteSpace(configuration.SolutionDir))
+                                {
+                                    tar = AcrBuild.GetGitHubArchive(BuildType.CoA, string.IsNullOrWhiteSpace(configuration.GitHubCommit) ? new Version(targetVersion).ToString(3) : configuration.GitHubCommit, GitHubArchive.GetAccessTokenProvider());
+                                    tarDisposable = tar as IAsyncDisposable;
+                                }
+                                else
+                                {
+                                    tar = AcrBuild.GetLocalGitArchiveAsync(new(configuration.SolutionDir));
+                                }
+
+                                build = new(BuildType.CoA, await tar.GetTagAsync(cts.Token), acr.Id, tokenCredential, new Azure.Containers.ContainerRegistry.ContainerRegistryAudience(azureCloudConfig.ArmEnvironment.Value.Endpoint.AbsoluteUri));
+                                await build.LoadAsync(tar, azureCloudConfig.ArmEnvironment.Value, cts.Token);
+                            }
+                            catch (Microsoft.Kiota.Abstractions.ApiException ae) when ((int)HttpStatusCode.Unauthorized == ae.ResponseStatusCode)
+                            {
+                                if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GITHUB_TOKEN")))
+                                {
+                                    throw new InvalidOperationException("GitHub returned an authentication error.", ae);
+                                }
+                                else
+                                {
+                                    Console.WriteLine("GitHub returned an authentication error. Retrying anonymously.");
+                                    Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
+                                }
+                            }
+                            finally
+                            {
+                                await (tarDisposable?.DisposeAsync() ?? ValueTask.CompletedTask);
+                            }
                         }
                     }
 
