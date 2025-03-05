@@ -83,6 +83,7 @@ namespace CromwellOnAzureDeployer
         private static bool AsyncRetryExceptionPolicy(Exception ex)
         {
             var dontRetry = ex is InvalidOperationException
+                || (ex is Microsoft.Kiota.Abstractions.ApiException ae && (int)HttpStatusCode.Unauthorized == ae.ResponseStatusCode)
                 || (ex is GitHub.Models.ValidationError ve && (int)HttpStatusCode.UnprocessableContent == ve.ResponseStatusCode)
                 || (ex is GitHub.Models.BasicError be &&
                     ((int)HttpStatusCode.Forbidden == be.ResponseStatusCode
@@ -1224,10 +1225,18 @@ backend.providers.TES.config {{
                 () => buildPushAcrRetryPolicy.ExecuteAsync(async () =>
                 {
                     AcrBuild build = default;
-                    {
-                        var loadSuccess = false;
+                    await Policy.Handle<Microsoft.Kiota.Abstractions.ApiException>(ae => (int)HttpStatusCode.Unauthorized == ae.ResponseStatusCode)
+                        .WaitAndRetryAsync([TimeSpan.FromSeconds(1)], (ae, _) =>
+                        {
+                            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GITHUB_TOKEN")))
+                            {
+                                throw new InvalidOperationException("GitHub returned an authentication error.", ae);
+                            }
 
-                        for (var i = 2; i > 0 && !loadSuccess; --i, await Task.Delay(TimeSpan.FromSeconds(1), cts.Token))
+                            Console.WriteLine("GitHub returned an authentication error. Retrying anonymously.");
+                            Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
+                        })
+                        .ExecuteAsync(async token =>
                         {
                             IAsyncDisposable tarDisposable = default;
 
@@ -1237,49 +1246,39 @@ backend.providers.TES.config {{
 
                                 if (string.IsNullOrWhiteSpace(configuration.SolutionDir))
                                 {
-                                    tar = AcrBuild.GetGitHubArchive(BuildType.CoA, string.IsNullOrWhiteSpace(configuration.GitHubCommit) ? new Version(targetVersion).ToString(3) : configuration.GitHubCommit, GitHubArchive.GetAccessTokenProvider());
+                                    tar = GitHubArchive.Create(BuildType.CoA, string.IsNullOrWhiteSpace(configuration.GitHubCommit) ? new Version(targetVersion).ToString(3) : configuration.GitHubCommit, GitHubArchive.GetAccessTokenProvider());
                                     tarDisposable = tar as IAsyncDisposable;
                                 }
                                 else
                                 {
-                                    tar = AcrBuild.GetLocalGitArchiveAsync(new(configuration.SolutionDir));
+                                    tar = LocalGitArchive.Create(new(configuration.SolutionDir));
                                 }
 
-                                build = new(BuildType.CoA, await tar.GetTagAsync(cts.Token), acr.Id, tokenCredential, new Azure.Containers.ContainerRegistry.ContainerRegistryAudience(azureCloudConfig.ArmEnvironment.Value.Endpoint.AbsoluteUri));
-                                await build.LoadAsync(tar, azureCloudConfig.ArmEnvironment.Value, cts.Token);
-                            }
-                            catch (Microsoft.Kiota.Abstractions.ApiException ae) when ((int)HttpStatusCode.Unauthorized == ae.ResponseStatusCode)
-                            {
-                                if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GITHUB_TOKEN")))
-                                {
-                                    throw new InvalidOperationException("GitHub returned an authentication error.", ae);
-                                }
-                                else
-                                {
-                                    Console.WriteLine("GitHub returned an authentication error. Retrying anonymously.");
-                                    Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
-                                }
+                                build = new(BuildType.CoA, await tar.GetTagAsync(token), acr.Id, tokenCredential, new Azure.Containers.ContainerRegistry.ContainerRegistryAudience(azureCloudConfig.ArmEnvironment.Value.Endpoint.AbsoluteUri));
+                                await build.LoadAsync(tar, azureCloudConfig.ArmEnvironment.Value, token);
                             }
                             finally
                             {
                                 await (tarDisposable?.DisposeAsync() ?? ValueTask.CompletedTask);
                             }
-                        }
-                    }
+                        },
+                        cts.Token);
 
-                    var buildSuccess = false;
-
-                    for (var i = 3; i > 0 && !buildSuccess; --i, await Task.Delay(TimeSpan.FromSeconds(1), cts.Token))
-                    {
-                        (buildSuccess, var buildLog) = await build.BuildAsync(configuration.DebugLogging ? LogType.Interactive : LogType.CapturedOnError, cts.Token);
-
-                        if (!buildSuccess && !string.IsNullOrWhiteSpace(buildLog))
+                    if (!await Policy
+                        .HandleResult(false)
+                        .WaitAndRetryAsync(Enumerable.Repeat(TimeSpan.FromSeconds(1), 2), (_, _) => Console.WriteLine("Retrying build."))
+                        .ExecuteAsync(async token =>
                         {
-                            ConsoleEx.WriteLine(buildLog);
-                        }
-                    }
+                            var (buildSuccess, buildLog) = await build.BuildAsync(configuration.DebugLogging ? LogType.Interactive : LogType.CapturedOnError, token);
 
-                    if (!buildSuccess)
+                            if (!buildSuccess && !string.IsNullOrWhiteSpace(buildLog))
+                            {
+                                ConsoleEx.WriteLine(buildLog);
+                            }
+
+                            return buildSuccess;
+                        },
+                        cts.Token))
                     {
                         throw new InvalidOperationException("Build failed.");
                     }
