@@ -2227,7 +2227,7 @@ backend.providers.TES.config {{
 
         private async Task<Microsoft.Graph.Models.User> GetUserObjectAsync()
         {
-	    // TODO: async blocking
+            // TODO: async blocking
             if (_me is null)
             {
                 Dictionary<Uri, string> nationalClouds = new(
