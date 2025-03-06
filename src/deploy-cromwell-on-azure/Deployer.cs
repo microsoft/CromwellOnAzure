@@ -1729,38 +1729,49 @@ backend.providers.TES.config {{
             var adminGroupObjectIds = managedCluster.Data.AadProfile?.AdminGroupObjectIds ?? [];
             adminGroupObjectIds = adminGroupObjectIds.Count != 0 ? adminGroupObjectIds : (string.IsNullOrWhiteSpace(configuration.AadGroupIds) ? [] : configuration.AadGroupIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Guid.Parse).ToList());
 
+            Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType type;
+            IEnumerable<Guid> principalIds;
+            string admins;
+            Func<Exception, Exception> transformException = default;
+
             if (adminGroupObjectIds.Count == 0)
             {
-                var user = await GetUserObjectAsync();
-
-                if (user is not null)
+                admins = "deployer user";
+                transformException = new(e =>
                 {
-                    await AssignRoleToResourceAsync(
-                        [new Guid(user.Id)],
-                        Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User,
-                        managedCluster,
-                        roleDefinitionId,
-                        message.Replace(@"{Admins}", "deployer user"),
-                        transformException: e =>
-                        {
-                            if (e is RequestFailedException ex && ex.Status == 403 && "AuthorizationFailed".Equals(ex.ErrorCode, StringComparison.OrdinalIgnoreCase))
-                            {
-                                return new System.ComponentModel.WarningException("Insufficient authorization for role assignment. Skipping role assignment to AKS cluster resource scope.", e);
-                            }
+                    if (e is RequestFailedException ex && ex.Status == 403 && "AuthorizationFailed".Equals(ex.ErrorCode, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new System.ComponentModel.WarningException("Insufficient authorization for role assignment. Skipping role assignment to AKS cluster resource scope.", e);
+                    }
 
-                            return e;
-                        });
+                    return e;
+                });
+
+                if (string.IsNullOrWhiteSpace(configuration.ServicePrincipalId))
+                {
+                    principalIds = [new(configuration.ServicePrincipalId)];
+                    type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.ServicePrincipal;
+                }
+                else
+                {
+                    var user = (await GetUserObjectAsync()) ?? throw new System.ComponentModel.WarningException($"The {admins} could not be determined. Skipping role assignment to AKS cluster resource scope.");
+                    principalIds = [new(user.Id)];
+                    type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.User;
                 }
             }
             else
             {
-                await AssignRoleToResourceAsync(
-                    adminGroupObjectIds,
-                    Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.Group,
-                    managedCluster,
-                    roleDefinitionId,
-                    message.Replace(@"{Admins}", "designated group"));
+                admins = "designated groups";
+                principalIds = adminGroupObjectIds;
+                type = Azure.ResourceManager.Authorization.Models.RoleManagementPrincipalType.Group;
             }
+
+            await AssignRoleToResourceAsync(
+                principalIds,
+                type,
+                managedCluster,
+                roleDefinitionId,
+                message.Replace(@"{Admins}", admins));
         }
 
         private Task<StorageAccountResource> CreateStorageAccountAsync()
@@ -2216,6 +2227,7 @@ backend.providers.TES.config {{
 
         private async Task<Microsoft.Graph.Models.User> GetUserObjectAsync()
         {
+            // TODO: async blocking
             if (_me is null)
             {
                 Dictionary<Uri, string> nationalClouds = new(
@@ -2226,27 +2238,22 @@ backend.providers.TES.config {{
                     new(ArmEnvironment.AzureGovernment.Endpoint, GraphClientFactory.USGOV_Cloud), // TODO: when should we return GraphClientFactory.USGOV_DOD_Cloud?
                 ]);
 
-                string baseUrl;
-                {
-                    using var client = GraphClientFactory.Create(nationalCloud: nationalClouds.TryGetValue(cloudEnvironment.ArmEnvironment.Endpoint, out var value) ? value : GraphClientFactory.Global_Cloud);
-                    baseUrl = client.BaseAddress.AbsoluteUri;
-                }
-                {
-                    using var client = new GraphServiceClient(tokenCredential, baseUrl: baseUrl);
+                using var httpClient = GraphClientFactory.Create(nationalCloud: nationalClouds.TryGetValue(cloudEnvironment.ArmEnvironment.Endpoint, out var value) ? value : GraphClientFactory.Global_Cloud);
+                var scope = new UriBuilder(httpClient.BaseAddress) { Path = ".default" };
+                using var client = new GraphServiceClient(httpClient, tokenCredential, scopes: [scope.Uri.AbsoluteUri], baseUrl: httpClient.BaseAddress.AbsoluteUri);
 
-                    try
-                    {
-                        _me = await client.Me.GetAsync(cancellationToken: cts.Token);
-                    }
-                    catch (Azure.Identity.AuthenticationFailedException)
-                    {
-                        _me = null;
-                    }
-                    catch (Microsoft.Graph.Models.ODataErrors.ODataError ex) when ("BadRequest".Equals(ex.Error?.Code, StringComparison.OrdinalIgnoreCase) && ex.Message.Contains("/me", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // "/me request is only valid with delegated authentication flow."
-                        _me = null;
-                    }
+                try
+                {
+                    _me = await client.Me.GetAsync(cancellationToken: cts.Token);
+                }
+                catch (AuthenticationFailedException afe)
+                {
+                    Console.WriteLine($"AuthenticationFailedException: {afe.Message}");
+                }
+                catch (Microsoft.Graph.Models.ODataErrors.ODataError ex) when ("BadRequest".Equals(ex.Error?.Code, StringComparison.OrdinalIgnoreCase) && ex.Message.Contains("/me", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"ODataError: {ex.Message}");
+                    // "/me request is only valid with delegated authentication flow."
                 }
             }
 
