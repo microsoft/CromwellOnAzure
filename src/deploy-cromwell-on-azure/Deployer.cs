@@ -1290,9 +1290,9 @@ backend.providers.TES.config {{
                     return build;
                 }));
 
-                var tesDigest = (await acrGetDigestRetryPolicy.ExecuteAsync(token => (client ??= GetClient()).GetArtifact("cromwellonazure/tes", build.Tag.ToString()).GetManifestPropertiesAsync(token), cts.Token)).Value.Digest;
+                var tesDigest = (await acrGetDigestRetryPolicy.ExecuteAsync(token => (client ??= GetClient()).GetArtifact("cromwellonazure/tes", build.Tag).GetManifestPropertiesAsync(token), cts.Token)).Value.Digest;
                 settings["ActualTesImageName"] = $"{acr.Data.LoginServer}/cromwellonazure/tes@{tesDigest}";
-                var triggerserviceDigest = (await acrGetDigestRetryPolicy.ExecuteAsync(token => (client ??= GetClient()).GetArtifact("cromwellonazure/triggerservice", build.Tag.ToString()).GetManifestPropertiesAsync(token), cts.Token)).Value.Digest;
+                var triggerserviceDigest = (await acrGetDigestRetryPolicy.ExecuteAsync(token => (client ??= GetClient()).GetArtifact("cromwellonazure/triggerservice", build.Tag).GetManifestPropertiesAsync(token), cts.Token)).Value.Digest;
                 settings["ActualTriggerServiceImageName"] = $"{acr.Data.LoginServer}/cromwellonazure/triggerservice@{triggerserviceDigest}";
             }
 

@@ -5,5 +5,7 @@
     <Product>Cromwell on Azure</Product>
     <Copyright>Copyright © Microsoft Corporation</Copyright>
     <VersionPrefix>$([System.Version]::Parse($(AssemblyVersion)).Major).$([System.Version]::Parse($(AssemblyVersion)).Minor).$([System.Version]::Parse($(AssemblyVersion)).Build)</VersionPrefix>
+    <!-- Do not set VersionSuffix in main or any PR into main. It is the prerelease label. -->
+    <VersionSuffix>beta</VersionSuffix>
   </PropertyGroup>
 </Project>
