@@ -1,1 +1,1 @@
-﻿CromwellOnAzureVersion=6.0.0
+﻿CromwellOnAzureVersion=6.1.0
