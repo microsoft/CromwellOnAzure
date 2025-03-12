@@ -1258,7 +1258,7 @@ backend.providers.TES.config {{
                                     tar = LocalGitArchive.Create(new(configuration.SolutionDir));
                                 }
 
-                                build = new(BuildType.CoA, await tar.GetTagAsync(token), acr.Id, tokenCredential, new Azure.Containers.ContainerRegistry.ContainerRegistryAudience(azureCloudConfig.ArmEnvironment.Value.Endpoint.AbsoluteUri));
+                                build = new(BuildType.CoA, await tar.GetTagAsync(token, allowAnyPrerelease: true), acr.Id, tokenCredential, new Azure.Containers.ContainerRegistry.ContainerRegistryAudience(azureCloudConfig.ArmEnvironment.Value.Endpoint.AbsoluteUri));
                                 await build.LoadAsync(tar, azureCloudConfig.ArmEnvironment.Value, token);
                             }
                             finally
