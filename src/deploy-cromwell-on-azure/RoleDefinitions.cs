@@ -15,11 +15,14 @@ namespace CromwellOnAzureDeployer
             = ImmutableDictionary<string, GuidAndDisplayName>.Empty.AddRange(
                 // Add in order of https://learn.microsoft.com/azure/role-based-access-control/built-in-roles, followed by any custom definitions (in a separate subclass).
                 [
-                    // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/general#contributor
-                    new($"{nameof(General)}.{nameof(General.Contributor)}", new(new("b24988ac-6180-42a0-ab88-20f7382dd24c"), "Contributor")),
+                    // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/privileged#contributor
+                    new($"{nameof(Privileged)}.{nameof(Privileged.Contributor)}", new(new("b24988ac-6180-42a0-ab88-20f7382dd24c"), "Contributor")),
 
-                    // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/general#owner
-                    new($"{nameof(General)}.{nameof(General.Owner)}", new(new("8e3af657-a8ff-443c-a75c-2fe8c4bcb635"), "Grants full access to manage all resources, including the ability to assign roles in Azure RBAC.")),
+                    // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/privileged#owner
+                    new($"{nameof(Privileged)}.{nameof(Privileged.Owner)}", new(new("8e3af657-a8ff-443c-a75c-2fe8c4bcb635"), "Grants full access to manage all resources, including the ability to assign roles in Azure RBAC.")),
+
+                    // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/privileged#user-access-administrator
+                    new($"{nameof(Privileged)}.{nameof(Privileged.UserAccessAdministrator)}", new(new("18d7d88d-d35e-4fb5-a5c3-7773c20a72d9"), "Lets you manage user access to Azure resources.")),
 
                     // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/networking#network-contributor
                     new($"{nameof(Networking)}.{nameof(Networking.NetworkContributor)}", new(new("4d97b98b-1d4f-4787-a291-c67834d212e7"), "Network Contributor")),
@@ -43,17 +46,22 @@ namespace CromwellOnAzureDeployer
         private static readonly ImmutableDictionary<Guid, string> _displayNames
             = _roleDefinitions.Values.ToImmutableDictionary(t => t.Name, t => t.DisplayName);
 
-        internal static class General
+        internal static class Privileged
         {
             /// <summary>
             /// Grants full access to manage all resources, but does not allow you to assign roles in Azure RBAC, manage assignments in Azure Blueprints, or share image galleries.
             /// </summary>
-            internal static Guid Contributor { get; } = _roleDefinitions[$"{nameof(General)}.{nameof(Contributor)}"].Name;
+            internal static Guid Contributor { get; } = _roleDefinitions[$"{nameof(Privileged)}.{nameof(Contributor)}"].Name;
 
             /// <summary>
             /// Grants full access to manage all resources, including the ability to assign roles in Azure RBAC.
             /// </summary>
-            internal static Guid Owner { get; } = _roleDefinitions[$"{nameof(General)}.{nameof(Owner)}"].Name;
+            internal static Guid Owner { get; } = _roleDefinitions[$"{nameof(Privileged)}.{nameof(Owner)}"].Name;
+
+            /// <summary>
+            /// Lets you manage user access to Azure resources.
+            /// </summary>
+            internal static Guid UserAccessAdministrator { get; } = _roleDefinitions[$"{nameof(Privileged)}.{nameof(UserAccessAdministrator)}"].Name;
         }
 
         internal static class Networking
