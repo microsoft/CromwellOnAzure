@@ -1182,7 +1182,7 @@ backend.providers.TES.config {{
                 }
                 else
                 {
-                    canReturnEarly = sameVersionUpgrade && !tesUpgraded && !triggerServiceUpgraded && !string.IsNullOrEmpty(settings["ActualTesImageName"]) && !string.IsNullOrEmpty(settings["ActualTriggerServiceImageName"]);
+                    canReturnEarly = !acrRequested && sameVersionUpgrade && !tesUpgraded && !triggerServiceUpgraded && !string.IsNullOrEmpty(settings["ActualTesImageName"]) && !string.IsNullOrEmpty(settings["ActualTriggerServiceImageName"]);
                 }
 
                 if (cromwellUpgraded || string.IsNullOrEmpty(settings["ActualCromwellImageName"]))
